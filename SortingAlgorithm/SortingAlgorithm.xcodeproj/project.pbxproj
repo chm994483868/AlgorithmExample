@@ -15,6 +15,7 @@
 		8E4C4C8F23B3B0890089E782 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 8E4C4C8D23B3B0890089E782 /* LaunchScreen.storyboard */; };
 		8E4C4C9823B3B3D20089E782 /* Bubbling.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E4C4C9723B3B3D20089E782 /* Bubbling.swift */; };
 		D2CAF87C23B9C96C00BFC04B /* QuickSort.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D2CAF87A23B9C96C00BFC04B /* QuickSort.cpp */; };
+		D2CAF88723BB1BBD00BFC04B /* InsertionSort.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2CAF88623BB1BBD00BFC04B /* InsertionSort.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -30,6 +31,7 @@
 		D2CAF87923B9C96C00BFC04B /* SortingAlgorithm-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "SortingAlgorithm-Bridging-Header.h"; sourceTree = "<group>"; };
 		D2CAF87A23B9C96C00BFC04B /* QuickSort.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = QuickSort.cpp; sourceTree = "<group>"; };
 		D2CAF87B23B9C96C00BFC04B /* QuickSort.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = QuickSort.hpp; sourceTree = "<group>"; };
+		D2CAF88623BB1BBD00BFC04B /* InsertionSort.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InsertionSort.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -63,6 +65,7 @@
 			isa = PBXGroup;
 			children = (
 				D2CAF87823B9C91200BFC04B /* 快速排序 */,
+				D2CAF88523BB1B8A00BFC04B /* 插入排序 */,
 				8E4C4C9623B3B39F0089E782 /* 冒泡排序 */,
 				8E4C4C8223B3B0870089E782 /* AppDelegate.swift */,
 				8E4C4C8423B3B0870089E782 /* SceneDelegate.swift */,
@@ -91,6 +94,14 @@
 				D2CAF87923B9C96C00BFC04B /* SortingAlgorithm-Bridging-Header.h */,
 			);
 			path = "快速排序";
+			sourceTree = "<group>";
+		};
+		D2CAF88523BB1B8A00BFC04B /* 插入排序 */ = {
+			isa = PBXGroup;
+			children = (
+				D2CAF88623BB1BBD00BFC04B /* InsertionSort.swift */,
+			);
+			path = "插入排序";
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -168,6 +179,7 @@
 				8E4C4C8723B3B0870089E782 /* ViewController.swift in Sources */,
 				8E4C4C8323B3B0870089E782 /* AppDelegate.swift in Sources */,
 				8E4C4C9823B3B3D20089E782 /* Bubbling.swift in Sources */,
+				D2CAF88723BB1BBD00BFC04B /* InsertionSort.swift in Sources */,
 				D2CAF87C23B9C96C00BFC04B /* QuickSort.cpp in Sources */,
 				8E4C4C8523B3B0870089E782 /* SceneDelegate.swift in Sources */,
 			);
