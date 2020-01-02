@@ -14,16 +14,14 @@ class ViewController: UIViewController {
         super.viewDidLoad()
         // Do any additional setup after loading the view.
         
-//        var array =  [8, 1, 4, 6, 2, 3, 5, 7]
-//        print("插入排序前: \(array)")
-//        insertionSort(&array)
-//        array.insertionSort()
-//        let resultArr = insertionSort1(array)
-//        bubbling(&array)
-//        let resultArr = bubbling1(array)
-//        array.bubbling()
-//        print("插入排序后: \(array)")
-//        print("插入排序后 resultArr : \(resultArr)")
+        let array =  [8, 1, 4, 6, 2, 3, 5, 7, 1]
+        
+        print("希尔排序前: \(array)")
+//        array.shellSort()
+//        shellSort(&array)
+        let array1 = shellSort1(array)
+        print("希尔排序后: \(array)")
+        print("希尔排序后: \(array1)")
     }
 }
 

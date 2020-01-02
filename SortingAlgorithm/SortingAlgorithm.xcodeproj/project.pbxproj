@@ -16,6 +16,7 @@
 		8E4C4C9823B3B3D20089E782 /* Bubbling.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E4C4C9723B3B3D20089E782 /* Bubbling.swift */; };
 		D2CAF87C23B9C96C00BFC04B /* QuickSort.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D2CAF87A23B9C96C00BFC04B /* QuickSort.cpp */; };
 		D2CAF88723BB1BBD00BFC04B /* InsertionSort.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2CAF88623BB1BBD00BFC04B /* InsertionSort.swift */; };
+		D2CAF89123BDBEBF00BFC04B /* ShellSort.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2CAF89023BDBEBE00BFC04B /* ShellSort.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -32,6 +33,7 @@
 		D2CAF87A23B9C96C00BFC04B /* QuickSort.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = QuickSort.cpp; sourceTree = "<group>"; };
 		D2CAF87B23B9C96C00BFC04B /* QuickSort.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = QuickSort.hpp; sourceTree = "<group>"; };
 		D2CAF88623BB1BBD00BFC04B /* InsertionSort.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InsertionSort.swift; sourceTree = "<group>"; };
+		D2CAF89023BDBEBE00BFC04B /* ShellSort.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellSort.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -64,6 +66,7 @@
 		8E4C4C8123B3B0870089E782 /* SortingAlgorithm */ = {
 			isa = PBXGroup;
 			children = (
+				D2CAF88F23BDBE6100BFC04B /* 希尔排序 */,
 				D2CAF87823B9C91200BFC04B /* 快速排序 */,
 				D2CAF88523BB1B8A00BFC04B /* 插入排序 */,
 				8E4C4C9623B3B39F0089E782 /* 冒泡排序 */,
@@ -102,6 +105,14 @@
 				D2CAF88623BB1BBD00BFC04B /* InsertionSort.swift */,
 			);
 			path = "插入排序";
+			sourceTree = "<group>";
+		};
+		D2CAF88F23BDBE6100BFC04B /* 希尔排序 */ = {
+			isa = PBXGroup;
+			children = (
+				D2CAF89023BDBEBE00BFC04B /* ShellSort.swift */,
+			);
+			path = "希尔排序";
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -180,6 +191,7 @@
 				8E4C4C8323B3B0870089E782 /* AppDelegate.swift in Sources */,
 				8E4C4C9823B3B3D20089E782 /* Bubbling.swift in Sources */,
 				D2CAF88723BB1BBD00BFC04B /* InsertionSort.swift in Sources */,
+				D2CAF89123BDBEBF00BFC04B /* ShellSort.swift in Sources */,
 				D2CAF87C23B9C96C00BFC04B /* QuickSort.cpp in Sources */,
 				8E4C4C8523B3B0870089E782 /* SceneDelegate.swift in Sources */,
 			);

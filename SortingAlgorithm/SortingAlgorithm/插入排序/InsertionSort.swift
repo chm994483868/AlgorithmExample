@@ -14,7 +14,7 @@ func insertionSort<T>(_ nums: inout [T]) where T: Comparable {
     
     for i in 1..<nums.count {
         preindex = i - 1 // 当前 index 的前一个 index，即已排完序部分的 endIndex
-        // 必须记录下这个元素，不然会被覆盖,(如果大于拍完序部分的最大值，则原封不动，如果不是则要移动已排完序部分，为当前元素找位置)
+        // 必须记录下这个元素，不然会被覆盖,(如果大于排完序部分的最大值，则原封不动，如果不是则要移动已排完序部分，为当前元素找位置)
         current = nums[i]
         // 逆序遍历已经排序好的数组
         // 如果当前元素小于排序好的元素，就把排序好的元素往后移动一个位置
@@ -61,7 +61,7 @@ public extension Array where Element: Comparable {
         
         for i in 1..<self.count {
             preindex = i - 1 // 当前 index 的前一个 index，即已排完序部分的 endIndex
-            // 必须记录下这个元素，不然会被覆盖,(如果大于拍完序部分的最大值，则原封不动，如果不是则要移动已排完序部分，为当前元素找位置)
+            // 必须记录下这个元素，不然会被覆盖,(如果大于排完序部分的最大值，则原封不动，如果不是则要移动已排完序部分，为当前元素找位置)
             current = self[i]
             // 逆序遍历已经排序好的数组
             // 如果当前元素小于排序好的元素，就把排序好的元素往后移动一个位置
@@ -70,7 +70,7 @@ public extension Array where Element: Comparable {
                 self[preindex + 1] = self[preindex]
                 preindex -= 1
             }
-            
+
             // 找到合适的位置，把当前的元素插入
             self[preindex + 1] = current
         }
