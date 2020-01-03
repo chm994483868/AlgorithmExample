@@ -11,8 +11,8 @@
 
 #include <stdio.h>
 
-void quickSort(int s[], int l, int r) {
-    if (l < r) {
+void quickSortWithC(int s[], int l, int r) {
+    if (l < r) { // 递归退出条件
         int i = l, j = r, x = s[l];
         
         while (i < j) {
@@ -21,7 +21,7 @@ void quickSort(int s[], int l, int r) {
             // 将 s[j] 填到 s[i] 中，s[j] 就形成了一个新的坑
             if (i < j) s[i++] = s[j];
             
-            // 从左往右找大于活等于 x 的数来填 s[j]
+            // 从左往右找大于或等于 x 的数来填 s[j]
             while (i < j && s[i] < x) i++;
             // 将 s[i] 填到 s[j] 中，s[i] 就形成了一个新坑
             if (i < j) s[j--] = s[i];
@@ -30,8 +30,8 @@ void quickSort(int s[], int l, int r) {
         // 退出时，i 等于 j。将 x 填到这个坑中。
         s[i] = x;
         
-        quickSort(s, l, i - 1);
-        quickSort(s, i + 1, r);
+        quickSortWithC(s, l, i - 1);
+        quickSortWithC(s, i + 1, r);
     }
 }
 

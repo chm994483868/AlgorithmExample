@@ -17,6 +17,8 @@
 		D2CAF87C23B9C96C00BFC04B /* QuickSort.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D2CAF87A23B9C96C00BFC04B /* QuickSort.cpp */; };
 		D2CAF88723BB1BBD00BFC04B /* InsertionSort.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2CAF88623BB1BBD00BFC04B /* InsertionSort.swift */; };
 		D2CAF89123BDBEBF00BFC04B /* ShellSort.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2CAF89023BDBEBE00BFC04B /* ShellSort.swift */; };
+		D2CAF89623BEE9F600BFC04B /* QuickSort.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2CAF89523BEE9F600BFC04B /* QuickSort.swift */; };
+		D2CAF89A23BF30BA00BFC04B /* MergeSort.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2CAF89923BF30BA00BFC04B /* MergeSort.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -34,6 +36,9 @@
 		D2CAF87B23B9C96C00BFC04B /* QuickSort.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = QuickSort.hpp; sourceTree = "<group>"; };
 		D2CAF88623BB1BBD00BFC04B /* InsertionSort.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InsertionSort.swift; sourceTree = "<group>"; };
 		D2CAF89023BDBEBE00BFC04B /* ShellSort.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellSort.swift; sourceTree = "<group>"; };
+		D2CAF89523BEE9F600BFC04B /* QuickSort.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickSort.swift; sourceTree = "<group>"; };
+		D2CAF89723BEFACA00BFC04B /* CBridgeing.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = CBridgeing.h; sourceTree = "<group>"; };
+		D2CAF89923BF30BA00BFC04B /* MergeSort.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MergeSort.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -66,13 +71,16 @@
 		8E4C4C8123B3B0870089E782 /* SortingAlgorithm */ = {
 			isa = PBXGroup;
 			children = (
-				D2CAF88F23BDBE6100BFC04B /* 希尔排序 */,
+				D2CAF89823BF2D0800BFC04B /* 归并排序 */,
 				D2CAF87823B9C91200BFC04B /* 快速排序 */,
+				D2CAF88F23BDBE6100BFC04B /* 希尔排序 */,
 				D2CAF88523BB1B8A00BFC04B /* 插入排序 */,
 				8E4C4C9623B3B39F0089E782 /* 冒泡排序 */,
 				8E4C4C8223B3B0870089E782 /* AppDelegate.swift */,
 				8E4C4C8423B3B0870089E782 /* SceneDelegate.swift */,
 				8E4C4C8623B3B0870089E782 /* ViewController.swift */,
+				D2CAF89723BEFACA00BFC04B /* CBridgeing.h */,
+				D2CAF87923B9C96C00BFC04B /* SortingAlgorithm-Bridging-Header.h */,
 				8E4C4C8823B3B0870089E782 /* Main.storyboard */,
 				8E4C4C8B23B3B0890089E782 /* Assets.xcassets */,
 				8E4C4C8D23B3B0890089E782 /* LaunchScreen.storyboard */,
@@ -94,7 +102,7 @@
 			children = (
 				D2CAF87A23B9C96C00BFC04B /* QuickSort.cpp */,
 				D2CAF87B23B9C96C00BFC04B /* QuickSort.hpp */,
-				D2CAF87923B9C96C00BFC04B /* SortingAlgorithm-Bridging-Header.h */,
+				D2CAF89523BEE9F600BFC04B /* QuickSort.swift */,
 			);
 			path = "快速排序";
 			sourceTree = "<group>";
@@ -113,6 +121,14 @@
 				D2CAF89023BDBEBE00BFC04B /* ShellSort.swift */,
 			);
 			path = "希尔排序";
+			sourceTree = "<group>";
+		};
+		D2CAF89823BF2D0800BFC04B /* 归并排序 */ = {
+			isa = PBXGroup;
+			children = (
+				D2CAF89923BF30BA00BFC04B /* MergeSort.swift */,
+			);
+			path = "归并排序";
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -193,7 +209,9 @@
 				D2CAF88723BB1BBD00BFC04B /* InsertionSort.swift in Sources */,
 				D2CAF89123BDBEBF00BFC04B /* ShellSort.swift in Sources */,
 				D2CAF87C23B9C96C00BFC04B /* QuickSort.cpp in Sources */,
+				D2CAF89A23BF30BA00BFC04B /* MergeSort.swift in Sources */,
 				8E4C4C8523B3B0870089E782 /* SceneDelegate.swift in Sources */,
+				D2CAF89623BEE9F600BFC04B /* QuickSort.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -346,7 +364,7 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = HMCDeveloper.SortingAlgorithm;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				SWIFT_OBJC_BRIDGING_HEADER = "SortingAlgorithm/快速排序/SortingAlgorithm-Bridging-Header.h";
+				SWIFT_OBJC_BRIDGING_HEADER = "SortingAlgorithm/SortingAlgorithm-Bridging-Header.h";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -366,7 +384,7 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = HMCDeveloper.SortingAlgorithm;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				SWIFT_OBJC_BRIDGING_HEADER = "SortingAlgorithm/快速排序/SortingAlgorithm-Bridging-Header.h";
+				SWIFT_OBJC_BRIDGING_HEADER = "SortingAlgorithm/SortingAlgorithm-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
