@@ -2,6 +2,6 @@
 <Workspace
    version = "1.0">
    <FileRef
-      location = "self:SortingAlgorithm.xcodeproj">
+      location = "self:Algorithm_C.xcodeproj">
    </FileRef>
 </Workspace>
