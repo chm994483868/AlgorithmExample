@@ -716,6 +716,7 @@ void AddToTail_Review(ListNode_struct** pHead, int value) {
 
 // 从链表中找到第一个含有某值的节点并删除该节点的代码
 void RemoveNode(ListNode_struct** pHead, int value) {
+    // 如果传入了一个空指针或者传入的指针指向空，则可以直接 return 了
     if (pHead == nullptr || *pHead == nullptr) {
         return;
     }
@@ -725,10 +726,43 @@ void RemoveNode(ListNode_struct** pHead, int value) {
     
     if ((*pHead)->m_nValue == value) {
         // 如果头节点就是要删除的节点
+        pToBeDeleted = *pHead; // 记录要删除的节点
+        *pHead = (*pHead)->m_pNext; // 删除
+    } else {
+        // 遍历寻找第一个与 value 值相等的节点
+        ListNode_struct* pNode = *pHead;
+        while (pNode->m_pNext != nullptr && pNode->m_pNext->m_nValue != value) {
+            pNode = pNode->m_pNext;
+        }
+        
+        // 如果找到相等则删除该节点
+        if (pNode->m_pNext != nullptr && pNode->m_pNext->m_nValue == value) {
+            pToBeDeleted = pNode->m_pNext; // 记录要删除的节点
+            
+            pNode->m_pNext = pNode->m_pNext->m_pNext; // 删除
+        }
+    }
+    
+    if (pToBeDeleted != nullptr) { // 释放内存
+        delete pToBeDeleted;
+        pToBeDeleted = nullptr;
+    }
+}
+
+void RemoveNode_Review(ListNode_struct** pHead, int value) {
+    if (pHead == nullptr || *pHead == nullptr) {
+        return;
+    }
+    
+    ListNode_struct* pToBeDeleted = nullptr;
+    
+    if ((*pHead)->m_nValue == value) {
         pToBeDeleted = *pHead;
+        
         *pHead = (*pHead)->m_pNext;
     } else {
         ListNode_struct* pNode = *pHead;
+        
         while (pNode->m_pNext != nullptr && pNode->m_pNext->m_nValue != value) {
             pNode = pNode->m_pNext;
         }
@@ -743,4 +777,131 @@ void RemoveNode(ListNode_struct** pHead, int value) {
         delete pToBeDeleted;
         pToBeDeleted = nullptr;
     }
+}
+
+// 从尾到头打印链表 (递归在本质上就是一个栈结构)
+void PrintListReversingly_Iteratively(ListNode_struct* pHead) {
+    if (pHead == nullptr)
+        return;
+    
+    std::stack<ListNode_struct*> nodes;
+    
+    ListNode_struct* pNode = pHead;
+    while (pNode != nullptr) {
+        nodes.push(pNode);
+        pNode = pNode->m_pNext;
+    }
+    
+    while (!nodes.empty()) {
+        pNode = nodes.top();
+        printf("%d\t", pNode->m_nValue);
+        nodes.pop();
+    }
+}
+
+void PrintListReversingly_Iteratively_Review(ListNode_struct* pHead) {
+    if (pHead == nullptr)
+        return;
+    
+    std::stack<ListNode_struct*> nodes;
+    
+    ListNode_struct* pNode = pHead;
+    while (pNode != nullptr) {
+        nodes.push(pNode);
+        pNode = pNode->m_pNext;
+    }
+    
+    while (!nodes.empty()) {
+        pNode = nodes.top();
+        printf("%d\t", pNode->m_nValue);
+        nodes.pop();
+    }
+}
+
+void PrintListReversingly_Recursively(ListNode_struct* pHead) {
+    if (pHead != nullptr) {
+        
+        if (pHead->m_pNext != nullptr) {
+            PrintListReversingly_Recursively(pHead->m_pNext);
+        }
+        
+        printf("%d\t", pHead->m_nValue);
+    }
+}
+
+void PrintListReversingly_Recursively_Review(ListNode_struct* pHead) {
+    if (pHead != nullptr) {
+        if (pHead->m_pNext != nullptr) {
+            PrintListReversingly_Recursively_Review(pHead->m_pNext);
+        }
+        
+        printf("%d\t", pHead->m_nValue);
+    }
+}
+//             10
+//          /      \
+//         6        14
+//       /   \     /   \
+//      4     8   12   16
+//
+// 前序(根左右): 10, 6, 4, 8, 14, 12, 16
+// 中序(左根右): 4, 6, 8, 10, 12, 14, 16
+// 后序(左右根): 4, 8, 6, 12, 16, 14, 10
+// 
+
+struct BinaryTreeNode {
+    int m_nValue;
+    BinaryTreeNode* m_pLeft;
+    BinaryTreeNode* m_pRight;
+};
+
+BinaryTreeNode* ConstructCore(int* startPreorder, int* endPreorder, int* startInorder, int* endInorder);
+
+BinaryTreeNode* Construct(int* preorder, int* inorder, int length) {
+    if (preorder == nullptr || inorder == nullptr || length <= 0) {
+        return nullptr;
+    }
+    
+    return ConstructCore(preorder, preorder + length - 1, inorder, inorder + length - 1);
+}
+
+BinaryTreeNode* ConstructCore(int* startPreorder, int* endPreorder, int* startInorder, int* endInorder) {
+    // 前序遍历序列的第一个数字是根节点的值
+    int rootValue = startPreorder[0];
+    BinaryTreeNode* root = new BinaryTreeNode();
+    root->m_nValue = rootValue;
+    root->m_pLeft = root->m_pRight = nullptr;
+    
+    if (startPreorder == endPreorder) {
+        if (startInorder == endInorder && *startPreorder == *startInorder) {
+            return root;
+        } else {
+//            throw std::exception("Invalid input.");
+            throw std::exception();
+        }
+    }
+    
+    // 在中序遍历序列中找到根节点的值
+    int* rootInorder = startInorder;
+    while (rootInorder <= endInorder && *rootInorder != rootValue) {
+        ++rootInorder;
+    }
+    
+    if (rootInorder == endInorder && *rootInorder != rootValue) {
+        throw std::exception();
+    }
+    
+    long leftLength = rootInorder - startInorder;
+    int* leftPreorderEnd = startPreorder + leftLength;
+    if (leftLength > 0) {
+        // 构建左子树
+        root->m_pLeft = ConstructCore(startPreorder + 1, leftPreorderEnd, startInorder, rootInorder - 1);
+    }
+    
+    if (leftLength < endPreorder - startPreorder) {
+        // 构建右子树
+        root->m_pRight = ConstructCore(leftPreorderEnd + 1, endPreorder, rootInorder + 1, endInorder);
+    }
+    
+    return root;
 }
