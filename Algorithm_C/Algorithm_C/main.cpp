@@ -439,86 +439,6 @@ int findRepeatNumber(int* nums, int numsSize) {
     return NULL;
 }
 
-int main(int argc, const char * argv[]) {
-    // insert code here...
-//    std::cout << "Hello, World!\n";
-    
-    int nums[] = {4, 6, 3, 2, 1, 8, 20, 14};
-    printArray("排序前:", nums, 8);
-    
-    // 冒泡排序
-//    bubbleSort(nums, 8);
-    // 插入排序
-//    insertSort(nums, 8);
-    // 选择排序
-//    selectSort(nums, 8);
-    // 希尔排序
-//    shellSort(nums, 8);
-    // 希尔排序优化
-//    shellSortOptimize(nums, 8);
-    // 快速排序
-//    quickSort(nums, 0, 7);
-    // 归并排序
-//    int temp[] = {};
-//    mergeSort(nums, 0, 7, temp);
-    // 堆排序
-//    heapSort(nums, 8);
-//    heap_sort(nums, 8);
-    
-    printArray("排序后:", nums, 8);
-    
-    return 0;
-}
-
-// 1. 复习 C++ 的 vector、stack、queue 文档，牢记它们的使用，为下面的算法学习做好铺垫。
-// 2. 反转二叉树练习。
-// 3. 找到链表中倒数第 k 个节点。
-// 4. 青蛙跳台阶。
-// 5. 数组中重复的数字。
-
-bool duplicate_Review(int numbers[], int length, int* duplication) {
-    if (numbers == nullptr || length == 0)
-        return false;
-    
-    for (int i = 0; i < length; i++) {
-        if (numbers[i] < 0 || numbers[i] > length - 1)
-            return false;
-    }
-    
-    for (int i = 0; i < length; i++) {
-        while (numbers[i] != i) {
-            if (numbers[i] == numbers[numbers[i]]) {
-                *duplication = numbers[i];
-                return true;
-            }
-            
-            int temp = numbers[i];
-            numbers[i] = numbers[temp];
-            numbers[temp] = temp;
-        }
-    }
-    
-    return false;
-}
-
-int forg_Review(int n) {
-    if (n < 2) {
-        return 1;
-    }
-    
-    int front = 1, back = 1;
-    for (int i = 2; i <= n; i++) {
-        // 本轮进来后：本轮的值是前两轮的值的和
-        int current = (front + back) % 1000000007; // 这个取余只是为了防溢出，看待时可忽略此操作，只认为本句是为了求前两轮值的和
-        // 然后更新前两轮的值，为下一轮做准备
-        front = back;
-        back = current;
-    }
-    
-    return back;
-}
-
-// 统计数组中的元素在给定的数字范围中出现的次数
 int countRange(const int* numbers, int length, int start, int end) {
     if (numbers == nullptr)
         return 0;
@@ -532,6 +452,7 @@ int countRange(const int* numbers, int length, int start, int end) {
     return count;
 }
 
+// 不修改数组找出重复的数字 O(n) O(n*logn)
 int getDuplication(const int* numbers, int length) {
     if (numbers == nullptr || length <= 0) {
         return -1;
@@ -543,6 +464,7 @@ int getDuplication(const int* numbers, int length) {
     while (start <= end) {
         int middle = ((end - start) >> 1) + start;
         
+        // 统计数组中的元素在给定的数字范围中出现的次数
         int count = countRange(numbers, length, start, middle);
         if (start == end) {
             if (count > 1) {
@@ -628,46 +550,6 @@ void ReplaceBlank(char string[], int length) {
     }
 }
 
-void ReplaceBlank_Review(char string[], int length) {
-    if (string == nullptr || length <= 0)
-        return;
-    
-    int originalLength = 0;
-    int numberOfBlank = 0;
-    int i = 0;
-    
-    while (string[i] != '\0') {
-        originalLength++;
-        
-        if (string[i] == ' ') {
-            numberOfBlank++;
-        }
-        
-        i++;
-    }
-    
-    int newLength = originalLength + numberOfBlank * 2;
-    if (newLength > length) {
-        return;
-    }
-    
-    // 开始移动
-    int indexOfOriginal = originalLength;
-    int indexOfNew = newLength;
-    
-    while (indexOfOriginal >= 0 && indexOfNew > indexOfOriginal) {
-        if (string[indexOfOriginal] == ' ') {
-            string[indexOfNew--] = '0';
-            string[indexOfNew--] = '2';
-            string[indexOfNew--] = '%';
-        } else {
-            string[indexOfNew--] = string[indexOfOriginal];
-        }
-        
-        indexOfOriginal--;
-    }
-}
-
 // 往链表的末尾添加一个结点
 struct ListNode_struct {
     int m_nValue;
@@ -698,23 +580,7 @@ void AddToTail(ListNode_struct** pHead, int value) {
     }
 }
 
-void AddToTail_Review(ListNode_struct** pHead, int value) {
-    ListNode_struct* newNode = new ListNode_struct();
-    newNode->m_nValue = value;
-    newNode->m_pNext = nullptr;
-    
-    if (*pHead == nullptr) {
-        *pHead = newNode;
-    } else {
-        ListNode_struct* pTemp = *pHead;
-        while (pTemp->m_pNext != nullptr) {
-            pTemp = pTemp->m_pNext;
-        }
-        pTemp->m_pNext = newNode;
-    }
-}
-
-// 从链表中找到第一个含有某值的节点并删除该节点的代码
+// 从链表中找到第一个含有某值的节点并删除该节点
 void RemoveNode(ListNode_struct** pHead, int value) {
     // 如果传入了一个空指针或者传入的指针指向空，则可以直接 return 了
     if (pHead == nullptr || *pHead == nullptr) {
@@ -749,37 +615,7 @@ void RemoveNode(ListNode_struct** pHead, int value) {
     }
 }
 
-void RemoveNode_Review(ListNode_struct** pHead, int value) {
-    if (pHead == nullptr || *pHead == nullptr) {
-        return;
-    }
-    
-    ListNode_struct* pToBeDeleted = nullptr;
-    
-    if ((*pHead)->m_nValue == value) {
-        pToBeDeleted = *pHead;
-        
-        *pHead = (*pHead)->m_pNext;
-    } else {
-        ListNode_struct* pNode = *pHead;
-        
-        while (pNode->m_pNext != nullptr && pNode->m_pNext->m_nValue != value) {
-            pNode = pNode->m_pNext;
-        }
-        
-        if (pNode->m_pNext != nullptr && pNode->m_pNext->m_nValue == value) {
-            pToBeDeleted = pNode->m_pNext;
-            pNode->m_pNext = pNode->m_pNext->m_pNext;
-        }
-    }
-    
-    if (pToBeDeleted != nullptr) {
-        delete pToBeDeleted;
-        pToBeDeleted = nullptr;
-    }
-}
-
-// 从尾到头打印链表分别由递归和非递归实现 (递归在本质上就是一个栈结构)
+// 从尾到头打印链表（非递归）
 void PrintListReversingly_Iteratively(ListNode_struct* pHead) {
     if (pHead == nullptr)
         return;
@@ -799,40 +635,12 @@ void PrintListReversingly_Iteratively(ListNode_struct* pHead) {
     }
 }
 
-void PrintListReversingly_Iteratively_Review(ListNode_struct* pHead) {
-    if (pHead == nullptr)
-        return;
-    
-    std::stack<ListNode_struct*> nodes;
-    
-    ListNode_struct* pNode = pHead;
-    while (pNode != nullptr) {
-        nodes.push(pNode);
-        pNode = pNode->m_pNext;
-    }
-    
-    while (!nodes.empty()) {
-        pNode = nodes.top();
-        printf("%d\t", pNode->m_nValue);
-        nodes.pop();
-    }
-}
-
+// 从尾到头打印链表（递归）（递归在本质上就是一个栈结构）
 void PrintListReversingly_Recursively(ListNode_struct* pHead) {
     if (pHead != nullptr) {
         
         if (pHead->m_pNext != nullptr) {
             PrintListReversingly_Recursively(pHead->m_pNext);
-        }
-        
-        printf("%d\t", pHead->m_nValue);
-    }
-}
-
-void PrintListReversingly_Recursively_Review(ListNode_struct* pHead) {
-    if (pHead != nullptr) {
-        if (pHead->m_pNext != nullptr) {
-            PrintListReversingly_Recursively_Review(pHead->m_pNext);
         }
         
         printf("%d\t", pHead->m_nValue);
@@ -1036,3 +844,33 @@ long long fibonacci_Iterative(unsigned int n) {
     return fibN;
 }
 
+int main(int argc, const char * argv[]) {
+    // insert code here...
+//    std::cout << "Hello, World!\n";
+    
+    int nums[] = {4, 6, 3, 2, 1, 8, 20, 14};
+    printArray("排序前:", nums, 8);
+    
+    // 冒泡排序
+//    bubbleSort(nums, 8);
+    // 插入排序
+//    insertSort(nums, 8);
+    // 选择排序
+//    selectSort(nums, 8);
+    // 希尔排序
+//    shellSort(nums, 8);
+    // 希尔排序优化
+//    shellSortOptimize(nums, 8);
+    // 快速排序
+//    quickSort(nums, 0, 7);
+    // 归并排序
+//    int temp[] = {};
+//    mergeSort(nums, 0, 7, temp);
+    // 堆排序
+//    heapSort(nums, 8);
+//    heap_sort(nums, 8);
+    
+    printArray("排序后:", nums, 8);
+    
+    return 0;
+}
