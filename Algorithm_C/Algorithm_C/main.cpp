@@ -779,7 +779,7 @@ void RemoveNode_Review(ListNode_struct** pHead, int value) {
     }
 }
 
-// 从尾到头打印链表 (递归在本质上就是一个栈结构)
+// 从尾到头打印链表分别由递归和非递归实现 (递归在本质上就是一个栈结构)
 void PrintListReversingly_Iteratively(ListNode_struct* pHead) {
     if (pHead == nullptr)
         return;
@@ -838,6 +838,7 @@ void PrintListReversingly_Recursively_Review(ListNode_struct* pHead) {
         printf("%d\t", pHead->m_nValue);
     }
 }
+
 //             10
 //          /      \
 //         6        14
@@ -848,7 +849,7 @@ void PrintListReversingly_Recursively_Review(ListNode_struct* pHead) {
 // 中序(左根右): 4, 6, 8, 10, 12, 14, 16
 // 后序(左右根): 4, 8, 6, 12, 16, 14, 10
 // 
-
+// 根据二叉树前序遍历和中序遍历的结果，重建该二叉树
 struct BinaryTreeNode {
     int m_nValue;
     BinaryTreeNode* m_pLeft;
@@ -876,8 +877,7 @@ BinaryTreeNode* ConstructCore(int* startPreorder, int* endPreorder, int* startIn
         if (startInorder == endInorder && *startPreorder == *startInorder) {
             return root;
         } else {
-//            throw std::exception("Invalid input.");
-            throw std::exception();
+            throw std::exception(); // Invalid input.
         }
     }
     
@@ -888,7 +888,7 @@ BinaryTreeNode* ConstructCore(int* startPreorder, int* endPreorder, int* startIn
     }
     
     if (rootInorder == endInorder && *rootInorder != rootValue) {
-        throw std::exception();
+        throw std::exception(); // Invalid input.
     }
     
     long leftLength = rootInorder - startInorder;
@@ -905,3 +905,134 @@ BinaryTreeNode* ConstructCore(int* startPreorder, int* endPreorder, int* startIn
     
     return root;
 }
+
+// 二叉树的下一个节点
+struct BinaryTreeNodeWithParent {
+    int m_nValue;
+    BinaryTreeNodeWithParent* m_pLeft;
+    BinaryTreeNodeWithParent* m_pRight;
+    BinaryTreeNodeWithParent* m_pParent;
+};
+
+BinaryTreeNodeWithParent* getNext(BinaryTreeNodeWithParent* pNode) {
+    if (pNode == nullptr) {
+        return nullptr;
+    }
+    
+    BinaryTreeNodeWithParent* pNext = nullptr;
+    if (pNode->m_pRight != nullptr) {
+        // 如果该节点的右子节点不为空，那么它的下一个节点就是它的右子节点的最左子节点，
+        // 如果这个右子节点不存在左子节点，则 pNode 的下一个节点就是该右节点了
+        BinaryTreeNodeWithParent* pRight = pNode->m_pRight;
+        while (pRight->m_pLeft != nullptr) {
+            pRight = pRight->m_pLeft;
+        }
+        
+        pNext = pRight;
+    } else if (pNode->m_pParent != nullptr) {
+        BinaryTreeNodeWithParent* pCurrent = pNode;
+        // 如果一个节点的右子节点为空，并且它是自己父节点的左子节点，那么它的下一个节点就是它的父节点
+        BinaryTreeNodeWithParent* pParent = pNode->m_pParent;
+        while (pParent != nullptr && pCurrent == pParent->m_pRight) { // 如果它是自己父节点的右子节点
+            pCurrent = pParent;
+            pParent = pParent->m_pParent; // 从父节点一直到序上去
+        }
+        
+        pNext = pParent;
+    }
+    
+    return pNext;
+}
+
+// 用两个栈实现队列
+template <typename T>
+class CQueue {
+public:
+    CQueue(void);
+    ~CQueue(void);
+    
+    void appendTail(const T& node);
+    T deleteHead();
+private:
+    stack<T> stack1;
+    stack<T> stack2;
+};
+
+template <typename T> CQueue<T>::CQueue(void) {
+    
+}
+
+template <typename T> CQueue<T>::~CQueue(void) {
+    
+}
+
+template<typename T> void CQueue<T>::appendTail(const T& element) {
+    stack1.push(element);
+}
+
+template<typename T> T CQueue<T>::deleteHead() {
+    if (stack2.size() <= 0) {
+        while (stack1.size() > 0) {
+            T& data = stack1.top();
+            stack1.pop();
+            stack2.push(data);
+        }
+    }
+
+    if (stack2.size() == 0) {
+        throw new std::exception();
+    }
+
+    T head = stack2.top();
+    stack2.pop();
+
+    return head;
+}
+
+// 递归和非递归的方式求 1 + 2 + 3 + ... + n 的值。
+int addFrom1ToN_Recursive(int n) {
+    return n == 0 ? 0 : n + addFrom1ToN_Recursive(n - 1);
+}
+
+int addFrom1ToN_Iterative(int n) {
+    int result = 0;
+    for(int i = 1; i <= n; i++) {
+        result += i;
+    }
+    
+    return result;
+}
+
+// 斐波那契数列
+long long fibonacci_Recursive(unsigned int n) {
+    if (n <= 0) {
+        return 0;
+    }
+    
+    if (n == 1) {
+        return 1;
+    }
+    
+    return fibonacci_Recursive(n - 1) + fibonacci_Recursive(n - 2);
+}
+
+long long fibonacci_Iterative(unsigned int n) {
+    int result[2] = {0, 1};
+    if (n < 2) {
+        return result[n];
+    }
+    
+    long long fibNMinusOne = 1;
+    long long fibNMinusTwo = 2;
+    long long fibN = 0;
+    
+    for (unsigned int i = 2; i <= n; i++) {
+        fibN = fibNMinusOne + fibNMinusTwo;
+        
+        fibNMinusTwo = fibNMinusOne;
+        fibNMinusOne = fibN;
+    }
+    
+    return fibN;
+}
+
