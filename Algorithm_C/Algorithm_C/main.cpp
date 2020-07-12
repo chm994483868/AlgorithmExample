@@ -36,12 +36,10 @@ void bubbleSort(int nums[], int count) {
         for (int j = 0; j < k; j++) {
             if (nums[j] > nums[j + 1]) {
                 swap(nums[j], nums[j + 1]);
-                
                 noExchange = false;
                 n = j;
             }
         }
-        
         if (noExchange) { break; }
         k = n;
     }
@@ -50,7 +48,7 @@ void bubbleSort(int nums[], int count) {
 // 插入排序
 void insertSort(int nums[], int count) {
     for (int i = 1; i < count; i++) {
-        for (int j = i; j > 0 && nums[j - 1] > nums[j] ; j--) {
+        for (int j = i; j > 0 && nums[j - 1] > nums[j]; j--) {
             swap(nums[j - 1], nums[j]);
         }
     }
@@ -82,7 +80,7 @@ void shellSort(int nums[], int count) {
     }
 }
 
-// 希尔排序优化
+// 希尔排序 优化
 void shellSortOptimize(int nums[], int count) {
     for (int gap = count / 2; gap > 0; gap /= 2) {
         for (int i = gap; i < count; i++) {
@@ -253,14 +251,6 @@ public:
     TreeNode(int x) : val(x), left(nullptr), right(nullptr) {}
 };
 
-class ListNode {
-public:
-    int val;
-    ListNode *next;
-    
-    ListNode(int x) : val(x), next(nullptr) {}
-};
-
 // 反转二叉树（递归）
 TreeNode* invertTree(TreeNode* root) {
     if (root == nullptr) return root;
@@ -277,11 +267,11 @@ TreeNode* invertTree(TreeNode* root) {
 TreeNode* invertTree2(TreeNode* root) {
     if (root == nullptr) return root;
     
-    stack<TreeNode *> treeStack;
+    stack<TreeNode*> treeStack;
     treeStack.push(root);
     
     while (!treeStack.empty()) {
-        TreeNode *top = treeStack.top();
+        TreeNode* top = treeStack.top();
         treeStack.pop();
         
         swap(top->left, top->right);
@@ -297,21 +287,29 @@ TreeNode* invertTree2(TreeNode* root) {
 TreeNode* invertTree3(TreeNode* root) {
     if (root == nullptr) return root;
     
-    queue<TreeNode *> treeQueue;
+    queue<TreeNode*> treeQueue;
     treeQueue.push(root);
     
     while (!treeQueue.empty()) {
-        TreeNode *top = treeQueue.front();
+        TreeNode* front = treeQueue.front();
         treeQueue.pop();
         
-        swap(top->left, top->right);
+        swap(front->left, front->right);
         
-        if (top->left != nullptr) treeQueue.push(top->left);
-        if (top->right != nullptr) treeQueue.push(top->right);
+        if (front->left != nullptr) treeQueue.push(front->left);
+        if (front->right != nullptr) treeQueue.push(front->right);
     }
     
     return root;
 }
+
+class ListNode {
+public:
+    int val;
+    ListNode *next;
+    
+    ListNode(int x) : val(x), next(nullptr) {}
+};
 
 // 找到链表中倒数第 k 个节点
 ListNode* findKthFromTail(ListNode* pListHead, int k) {
@@ -326,8 +324,8 @@ ListNode* findKthFromTail(ListNode* pListHead, int k) {
     
     ListNode* pAListNode = pListHead;
     while (pBListHead->next != nullptr) {
-        pAListNode = pAListNode->next;
         pBListHead = pBListHead->next;
+        pAListNode = pAListNode->next;
     }
     
     return pAListNode;
@@ -336,13 +334,12 @@ ListNode* findKthFromTail(ListNode* pListHead, int k) {
 // 青蛙跳台阶
 unsigned long frog(int n) {
     // 递归：太慢，下面是用迭代优化
-    //    if (n == 0 || n == 1) {
-    //        return 1;
-    //    } else if (n == 2) {
-    //        return 2;
-    //    }
+    // int results[3] = {0, 1, 2};
+    // if (n < 3) {
+    //    return results[n];
+    // }
     //
-    //    return frog(n - 1) + frog(n - 2);
+    // return frog(n - 1) + frog(n - 2);
     
     if (n < 2) return 1;
     
@@ -425,6 +422,12 @@ int findRepeatNumber(int* nums, int numsSize) {
         return NULL;
     }
     
+    for (int i = 0; i < numsSize; i++) {
+        if (nums[i] < 0 || nums[i] > numsSize - 1) {
+            return NULL;
+        }
+    }
+    
     int a[100000];
     memset(a, 0, sizeof(a));
     
@@ -445,7 +448,7 @@ int countRange(const int* numbers, int length, int start, int end) {
     
     int count = 0;
     for (int i = 0; i < length; i++) {
-        if (numbers[i] >= start || numbers[i] <= end)
+        if (numbers[i] >= start && numbers[i] <= end)
             count++;
     }
     
@@ -463,9 +466,9 @@ int getDuplication(const int* numbers, int length) {
     
     while (start <= end) {
         int middle = ((end - start) >> 1) + start;
-        
         // 统计数组中的元素在给定的数字范围中出现的次数
         int count = countRange(numbers, length, start, middle);
+        
         if (start == end) {
             if (count > 1) {
                 return start;
@@ -774,11 +777,11 @@ template <typename T> CQueue<T>::~CQueue(void) {
     
 }
 
-template<typename T> void CQueue<T>::appendTail(const T& element) {
+template <typename T> void CQueue<T>::appendTail(const T& element) {
     stack1.push(element);
 }
 
-template<typename T> T CQueue<T>::deleteHead() {
+template <typename T> T CQueue<T>::deleteHead() {
     if (stack2.size() <= 0) {
         while (stack1.size() > 0) {
             T& data = stack1.top();
@@ -804,7 +807,7 @@ int addFrom1ToN_Recursive(int n) {
 
 int addFrom1ToN_Iterative(int n) {
     int result = 0;
-    for(int i = 1; i <= n; i++) {
+    for(int i = 1; i <= n; ++i) {
         result += i;
     }
     
@@ -831,10 +834,10 @@ long long fibonacci_Iterative(unsigned int n) {
     }
     
     long long fibNMinusOne = 1;
-    long long fibNMinusTwo = 2;
+    long long fibNMinusTwo = 0;
     long long fibN = 0;
     
-    for (unsigned int i = 2; i <= n; i++) {
+    for (unsigned int i = 2; i <= n; ++i) {
         fibN = fibNMinusOne + fibNMinusTwo;
         
         fibNMinusTwo = fibNMinusOne;
@@ -868,7 +871,7 @@ int main(int argc, const char * argv[]) {
 //    mergeSort(nums, 0, 7, temp);
     // 堆排序
 //    heapSort(nums, 8);
-//    heap_sort(nums, 8);
+    heap_sort(nums, 8);
     
     printArray("排序后:", nums, 8);
     
