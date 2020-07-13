@@ -31,8 +31,8 @@ void printArray(string desc, int nums[], int count) {
 void bubbleSort(int nums[], int count) {
     int k = count - 1;
     for (int i = 0; i < count - 1; i++) {
-        bool noExchange = true;
-        int n = 0;
+        bool noExchange = true; // 用于记录本次循环是否发生交换
+        int n = 0; // 用于记录本次循环最后一次发生交换时下标
         for (int j = 0; j < k; j++) {
             if (nums[j] > nums[j + 1]) {
                 swap(nums[j], nums[j + 1]);
@@ -47,7 +47,7 @@ void bubbleSort(int nums[], int count) {
 
 // 插入排序
 void insertSort(int nums[], int count) {
-    for (int i = 1; i < count; i++) {
+    for (int i = 1; i < count; i++) { // i 从 1 开始，0 定为左侧已排序数组第一个元素
         for (int j = i; j > 0 && nums[j - 1] > nums[j]; j--) {
             swap(nums[j - 1], nums[j]);
         }
@@ -57,7 +57,7 @@ void insertSort(int nums[], int count) {
 // 选择排序
 void selectSort(int nums[], int count) {
     for (int i = 0; i < count; i++) {
-        int minIndex = i;
+        int minIndex = i; // 找最小元素
         for (int j = i + 1; j < count; j++) {
             if (nums[j] < nums[minIndex]) {
                 minIndex = j;
@@ -69,8 +69,8 @@ void selectSort(int nums[], int count) {
 
 // 希尔排序
 void shellSort(int nums[], int count) {
-    for (int gap = count / 2; gap > 0; gap /= 2) {
-        for (int i = 0; i < gap; i++) {
+    for (int gap = count / 2; gap > 0; gap /= 2) { // 分组
+        for (int i = 0; i < gap; i++) { // 对本次分组里的各组进行排序
             for (int j = i + gap; j < count; j += gap) {
                 for (int k = j; k > 0 && nums[k - gap] > nums[k]; k -= gap) {
                     swap(nums[k - gap], nums[k]);
@@ -83,7 +83,7 @@ void shellSort(int nums[], int count) {
 // 希尔排序 优化
 void shellSortOptimize(int nums[], int count) {
     for (int gap = count / 2; gap > 0; gap /= 2) {
-        for (int i = gap; i < count; i++) {
+        for (int i = gap; i < count; i++) { // 优化
             for (int j = i; j > 0 && nums[j - gap] > nums[j]; j -= gap) {
                 swap(nums[j - gap], nums[j]);
             }
@@ -101,16 +101,16 @@ void quickSort(int nums[], int l, int r) {
     int i = l, j = r, x = nums[l];
     
     while (i < j) {
-        while (i < j && nums[j] >= x) j--;
+        while (i < j && nums[j] >= x) j--; // 右侧挖坑
         if (i < j) nums[i++] = nums[j];
         
-        while (i < j && nums[i] < x) i++;
+        while (i < j && nums[i] < x) i++; // 左侧挖坑
         if (i < j) nums[j--] = nums[i];
     }
     
     nums[i] = x;
     
-    quickSort(nums, l, i - 1);
+    quickSort(nums, l, i - 1); // 分治
     quickSort(nums, i + 1, r);
 }
 
@@ -150,9 +150,9 @@ void mergeSort(int a[], int first, int last, int temp[]) {
     int mid = (first + last) / 2;
     
     mergeSort(a, first, mid, temp);
-    mergeSort(a, mid + 1, last, temp);
+    mergeSort(a, mid + 1, last, temp); // 递归拆
     
-    mergeArray(a, first, mid, last, temp);
+    mergeArray(a, first, mid, last, temp); // 递归结束开始合并
 }
 
 void MinHeapFixup(int a[], int i) {
@@ -175,10 +175,10 @@ void MinHeapAddNumber(int a[], int n, int nNum) {
 }
 
 void MinHeapFixdown(int a[], int i, int n) {
-    int j = 2 * i + 1, temp = a[i];
+    int j = 2 * i + 1, temp = a[i]; // 找到左子节点
 
     while (j < n) {
-        if (j + 1 < n && a[j + 1] > a[j]) {
+        if (j + 1 < n && a[j + 1] > a[j]) { // 找到左右子节点中的最大值
             j++;
         }
         
@@ -197,10 +197,10 @@ void MinHeapFixdown(int a[], int i, int n) {
 // 堆排序
 void heapSort(int nums[], int n) {
     for (int i = (n - 1 - 1) / 2; i >= 0; i--) {
-        MinHeapFixdown(nums, i, n);
+        MinHeapFixdown(nums, i, n); // 建堆
     }
     
-    for (int j = n - 1; j >= 1; j--) {
+    for (int j = n - 1; j >= 1; j--) { // 排序
         swap(nums[j], nums[0]);
         MinHeapFixdown(nums, 0, j);
     }
@@ -212,8 +212,8 @@ void heapify(int tree[], int n, int i) {
         return;
     }
     
-    int c1 = 2 * i + 1;
-    int c2 = 2 * i + 2;
+    int c1 = 2 * i + 1; // 左子节点
+    int c2 = 2 * i + 2; // 右子节点
     int max = i;
     
     if (c1 < n && tree[c1] > tree[max]) {
@@ -266,16 +266,17 @@ TreeNode* invertTree(TreeNode* root) {
 // 反转二叉树（栈）
 TreeNode* invertTree2(TreeNode* root) {
     if (root == nullptr) return root;
-    
+    // 创建栈，并把根节点入栈
     stack<TreeNode*> treeStack;
     treeStack.push(root);
     
     while (!treeStack.empty()) {
+        // 取出栈顶元素，交换左右子节点
         TreeNode* top = treeStack.top();
         treeStack.pop();
-        
         swap(top->left, top->right);
         
+        // 左右子节点入栈
         if (top->left != nullptr) treeStack.push(top->left);
         if (top->right != nullptr) treeStack.push(top->right);
     }
@@ -286,7 +287,7 @@ TreeNode* invertTree2(TreeNode* root) {
 // 反转二叉树（队列）
 TreeNode* invertTree3(TreeNode* root) {
     if (root == nullptr) return root;
-    
+    // 创建队列，并把根节点入栈
     queue<TreeNode*> treeQueue;
     treeQueue.push(root);
     
@@ -315,14 +316,17 @@ public:
 ListNode* findKthFromTail(ListNode* pListHead, int k) {
     if (pListHead == nullptr || k == 0) return pListHead;
     
+    // 从头节点开始前进 k - 1 步
     ListNode* pBListHead = pListHead;
     for (int i = 0; i < k - 1; i++) {
+        // 这里要判断 k 是否大于链表总长度
         if (pBListHead == nullptr) { return nullptr; }
         
         pBListHead = pBListHead->next;
     }
     
     ListNode* pAListNode = pListHead;
+    // 这里 while 的条件是 pBListHead->next 不是空。保证第一个指针是指到最后一个节点，而不是指到最后一个节点之外
     while (pBListHead->next != nullptr) {
         pBListHead = pBListHead->next;
         pAListNode = pAListNode->next;
@@ -343,8 +347,16 @@ unsigned long frog(int n) {
     
     if (n < 2) return 1;
     
+    // 这里要注意一下，和斐波那契数列的微小区别
+    // 斐波那契数列如下:
+    // n: 0 1 2 3 4 5 6 7  8  9
+    //    0 1 1 2 3 5 8 13 21 34...
+    // 青蛙跳台阶如下:
+    // n: 0 1 2 3 4 5 6 7 8 9 10
+    //    0 1 2 3 5 8 13
+    // 它们之间刚好错开了一位
     int a = 1, b = 1;
-    for (int i = 2; i <= n; i++) {
+    for (int i = 2; i <= n; i++) { // i 从 2 开始的
         int temp = (a + b) % 1000000007;
         a = b;
         b = temp;
@@ -362,23 +374,24 @@ public:
     
     CMyString& operator=(const CMyString& str) {
         // 初级实现：
-//        if (this == &str) return *this; // 1.如果是同一个直接返回
+        // 注意这里的是: this == &str this 前面没有 *, str 前面加了 &
+//        if (this == &str) return *this;
 //
-//        delete [] m_pData; // 2. 释放原始字符
+//        delete [] m_pData; // 释放原始字符内存空间，注意这里使用的是 delete [], 添加了中括号
 //        m_pData = nullptr;
 //
-//        m_pData = new char[strlen(str.m_pData) + 1]; // 3. 复制 m_pData
+//        m_pData = new char[strlen(str.m_pData) + 1]; // 开辟空间，复制 m_pData
 //        strcpy(m_pData, str.m_pData);
 //
 //        return *this;
         
         // 考虑安全异常的进阶实现:
         if (this != &str) {
-            CMyString strTemp(str);
+            CMyString strTemp(str); // 先使用复制构造函数创建 strTemp
             
-            char* pTemp = strTemp.m_pData;
+            char* pTemp = strTemp.m_pData; // 取出 m_pData
             strTemp.m_pData = m_pData; // 用这个临时局部变量释放原实例内存
-            m_pData = pTemp;
+            m_pData = pTemp; // 赋值
         }
         
         return *this;
@@ -394,19 +407,23 @@ bool duplicate(int numbers[], int length, int* duplication) {
         return false;
     }
     
+    // 判断数组中是否有数字不符合数值范围
     for (int i = 0; i < length; i++) {
         if (numbers[i] < 0 || numbers[i] > length - 1) {
             return false;
         }
     }
     
+    // 开始循环
     for (int i = 0; i < length; i++) {
         while (numbers[i] != i) {
+            // 如果有重复
             if (numbers[i] == numbers[numbers[i]]) {
                 *duplication = numbers[i];
                 return true;
             }
             
+            // 交换位置
             int temp = numbers[i];
             numbers[i] = numbers[temp];
             numbers[temp] = temp;
@@ -422,16 +439,20 @@ int findRepeatNumber(int* nums, int numsSize) {
         return NULL;
     }
     
+    // 判断数组中是否有数字不符合数值范围
     for (int i = 0; i < numsSize; i++) {
         if (nums[i] < 0 || nums[i] > numsSize - 1) {
             return NULL;
         }
     }
     
+    // 准备一个辅助数组
     int a[100000];
+    // 辅助数组元素全部置为 0
     memset(a, 0, sizeof(a));
     
     for (int i = 0; i < numsSize; i++) {
+        // 根据当前值直接找到对应下标的值，看是否是 0 或者 1，如果是 0 则修改为 1，如果是 1 则表示前面这个数字已经出现过了，即发现了重复数字
         if (!a[nums[i]]) {
             a[nums[i]] = 1;
         } else {
@@ -457,18 +478,23 @@ int countRange(const int* numbers, int length, int start, int end) {
 
 // 不修改数组找出重复的数字 O(n) O(n*logn)
 int getDuplication(const int* numbers, int length) {
+    // 判断参数是否符合规则
     if (numbers == nullptr || length <= 0) {
         return -1;
     }
     
+    // 数组中的数值从 1 开始到 length - 1
     int start = 1;
     int end = length - 1;
     
     while (start <= end) {
+        // 先找到中间值
         int middle = ((end - start) >> 1) + start;
+        
         // 统计数组中的元素在给定的数字范围中出现的次数
         int count = countRange(numbers, length, start, middle);
         
+        // 如是数字范围开始和结束是同一个数字，并且它出现的次数大于 1 则表示用重复，
         if (start == end) {
             if (count > 1) {
                 return start;
@@ -477,6 +503,7 @@ int getDuplication(const int* numbers, int length) {
             }
         }
         
+        // 更新 start 或者 end
         if (count > (middle - start + 1)) { // 说明重复在前半部分
             end = middle;
         } else {
@@ -489,19 +516,22 @@ int getDuplication(const int* numbers, int length) {
 
 // 在二维数组中查找数字
 bool Fine(int* matrix, int rows, int colums, int number) {
+    // 记录标志是否找到
     bool found = false;
     // 从右上角开始
     int row = 0;
     int colum = colums - 1;
     
+    // 行不能超过总行数，列数大于等于 0
     while (matrix != nullptr && row < rows && colum >= 0) {
+        // 如果相等则表示找到了
         if (matrix[row * colums + colum] == number) {
             found = true;
             break;
-        } else if (matrix[row * colums + colum] > number) { // 此时列向左
-            colum--;
-        } else { // 此时行向下
-            row++;
+        } else if (matrix[row * colums + colum] > number) { // 如果是大于表示要减小列数
+            --colum;
+        } else { // 如果是小于则表示要增加行数
+            ++row;
         }
     }
     
@@ -511,40 +541,50 @@ bool Fine(int* matrix, int rows, int colums, int number) {
 // 替换空格
 // length 为字符数组 string 的总容量
 void ReplaceBlank(char string[], int length) {
+    // 首先判断参数是否符合规则
     if (string == nullptr || length <= 0)
         return;
     
     // originalLength 为字符串 string 的实际长度
     int originalLength = 0; // 记录原始字符串的实际字符数
     int numberOfBlank = 0; // 记录空格数
-    int i = 0; // 下标
+    // 这里用了一个 i 从字符串中根据 i 下标来取出对应的字符
+    int i = 0;
     
     // 分别统计它们的值
     while (string[i] != '\0') {
+        // 统计实际字符个数
         ++originalLength;
+        // 统计空格个数
         if (string[i] == ' ') {
             ++numberOfBlank;
         }
-        
+        // 递进 i 的值
         ++i;
     }
     
     // newLength 为把空格替换成 '%20' 之后的长度
     int newLength = originalLength + numberOfBlank * 2; // 原始长度加上空格数乘以 2
+    // 判断增长以后是否超出了字符串的空间长度，如果是超出了则防止其他内存被改写，直接返回，结束函数的执行
     if (newLength > length) {
         return;
     }
     
-    int indexOfOriginal = originalLength; // 记录 p1 指针位置
-    int indexOfNew = newLength; // 记录 p2 指针位置
+    // 记录 p1 指针位置
+    int indexOfOriginal = originalLength;
+    // 记录 p2 指针位置
+    // 注意这里的 p1 和 p2 指针都是倒序向前的
+    int indexOfNew = newLength;
     
+    // p1 大于等于 0，p2 指针小于 p1
     while (indexOfOriginal >= 0 && indexOfNew > indexOfOriginal) {
-        // p2 指针就不同了，当遇到空格时，要连续移动三步，如果不是空格就正常一步一步往前走
+        // p2 指针就不同了，当遇到空格时，要连续移动三步
         if (string[indexOfOriginal] == ' ') {
             string[indexOfNew--] = '0';
             string[indexOfNew--] = '2';
             string[indexOfNew--] = '%';
         } else {
+            // 如果不是空格就正常一步一步往前走
             string[indexOfNew--] = string[indexOfOriginal];
         }
         
@@ -574,6 +614,7 @@ void AddToTail(ListNode_struct** pHead, int value) {
     } else {
         // 如果不是空链表，则首先移动到链表尾部
         ListNode_struct* pNode = *pHead;
+        // 这里 while 里的判断条件是 pNode->m_pNext 不是 nullptr
         while (pNode->m_pNext != nullptr) {
             pNode = pNode->m_pNext;
         }
@@ -623,6 +664,7 @@ void PrintListReversingly_Iteratively(ListNode_struct* pHead) {
     if (pHead == nullptr)
         return;
     
+    // 放在栈里面
     std::stack<ListNode_struct*> nodes;
     
     ListNode_struct* pNode = pHead;
@@ -631,6 +673,7 @@ void PrintListReversingly_Iteratively(ListNode_struct* pHead) {
         pNode = pNode->m_pNext;
     }
     
+    // 循环出栈打印
     while (!nodes.empty()) {
         pNode = nodes.top();
         printf("%d\t", pNode->m_nValue);
@@ -643,9 +686,11 @@ void PrintListReversingly_Recursively(ListNode_struct* pHead) {
     if (pHead != nullptr) {
         
         if (pHead->m_pNext != nullptr) {
+            // 递归
             PrintListReversingly_Recursively(pHead->m_pNext);
         }
         
+        // 打印
         printf("%d\t", pHead->m_nValue);
     }
 }
@@ -680,10 +725,12 @@ BinaryTreeNode* Construct(int* preorder, int* inorder, int length) {
 BinaryTreeNode* ConstructCore(int* startPreorder, int* endPreorder, int* startInorder, int* endInorder) {
     // 前序遍历序列的第一个数字是根节点的值
     int rootValue = startPreorder[0];
+    // 创建根节点
     BinaryTreeNode* root = new BinaryTreeNode();
     root->m_nValue = rootValue;
     root->m_pLeft = root->m_pRight = nullptr;
     
+    // 如果前序和中序都是一个数字并且都是相同的，则表示这棵树只有一个根节点，可以直接返回了。
     if (startPreorder == endPreorder) {
         if (startInorder == endInorder && *startPreorder == *startInorder) {
             return root;
@@ -698,17 +745,22 @@ BinaryTreeNode* ConstructCore(int* startPreorder, int* endPreorder, int* startIn
         ++rootInorder;
     }
     
+    // 判断如果找根节点直接找到了中序的最后一个值，是否是和 rootValue 相等的，如果不等，则表示原始入参有问题，直接返回
     if (rootInorder == endInorder && *rootInorder != rootValue) {
         throw std::exception(); // Invalid input.
     }
     
+    // 左子树长度
     long leftLength = rootInorder - startInorder;
+    // 左子树前序终点
     int* leftPreorderEnd = startPreorder + leftLength;
+    // 递归构建左子树
     if (leftLength > 0) {
         // 构建左子树
         root->m_pLeft = ConstructCore(startPreorder + 1, leftPreorderEnd, startInorder, rootInorder - 1);
     }
     
+    // 如果前序起点和终点的距离大于左子树，则表明还有右子树，则递归构建右子树
     if (leftLength < endPreorder - startPreorder) {
         // 构建右子树
         root->m_pRight = ConstructCore(leftPreorderEnd + 1, endPreorder, rootInorder + 1, endInorder);
@@ -746,7 +798,7 @@ BinaryTreeNodeWithParent* getNext(BinaryTreeNodeWithParent* pNode) {
         BinaryTreeNodeWithParent* pParent = pNode->m_pParent;
         while (pParent != nullptr && pCurrent == pParent->m_pRight) { // 如果它是自己父节点的右子节点
             pCurrent = pParent;
-            pParent = pParent->m_pParent; // 从父节点一直到序上去
+            pParent = pParent->m_pParent; // 从父节点一直倒序上去
         }
         
         pNext = pParent;
@@ -778,12 +830,13 @@ template <typename T> CQueue<T>::~CQueue(void) {
 }
 
 template <typename T> void CQueue<T>::appendTail(const T& element) {
-    stack1.push(element);
+    stack1.push(element); // 直接入栈 stack1
 }
 
 template <typename T> T CQueue<T>::deleteHead() {
     if (stack2.size() <= 0) {
         while (stack1.size() > 0) {
+            // 入栈，这里用的是 T&
             T& data = stack1.top();
             stack1.pop();
             stack2.push(data);
@@ -794,7 +847,7 @@ template <typename T> T CQueue<T>::deleteHead() {
         throw new std::exception();
     }
 
-    T head = stack2.top();
+    T head = stack2.top(); // 这里用的是 T
     stack2.pop();
 
     return head;
@@ -807,7 +860,7 @@ int addFrom1ToN_Recursive(int n) {
 
 int addFrom1ToN_Iterative(int n) {
     int result = 0;
-    for(int i = 1; i <= n; ++i) {
+    for(int i = 1; i <= n; ++i) { // 循环加 i
         result += i;
     }
     
@@ -837,7 +890,7 @@ long long fibonacci_Iterative(unsigned int n) {
     long long fibNMinusTwo = 0;
     long long fibN = 0;
     
-    for (unsigned int i = 2; i <= n; ++i) {
+    for (unsigned int i = 2; i <= n; ++i) { // i 从 2 开始的
         fibN = fibNMinusOne + fibNMinusTwo;
         
         fibNMinusTwo = fibNMinusOne;
@@ -845,6 +898,38 @@ long long fibonacci_Iterative(unsigned int n) {
     }
     
     return fibN;
+}
+
+void sortAges(int ages[], int length) {
+    if (ages == nullptr || length <= 0) {
+        return;
+    }
+    
+    const int oldestAge = 99;
+    int timesOfAge[oldestAge + 1];
+    
+    for (int i = 0; i <= oldestAge; ++i) {
+        timesOfAge[i] = 0;
+    }
+    
+    for (int i = 0; i < length; ++i) {
+        int age = ages[i];
+        if (age < 0 || age > oldestAge) {
+            throw std::exception(); // age out of ranges.
+        }
+        
+        ++timesOfAge[age];
+    }
+    
+    int index = 0;
+    for (int i = 0; i <= oldestAge; ++i) {
+        while (timesOfAge[i] > 0) {
+            ages[index] = i;
+            ++index;
+            
+            --timesOfAge[i];
+        }
+    }
 }
 
 int main(int argc, const char * argv[]) {
