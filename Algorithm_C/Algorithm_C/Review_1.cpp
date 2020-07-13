@@ -738,4 +738,133 @@ long long fibonacci_Iterative(unsigned int n) {
     return fibN;
 }
 
+// 29. 对公司员工年龄排序（计数排序）。
+void sortAges(int ages[], int length) {
+    if (ages == nullptr || length <= 0) {
+        return;
+    }
+    
+    const int oldestAge = 99;
+    int timesOfAge[oldestAge + 1];
+    for (int i = 0; i <= oldestAge; ++i) {
+        timesOfAge[i] = 0;
+    }
+    
+    for (int i = 0 ; i < length; ++i) {
+        int age = ages[i];
+        
+        if (age < 0 || age > oldestAge) {
+            throw std::exception(); // 年龄超过限制，参数错误
+        }
+        
+        ++timesOfAge[age];
+    }
+    
+    int index = 0;
+    for (int i = 0; i <= oldestAge; ++i) {
+        while (timesOfAge[i] > 0) {
+            ages[index] = i;
+            
+            --timesOfAge[i];
+            ++index;
+        }
+    }
+}
+
+// 30. 旋转数组的最小数字。
+int minInOrder(int* numbers, int index1, int index2);
+int min(int* numbers, int length) {
+    if (numbers == nullptr || length <= 0) {
+        throw std::exception(); // 参数无效
+    }
+    
+    int index1 = 0;
+    int index2 = length - 1;
+    int indexMid = index1;
+    
+    while (numbers[index1] >= numbers[index2]) {
+        if (index2 - index1 == 1) {
+            indexMid = index2;
+            break;
+        }
+        
+        indexMid = (index2 - index1) / 2 + index1;
+        
+        if (numbers[index1] == numbers[index2] && numbers[indexMid] == numbers[index1]) {
+            return minInOrder(numbers, index1, index2);
+        }
+        
+        if (numbers[index1] <= numbers[indexMid]) {
+            index1 = indexMid;
+        } else if (numbers[index2] >= numbers[indexMid]) {
+            index2 = indexMid;
+        }
+    }
+    
+    return numbers[indexMid];
+}
+
+int minInOrder(int* numbers, int index1, int index2) {
+    int result = numbers[index1];
+    for (int i = index1 + 1; i <= index2; ++i) {
+        if (numbers[i] < result) {
+            result = numbers[i];
+        }
+    }
+    return result;
+}
+
+// 31. 矩阵中的路径。
+bool hasPathCore(const char* matrix, int rows, int cols, int row, int col, const char* str, int& pathLength, bool* visited);
+bool hasPath(const char* matrix, int rows, int cols, const char* str) {
+    if (matrix == nullptr || rows < 1 || cols < 1 || str == nullptr) {
+        return false;
+    }
+    
+    bool* visited = new bool[rows * cols];
+    memset(visited, 0, rows * cols); // 置为 0
+    
+    int pathLength = 0;
+    for (int row = 0; row < rows; ++row) {
+        for (int col = 0; col < cols; ++col) {
+            
+            if(hasPathCore(matrix, rows, cols, row, col, str, pathLength, visited)) {
+                return true;
+            }
+            
+        }
+    }
+    
+    delete [] visited;
+    return false;
+}
+
+bool hasPathCore(const char* matrix, int rows, int cols, int row, int col, const char* str, int& pathLength, bool* visited) {
+    if (str[pathLength] == '\0') {
+        return true;
+    }
+    
+    bool hasPath = false;
+    if (row >= 0 && row < rows && col >= 0 && col < cols && matrix[row * cols + col] == str[pathLength] && !visited[row * cols + col]) {
+        
+        ++pathLength;
+        visited[row * cols + col] = true;
+        
+        hasPath = hasPathCore(matrix, rows, cols, row - 1, col, str, pathLength, visited) || hasPathCore(matrix, rows, cols, row, col - 1, str, pathLength, visited) || hasPathCore(matrix, rows, cols, row + 1, col, str, pathLength, visited) || hasPathCore(matrix, rows, cols, row, col + 1, str, pathLength, visited);
+        
+        if (!hasPath) {
+            --pathLength;
+            visited[row * cols + col] = false;
+        }
+    }
+    
+    return hasPath;
+}
+
+// 32. 机器人的运动范围。
+
+// 33. 剪绳子。
+
+// 34. 二进制中 1 的个数。
+
 }
