@@ -15,6 +15,9 @@
 #include <queue>
 #include <list>
 #include <algorithm>
+#include <cmath>
+#include <cstdio>
+#include <exception>
 
 using namespace std;
 
@@ -868,6 +871,7 @@ int addFrom1ToN_Iterative(int n) {
 }
 
 // 斐波那契数列
+// 递归
 long long fibonacci_Recursive(unsigned int n) {
     if (n <= 0) {
         return 0;
@@ -880,6 +884,7 @@ long long fibonacci_Recursive(unsigned int n) {
     return fibonacci_Recursive(n - 1) + fibonacci_Recursive(n - 2);
 }
 
+// 非递归
 long long fibonacci_Iterative(unsigned int n) {
     int result[2] = {0, 1};
     if (n < 2) {
@@ -900,36 +905,322 @@ long long fibonacci_Iterative(unsigned int n) {
     return fibN;
 }
 
+// 对员工年龄排序（计数排序）
 void sortAges(int ages[], int length) {
+    // 1.参数判断
     if (ages == nullptr || length <= 0) {
         return;
     }
     
+    // 2.辅助数组，数组下标对应年龄，下标对应的值表示该年龄的员工数量
     const int oldestAge = 99;
     int timesOfAge[oldestAge + 1];
-    
     for (int i = 0; i <= oldestAge; ++i) {
         timesOfAge[i] = 0;
     }
     
+    // 3. 遍历数组，统计不同的年龄
     for (int i = 0; i < length; ++i) {
         int age = ages[i];
+        
+        // 这里加一个年龄越界的判断
         if (age < 0 || age > oldestAge) {
-            throw std::exception(); // age out of ranges.
+            throw std::exception(); // age out of range
         }
         
         ++timesOfAge[age];
     }
     
+    // 4. 取出统计数组里面的值
     int index = 0;
     for (int i = 0; i <= oldestAge; ++i) {
         while (timesOfAge[i] > 0) {
             ages[index] = i;
             ++index;
-            
             --timesOfAge[i];
         }
     }
+}
+
+// 旋转数组的最小数字
+int minInOrder(int* numbers, int index1, int index2);
+int min(int* numbers, int length) {
+    // 判断参数是否有效
+    if (numbers == nullptr || length <= 0) {
+        throw new std::exception(); // Invalid parameters
+    }
+    
+    // 左侧
+    int index1 = 0;
+    // 右侧
+    int index2 = length - 1;
+    // 中间值
+    // 默认从 index1 开始，没有初始设置为: indexMid = (index1 + index2) / 2
+    // 放在了下面的循环里面的更新 indexMid 的值
+    
+    // 如果把排序数组的前面的 0 个元素搬到最后面，即排序数组本身，这仍然是数组的一个旋转
+    // 我们的代码需要支持这种情况，此时数组第一个数字就是最小数字，可以直接返回，而这就是把
+    // indexMid 初始化设置为 index1 的原因
+    int indexMid = index1;
+    
+    while (numbers[index1] >= numbers[index2]) {
+        // 如果 index1 和 index2 指向相邻的两个数，
+        // 则 index1 指向第一个递增子数组的最后一个数字，
+        // index2 指向第二个子数组的第一个数字，也就是数组中的最小数字
+        if (index2 - index1 == 1) {
+            indexMid = index2;
+            break;
+        }
+        
+        // 如果下标为 index1、index2 和 indexMid 指向的三个数字相等，
+        // 则只能顺序查找
+        indexMid = (index1 + index2) / 2;
+        if (numbers[index1] == numbers[index2] && numbers[indexMid] == numbers[index1]) {
+            return minInOrder(numbers, index1, index2);
+        }
+        
+        // 缩小查找范围
+        // 比较更新: index1 左移 或者 index2 右移
+        if (numbers[indexMid] >= numbers[index1]) {
+            index1 = indexMid;
+        } else if (numbers[indexMid] <= numbers[index2]) {
+            index2 = indexMid;
+        }
+    }
+    
+    return numbers[indexMid];
+}
+
+int minInOrder(int* numbers, int index1, int index2) {
+    int result = numbers[index1];
+    for (int i = index1 + 1; i <= index2; ++i) {
+        if (result > numbers[i]) {
+            result = numbers[i];
+        }
+    }
+    return result;
+}
+
+// 矩阵中的路径
+bool hasPathCore(const char* matrix, int rows, int cols, int row, int col, const char* str, int& pathLength, bool* visited);
+bool hasPath(const char* matrix, int rows, int cols, const char* str) {
+    // 第一步判断参数是否正确
+    // 1. 参数判断
+    if (matrix == nullptr || rows < 1 || cols < 1 || str == nullptr) {
+        return false;
+    }
+    // 第二步准备下个函数的入参
+    // 这里 bool 矩阵创建重点记一下
+    // 2. 创建一个 bool 数组来记录矩阵中对应位置的字母是否已经使用过了
+    bool* visited = new bool[rows * cols];
+    memset(visited, 0, rows * cols);
+    
+    // 3. 嵌套循环
+    int pathLength = 0; // 记录当前位置
+    for (int row = 0; row < rows; ++row) {
+        for (int col = 0; col < cols; ++col) {
+            
+            if (hasPathCore(matrix, rows, cols, row, col, str, pathLength, visited)) {
+                return true;
+            }
+            
+        }
+    }
+    
+    delete [] visited;
+    return false;
+}
+
+bool hasPathCore(const char* matrix, int rows, int cols, int row, int col, const char* str, int& pathLength, bool* visited) {
+    // 如果 pathLength 到了字符串末尾，说明已经找到对应路径，可以结束函数执行了！
+    if (str[pathLength] == '\0') {
+        return true;
+    }
+    
+    bool hasPath = false;
+    
+    // 判断当前这个指定路径是否能进行判断
+    // 这里要判断 row 和 col 大于 0 并且小于最大值，因为下面有个 -1 操作，它们的值可能小于 0
+    // 这里要判断 matrix[row * cols + col] == str[pathLength] 确定前一个路径节点包含字符
+    // 三是判断 !visited[row + cols + col] 路径节点是第一次经过
+    if (row >= 0 && row < rows && col >= 0 && col < cols && matrix[row * cols + col] == str[pathLength] && !visited[row + cols + col]) {
+        // 先往前走一步
+        ++pathLength;
+        // 标记该路径已经被走过
+        visited[row * cols + col] = true;
+        
+        hasPath = hasPathCore(matrix, rows, cols, row, col - 1, str, pathLength, visited) || hasPathCore(matrix, rows, cols, row - 1, col, str, pathLength, visited) || hasPathCore(matrix, rows, cols, row, col + 1, str, pathLength, visited) || hasPathCore(matrix, rows, cols, row + 1, col, str, pathLength, visited);
+        
+        // 如果经过上面 4 个或，没有正确结果，则倒上去
+        if (!hasPath) {
+            // 倒退一步
+            // 这个 --pathLength 正是回溯法的精髓
+            // 倒退一步
+            --pathLength;
+            // 该路径点置为 false
+            visited[row * cols + col] = false;
+        }
+    }
+
+    return hasPath;
+}
+
+// 机器人的运动范围
+int movingCountCore(int threshold, int rows, int cols, int row, int col, bool* visited);
+bool check(int threshold, int rows, int cols, int row, int col, bool* visited);
+int getDigitSum(int number);
+
+int movingCount(int threshold, int rows, int cols) {
+    // 参数判断
+    if (threshold < 0 || rows <= 0 || cols <= 0) {
+        return 0;
+    }
+    
+    // 创建标记数组，并初始全部设置为 false
+    bool* visited = new bool[rows * cols];
+    for (int i = 0; i < rows * cols; ++i) {
+        visited[i] = false;
+    }
+    
+    // 计算 count，从 0 0 开始
+    int count = movingCountCore(threshold, rows, cols, 0, 0, visited);
+    
+    // 释放数组内存
+    delete [] visited;
+    
+    return count;
+}
+
+int movingCountCore(int threshold, int rows, int cols, int row, int col, bool* visited) {
+    // 记录数值
+    int count = 0;
+    
+    if (check(threshold, rows, cols, row, col, visited)) {
+        // 标记置为 true，表示该点已经经过了
+        visited[row * cols + col] = true;
+        
+        count = 1 + movingCountCore(threshold, rows, cols, row - 1, col, visited) + movingCountCore(threshold, rows, cols, row, col - 1, visited) + movingCountCore(threshold, rows, cols, row + 1, col, visited) +
+        movingCountCore(threshold, rows, cols, row, col + 1, visited);
+    }
+    
+    return count;
+}
+
+// 判断参数是否合规
+bool check(int threshold, int rows, int cols, int row, int col, bool* visited) {
+    // 行和列的范围，大于等于 0, 内部有一个 -1 操作，计算可能小于 0
+    // 判断 row 和 col 数字之和是否小于等于 threshold
+    // 判断数组标记是否为 false
+    if (row >= 0 && row < rows && col >= 0 && col < cols && getDigitSum(row) + getDigitSum(col) <= threshold && !visited[row * cols + col]) {
+        return true;
+    }
+    
+    return false;
+}
+
+int getDigitSum(int number) {
+    int sum = 0;
+    while (number > 0) {
+        sum += number % 10;
+        number /= 10;
+    }
+    
+    return sum;
+}
+
+// 剪绳子
+int maxProductAfterCutting_solution1(int length) {
+    if (length < 2)
+        return 0;
+    
+    if (length == 2)
+        return 1;
+    
+    if (length == 3)
+        return 2;
+    
+    int* products = new int[length + 1];
+    products[0] = 0;
+    products[1] = 1;
+    products[2] = 2;
+    products[3] = 3;
+    
+    int max = 0;
+    for(int i = 4; i <= length; ++i) {
+        max = 0;
+        for (int j = 1; j <= i / 2; ++j) {
+            int product = products[j] * products[i - j];
+            if (max < product) {
+                max = product;
+            }
+            
+            products[i] = max;
+        }
+    }
+    
+    max = products[length];
+    delete [] products;
+    
+    return max;
+}
+
+int maxProductAfterCutting_solution2(int length) {
+    if (length < 2) {
+        return 0;
+    }
+    if (length == 2) {
+        return 1;
+    }
+    if (length == 3) {
+        return 2;
+    }
+    
+    int timesOf3 = length / 3;
+    
+    if(length - timesOf3 * 3 == 1) {
+        timesOf3 -= 1;
+    }
+    
+    int timesOf2 = (length - timesOf3 * 3) / 2;
+    
+    return (int) (pow(3, timesOf3)) * (int) (pow(2, timesOf2));
+}
+
+// 二进制中 1 的个数
+int numberOf1(int n) {
+    int count = 0;
+    while (n > 0) {
+        if (n & 1) {
+            ++count;
+        }
+        
+        n = n >> 1;
+    }
+    
+    return count;
+}
+
+int numberOf1_Two(int n) {
+    int count = 0;
+    unsigned int flag = 1;
+    while (flag) {
+        if (n & flag) {
+            ++count;
+        }
+        flag = flag << 1;
+    }
+    
+    return count;
+}
+
+int numberOf1_Three(int n) {
+    int count = 0;
+    while (n) {
+        ++count;
+        n = (n - 1) & n;
+    }
+    
+    return count;
 }
 
 int main(int argc, const char * argv[]) {
