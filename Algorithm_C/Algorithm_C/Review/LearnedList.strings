@@ -1,24 +1,10 @@
-//
-//  Review_2.cpp
-//  Algorithm_C
-//
-//  Created by HM C on 2020/7/12.
-//  Copyright © 2020 CHM. All rights reserved.
-//
+/* 
+  LearnedList.strings
+  Algorithm_C
 
-#include <stdio.h>
-#include <iostream>
-
-#include <string.h>
-#include <vector>
-#include <stack>
-#include <queue>
-#include <list>
-#include <algorithm>
-
-using namespace std;
-
-namespace Review_2 {
+  Created by CHM on 2020/7/14.
+  Copyright © 2020 CHM. All rights reserved.
+*/
 
 // 01. 冒泡排序 O(n*n)
 // 02. 插入排序 O(n*n)
@@ -54,5 +40,4 @@ namespace Review_2 {
 // 32. 机器人的运动范围。
 // 33. 剪绳子。
 // 34. 二进制中 1 的个数。
-
-}
+// 35. 求数值的整数次方，不得使用库函数，不需要考虑大数问题。

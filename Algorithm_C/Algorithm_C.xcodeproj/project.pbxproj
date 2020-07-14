@@ -10,6 +10,7 @@
 		8E5CCE0724B9FF3D0081B5FF /* Review_1.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8E5CCE0624B9FF3D0081B5FF /* Review_1.cpp */; };
 		8EB134DB24BA8E8D0055BDDF /* Review_2.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8EB134DA24BA8E8D0055BDDF /* Review_2.cpp */; };
 		D2330A2824AF0FD500C6480D /* main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D2330A2724AF0FD500C6480D /* main.cpp */; };
+		D2407F3C24BD61BD0018D876 /* Power.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D2407F3A24BD61BD0018D876 /* Power.cpp */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -30,6 +31,9 @@
 		D225BF4324B7E38500D16B45 /* StudyList.strings */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; path = StudyList.strings; sourceTree = "<group>"; };
 		D2330A2424AF0FD500C6480D /* Algorithm_C */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = Algorithm_C; sourceTree = BUILT_PRODUCTS_DIR; };
 		D2330A2724AF0FD500C6480D /* main.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
+		D2407F3A24BD61BD0018D876 /* Power.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Power.cpp; sourceTree = "<group>"; };
+		D2407F3B24BD61BD0018D876 /* Power.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = Power.hpp; sourceTree = "<group>"; };
+		D2407F3D24BD626B0018D876 /* LearnedList.strings */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; path = LearnedList.strings; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -62,12 +66,31 @@
 		D2330A2624AF0FD500C6480D /* Algorithm_C */ = {
 			isa = PBXGroup;
 			children = (
+				D2407F3924BD61A60018D876 /* Power */,
 				D225BF4324B7E38500D16B45 /* StudyList.strings */,
 				D2330A2724AF0FD500C6480D /* main.cpp */,
+				D2407F3824BD3D9A0018D876 /* Review */,
+			);
+			path = Algorithm_C;
+			sourceTree = "<group>";
+		};
+		D2407F3824BD3D9A0018D876 /* Review */ = {
+			isa = PBXGroup;
+			children = (
+				D2407F3D24BD626B0018D876 /* LearnedList.strings */,
 				8E5CCE0624B9FF3D0081B5FF /* Review_1.cpp */,
 				8EB134DA24BA8E8D0055BDDF /* Review_2.cpp */,
 			);
-			path = Algorithm_C;
+			path = Review;
+			sourceTree = "<group>";
+		};
+		D2407F3924BD61A60018D876 /* Power */ = {
+			isa = PBXGroup;
+			children = (
+				D2407F3A24BD61BD0018D876 /* Power.cpp */,
+				D2407F3B24BD61BD0018D876 /* Power.hpp */,
+			);
+			path = Power;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -130,6 +153,7 @@
 				8EB134DB24BA8E8D0055BDDF /* Review_2.cpp in Sources */,
 				D2330A2824AF0FD500C6480D /* main.cpp in Sources */,
 				8E5CCE0724B9FF3D0081B5FF /* Review_1.cpp in Sources */,
+				D2407F3C24BD61BD0018D876 /* Power.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

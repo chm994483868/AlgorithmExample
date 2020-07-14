@@ -8,7 +8,9 @@
 
 #include <iostream>
 
+#include <cstdio>
 #include <stdio.h>
+
 #include <string.h>
 #include <vector>
 #include <stack>
@@ -16,10 +18,11 @@
 #include <list>
 #include <algorithm>
 #include <cmath>
-#include <cstdio>
 #include <exception>
 
 using namespace std;
+
+extern void powerStartTest();
 
 void printArray(string desc, int nums[], int count) {
     std::cout << desc;
@@ -1075,34 +1078,34 @@ int movingCount(int threshold, int rows, int cols) {
     if (threshold < 0 || rows <= 0 || cols <= 0) {
         return 0;
     }
-    
+
     // 创建标记数组，并初始全部设置为 false
     bool* visited = new bool[rows * cols];
     for (int i = 0; i < rows * cols; ++i) {
         visited[i] = false;
     }
-    
+
     // 计算 count，从 0 0 开始
     int count = movingCountCore(threshold, rows, cols, 0, 0, visited);
-    
+
     // 释放数组内存
     delete [] visited;
-    
+
     return count;
 }
 
 int movingCountCore(int threshold, int rows, int cols, int row, int col, bool* visited) {
     // 记录数值
     int count = 0;
-    
+
     if (check(threshold, rows, cols, row, col, visited)) {
         // 标记置为 true，表示该点已经经过了
         visited[row * cols + col] = true;
-        
+
         count = 1 + movingCountCore(threshold, rows, cols, row - 1, col, visited) + movingCountCore(threshold, rows, cols, row, col - 1, visited) + movingCountCore(threshold, rows, cols, row + 1, col, visited) +
         movingCountCore(threshold, rows, cols, row, col + 1, visited);
     }
-    
+
     return count;
 }
 
@@ -1114,7 +1117,7 @@ bool check(int threshold, int rows, int cols, int row, int col, bool* visited) {
     if (row >= 0 && row < rows && col >= 0 && col < cols && getDigitSum(row) + getDigitSum(col) <= threshold && !visited[row * cols + col]) {
         return true;
     }
-    
+
     return false;
 }
 
@@ -1124,7 +1127,7 @@ int getDigitSum(int number) {
         sum += number % 10;
         number /= 10;
     }
-    
+
     return sum;
 }
 
@@ -1227,8 +1230,8 @@ int main(int argc, const char * argv[]) {
     // insert code here...
 //    std::cout << "Hello, World!\n";
     
-    int nums[] = {4, 6, 3, 2, 1, 8, 20, 14};
-    printArray("排序前:", nums, 8);
+//    int nums[] = {4, 6, 3, 2, 1, 8, 20, 14};
+//    printArray("排序前:", nums, 8);
     
     // 冒泡排序
 //    bubbleSort(nums, 8);
@@ -1247,9 +1250,13 @@ int main(int argc, const char * argv[]) {
 //    mergeSort(nums, 0, 7, temp);
     // 堆排序
 //    heapSort(nums, 8);
-    heap_sort(nums, 8);
+//    heap_sort(nums, 8);
+
+//    printArray("排序后:", nums, 8);
     
-    printArray("排序后:", nums, 8);
+    powerStartTest();
+    
+    std::cout << '\n';
     
     return 0;
 }

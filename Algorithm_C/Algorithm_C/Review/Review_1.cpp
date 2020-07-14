@@ -862,9 +862,115 @@ bool hasPathCore(const char* matrix, int rows, int cols, int row, int col, const
 }
 
 // 32. 机器人的运动范围。
+int movingCountCore(int threshold, int rows, int cols, int row, int col, bool* visited);
+bool check(int threshold, int rows, int cols, int row, int col, bool* visited);
+int getDigitSum(int number);
+
+int movingCount(int threshold, int rows, int cols) {
+    if (threshold < 0 || rows <= 0 || cols <= 0)
+        return 0;
+    
+    bool* visited = new bool[rows * cols];
+    for (int i = 0; i < rows * cols; ++i) {
+        visited[i] = false;
+    }
+    
+    int count = movingCountCore(threshold, rows, cols, 0, 0, visited);
+    
+    delete [] visited;
+    return count;
+}
+
+int movingCountCore(int threshold, int rows, int cols, int row, int col, bool* visited) {
+    int count = 0;
+    if (check(threshold, rows, cols, row, col, visited)) {
+        visited[row * cols + col] = true;
+        
+        count = 1 + movingCountCore(threshold, rows, cols, row - 1, col, visited) + movingCountCore(threshold, rows, cols, row, col - 1, visited) + movingCountCore(threshold, rows, cols, row + 1, col, visited) + movingCountCore(threshold, rows, cols, row, col + 1, visited);
+    }
+    
+    return count;
+}
+
+bool check(int threshold, int rows, int cols, int row, int col, bool* visited) {
+    if (row >= 0 && row < rows && col >= 0 && col < cols && getDigitSum(row) + getDigitSum(col) <= threshold && !visited[row * cols + col]) {
+        return true;
+    }
+    
+    return false;
+}
+
+int getDigitSum(int number) {
+    int sum = 0;
+    while (number > 0) {
+        sum += number % 10;
+        number /= 10;
+    }
+    
+    return sum;
+}
 
 // 33. 剪绳子。
+//int maxProductAfterCutting_solution1(int length) {
+//    if (length < 2)
+//        return 0;
+//    if (length == 2)
+//        return 1;
+//    if (length == 3)
+//        return 2;
+//
+//    int* products = new int[length + 1];
+//    products[0] = 0;
+//    products[1] = 1;
+//    products[2] = 2;
+//    products[3] = 3;
+//
+//    int max = 0;
+//    for (int i = 4; i <= length; ++i) {
+//
+//        max = 0;
+//        for (int j = 1; j <= i / 2; ++j) {
+//            int product = products[j] * products[i - j];
+//            if (max < product)
+//                max = product;
+//
+//            products[i] = max;
+//        }
+//
+//    }
+//
+//    max = products[length];
+//    delete [] products;
+//
+//    return max;
+//}
+
+//int maxProductAfterCutting_solution2(int length) {
+//    if (length < 2)
+//        return 0;
+//    if (length == 2)
+//        return 1;
+//    if (length == 3)
+//        return 2;
+//
+//    int timesOf3 = length / 3;
+//
+//    if (length - timesOf3 * 3 == 1)
+//        timesOf3 -= 1;
+//
+//    int timesOf2 = (length - timesOf3 * 3) / 2;
+//
+//    return (int) (pow(3, timesOf3)) * (int) (pow(2, timesOf2));
+//}
 
 // 34. 二进制中 1 的个数。
+int ttt(int n) {
+    int count = 0;
+    while (n) {
+        ++count;
+        n = (n - 1) & n;
+    }
+    return n;
+}
 
 }
