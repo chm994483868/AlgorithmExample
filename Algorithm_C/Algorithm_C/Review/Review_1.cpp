@@ -15,6 +15,8 @@
 #include <queue>
 #include <list>
 #include <algorithm>
+#include <cstdio>
+#include <memory>
 
 using namespace std;
 
@@ -1024,8 +1026,184 @@ bool equal(double num1, double num2) {
 }
 
 // 36. 打印从 1 到最大的 n 位数。
+void PrintNumber(char* number);
+bool Increment(char* number);
+void Print1ToMaxOfNDigitsRecursively(char* number, int length, int index);
+
+void Print1ToMaxOfNDigits_1(int n) {
+    if (n <= 0)
+        return;
+    
+    char* number = new char[n + 1];
+#warning 小括号里面是 n，写成了 n - 1
+    memset(number, '0', n);
+    number[n] = '\0';
+    
+    while (!Increment(number)) {
+        PrintNumber(number);
+    }
+    
+#warning 这里 number 忘记了释放
+    delete [] number;
+}
+
+bool Increment(char* number) {
+    bool isOverflow = false;
+    int nTakeOver = 0;
+    unsigned long nLength = strlen(number);
+    
+    for (unsigned long i = nLength - 1; i >= 0; --i) {
+        int nSum = number[i] - '0' + nTakeOver;
+        
+        if (i == nLength - 1) {
+            ++nSum;
+        }
+        
+        if (nSum >= 10) {
+            if (i == 0) {
+                isOverflow = true;
+            } else {
+                nSum -= 10;
+                nTakeOver = 1;
+                number[i] = '0' + nSum;
+            }
+        } else {
+            number[i] = '0' + nSum;
+            break;
+        }
+    }
+    
+    return isOverflow;
+}
+
+void PrintNumber(char* number) {
+    bool isBeginning0 = true;
+    unsigned long nLength = strlen(number);
+    
+    for (unsigned long i = 0; i < nLength; ++i) {
+        
+#warning if 里面的 != '0' 的判断写成了 == '0'
+        if (isBeginning0 && number[i] != '0')
+            isBeginning0 = false;
+        
+        if (!isBeginning0) {
+            printf("%c", number[i]);
+        }
+    }
+    
+    printf("\t");
+}
+
 // 37. 删除链表的节点。
+// 分三种情况：
+// 1): 链表长度大于 1，且待删除节点位于中间，就是待删除节点的 n_pNext != nullptr
+// 2): 链表长度为 1，且待删除节点就是头节点
+// 3): 链表长度大于 1，且待删除节点是链表的尾节点，删除之前我们要遍历链表，找到待删除节点的前一个节点
+void DeleteNode(ListNode** pListHead, ListNode* pToBeDeleted) {
+    if (pListHead == nullptr || *pListHead == nullptr || pToBeDeleted == nullptr)
+        return;
+    
+    if (pToBeDeleted->m_pNext != nullptr) {
+        ListNode* pNext = pToBeDeleted->m_pNext;
+        pToBeDeleted->m_nValue = pNext->m_nValue;
+        pToBeDeleted->m_pNext = pNext->m_pNext;
+        
+        delete pNext;
+        pNext = nullptr;
+    } else if (*pListHead == pToBeDeleted) {
+        delete pToBeDeleted;
+        pToBeDeleted = nullptr;
+        *pListHead = nullptr;
+    } else {
+        ListNode* pNode = *pListHead;
+        while (pNode->m_pNext != pToBeDeleted) {
+            pNode = pNode->m_pNext;
+        }
+        
+        pNode->m_pNext = nullptr;
+        delete pToBeDeleted;
+        pToBeDeleted = nullptr;
+    }
+}
+
 // 38. 删除链表中重复的节点。
+// 分五种情况:
+// 1): 重复的节点在链表头
+// 2): 重复的节点在链表中间
+// 3): 重复的节点在链表尾
+// 4): 没有重复的节点
+// 5): 整个链表都是重复的节点
+void DeleteDuplication(ListNode** pHead) {
+    if (pHead == nullptr || *pHead == nullptr)
+        return;
+    
+    ListNode* pPreNode = nullptr;
+    ListNode* pNode = *pHead;
+    
+    while (pNode != nullptr) {
+        ListNode* pNext = pNode->m_pNext;
+        bool needDelete = false;
+        
+        if (pNext != nullptr && pNode->m_nValue == pNext->m_nValue)
+            needDelete = true;
+        
+        if (!needDelete) {
+            pPreNode = pNode;
+            pNode = pNode->m_pNext;
+        } else {
+            ListNode* pToBeDel = pNode;
+            int value = pNode->m_nValue;
+            
+            while (pToBeDel != nullptr && pToBeDel->m_nValue == value) {
+                pNext = pToBeDel->m_pNext;
+                
+                delete pToBeDel;
+                pToBeDel = nullptr;
+                
+                pToBeDel = pNext;
+            }
+            
+            if (pPreNode == nullptr)
+                *pHead = pNext;
+            else
+                pPreNode->m_pNext = pNext;
+            
+            pNode = pNext;
+        }
+    }
+}
+
 // 39. 正则表达式匹配。
+bool matchCore(const char* str, const char* pattern);
+bool match(const char* str, const char* pattern) {
+    if (str == nullptr || pattern == nullptr)
+        return false;
+    
+    return matchCore(str, pattern);
+}
+
+bool matchCore(const char* str, const char* pattern) {
+    if (*str == '\0' && *pattern == '\0')
+        return false;
+    
+    if (*str != '\0' && *pattern == '\0')
+        return false;
+    
+    if (*(pattern + 1) == '*') {
+        if (*str == *pattern || (*pattern == '.' && *str != '\0')) {
+            return matchCore(str + 1, pattern + 2) ||
+            matchCore(str + 1, pattern) ||
+            matchCore(str, pattern + 2);
+        } else {
+            return matchCore(str, pattern + 2);
+        }
+    }
+    
+    if (*str == *pattern || (*pattern == '.' && *str != '\0')) {
+        return matchCore(str + 1, pattern + 1);
+    }
+    
+    return false;
+}
 
 }
