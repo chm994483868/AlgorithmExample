@@ -1254,7 +1254,7 @@ int main(int argc, const char * argv[]) {
 
 //    printArray("排序后:", nums, 8);
     
-    powerStartTest();
+    startTest_Power();
     
     std::cout << '\n';
     

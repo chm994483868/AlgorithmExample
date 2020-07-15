@@ -16,6 +16,6 @@
 bool g_InvalidInput = false;
 double power(double base, int exponent);
  
-void powerStartTest();
+void startTest_Power();
 
 #endif /* Power_hpp */

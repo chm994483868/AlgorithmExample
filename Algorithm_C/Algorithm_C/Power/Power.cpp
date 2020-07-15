@@ -85,7 +85,7 @@ void Test(const char* testName, double base, int exponent, double expectedResult
         std::cout << testName << " FAILED" << std::endl;
 }
 
-void powerStartTest() {
+void startTest_Power() {
     // µ◊ ˝°¢÷∏ ˝∂ºŒ™’˝ ˝
     Test("Test1", 2, 3, 8, false);
 

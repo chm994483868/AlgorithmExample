@@ -13,4 +13,9 @@
 #include <cstdio>
 #include <memory>
 
+void print1ToMaxOfNDigits_1(int n);
+void print1ToMaxOfNDigits_2(int n);
+
+void startTest_Print1ToMaxOfNDigits();
+
 #endif /* Print1ToMaxOfNDigits_hpp */
