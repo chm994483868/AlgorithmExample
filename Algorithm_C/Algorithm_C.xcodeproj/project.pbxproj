@@ -12,6 +12,7 @@
 		8EB134DF24BDF2CD0055BDDF /* Print1ToMaxOfNDigits.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8EB134DD24BDF2CD0055BDDF /* Print1ToMaxOfNDigits.cpp */; };
 		D2330A2824AF0FD500C6480D /* main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D2330A2724AF0FD500C6480D /* main.cpp */; };
 		D2407F3C24BD61BD0018D876 /* Power.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D2407F3A24BD61BD0018D876 /* Power.cpp */; };
+		D267479324BEC58500DB689B /* DeleteNodeInList.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D267479124BEC58500DB689B /* DeleteNodeInList.cpp */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -37,6 +38,8 @@
 		D2407F3A24BD61BD0018D876 /* Power.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Power.cpp; sourceTree = "<group>"; };
 		D2407F3B24BD61BD0018D876 /* Power.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = Power.hpp; sourceTree = "<group>"; };
 		D2407F3D24BD626B0018D876 /* LearnedList.strings */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; path = LearnedList.strings; sourceTree = "<group>"; };
+		D267479124BEC58500DB689B /* DeleteNodeInList.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = DeleteNodeInList.cpp; sourceTree = "<group>"; };
+		D267479224BEC58500DB689B /* DeleteNodeInList.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = DeleteNodeInList.hpp; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -78,6 +81,7 @@
 		D2330A2624AF0FD500C6480D /* Algorithm_C */ = {
 			isa = PBXGroup;
 			children = (
+				D267479024BEC57100DB689B /* DeleteNodeInList */,
 				8EB134DC24BDF2AB0055BDDF /* Print1ToMaxOfNDigits */,
 				D2407F3924BD61A60018D876 /* Power */,
 				D225BF4324B7E38500D16B45 /* StudyList.strings */,
@@ -104,6 +108,15 @@
 				D2407F3B24BD61BD0018D876 /* Power.hpp */,
 			);
 			path = Power;
+			sourceTree = "<group>";
+		};
+		D267479024BEC57100DB689B /* DeleteNodeInList */ = {
+			isa = PBXGroup;
+			children = (
+				D267479124BEC58500DB689B /* DeleteNodeInList.cpp */,
+				D267479224BEC58500DB689B /* DeleteNodeInList.hpp */,
+			);
+			path = DeleteNodeInList;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -166,6 +179,7 @@
 				8EB134DB24BA8E8D0055BDDF /* Review_2.cpp in Sources */,
 				D2330A2824AF0FD500C6480D /* main.cpp in Sources */,
 				8E5CCE0724B9FF3D0081B5FF /* Review_1.cpp in Sources */,
+				D267479324BEC58500DB689B /* DeleteNodeInList.cpp in Sources */,
 				D2407F3C24BD61BD0018D876 /* Power.cpp in Sources */,
 				8EB134DF24BDF2CD0055BDDF /* Print1ToMaxOfNDigits.cpp in Sources */,
 			);

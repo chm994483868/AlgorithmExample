@@ -71,7 +71,55 @@ bool increment(char* number) {
 }
 
 void print1ToMaxOfNDigits_2(int n) {
+    if (n <= 0)
+        return;
     
+    char* number = new char[n + 1];
+    number[n] = '\0';
+    
+    for (int i = 0; i < 10; ++i) {
+        
+        // 这里 0 - 9 循环，依次把 number 置成这样
+        // 然后执行下面的递归函数
+        
+        // number[0] = '0'
+        // 递归打印...
+        
+        // number[1] = '1'
+        // 递归打印...
+        
+        // number[2] = '2'
+        // 递归打印...
+        
+        // number[3] = '3'
+        // 递归打印...
+        
+        // number[4] = '4'
+        // 递归打印...
+        
+        // number[5] = '5'
+        // 递归打印...
+        
+        // ...
+        // ...
+        
+        number[0] = i + '0';
+        print1ToMaxOfNDigitsRecursively(number, n, 0);
+    }
+    
+    delete [] number;
+}
+
+void print1ToMaxOfNDigitsRecursively(char* number, int length, int index) {
+    if (index == length - 1) {
+        printNumber(number);
+        return;
+    }
+    
+    for (int i = 0; i < 10; ++i) {
+        number[index + 1] = i + '0';
+        print1ToMaxOfNDigitsRecursively(number, length, index + 1);
+    }
 }
 
 void printNumber(char* number) {
@@ -91,4 +139,20 @@ void printNumber(char* number) {
     }
     
     printf("\t");
+}
+
+void Test(int n) {
+    printf("Test for %d begins:\n", n);
+
+    print1ToMaxOfNDigits_1(n);
+
+    printf("\nTest for %d ends.\n", n);
+}
+
+void startTest_Print1ToMaxOfNDigits() {
+    Test(1);
+    Test(2);
+    Test(3);
+    Test(0);
+    Test(-1);
 }

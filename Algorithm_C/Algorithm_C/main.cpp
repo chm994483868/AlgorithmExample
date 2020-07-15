@@ -22,7 +22,8 @@
 
 using namespace std;
 
-extern void powerStartTest();
+extern void startTest_Power();
+extern void startTest_Print1ToMaxOfNDigits();
 
 void printArray(string desc, int nums[], int count) {
     std::cout << desc;
@@ -1254,7 +1255,8 @@ int main(int argc, const char * argv[]) {
 
 //    printArray("排序后:", nums, 8);
     
-    startTest_Power();
+//    startTest_Power();
+    startTest_Print1ToMaxOfNDigits();
     
     std::cout << '\n';
     
