@@ -14,6 +14,7 @@
 		D2407F3C24BD61BD0018D876 /* Power.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D2407F3A24BD61BD0018D876 /* Power.cpp */; };
 		D267479324BEC58500DB689B /* DeleteNodeInList.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D267479124BEC58500DB689B /* DeleteNodeInList.cpp */; };
 		D267479724BED8E300DB689B /* DeleteDuplicatedNode.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D267479524BED8E300DB689B /* DeleteDuplicatedNode.cpp */; };
+		D267479B24BF060700DB689B /* RegularExpressions.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D267479924BF060700DB689B /* RegularExpressions.cpp */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -43,6 +44,8 @@
 		D267479224BEC58500DB689B /* DeleteNodeInList.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = DeleteNodeInList.hpp; sourceTree = "<group>"; };
 		D267479524BED8E300DB689B /* DeleteDuplicatedNode.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = DeleteDuplicatedNode.cpp; sourceTree = "<group>"; };
 		D267479624BED8E300DB689B /* DeleteDuplicatedNode.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = DeleteDuplicatedNode.hpp; sourceTree = "<group>"; };
+		D267479924BF060700DB689B /* RegularExpressions.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = RegularExpressions.cpp; sourceTree = "<group>"; };
+		D267479A24BF060700DB689B /* RegularExpressions.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = RegularExpressions.hpp; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -84,6 +87,7 @@
 		D2330A2624AF0FD500C6480D /* Algorithm_C */ = {
 			isa = PBXGroup;
 			children = (
+				D267479824BF05FA00DB689B /* RegularExpressions */,
 				D267479424BED8D300DB689B /* DeleteDuplicatedNode */,
 				D267479024BEC57100DB689B /* DeleteNodeInList */,
 				8EB134DC24BDF2AB0055BDDF /* Print1ToMaxOfNDigits */,
@@ -130,6 +134,15 @@
 				D267479624BED8E300DB689B /* DeleteDuplicatedNode.hpp */,
 			);
 			path = DeleteDuplicatedNode;
+			sourceTree = "<group>";
+		};
+		D267479824BF05FA00DB689B /* RegularExpressions */ = {
+			isa = PBXGroup;
+			children = (
+				D267479924BF060700DB689B /* RegularExpressions.cpp */,
+				D267479A24BF060700DB689B /* RegularExpressions.hpp */,
+			);
+			path = RegularExpressions;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -193,6 +206,7 @@
 				D2330A2824AF0FD500C6480D /* main.cpp in Sources */,
 				8E5CCE0724B9FF3D0081B5FF /* Review_1.cpp in Sources */,
 				D267479324BEC58500DB689B /* DeleteNodeInList.cpp in Sources */,
+				D267479B24BF060700DB689B /* RegularExpressions.cpp in Sources */,
 				D2407F3C24BD61BD0018D876 /* Power.cpp in Sources */,
 				D267479724BED8E300DB689B /* DeleteDuplicatedNode.cpp in Sources */,
 				8EB134DF24BDF2CD0055BDDF /* Print1ToMaxOfNDigits.cpp in Sources */,
