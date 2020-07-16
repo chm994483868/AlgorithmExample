@@ -25,6 +25,8 @@ using namespace std;
 extern void startTest_Power();
 extern void startTest_Print1ToMaxOfNDigits();
 extern void startTest_Match();
+extern void startTest_IsNumeric();
+extern void startTest_ReorderOddEven();
 
 void printArray(string desc, int nums[], int count) {
     std::cout << desc;
@@ -1258,7 +1260,9 @@ int main(int argc, const char * argv[]) {
     
 //    startTest_Power();
 //    startTest_Print1ToMaxOfNDigits();
-    startTest_Match();
+//    startTest_Match();
+//    startTest_IsNumeric();
+    startTest_ReorderOddEven();
     
     std::cout << '\n';
     

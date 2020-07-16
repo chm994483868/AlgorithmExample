@@ -1206,4 +1206,202 @@ bool matchCore(const char* str, const char* pattern) {
     return false;
 }
 
+// 40. 表示数值的字符串。
+bool scanUnsignedInteger(const char** str);
+bool scanInteger(const char** str);
+
+bool isNumeric(const char* str) {
+    if (str == nullptr)
+        return false;
+    
+    bool numeric = scanInteger(&str);
+    
+    if (*str == '.') {
+        ++str;
+        
+        numeric = scanUnsignedInteger(&str) || numeric;
+    }
+    
+    if (*str == 'e' || *str == 'E') {
+        ++str;
+        
+        numeric = scanInteger(&str) && numeric;
+    }
+    
+    return numeric && *str == '\0';
+}
+
+bool scanUnsignedInteger(const char** str) {
+    const char* pBefore = *str;
+    while (**str != '\0' && **str >= '0' && **str <= '9') {
+        ++(*str);
+    }
+    
+    return *str > pBefore;
+}
+
+bool scanInteger(const char** str) {
+    if (**str == '+' || **str == '-')
+        ++(*str);
+    
+    return scanUnsignedInteger(str);
+}
+
+// 41. 调整数组顺序使奇数位于偶数前面。
+void reorder(int *pData, unsigned int length, bool (*func)(int));
+bool isEven(int n);
+
+void reorderOddEven_1(int *pData, unsigned int length) {
+    if (pData == nullptr || length <= 0)
+        return;
+    
+    int* pBegin = pData;
+    int* pEnd = pData + length - 1;
+    
+    while (pBegin < pEnd) {
+        while (pBegin < pEnd && (*pEnd & 0x1) == 0)
+            --pEnd;
+        
+        while (pBegin < pEnd && (*pBegin & 0x1) != 0) {
+            ++pBegin;
+        }
+        
+        if (pBegin < pEnd) {
+            int temp = *pBegin;
+            *pBegin = *pEnd;
+            *pEnd = temp;
+        }
+    }
+}
+
+void reorderOddEven_2(int *pData, unsigned int length) {
+    reorder(pData, length, isEven);
+}
+
+void reorder(int *pData, unsigned int length, bool (*func)(int)) {
+    if (pData == nullptr || length <= 0)
+        return;
+    
+    int* pBegin = pData;
+    int* pEnd = pData + length - 1;
+    
+    while (pBegin < pEnd) {
+        while (pBegin < pEnd && !func(*pBegin))
+            ++pBegin;
+        
+        while (pBegin < pEnd && func(*pEnd)) {
+            --pEnd;
+        }
+        
+        if (pBegin < pEnd) {
+            int temp = *pBegin;
+            *pBegin = *pEnd;
+            *pEnd = temp;
+        }
+    }
+}
+
+bool isEven(int n) {
+    return (n & 0x1) == 0;
+}
+
+// 42. 链表中倒数第 k 个节点。
+ListNode* FindKthToTail(ListNode* pListHead, unsigned int k) {
+    if (pListHead == nullptr || k == 0)
+        return nullptr;
+    
+    ListNode* pAHead = pListHead;
+    for (int i = 0; i < k - 1; ++i) {
+        if (pAHead->m_pNext != nullptr)
+            pAHead = pAHead->m_pNext;
+        else
+            return nullptr;
+    }
+    
+    ListNode* pBehind = pListHead;
+    while (pAHead->m_pNext != nullptr) {
+        pAHead = pAHead->m_pNext;
+        pBehind = pBehind->m_pNext;
+    }
+    
+    return pBehind;
+}
+
+// 43. 链表中环的入口节点。
+ListNode* meetingNode(ListNode* pHead) {
+    if (pHead == nullptr)
+        return nullptr;
+    
+    ListNode* pSlow = pHead->m_pNext;
+    if (pSlow == nullptr)
+        return nullptr;
+    
+    ListNode* pFast = pSlow->m_pNext;
+    while (pSlow != nullptr && pFast != nullptr) {
+        if (pSlow == pFast)
+            return pFast;
+        
+        pSlow = pSlow->m_pNext;
+        
+        pFast = pFast->m_pNext;
+        if (pFast != nullptr) {
+            pFast = pFast->m_pNext;
+        }
+    }
+    
+    return nullptr;
+}
+
+ListNode* entryNodeOfLoop(ListNode* pHead) {
+    // 1. 先找到环中的一个节点
+    ListNode* pMeetingNode = meetingNode(pHead);
+    if (pMeetingNode == nullptr)
+        return nullptr;
+    
+    // 2. 环中节点的数目
+    ListNode* pNode1 = pMeetingNode;
+    int nodesInLoop = 1;
+    
+    while (pNode1->m_pNext != pMeetingNode) {
+        pNode1 = pNode1->m_pNext;
+        ++nodesInLoop;
+    }
+    
+    // 3. pNode1 从头节点往前走 nodesInLoop 步
+    pNode1 = pHead;
+    for (int i = 0; i < nodesInLoop; ++i) {
+        pNode1 = pNode1->m_pNext;
+    }
+    
+    // 4. pNode1 和 pNode2 同时往前走
+    ListNode* pNode2 = pHead;
+    while (pNode1 != pNode2) {
+        pNode1 = pNode1->m_pNext;
+        pNode2 = pNode2->m_pNext;
+    }
+    
+    return pNode1;
+}
+
+// 44. 反转链表。
+ListNode* reverseList(ListNode* pHead) {
+    ListNode* pReversedHead = nullptr;
+    ListNode* pPrev = nullptr;
+    ListNode* pNode = pHead;
+    
+    while (pNode != nullptr) {
+        ListNode* pNext = pNode->m_pNext;
+        
+        if (pNext == nullptr)
+            pReversedHead = pNode;
+        
+        pNode->m_pNext = pPrev;
+        
+        pPrev = pNode;
+        pNode = pNext;
+    }
+    
+    return pReversedHead;
+}
+
 }

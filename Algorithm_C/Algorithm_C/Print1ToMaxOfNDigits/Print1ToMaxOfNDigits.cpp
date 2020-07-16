@@ -78,19 +78,6 @@ void print1ToMaxOfNDigits_2(int n) {
     number[n] = '\0';
     
     for (int i = 0; i < 10; ++i) {
-        
-        // 这里 0 - 9 循环，依次把 number 置成这样
-        // 然后执行下面的递归函数
-        
-        // number[0] = '0'
-        // 递归打印...
-        
-        // number[1] = '1'
-        // 递归打印...
-        
-        // ...
-        // ...
-        
         number[0] = i + '0';
         print1ToMaxOfNDigitsRecursively(number, n, 0);
     }
@@ -103,8 +90,7 @@ void print1ToMaxOfNDigitsRecursively(char* number, int length, int index) {
         printNumber(number);
         return;
     }
-    // "00___"
-    //
+    
     for (int i = 0; i < 10; ++i) {
         number[index + 1] = i + '0';
         print1ToMaxOfNDigitsRecursively(number, length, index + 1);
