@@ -15,6 +15,7 @@
 		D21EDC8C24C01DE300CBF16E /* KthNodeFromEnd.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D21EDC8A24C01DE300CBF16E /* KthNodeFromEnd.cpp */; };
 		D21EDC9024C02C1900CBF16E /* EntryNodeInListLoop.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D21EDC8E24C02C1900CBF16E /* EntryNodeInListLoop.cpp */; };
 		D21EDC9424C03FFA00CBF16E /* ReverseList.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D21EDC9224C03FFA00CBF16E /* ReverseList.cpp */; };
+		D21EDC9924C066A000CBF16E /* MergeSortedLists.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D21EDC9724C066A000CBF16E /* MergeSortedLists.cpp */; };
 		D2330A2824AF0FD500C6480D /* main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D2330A2724AF0FD500C6480D /* main.cpp */; };
 		D2407F3C24BD61BD0018D876 /* Power.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D2407F3A24BD61BD0018D876 /* Power.cpp */; };
 		D267479324BEC58500DB689B /* DeleteNodeInList.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D267479124BEC58500DB689B /* DeleteNodeInList.cpp */; };
@@ -49,6 +50,8 @@
 		D21EDC8F24C02C1900CBF16E /* EntryNodeInListLoop.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = EntryNodeInListLoop.hpp; sourceTree = "<group>"; };
 		D21EDC9224C03FFA00CBF16E /* ReverseList.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = ReverseList.cpp; sourceTree = "<group>"; };
 		D21EDC9324C03FFA00CBF16E /* ReverseList.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = ReverseList.hpp; sourceTree = "<group>"; };
+		D21EDC9724C066A000CBF16E /* MergeSortedLists.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = MergeSortedLists.cpp; sourceTree = "<group>"; };
+		D21EDC9824C066A000CBF16E /* MergeSortedLists.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = MergeSortedLists.hpp; sourceTree = "<group>"; };
 		D225BF4324B7E38500D16B45 /* StudyList.strings */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; path = StudyList.strings; sourceTree = "<group>"; };
 		D2330A2424AF0FD500C6480D /* Algorithm_C */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = Algorithm_C; sourceTree = BUILT_PRODUCTS_DIR; };
 		D2330A2724AF0FD500C6480D /* main.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
@@ -136,6 +139,15 @@
 			path = LearnedList;
 			sourceTree = "<group>";
 		};
+		D21EDC9624C0669600CBF16E /* MergeSortedLists */ = {
+			isa = PBXGroup;
+			children = (
+				D21EDC9724C066A000CBF16E /* MergeSortedLists.cpp */,
+				D21EDC9824C066A000CBF16E /* MergeSortedLists.hpp */,
+			);
+			path = MergeSortedLists;
+			sourceTree = "<group>";
+		};
 		D2330A1B24AF0FD500C6480D = {
 			isa = PBXGroup;
 			children = (
@@ -155,6 +167,7 @@
 		D2330A2624AF0FD500C6480D /* Algorithm_C */ = {
 			isa = PBXGroup;
 			children = (
+				D21EDC9624C0669600CBF16E /* MergeSortedLists */,
 				D21EDC9124C03FF100CBF16E /* ReverseList */,
 				D21EDC8D24C02C0E00CBF16E /* EntryNodeInListLoop */,
 				D21EDC8924C01DDA00CBF16E /* KthNodeFromEnd */,
@@ -286,6 +299,7 @@
 				D21EDC8C24C01DE300CBF16E /* KthNodeFromEnd.cpp in Sources */,
 				D21EDC9024C02C1900CBF16E /* EntryNodeInListLoop.cpp in Sources */,
 				D21EDC9424C03FFA00CBF16E /* ReverseList.cpp in Sources */,
+				D21EDC9924C066A000CBF16E /* MergeSortedLists.cpp in Sources */,
 				D267479724BED8E300DB689B /* DeleteDuplicatedNode.cpp in Sources */,
 				8EB134DF24BDF2CD0055BDDF /* Print1ToMaxOfNDigits.cpp in Sources */,
 			);
