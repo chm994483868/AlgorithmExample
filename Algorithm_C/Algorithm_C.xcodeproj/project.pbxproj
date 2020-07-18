@@ -16,6 +16,7 @@
 		8E3ECB8E24C28B98004D4F4E /* PrintTreesInLines.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8E3ECB8C24C28B98004D4F4E /* PrintTreesInLines.cpp */; };
 		8E3ECB9224C29779004D4F4E /* PrintTreesInZigzag.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8E3ECB9024C29779004D4F4E /* PrintTreesInZigzag.cpp */; };
 		8E3ECB9624C2A9FF004D4F4E /* SquenceOfBST.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8E3ECB9424C2A9FF004D4F4E /* SquenceOfBST.cpp */; };
+		8E3ECB9A24C2E9CA004D4F4E /* PathInTree.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8E3ECB9824C2E9CA004D4F4E /* PathInTree.cpp */; };
 		8E5CCE0724B9FF3D0081B5FF /* Review_1.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8E5CCE0624B9FF3D0081B5FF /* Review_1.cpp */; };
 		8EB134DB24BA8E8D0055BDDF /* Review_2.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8EB134DA24BA8E8D0055BDDF /* Review_2.cpp */; };
 		8EB134DF24BDF2CD0055BDDF /* Print1ToMaxOfNDigits.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8EB134DD24BDF2CD0055BDDF /* Print1ToMaxOfNDigits.cpp */; };
@@ -64,6 +65,8 @@
 		8E3ECB9124C29779004D4F4E /* PrintTreesInZigzag.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = PrintTreesInZigzag.hpp; sourceTree = "<group>"; };
 		8E3ECB9424C2A9FF004D4F4E /* SquenceOfBST.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = SquenceOfBST.cpp; sourceTree = "<group>"; };
 		8E3ECB9524C2A9FF004D4F4E /* SquenceOfBST.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = SquenceOfBST.hpp; sourceTree = "<group>"; };
+		8E3ECB9824C2E9CA004D4F4E /* PathInTree.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = PathInTree.cpp; sourceTree = "<group>"; };
+		8E3ECB9924C2E9CA004D4F4E /* PathInTree.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = PathInTree.hpp; sourceTree = "<group>"; };
 		8E5CCE0624B9FF3D0081B5FF /* Review_1.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Review_1.cpp; sourceTree = "<group>"; };
 		8EB134DA24BA8E8D0055BDDF /* Review_2.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Review_2.cpp; sourceTree = "<group>"; };
 		8EB134DD24BDF2CD0055BDDF /* Print1ToMaxOfNDigits.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Print1ToMaxOfNDigits.cpp; sourceTree = "<group>"; };
@@ -188,6 +191,15 @@
 			path = SquenceOfBST;
 			sourceTree = "<group>";
 		};
+		8E3ECB9724C2E9C2004D4F4E /* PathInTree */ = {
+			isa = PBXGroup;
+			children = (
+				8E3ECB9824C2E9CA004D4F4E /* PathInTree.cpp */,
+				8E3ECB9924C2E9CA004D4F4E /* PathInTree.hpp */,
+			);
+			path = PathInTree;
+			sourceTree = "<group>";
+		};
 		8EB134DC24BDF2AB0055BDDF /* Print1ToMaxOfNDigits */ = {
 			isa = PBXGroup;
 			children = (
@@ -287,6 +299,7 @@
 		D2330A2624AF0FD500C6480D /* Algorithm_C */ = {
 			isa = PBXGroup;
 			children = (
+				8E3ECB9724C2E9C2004D4F4E /* PathInTree */,
 				8E3ECB9324C2A9F9004D4F4E /* SquenceOfBST */,
 				8E3ECB8F24C29771004D4F4E /* PrintTreesInZigzag */,
 				8E3ECB8B24C28B98004D4F4E /* PrintTreesInLines */,
@@ -427,6 +440,7 @@
 				8E3ECB9224C29779004D4F4E /* PrintTreesInZigzag.cpp in Sources */,
 				8E3ECB8224C28B65004D4F4E /* StackWithMin.cpp in Sources */,
 				8E5CCE0724B9FF3D0081B5FF /* Review_1.cpp in Sources */,
+				8E3ECB9A24C2E9CA004D4F4E /* PathInTree.cpp in Sources */,
 				8E3ECB7E24C28B56004D4F4E /* PrintMatrix.cpp in Sources */,
 				D267479324BEC58500DB689B /* DeleteNodeInList.cpp in Sources */,
 				8E3ECB9624C2A9FF004D4F4E /* SquenceOfBST.cpp in Sources */,

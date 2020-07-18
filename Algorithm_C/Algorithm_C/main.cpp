@@ -27,6 +27,7 @@ extern void startTest_Print1ToMaxOfNDigits();
 extern void startTest_Match();
 extern void startTest_IsNumeric();
 extern void startTest_ReorderOddEven();
+extern void startTest_FindPathTree();
 
 void printArray(string desc, int nums[], int count) {
     std::cout << desc;
@@ -1262,7 +1263,9 @@ int main(int argc, const char * argv[]) {
 //    startTest_Print1ToMaxOfNDigits();
 //    startTest_Match();
 //    startTest_IsNumeric();
-    startTest_ReorderOddEven();
+//    startTest_ReorderOddEven();
+    
+    startTest_FindPathTree();
     
     std::cout << '\n';
     
