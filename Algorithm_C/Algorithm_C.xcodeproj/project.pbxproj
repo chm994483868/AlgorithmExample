@@ -14,6 +14,8 @@
 		8E3ECB8624C28B73004D4F4E /* StackPushPopOrder.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8E3ECB8424C28B73004D4F4E /* StackPushPopOrder.cpp */; };
 		8E3ECB8A24C28B8D004D4F4E /* PrintTreeFromTopToBottom.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8E3ECB8824C28B8C004D4F4E /* PrintTreeFromTopToBottom.cpp */; };
 		8E3ECB8E24C28B98004D4F4E /* PrintTreesInLines.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8E3ECB8C24C28B98004D4F4E /* PrintTreesInLines.cpp */; };
+		8E3ECB9224C29779004D4F4E /* PrintTreesInZigzag.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8E3ECB9024C29779004D4F4E /* PrintTreesInZigzag.cpp */; };
+		8E3ECB9624C2A9FF004D4F4E /* SquenceOfBST.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8E3ECB9424C2A9FF004D4F4E /* SquenceOfBST.cpp */; };
 		8E5CCE0724B9FF3D0081B5FF /* Review_1.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8E5CCE0624B9FF3D0081B5FF /* Review_1.cpp */; };
 		8EB134DB24BA8E8D0055BDDF /* Review_2.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8EB134DA24BA8E8D0055BDDF /* Review_2.cpp */; };
 		8EB134DF24BDF2CD0055BDDF /* Print1ToMaxOfNDigits.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8EB134DD24BDF2CD0055BDDF /* Print1ToMaxOfNDigits.cpp */; };
@@ -58,6 +60,10 @@
 		8E3ECB8924C28B8D004D4F4E /* PrintTreeFromTopToBottom.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = PrintTreeFromTopToBottom.hpp; sourceTree = "<group>"; };
 		8E3ECB8C24C28B98004D4F4E /* PrintTreesInLines.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = PrintTreesInLines.cpp; sourceTree = "<group>"; };
 		8E3ECB8D24C28B98004D4F4E /* PrintTreesInLines.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = PrintTreesInLines.hpp; sourceTree = "<group>"; };
+		8E3ECB9024C29779004D4F4E /* PrintTreesInZigzag.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = PrintTreesInZigzag.cpp; sourceTree = "<group>"; };
+		8E3ECB9124C29779004D4F4E /* PrintTreesInZigzag.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = PrintTreesInZigzag.hpp; sourceTree = "<group>"; };
+		8E3ECB9424C2A9FF004D4F4E /* SquenceOfBST.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = SquenceOfBST.cpp; sourceTree = "<group>"; };
+		8E3ECB9524C2A9FF004D4F4E /* SquenceOfBST.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = SquenceOfBST.hpp; sourceTree = "<group>"; };
 		8E5CCE0624B9FF3D0081B5FF /* Review_1.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Review_1.cpp; sourceTree = "<group>"; };
 		8EB134DA24BA8E8D0055BDDF /* Review_2.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Review_2.cpp; sourceTree = "<group>"; };
 		8EB134DD24BDF2CD0055BDDF /* Print1ToMaxOfNDigits.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Print1ToMaxOfNDigits.cpp; sourceTree = "<group>"; };
@@ -164,6 +170,24 @@
 			path = PrintTreesInLines;
 			sourceTree = "<group>";
 		};
+		8E3ECB8F24C29771004D4F4E /* PrintTreesInZigzag */ = {
+			isa = PBXGroup;
+			children = (
+				8E3ECB9024C29779004D4F4E /* PrintTreesInZigzag.cpp */,
+				8E3ECB9124C29779004D4F4E /* PrintTreesInZigzag.hpp */,
+			);
+			path = PrintTreesInZigzag;
+			sourceTree = "<group>";
+		};
+		8E3ECB9324C2A9F9004D4F4E /* SquenceOfBST */ = {
+			isa = PBXGroup;
+			children = (
+				8E3ECB9424C2A9FF004D4F4E /* SquenceOfBST.cpp */,
+				8E3ECB9524C2A9FF004D4F4E /* SquenceOfBST.hpp */,
+			);
+			path = SquenceOfBST;
+			sourceTree = "<group>";
+		};
 		8EB134DC24BDF2AB0055BDDF /* Print1ToMaxOfNDigits */ = {
 			isa = PBXGroup;
 			children = (
@@ -263,6 +287,8 @@
 		D2330A2624AF0FD500C6480D /* Algorithm_C */ = {
 			isa = PBXGroup;
 			children = (
+				8E3ECB9324C2A9F9004D4F4E /* SquenceOfBST */,
+				8E3ECB8F24C29771004D4F4E /* PrintTreesInZigzag */,
 				8E3ECB8B24C28B98004D4F4E /* PrintTreesInLines */,
 				8E3ECB8724C28B8C004D4F4E /* PrintTreeFromTopToBottom */,
 				8E3ECB8324C28B73004D4F4E /* StackPushPopOrder */,
@@ -398,10 +424,12 @@
 				D21EDC8824BFFCFB00CBF16E /* ReorderArray.cpp in Sources */,
 				8EB134DB24BA8E8D0055BDDF /* Review_2.cpp in Sources */,
 				D2330A2824AF0FD500C6480D /* main.cpp in Sources */,
+				8E3ECB9224C29779004D4F4E /* PrintTreesInZigzag.cpp in Sources */,
 				8E3ECB8224C28B65004D4F4E /* StackWithMin.cpp in Sources */,
 				8E5CCE0724B9FF3D0081B5FF /* Review_1.cpp in Sources */,
 				8E3ECB7E24C28B56004D4F4E /* PrintMatrix.cpp in Sources */,
 				D267479324BEC58500DB689B /* DeleteNodeInList.cpp in Sources */,
+				8E3ECB9624C2A9FF004D4F4E /* SquenceOfBST.cpp in Sources */,
 				D267479B24BF060700DB689B /* RegularExpressions.cpp in Sources */,
 				D2407F3C24BD61BD0018D876 /* Power.cpp in Sources */,
 				D21EDC8C24C01DE300CBF16E /* KthNodeFromEnd.cpp in Sources */,
