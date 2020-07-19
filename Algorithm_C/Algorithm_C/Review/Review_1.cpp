@@ -17,6 +17,7 @@
 #include <algorithm>
 #include <cstdio>
 #include <memory>
+#include <deque>
 
 using namespace std;
 
@@ -1405,27 +1406,379 @@ ListNode* reverseList(ListNode* pHead) {
 }
 
 // 45. 合并两个排序的链表。
+ListNode* mergeSortedLists(ListNode* pHead1, ListNode* pHead2) {
+    if (pHead1 == nullptr)
+        return pHead2;
+    else if (pHead2 == nullptr)
+        return pHead1;
+    
+    ListNode* pMergeHead = nullptr;
+    if (pHead1->m_nValue < pHead2->m_nValue) {
+        pMergeHead = pHead1;
+        pMergeHead->m_pNext = mergeSortedLists(pHead1->m_pNext, pHead2);
+    } else {
+        pMergeHead = pHead2;
+        pMergeHead->m_pNext = mergeSortedLists(pHead1, pHead2->m_pNext);
+    }
+    
+    return pMergeHead;
+}
 
 // 46. 树的子结构。
+struct BinaryTreeNode {
+    int m_nValue;
+    BinaryTreeNode* m_pLeft;
+    BinaryTreeNode* m_pRight;
+};
+
+bool equal_Review_1(int num1, int num2) {
+    if (num1 - num2 > -0.0000001 && num1 - num2 < 0.0000001) {
+        return true;
+    } else {
+        return false;
+    }
+}
+
+bool doesTree1HaveTree2(BinaryTreeNode* pRoot1, BinaryTreeNode* pRoot2) {
+    if (pRoot2 == nullptr)
+        return true;
+    
+    if (pRoot1 == nullptr)
+        return false;
+    
+    if (!equal_Review_1(pRoot1->m_nValue, pRoot2->m_nValue))
+        return false;
+    
+    return doesTree1HaveTree2(pRoot1->m_pLeft, pRoot2->m_pLeft) && doesTree1HaveTree2(pRoot1->m_pRight, pRoot2->m_pRight);
+}
+
+bool hasSubtree(BinaryTreeNode* pRoot1, BinaryTreeNode* pRoot2) {
+    bool result = false;
+    
+    if (pRoot1 != nullptr && pRoot2 != nullptr) {
+        if (equal_Review_1(pRoot1->m_nValue, pRoot2->m_nValue))
+            result = doesTree1HaveTree2(pRoot1, pRoot2);
+        
+        if (!result)
+            result = hasSubtree(pRoot1->m_pLeft, pRoot2);
+        
+        if (!result)
+            result = hasSubtree(pRoot1->m_pRight, pRoot2);
+    }
+    
+    return result;
+}
+
 
 // 47. 二叉树的镜像（反转二叉树）。
+void mirrorRecursively(BinaryTreeNode* pNode) {
+    if ((pNode == nullptr) || (pNode->m_pLeft == nullptr && pNode->m_pRight == nullptr))
+        return;
+    
+    BinaryTreeNode* pTemp = pNode->m_pLeft;
+    pNode->m_pLeft = pNode->m_pRight;
+    pNode->m_pRight = pTemp;
+    
+    if (pNode->m_pLeft != nullptr)
+        mirrorRecursively(pNode->m_pLeft);
+    
+    if (pNode->m_pRight != nullptr)
+        mirrorRecursively(pNode->m_pRight);
+}
+
+void mirrorIteratively(BinaryTreeNode* pNode) {
+    if (pNode == nullptr)
+        return;
+    
+    std::stack<BinaryTreeNode*> stackTreeNode;
+    stackTreeNode.push(pNode);
+    
+    while (!stackTreeNode.empty()) {
+        BinaryTreeNode* pNode = stackTreeNode.top();
+        stackTreeNode.pop();
+        
+        BinaryTreeNode* pTemp = pNode->m_pLeft;
+        pNode->m_pLeft = pNode->m_pRight;
+        pNode->m_pRight = pTemp;
+        
+        if (pNode->m_pLeft != nullptr)
+            stackTreeNode.push(pNode->m_pLeft);
+        
+        if (pNode->m_pRight != nullptr)
+            stackTreeNode.push(pNode->m_pRight);
+    }
+}
 
 // 48. 对称的二叉树。
+bool isSymmetrical(BinaryTreeNode* pRoot1, BinaryTreeNode* pRoot2) {
+    if (pRoot1 == nullptr && pRoot2 == nullptr)
+        return true;
+    
+    if (pRoot1 == nullptr || pRoot2 == nullptr)
+        return false;
+    
+    if (pRoot1->m_nValue != pRoot2->m_nValue)
+        return false;
+    
+    return isSymmetrical(pRoot1->m_pLeft, pRoot2->m_pRight) && isSymmetrical(pRoot1->m_pRight, pRoot2->m_pLeft);
+}
+
+bool isSymmetrical(BinaryTreeNode* pRoot) {
+    return isSymmetrical(pRoot, pRoot);
+}
 
 // 49. 顺时针打印矩阵。
 
 // 50. 包含 min 函数的栈。
+template<typename T> class StackWithMin {
+public:
+    StackWithMin() {}
+    virtual ~StackWithMin() {}
+    
+    T& top();
+    const T& top() const;
+    
+    void push(const T& value);
+    void pop();
+    
+    const T& min() const;
+    
+    bool empty() const;
+    size_t size() const;
+    
+private:
+    std::stack<T> m_data;
+    std::stack<T> m_min;
+};
+
+template<typename T> void StackWithMin<T>::push(const T& value) {
+    m_data.push(value);
+    
+    if (m_min.size() == 0 || value < m_min.top())
+        m_min.push(value);
+    else
+        m_min.push(m_min.top());
+}
+
+template<typename T> void StackWithMin<T>::pop() {
+    assert(m_data.size() > 0 && m_min.size() > 0);
+    
+    m_data.pop();
+    m_min.pop();
+}
+
+template<typename T> const T& StackWithMin<T>::min() const {
+    assert(m_data.size() > 0 && m_min.size() > 0);
+    
+    return m_min.top();
+}
+
+template<typename T> T& StackWithMin<T>::top() {
+    return m_data.top();
+}
+
+template<typename T> const T& StackWithMin<T>::top() const {
+    return m_data.top();
+}
+
+template<typename T> bool StackWithMin<T>::empty() const {
+    return m_data.empty();
+}
+
+template<typename T> size_t StackWithMin<T>::size() const {
+    return m_data.size();
+}
 
 // 51. 栈的压入、弹出序列。
+bool isPopOrder(const int* pPush, const int* pPop, int nLength) {
+    bool bPossible = false;
+    
+    if (pPush != nullptr && pPop != nullptr && nLength > 0) {
+        const int* pNextPush = pPush;
+        const int* pNextPop = pPop;
+        
+        std::stack<int> stackData;
+        
+        while (pNextPop - pPop < nLength) {
+            while (stackData.empty() || stackData.top() != *pNextPop) {
+                if (pNextPush - pPush == nLength)
+                    break;
+                
+                stackData.push(*pNextPush);
+                
+                ++pNextPush;
+            }
+            
+            if (stackData.top() != *pNextPop)
+                break;
+            
+            stackData.pop();
+            ++pNextPop;
+        }
+        
+        if (stackData.empty() && pNextPop - pPop == nLength)
+            bPossible = true;
+    }
+    
+    return bPossible;
+}
 
 // 52. 从上到下打印二叉树。
+void printFromTopToBottom(BinaryTreeNode* pRoot) {
+    if (pRoot == nullptr)
+        return;
+    
+    std::deque<BinaryTreeNode*> dequeTreeNode;
+    dequeTreeNode.push_back(pRoot);
+    
+    while (dequeTreeNode.size()) {
+        BinaryTreeNode* pNode = dequeTreeNode.front();
+        dequeTreeNode.pop_front();
+        
+        printf("%d", pNode->m_nValue);
+        
+        if (pNode->m_pLeft)
+            dequeTreeNode.push_back(pNode->m_pLeft);
+        
+        if (pNode->m_pRight)
+            dequeTreeNode.push_back(pNode->m_pRight);
+    }
+}
 
 // 53. 分行从上到下打印二叉树。
+void printTreesInLines(BinaryTreeNode* pRoot) {
+    if (pRoot == nullptr)
+        return;
+    
+    std::queue<BinaryTreeNode*> nodes;
+    nodes.push(pRoot);
+    
+    int nextLevel = 0;
+    int toBePrinted = 1;
+    while (!nodes.empty()) {
+        BinaryTreeNode* pNode = nodes.front();
+        printf("%d ", pNode->m_nValue);
+        
+        if (pNode->m_pLeft != nullptr) {
+            nodes.push(pNode->m_pLeft);
+            ++nextLevel;
+        }
+        
+        if (pNode->m_pRight != nullptr) {
+            nodes.push(pNode->m_pRight);
+            ++nextLevel;
+        }
+        
+        nodes.pop();
+        --toBePrinted;
+        if (toBePrinted == 0) {
+            printf("\n");
+            toBePrinted = nextLevel;
+            nextLevel = 0;
+        }
+    }
+}
 
 // 54. 之字形打印二叉树。
+void printTreesInZigzag(BinaryTreeNode* pRoot) {
+    if (pRoot == nullptr)
+        return;
+    
+    std::stack<BinaryTreeNode*> levels[2];
+    int current = 0;
+    int next = 1;
+    
+    levels[current].push(pRoot);
+    while (!levels[0].empty() || !levels[1].empty()) {
+        BinaryTreeNode* pNode = levels[current].top();
+        levels[current].pop();
+        
+        printf("%d ", pNode->m_nValue);
+        
+        if (current == 0) {
+            if (pNode->m_pLeft != nullptr)
+                levels[next].push(pNode->m_pLeft);
+            
+            if (pNode->m_pRight != nullptr)
+                levels[next].push(pNode->m_pRight);
+        } else {
+            if (pNode->m_pRight != nullptr)
+                levels[next].push(pNode->m_pRight);
+            
+            if (pNode->m_pLeft != nullptr)
+                levels[next].push(pNode->m_pLeft);
+        }
+        
+        if (levels[current].empty()) {
+            printf("\n");
+            current = 1 - current;
+            next = 1 - next;
+        }
+    }
+}
 
 // 55. 二叉搜索树的后序遍历序列。
+bool verifySquenceOfBST(int sequence[], int length) {
+    if (sequence == nullptr || length <= 0)
+        return false;
+    
+    int root = sequence[length - 1];
+    
+    int i = 0;
+    for(; i < length - 1; ++i) {
+        if (sequence[i] > root)
+            break;
+    }
+    
+    int j = i;
+    for (; j < length - 1; ++j) {
+        if (sequence[j] < root) {
+            return false;
+        }
+    }
+    
+    bool left = true;
+    if (i > 0)
+        left = verifySquenceOfBST(sequence, i);
+    
+    bool right = true;
+    if (i < length - 1)
+        right = verifySquenceOfBST(sequence + i, length - i - 1);
+    
+    return (left && right);
+}
 
 // 56. 二叉树中和为某一值的路径。
+void findPath(BinaryTreeNode* pRoot, int expectedSum, std::vector<int>& path, int& currentSum) {
+    currentSum += pRoot->m_nValue;
+    path.push_back(pRoot->m_nValue);
+    
+    bool isLeaf = pRoot->m_pLeft == nullptr && pRoot->m_pRight == nullptr;
+    if (currentSum == expectedSum && isLeaf) {
+        printf("A path is found: ");
+        std::vector<int>::iterator iter = path.begin();
+        for (; iter < path.end(); ++iter)
+            printf("%d ", *iter);
+        
+        printf("\n");
+    }
+    
+    if (pRoot->m_pLeft != nullptr)
+        findPath(pRoot->m_pLeft, expectedSum, path, currentSum);
+    if (pRoot->m_pRight != nullptr)
+        findPath(pRoot->m_pRight, expectedSum, path, currentSum);
+    
+    currentSum -= pRoot->m_nValue;
+    path.pop_back();
+}
+
+void findPath(BinaryTreeNode* pRoot, int expectedSum) {
+    if (pRoot == nullptr)
+        return;
+    
+    std::vector<int> path;
+    int currentSum = 0;
+    findPath(pRoot, expectedSum, path, currentSum);
+}
 
 }
