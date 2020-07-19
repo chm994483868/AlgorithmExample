@@ -90,7 +90,7 @@ void shellSortOptimization(int nums[], int count) {
 
 // 06. 快速排序 O(n*logn)
 void quickSort(int nums[], int l, int r) {
-    if (l <= r) {
+    if (l >= r) {
         return;
     }
     
@@ -544,7 +544,7 @@ void RemoveNode(ListNode** pHead, int value) {
 // 21. 从尾到头打印链表（递归）（递归在本质上就是一个栈结构）
 void PrintListReversingly_Recursively(ListNode* pHead) {
     ListNode* pNode = pHead;
-    if (pNode == nullptr) {
+    if (pNode != nullptr) {
         
         if (pNode->m_pNext != nullptr) {
             PrintListReversingly_Recursively(pNode->m_pNext);
@@ -609,7 +609,7 @@ TreeNode* constructCore(int* startPreorder, int* endPreorder, int* startInorder,
     long leftLength = rootInorder - startInorder;
     int* leftPreorderEnd = startPreorder + leftLength;
     if (leftLength > 0) {
-        root->m_pLeft = constructCore(startPreorder + 1, leftPreorderEnd, startPreorder, rootInorder - 1);
+        root->m_pLeft = constructCore(startPreorder + 1, leftPreorderEnd, startInorder, rootInorder - 1);
     }
     
     if (leftLength < endPreorder - startPreorder) {
