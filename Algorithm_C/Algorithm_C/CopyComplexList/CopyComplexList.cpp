@@ -66,9 +66,13 @@ void CloneNodes(ComplexListNode* pHead) {
         // 1. pCloned 的 next 是 pNode 的 next
         pCloned->m_pNext = pNode->m_pNext;
         pCloned->m_pSibling = nullptr;
+        
         // 2. pNode 的 next 是 pCloned
         pNode->m_pNext = pCloned;
+        
         // 3. 更新 pNode
+        // 这里只能用 pCloned->m_pNext
+        // 原始的 pNode->m_pNext 已经指向了 pCloned
         pNode = pCloned->m_pNext;
     }
 }
@@ -77,6 +81,7 @@ void ConnectSiblingNodes(ComplexListNode* pHead) {
     ComplexListNode* pNode = pHead;
     while (pNode != nullptr) {
         ComplexListNode* pCloned = pNode->m_pNext;
+        
         if (pNode->m_pSibling != nullptr) {
             pCloned->m_pSibling = pNode->m_pSibling->m_pNext;
         }
