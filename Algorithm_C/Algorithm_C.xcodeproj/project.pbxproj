@@ -32,6 +32,10 @@
 		D267479324BEC58500DB689B /* DeleteNodeInList.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D267479124BEC58500DB689B /* DeleteNodeInList.cpp */; };
 		D267479724BED8E300DB689B /* DeleteDuplicatedNode.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D267479524BED8E300DB689B /* DeleteDuplicatedNode.cpp */; };
 		D267479B24BF060700DB689B /* RegularExpressions.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D267479924BF060700DB689B /* RegularExpressions.cpp */; };
+		D2D21CF224C54CA8008FD1E7 /* CopyComplexList.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D2D21CF024C54CA8008FD1E7 /* CopyComplexList.cpp */; };
+		D2D21CF624C5703D008FD1E7 /* ConvertBinarySearchTree.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D2D21CF424C5703D008FD1E7 /* ConvertBinarySearchTree.cpp */; };
+		D2D21CFA24C59C9E008FD1E7 /* SerializeBinaryTrees.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D2D21CF824C59C9E008FD1E7 /* SerializeBinaryTrees.cpp */; };
+		D2D21CFE24C5A5BA008FD1E7 /* StringPermutation.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D2D21CFC24C5A5BA008FD1E7 /* StringPermutation.cpp */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -97,6 +101,14 @@
 		D267479624BED8E300DB689B /* DeleteDuplicatedNode.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = DeleteDuplicatedNode.hpp; sourceTree = "<group>"; };
 		D267479924BF060700DB689B /* RegularExpressions.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = RegularExpressions.cpp; sourceTree = "<group>"; };
 		D267479A24BF060700DB689B /* RegularExpressions.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = RegularExpressions.hpp; sourceTree = "<group>"; };
+		D2D21CF024C54CA8008FD1E7 /* CopyComplexList.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = CopyComplexList.cpp; sourceTree = "<group>"; };
+		D2D21CF124C54CA8008FD1E7 /* CopyComplexList.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = CopyComplexList.hpp; sourceTree = "<group>"; };
+		D2D21CF424C5703D008FD1E7 /* ConvertBinarySearchTree.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = ConvertBinarySearchTree.cpp; sourceTree = "<group>"; };
+		D2D21CF524C5703D008FD1E7 /* ConvertBinarySearchTree.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = ConvertBinarySearchTree.hpp; sourceTree = "<group>"; };
+		D2D21CF824C59C9E008FD1E7 /* SerializeBinaryTrees.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = SerializeBinaryTrees.cpp; sourceTree = "<group>"; };
+		D2D21CF924C59C9E008FD1E7 /* SerializeBinaryTrees.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = SerializeBinaryTrees.hpp; sourceTree = "<group>"; };
+		D2D21CFC24C5A5BA008FD1E7 /* StringPermutation.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = StringPermutation.cpp; sourceTree = "<group>"; };
+		D2D21CFD24C5A5BA008FD1E7 /* StringPermutation.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = StringPermutation.hpp; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -140,8 +152,8 @@
 		8E3ECB7F24C28B64004D4F4E /* StackWithMin */ = {
 			isa = PBXGroup;
 			children = (
-				8E3ECB8024C28B64004D4F4E /* StackWithMin.hpp */,
 				8E3ECB8124C28B64004D4F4E /* StackWithMin.cpp */,
+				8E3ECB8024C28B64004D4F4E /* StackWithMin.hpp */,
 			);
 			path = StackWithMin;
 			sourceTree = "<group>";
@@ -299,6 +311,10 @@
 		D2330A2624AF0FD500C6480D /* Algorithm_C */ = {
 			isa = PBXGroup;
 			children = (
+				D2D21CFB24C5A5B2008FD1E7 /* StringPermutation */,
+				D2D21CF724C59C97008FD1E7 /* SerializeBinaryTrees */,
+				D2D21CF324C57035008FD1E7 /* ConvertBinarySearchTree */,
+				D2D21CEC24C54BCE008FD1E7 /* CopyComplexList */,
 				8E3ECB9724C2E9C2004D4F4E /* PathInTree */,
 				8E3ECB9324C2A9F9004D4F4E /* SquenceOfBST */,
 				8E3ECB8F24C29771004D4F4E /* PrintTreesInZigzag */,
@@ -374,6 +390,42 @@
 			path = RegularExpressions;
 			sourceTree = "<group>";
 		};
+		D2D21CEC24C54BCE008FD1E7 /* CopyComplexList */ = {
+			isa = PBXGroup;
+			children = (
+				D2D21CF024C54CA8008FD1E7 /* CopyComplexList.cpp */,
+				D2D21CF124C54CA8008FD1E7 /* CopyComplexList.hpp */,
+			);
+			path = CopyComplexList;
+			sourceTree = "<group>";
+		};
+		D2D21CF324C57035008FD1E7 /* ConvertBinarySearchTree */ = {
+			isa = PBXGroup;
+			children = (
+				D2D21CF424C5703D008FD1E7 /* ConvertBinarySearchTree.cpp */,
+				D2D21CF524C5703D008FD1E7 /* ConvertBinarySearchTree.hpp */,
+			);
+			path = ConvertBinarySearchTree;
+			sourceTree = "<group>";
+		};
+		D2D21CF724C59C97008FD1E7 /* SerializeBinaryTrees */ = {
+			isa = PBXGroup;
+			children = (
+				D2D21CF824C59C9E008FD1E7 /* SerializeBinaryTrees.cpp */,
+				D2D21CF924C59C9E008FD1E7 /* SerializeBinaryTrees.hpp */,
+			);
+			path = SerializeBinaryTrees;
+			sourceTree = "<group>";
+		};
+		D2D21CFB24C5A5B2008FD1E7 /* StringPermutation */ = {
+			isa = PBXGroup;
+			children = (
+				D2D21CFC24C5A5BA008FD1E7 /* StringPermutation.cpp */,
+				D2D21CFD24C5A5BA008FD1E7 /* StringPermutation.hpp */,
+			);
+			path = StringPermutation;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -434,6 +486,7 @@
 				8E3ECB8E24C28B98004D4F4E /* PrintTreesInLines.cpp in Sources */,
 				8EB134E324C0913A0055BDDF /* SubstructureInTree.cpp in Sources */,
 				D21EDC8424BFCCC200CBF16E /* NumericStrings.cpp in Sources */,
+				D2D21CF224C54CA8008FD1E7 /* CopyComplexList.cpp in Sources */,
 				D21EDC8824BFFCFB00CBF16E /* ReorderArray.cpp in Sources */,
 				8EB134DB24BA8E8D0055BDDF /* Review_2.cpp in Sources */,
 				D2330A2824AF0FD500C6480D /* main.cpp in Sources */,
@@ -443,6 +496,7 @@
 				8E3ECB9A24C2E9CA004D4F4E /* PathInTree.cpp in Sources */,
 				8E3ECB7E24C28B56004D4F4E /* PrintMatrix.cpp in Sources */,
 				D267479324BEC58500DB689B /* DeleteNodeInList.cpp in Sources */,
+				D2D21CFA24C59C9E008FD1E7 /* SerializeBinaryTrees.cpp in Sources */,
 				8E3ECB9624C2A9FF004D4F4E /* SquenceOfBST.cpp in Sources */,
 				D267479B24BF060700DB689B /* RegularExpressions.cpp in Sources */,
 				D2407F3C24BD61BD0018D876 /* Power.cpp in Sources */,
@@ -452,6 +506,8 @@
 				8E3ECB7624C28B2C004D4F4E /* MirrorOfBinaryTree.cpp in Sources */,
 				8E3ECB7A24C28B42004D4F4E /* SymmetricalBinaryTree.cpp in Sources */,
 				D21EDC9924C066A000CBF16E /* MergeSortedLists.cpp in Sources */,
+				D2D21CFE24C5A5BA008FD1E7 /* StringPermutation.cpp in Sources */,
+				D2D21CF624C5703D008FD1E7 /* ConvertBinarySearchTree.cpp in Sources */,
 				D267479724BED8E300DB689B /* DeleteDuplicatedNode.cpp in Sources */,
 				8E3ECB8A24C28B8D004D4F4E /* PrintTreeFromTopToBottom.cpp in Sources */,
 				8EB134DF24BDF2CD0055BDDF /* Print1ToMaxOfNDigits.cpp in Sources */,

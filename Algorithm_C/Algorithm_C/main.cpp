@@ -28,6 +28,7 @@ extern void startTest_Match();
 extern void startTest_IsNumeric();
 extern void startTest_ReorderOddEven();
 extern void startTest_FindPathTree();
+extern void startTest_ComplexListNode_Clone();
 
 void printArray(string desc, int nums[], int count) {
     std::cout << desc;
@@ -1231,6 +1232,26 @@ int numberOf1_Three(int n) {
     return count;
 }
 
+// N = 10 进来:
+//
+void rec(int N) {
+    if (N > 0) {
+        rec(N - 10);
+        rec(N - 1);
+    }
+    
+    cout << "N=" << N << endl;
+    cout << "最后一句了" << endl;
+}
+
+// 10
+// N = 0
+// N = -1
+// N = -2
+// N = -3
+// N = -4
+// 
+
 int main(int argc, const char * argv[]) {
     // insert code here...
 //    std::cout << "Hello, World!\n";
@@ -1264,10 +1285,12 @@ int main(int argc, const char * argv[]) {
 //    startTest_Match();
 //    startTest_IsNumeric();
 //    startTest_ReorderOddEven();
+//    startTest_FindPathTree();
+//    startTest_ComplexListNode_Clone();
     
-    startTest_FindPathTree();
+//    std::cout << '\n';
     
-    std::cout << '\n';
+    rec(10);
     
     return 0;
 }

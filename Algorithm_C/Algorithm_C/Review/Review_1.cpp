@@ -402,7 +402,7 @@ int getDuplication(const int* numbers, int length) {
         int count = countRange(numbers, length, start, middle);
         
         if (start == end) {
-            if (count == 1) {
+            if (count >= 1) {
                 return start;
             } else {
                 break;
@@ -791,7 +791,7 @@ int min(int* numbers, int length) {
             break;
         }
         
-        indexMid = (index2 - index1) / 2 + index1;
+        indexMid = ((index2 - index1) >> 1) + index1;
         
         if (numbers[index1] == numbers[index2] && numbers[indexMid] == numbers[index1]) {
             return minInOrder(numbers, index1, index2);
@@ -973,7 +973,7 @@ int ttt(int n) {
         ++count;
         n = (n - 1) & n;
     }
-    return n;
+    return count;
 }
 
 // 35. 求数值的整数次方，不得使用库函数，不需要考虑大数问题。
@@ -1185,7 +1185,7 @@ bool match(const char* str, const char* pattern) {
 
 bool matchCore(const char* str, const char* pattern) {
     if (*str == '\0' && *pattern == '\0')
-        return false;
+        return true;
     
     if (*str != '\0' && *pattern == '\0')
         return false;
