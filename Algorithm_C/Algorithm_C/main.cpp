@@ -1252,6 +1252,49 @@ void rec(int N) {
 // N = -4
 // 
 
+void prologue(const BinaryTreeNode* pRoot) {
+    if (pRoot == nullptr) {
+        return;
+    }
+    
+    // 前序
+//    printf("%d\t", pRoot->m_nValue);
+    
+    if (pRoot->m_pLeft != nullptr) {
+        prologue(pRoot->m_pLeft);
+    }
+    
+    // 中序
+//    printf("%d\t", pRoot->m_nValue);
+    
+    if (pRoot->m_pRight != nullptr) {
+        prologue(pRoot->m_pRight);
+    }
+    
+    // 后序
+//    printf("%d\t", pRoot->m_nValue);
+}
+
+// 前序: 10 6 4 8 14 12 16
+// 中序: 4 6 8 10 12 14 16
+// 后序: 4 8 6 12 16 14 10
+
+void fun(int n)
+{
+    n--;
+    
+    if ( 0 == n ) //跳出递归的条件
+    {
+        printf("end\n");
+        return ;//出栈
+    }
+ 
+    printf("fun --> %d\n" ,n);//fun函数的值
+    fun(n);//fun1
+    fun(n);//fun2
+    //printf("fun --> %d\n" ,n);
+}
+
 int main(int argc, const char * argv[]) {
     // insert code here...
 //    std::cout << "Hello, World!\n";
@@ -1289,8 +1332,56 @@ int main(int argc, const char * argv[]) {
 //    startTest_ComplexListNode_Clone();
     
 //    std::cout << '\n';
+//    rec(10);
     
-    rec(10);
+//    BinaryTreeNode* ten = new BinaryTreeNode();
+//    ten->m_nValue = 10;
+//    ten->m_pLeft = nullptr;
+//    ten->m_pRight = nullptr;
+//
+//    BinaryTreeNode* six = new BinaryTreeNode();
+//    six->m_nValue = 6;
+//    six->m_pLeft = nullptr;
+//    six->m_pRight = nullptr;
+//
+//    BinaryTreeNode* four = new BinaryTreeNode();
+//    four->m_nValue = 4;
+//    four->m_pLeft = nullptr;
+//    four->m_pRight = nullptr;
+//
+//    BinaryTreeNode* eight = new BinaryTreeNode();
+//    eight->m_nValue = 8;
+//    eight->m_pLeft = nullptr;
+//    eight->m_pRight = nullptr;
+//
+//    BinaryTreeNode* fourteen = new BinaryTreeNode();
+//    fourteen->m_nValue = 14;
+//    fourteen->m_pLeft = nullptr;
+//    fourteen->m_pRight = nullptr;
+//
+//    BinaryTreeNode* twelve = new BinaryTreeNode();
+//    twelve->m_nValue = 12;
+//    twelve->m_pLeft = nullptr;
+//    twelve->m_pRight = nullptr;
+//
+//    BinaryTreeNode* sixteen = new BinaryTreeNode();
+//    sixteen->m_nValue = 16;
+//    sixteen->m_pLeft = nullptr;
+//    sixteen->m_pRight = nullptr;
+//
+//    ten->m_pLeft = six;
+//    ten->m_pRight = fourteen;
+//
+//    six->m_pLeft = four;
+//    six->m_pRight = eight;
+//
+//    fourteen->m_pLeft = twelve;
+//    fourteen->m_pRight = sixteen;
+//
+//    prologue(ten);
+//    printf("\n");
+    
+    fun(5);
     
     return 0;
 }

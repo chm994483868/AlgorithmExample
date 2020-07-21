@@ -32,6 +32,7 @@
 		D267479324BEC58500DB689B /* DeleteNodeInList.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D267479124BEC58500DB689B /* DeleteNodeInList.cpp */; };
 		D267479724BED8E300DB689B /* DeleteDuplicatedNode.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D267479524BED8E300DB689B /* DeleteDuplicatedNode.cpp */; };
 		D267479B24BF060700DB689B /* RegularExpressions.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D267479924BF060700DB689B /* RegularExpressions.cpp */; };
+		D28F813A24C6E60E00EE7EF3 /* RecursiveSummary.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D28F813824C6E60E00EE7EF3 /* RecursiveSummary.cpp */; };
 		D2D21CF224C54CA8008FD1E7 /* CopyComplexList.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D2D21CF024C54CA8008FD1E7 /* CopyComplexList.cpp */; };
 		D2D21CF624C5703D008FD1E7 /* ConvertBinarySearchTree.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D2D21CF424C5703D008FD1E7 /* ConvertBinarySearchTree.cpp */; };
 		D2D21CFA24C59C9E008FD1E7 /* SerializeBinaryTrees.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D2D21CF824C59C9E008FD1E7 /* SerializeBinaryTrees.cpp */; };
@@ -101,6 +102,9 @@
 		D267479624BED8E300DB689B /* DeleteDuplicatedNode.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = DeleteDuplicatedNode.hpp; sourceTree = "<group>"; };
 		D267479924BF060700DB689B /* RegularExpressions.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = RegularExpressions.cpp; sourceTree = "<group>"; };
 		D267479A24BF060700DB689B /* RegularExpressions.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = RegularExpressions.hpp; sourceTree = "<group>"; };
+		D28F813524C66BE500EE7EF3 /* InternalMonologue.strings */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; path = InternalMonologue.strings; sourceTree = "<group>"; };
+		D28F813824C6E60E00EE7EF3 /* RecursiveSummary.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = RecursiveSummary.cpp; sourceTree = "<group>"; };
+		D28F813924C6E60E00EE7EF3 /* RecursiveSummary.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = RecursiveSummary.hpp; sourceTree = "<group>"; };
 		D2D21CF024C54CA8008FD1E7 /* CopyComplexList.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = CopyComplexList.cpp; sourceTree = "<group>"; };
 		D2D21CF124C54CA8008FD1E7 /* CopyComplexList.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = CopyComplexList.hpp; sourceTree = "<group>"; };
 		D2D21CF424C5703D008FD1E7 /* ConvertBinarySearchTree.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = ConvertBinarySearchTree.cpp; sourceTree = "<group>"; };
@@ -338,6 +342,7 @@
 				8EB134DC24BDF2AB0055BDDF /* Print1ToMaxOfNDigits */,
 				D2407F3924BD61A60018D876 /* Power */,
 				D225BF4324B7E38500D16B45 /* StudyList.strings */,
+				D28F813524C66BE500EE7EF3 /* InternalMonologue.strings */,
 				D2330A2724AF0FD500C6480D /* main.cpp */,
 				D2407F3824BD3D9A0018D876 /* Review */,
 			);
@@ -347,6 +352,7 @@
 		D2407F3824BD3D9A0018D876 /* Review */ = {
 			isa = PBXGroup;
 			children = (
+				D28F813724C6E5F700EE7EF3 /* RecursiveSummary */,
 				D21EDC9524C04E4000CBF16E /* LearnedList */,
 				8E5CCE0624B9FF3D0081B5FF /* Review_1.cpp */,
 				8EB134DA24BA8E8D0055BDDF /* Review_2.cpp */,
@@ -388,6 +394,15 @@
 				D267479A24BF060700DB689B /* RegularExpressions.hpp */,
 			);
 			path = RegularExpressions;
+			sourceTree = "<group>";
+		};
+		D28F813724C6E5F700EE7EF3 /* RecursiveSummary */ = {
+			isa = PBXGroup;
+			children = (
+				D28F813824C6E60E00EE7EF3 /* RecursiveSummary.cpp */,
+				D28F813924C6E60E00EE7EF3 /* RecursiveSummary.hpp */,
+			);
+			path = RecursiveSummary;
 			sourceTree = "<group>";
 		};
 		D2D21CEC24C54BCE008FD1E7 /* CopyComplexList */ = {
@@ -484,6 +499,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				8E3ECB8E24C28B98004D4F4E /* PrintTreesInLines.cpp in Sources */,
+				D28F813A24C6E60E00EE7EF3 /* RecursiveSummary.cpp in Sources */,
 				8EB134E324C0913A0055BDDF /* SubstructureInTree.cpp in Sources */,
 				D21EDC8424BFCCC200CBF16E /* NumericStrings.cpp in Sources */,
 				D2D21CF224C54CA8008FD1E7 /* CopyComplexList.cpp in Sources */,

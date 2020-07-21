@@ -12,6 +12,8 @@
 #include <stdio.h>
 #include <cstdio>
 
+using namespace std;
+
 struct BinaryTreeNode {
     int m_nValue;
     BinaryTreeNode* m_pLeft;
