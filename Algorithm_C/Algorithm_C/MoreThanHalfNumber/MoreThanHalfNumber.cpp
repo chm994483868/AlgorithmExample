@@ -104,34 +104,6 @@ int moreThanHalfNum_Solution1(int* numbers, int length) {
     return result;
 }
 
-int moreThanHalfNum_Solution1_Review(int* numbers, int length) {
-    if (checkInvalidArray(numbers, length)) {
-        return 0;
-    }
-    
-    int middle = length >> 1;
-    int start = 0;
-    int end = length - 1;
-    
-    int index = partition(numbers, length, start, end);
-    while (index != middle) {
-        if (index > middle) {
-            end = index - 1;
-            index = partition(numbers, length, start, end);
-        } else {
-            start = index + 1;
-            index = partition(numbers, length, start, end);
-        }
-    }
-    
-    int result = numbers[middle];
-    if (!checkMoreThanHalf(numbers, length, result)) {
-        result = 0;
-    }
-    
-    return result;
-}
-
 int moreThanHalfNum_Solution2(int* numbers, int length) {
     if (checkInvalidArray(numbers, length)) {
         return 0;
@@ -160,8 +132,105 @@ int moreThanHalfNum_Solution2(int* numbers, int length) {
     return result;
 }
 
+
+int randomInRange_Review(int min, int max) {
+    int random = rand() % (max - min + 1) + min;
+    return random;
+}
+
+void swap_Review(int* num1, int* num2) {
+    int temp = *num1;
+    *num1 = *num2;
+    *num2 = temp;
+}
+
+// 从数组中随机取一个数字，然后调整数组，使该随机数左边的值都小于它右边的值都大于它
+int partition_Review(int data[], int length, int start, int end) {
+    if (data == nullptr || length <= 0 || start < 0 || end >= length) {
+        throw std::exception(); // 参数无效
+    }
+    
+    int index = randomInRange_Review(start, end);
+    swap_Review(&data[index], &data[end]);
+    
+    int small = start - 1;
+    
+    for (index = start; index < end; ++index) {
+        if (data[index] < data[end]) {
+            ++small;
+            
+            if (small != index) {
+                swap_Review(&data[small], &data[index]);
+            }
+        }
+    }
+    
+    ++small;
+    if (small != end) {
+        swap_Review(&data[small], &data[end]);
+    }
+    
+    return small;
+}
+
+bool g_bInputInvalid_Review = false;
+bool checkInvalidArray_Review(int* numbers, int length) {
+    g_bInputInvalid_Review = false;
+    if (numbers == nullptr && length <= 0) {
+        g_bInputInvalid_Review = true;
+    }
+    
+    return g_bInputInvalid_Review;
+}
+
+bool checkMoreThanHalf_Review(int* numbers, int length, int number) {
+    int times = 0;
+    for (int i = 0; i < length; ++i) {
+        if (numbers[i] == number) {
+            ++times;
+        }
+    }
+    
+    bool isMoreThanHalf = true;
+    if (times * 2 <= length) {
+        g_bInputInvalid_Review = true;
+        isMoreThanHalf = false;
+    }
+    
+    return isMoreThanHalf;
+}
+
+int moreThanHalfNum_Solution1_Review(int* numbers, int length) {
+    if (checkInvalidArray_Review(numbers, length)) {
+        return 0;
+    }
+    
+    int middle = length >> 1;
+    int start = 0;
+    int end = length - 1;
+    
+    int index = partition_Review(numbers, length, start, end);
+    
+    while (index != middle) {
+        if (index > middle) {
+            end = index - 1;
+            index = partition_Review(numbers, length, start, end);
+        } else {
+            start = index + 1;
+            index = partition_Review(numbers, length, start, end);
+        }
+    }
+    
+    int result = numbers[middle];
+    if (!checkMoreThanHalf_Review(numbers, length, result)) {
+        result = 0;
+    }
+    
+    return result;
+}
+
 int moreThanHalfNum_Solution2_Review(int* numbers, int length) {
-    if (checkInvalidArray(numbers, length)) {
+    if (checkInvalidArray_Review(numbers, length)) {
         return 0;
     }
     
@@ -179,7 +248,7 @@ int moreThanHalfNum_Solution2_Review(int* numbers, int length) {
         }
     }
     
-    if (!checkMoreThanHalf(numbers, length, result)) {
+    if (!checkMoreThanHalf_Review(numbers, length, result)) {
         result = 0;
     }
     
