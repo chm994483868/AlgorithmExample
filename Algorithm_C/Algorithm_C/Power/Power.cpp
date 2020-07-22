@@ -12,11 +12,11 @@ bool equal_Power(double num1, double num2);
 double powerWithUnsignedExponent(double base, unsigned int exponent);
 
 double power(double base, int exponent) {
-    g_InvalidInput = false;
+    Power::g_InvalidInput = false;
     
     // 1. 判断如果 base 是 0，并且 exponent 小于 0，则不能对 0 取倒数
     if (equal_Power(base, 0.0) && exponent < 0) {
-        g_InvalidInput = true;
+        Power::g_InvalidInput = true;
         return 0.0;
     }
     
@@ -79,7 +79,7 @@ bool equal_Power(double num1, double num2) {
 void Test(const char* testName, double base, int exponent, double expectedResult, bool expectedFlag) {
     double result = power(base, exponent);
     
-    if (equal_Power(result, expectedResult) && g_InvalidInput == expectedFlag)
+    if (equal_Power(result, expectedResult) && Power::g_InvalidInput == expectedFlag)
         std::cout << testName << " passed" << std::endl;
     else
         std::cout << testName << " FAILED" << std::endl;

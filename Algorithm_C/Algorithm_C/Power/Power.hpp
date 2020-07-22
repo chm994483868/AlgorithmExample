@@ -13,9 +13,13 @@
 #include <iostream>
 #include <cmath>
 
+namespace Power {
+
 bool g_InvalidInput = false;
 double power(double base, int exponent);
  
 void startTest_Power();
+
+}
 
 #endif /* Power_hpp */

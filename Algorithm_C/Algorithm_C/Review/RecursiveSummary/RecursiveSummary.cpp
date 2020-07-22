@@ -8,6 +8,8 @@
 
 #include "RecursiveSummary.hpp"
 
+namespace RecursiveSummary {
+
 // 递归相关题目总结
 
 // 06. 快速排序 O(n*logn)
@@ -44,4 +46,6 @@ void quickSort(int nums[], int left, int right) {
     
     quickSort(nums, left, i - 1);
     quickSort(nums, i + 1, right);
+}
+
 }

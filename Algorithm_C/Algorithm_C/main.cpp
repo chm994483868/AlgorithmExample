@@ -186,36 +186,78 @@ void MinHeapAddNumber(int a[], int n, int nNum) {
     MinHeapFixup(a, n);
 }
 
-void MinHeapFixdown(int a[], int i, int n) {
-    int j = 2 * i + 1, temp = a[i]; // 找到左子节点
+//void MinHeapFixdown(int a[], int i, int n) {
+//    int j = 2 * i + 1, temp = a[i]; // 找到左子节点
+//
+//    while (j < n) {
+//        if (j + 1 < n && a[j + 1] > a[j]) { // 找到左右子节点中的最大值
+//            j++;
+//        }
+//
+//        if (a[j] <= temp) {
+//            break;
+//        }
+//
+//        a[i] = a[j];
+//        i = j;
+//        j = 2 * i + 1;
+//    }
+//
+//    a[i] = temp;
+//}
+//
+//// 堆排序
+//void heapSort(int nums[], int n) {
+//    for (int i = (n - 1 - 1) / 2; i >= 0; i--) {
+//        MinHeapFixdown(nums, i, n); // 建堆
+//    }
+//
+//    for (int j = n - 1; j >= 1; j--) { // 排序
+//        swap(nums[j], nums[0]);
+//        MinHeapFixdown(nums, 0, j);
+//    }
+//}
 
+void maxHeapFixdown(int nums[], int i, int n) {
+    // 1. 左子节点下标
+    int j = i * 2 + 1;
+    int temp = nums[i];
+    
     while (j < n) {
-        if (j + 1 < n && a[j + 1] > a[j]) { // 找到左右子节点中的最大值
-            j++;
+        // 2. 找到左右子节点中的最大值
+        if (j + 1 < n && nums[j + 1] > nums[j]) {
+            ++j;
         }
         
-        if (a[j] <= temp) {
+        // 3. 如果父节点的值，大于等于左右子节点的值，则不用交换
+        if (nums[j] <= temp) {
             break;
         }
+        // 4. 把子节点中较大的值赋给父节点
+//        nums[i] = nums[j];
+        swap(nums[i], nums[j]);
         
-        a[i] = a[j];
+        // 5. 更新 i 和 j
         i = j;
-        j = 2 * i + 1;
+        j = i * 2 + 1;
     }
     
-    a[i] = temp;
+//    nums[i] = temp;
 }
 
-// 堆排序
-void heapSort(int nums[], int n) {
-    for (int i = (n - 1 - 1) / 2; i >= 0; i--) {
-        MinHeapFixdown(nums, i, n); // 建堆
+void heapSort(int nums[], int length) {
+    // 1. 建堆
+    int i = ((length - 1) - 1) / 2;
+    for (; i >= 0; --i) {
+        maxHeapFixdown(nums, i, length);
     }
     
-    for (int j = n - 1; j >= 1; j--) { // 排序
-        swap(nums[j], nums[0]);
-        MinHeapFixdown(nums, 0, j);
+    // 2. 排序
+    for (i = length - 1; i >= 1; --i) {
+        swap(nums[0], nums[i]);
+        maxHeapFixdown(nums, 0, i);
     }
+    
 }
 
 // 堆化数组
@@ -1279,8 +1321,7 @@ void prologue(const BinaryTreeNode* pRoot) {
 // 中序: 4 6 8 10 12 14 16
 // 后序: 4 8 6 12 16 14 10
 
-void fun(int n)
-{
+void fun(int n) {
     n--;
     
     if ( 0 == n ) //跳出递归的条件
@@ -1299,8 +1340,8 @@ int main(int argc, const char * argv[]) {
     // insert code here...
 //    std::cout << "Hello, World!\n";
     
-//    int nums[] = {4, 6, 3, 2, 1, 8, 20, 14};
-//    printArray("排序前:", nums, 8);
+    int nums[] = {4, 6, 3, 2, 1, 8, 20, 14};
+    printArray("排序前:", nums, 8);
     
     // 冒泡排序
 //    bubbleSort(nums, 8);
@@ -1318,10 +1359,10 @@ int main(int argc, const char * argv[]) {
 //    int temp[] = {};
 //    mergeSort(nums, 0, 7, temp);
     // 堆排序
-//    heapSort(nums, 8);
+    heapSort(nums, 8);
 //    heap_sort(nums, 8);
 
-//    printArray("排序后:", nums, 8);
+    printArray("排序后:", nums, 8);
     
 //    startTest_Power();
 //    startTest_Print1ToMaxOfNDigits();
@@ -1381,7 +1422,7 @@ int main(int argc, const char * argv[]) {
 //    prologue(ten);
 //    printf("\n");
     
-    fun(5);
+//    fun(5);
     
     return 0;
 }

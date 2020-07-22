@@ -17,11 +17,13 @@ ListNode* reverseList(ListNode* pHead) {
         ListNode* pNext = pNode->m_pNext;
         
         // 1. 如果 pNext 是 nullptr 即表示当前链表到了尾节点
+        // 而当前链表的尾节点定是翻转后链表的头节点，
+        // 所以下面把 pNode 直接赋值给 pReversedHead
         if (pNext == nullptr)
             pReversedHead = pNode;
         
         // 2. 这里 pPrev 用来保存前一个节点，如果 pNode 是头节点时，pPrev 是 nllptr
-        //    然后从下次开始 pPrev 被赋值 pNode
+        //    然后从下次开始 pPrev 每次记录前一个节点，
         pNode->m_pNext = pPrev;
         pPrev = pNode;
         
