@@ -41,7 +41,7 @@ int findGreatestSumOfSubArray(int* pData, int nLength) {
     return nGreatestSum;
 }
 
-int findGreatestSumOfSumArray_Review(int* pData, int nLength) {
+int findGreatestSumOfSubArray_Review(int* pData, int nLength) {
     if (pData == nullptr || nLength <= 0) {
         g_InvalidInput = true;
         return 0;
