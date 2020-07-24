@@ -56,6 +56,8 @@
 		D2FE54C024CABC6900E5B5EA /* IntegerIdenticalToIndex.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D2FE54BE24CABC6900E5B5EA /* IntegerIdenticalToIndex.cpp */; };
 		D2FE54C424CAC39F00E5B5EA /* KthNodeInBST.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D2FE54C224CAC39F00E5B5EA /* KthNodeInBST.cpp */; };
 		D2FE54C824CACB0000E5B5EA /* TreeDepth.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D2FE54C624CACB0000E5B5EA /* TreeDepth.cpp */; };
+		D2FE54CC24CAD5F600E5B5EA /* BalancedBinaryTree.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D2FE54CA24CAD5F600E5B5EA /* BalancedBinaryTree.cpp */; };
+		D2FE54D024CAF0E600E5B5EA /* NumbersAppearOnce.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D2FE54CE24CAF0E600E5B5EA /* NumbersAppearOnce.cpp */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -170,6 +172,10 @@
 		D2FE54C324CAC39F00E5B5EA /* KthNodeInBST.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = KthNodeInBST.hpp; sourceTree = "<group>"; };
 		D2FE54C624CACB0000E5B5EA /* TreeDepth.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = TreeDepth.cpp; sourceTree = "<group>"; };
 		D2FE54C724CACB0000E5B5EA /* TreeDepth.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = TreeDepth.hpp; sourceTree = "<group>"; };
+		D2FE54CA24CAD5F600E5B5EA /* BalancedBinaryTree.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = BalancedBinaryTree.cpp; sourceTree = "<group>"; };
+		D2FE54CB24CAD5F600E5B5EA /* BalancedBinaryTree.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = BalancedBinaryTree.hpp; sourceTree = "<group>"; };
+		D2FE54CE24CAF0E600E5B5EA /* NumbersAppearOnce.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = NumbersAppearOnce.cpp; sourceTree = "<group>"; };
+		D2FE54CF24CAF0E600E5B5EA /* NumbersAppearOnce.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = NumbersAppearOnce.hpp; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -381,6 +387,8 @@
 		D2330A2624AF0FD500C6480D /* Algorithm_C */ = {
 			isa = PBXGroup;
 			children = (
+				D2FE54CD24CAF0DF00E5B5EA /* NumbersAppearOnce */,
+				D2FE54C924CAD5EE00E5B5EA /* BalancedBinaryTree */,
 				D2FE54C524CACAFA00E5B5EA /* TreeDepth */,
 				D2FE54C124CAC39900E5B5EA /* KthNodeInBST */,
 				D2FE54BD24CABC4700E5B5EA /* IntegerIdenticalToIndex */,
@@ -688,6 +696,24 @@
 			path = TreeDepth;
 			sourceTree = "<group>";
 		};
+		D2FE54C924CAD5EE00E5B5EA /* BalancedBinaryTree */ = {
+			isa = PBXGroup;
+			children = (
+				D2FE54CA24CAD5F600E5B5EA /* BalancedBinaryTree.cpp */,
+				D2FE54CB24CAD5F600E5B5EA /* BalancedBinaryTree.hpp */,
+			);
+			path = BalancedBinaryTree;
+			sourceTree = "<group>";
+		};
+		D2FE54CD24CAF0DF00E5B5EA /* NumbersAppearOnce */ = {
+			isa = PBXGroup;
+			children = (
+				D2FE54CE24CAF0E600E5B5EA /* NumbersAppearOnce.cpp */,
+				D2FE54CF24CAF0E600E5B5EA /* NumbersAppearOnce.hpp */,
+			);
+			path = NumbersAppearOnce;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -753,6 +779,7 @@
 				D2CB57A224C81B0100B31AE3 /* StreamMedian.cpp in Sources */,
 				D2FE54C824CACB0000E5B5EA /* TreeDepth.cpp in Sources */,
 				D21EDC8424BFCCC200CBF16E /* NumericStrings.cpp in Sources */,
+				D2FE54D024CAF0E600E5B5EA /* NumbersAppearOnce.cpp in Sources */,
 				D2D21CF224C54CA8008FD1E7 /* CopyComplexList.cpp in Sources */,
 				D21EDC8824BFFCFB00CBF16E /* ReorderArray.cpp in Sources */,
 				D2CB57A624C82C2500B31AE3 /* GreatestSumOfSubarrays.cpp in Sources */,
@@ -775,6 +802,7 @@
 				D267479B24BF060700DB689B /* RegularExpressions.cpp in Sources */,
 				D2407F3C24BD61BD0018D876 /* Power.cpp in Sources */,
 				D250310D24C99FB9007DCD5A /* LongestSubstringWithoutDup.cpp in Sources */,
+				D2FE54CC24CAD5F600E5B5EA /* BalancedBinaryTree.cpp in Sources */,
 				D2FE54B424CA94EC00E5B5EA /* FirstCommonNodesInLists.cpp in Sources */,
 				D250310124C94373007DCD5A /* SortArrayForMinNumber.cpp in Sources */,
 				D21EDC8C24C01DE300CBF16E /* KthNodeFromEnd.cpp in Sources */,

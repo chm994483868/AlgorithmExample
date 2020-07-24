@@ -7,3 +7,20 @@
 //
 
 #include "TreeDepth.hpp"
+
+struct BinaryTreeNode {
+    int m_nValue;
+    BinaryTreeNode* m_pLeft;
+    BinaryTreeNode* m_pRight;
+};
+
+int treeDepth(const BinaryTreeNode* pRoot) {
+    if (pRoot == nullptr) {
+        return 0;
+    }
+    
+    int nLeft = treeDepth(pRoot->m_pLeft);
+    int nRight = treeDepth(pRoot->m_pRight);
+    
+    return (nLeft > nRight) ? (nLeft + 1) : (nRight + 1);
+}
