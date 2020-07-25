@@ -8,6 +8,8 @@
 
 #include "TreeDepth.hpp"
 
+namespace TreeDepth {
+
 struct BinaryTreeNode {
     int m_nValue;
     BinaryTreeNode* m_pLeft;
@@ -23,4 +25,6 @@ int treeDepth(const BinaryTreeNode* pRoot) {
     int nRight = treeDepth(pRoot->m_pRight);
     
     return (nLeft > nRight) ? (nLeft + 1) : (nRight + 1);
+}
+
 }

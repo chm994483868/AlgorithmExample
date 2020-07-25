@@ -21,6 +21,10 @@
 		8E3ECBA224CBA6EF004D4F4E /* NumberAppearingOnce.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8E3ECBA024CBA6EF004D4F4E /* NumberAppearingOnce.cpp */; };
 		8E3ECBA624CBAD5E004D4F4E /* TwoNumbersWithSum.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8E3ECBA424CBAD5E004D4F4E /* TwoNumbersWithSum.cpp */; };
 		8E3ECBAA24CBB10B004D4F4E /* ContinuousSquenceWithSum.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8E3ECBA824CBB10B004D4F4E /* ContinuousSquenceWithSum.cpp */; };
+		8E3ECBAE24CBFF17004D4F4E /* ReverseWordsInSentence.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8E3ECBAC24CBFF17004D4F4E /* ReverseWordsInSentence.cpp */; };
+		8E3ECBB224CC08BB004D4F4E /* LeftRotateString.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8E3ECBB024CC08BB004D4F4E /* LeftRotateString.cpp */; };
+		8E3ECBB624CC3370004D4F4E /* MaxInSlidingWindow.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8E3ECBB424CC3370004D4F4E /* MaxInSlidingWindow.cpp */; };
+		8E3ECBBA24CC3B59004D4F4E /* QueueWithMax.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8E3ECBB824CC3B59004D4F4E /* QueueWithMax.cpp */; };
 		8E5CCE0724B9FF3D0081B5FF /* Review_1.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8E5CCE0624B9FF3D0081B5FF /* Review_1.cpp */; };
 		8EB134DB24BA8E8D0055BDDF /* Review_2.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8EB134DA24BA8E8D0055BDDF /* Review_2.cpp */; };
 		8EB134DF24BDF2CD0055BDDF /* Print1ToMaxOfNDigits.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8EB134DD24BDF2CD0055BDDF /* Print1ToMaxOfNDigits.cpp */; };
@@ -104,6 +108,14 @@
 		8E3ECBA524CBAD5E004D4F4E /* TwoNumbersWithSum.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = TwoNumbersWithSum.hpp; sourceTree = "<group>"; };
 		8E3ECBA824CBB10B004D4F4E /* ContinuousSquenceWithSum.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = ContinuousSquenceWithSum.cpp; sourceTree = "<group>"; };
 		8E3ECBA924CBB10B004D4F4E /* ContinuousSquenceWithSum.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = ContinuousSquenceWithSum.hpp; sourceTree = "<group>"; };
+		8E3ECBAC24CBFF17004D4F4E /* ReverseWordsInSentence.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = ReverseWordsInSentence.cpp; sourceTree = "<group>"; };
+		8E3ECBAD24CBFF17004D4F4E /* ReverseWordsInSentence.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = ReverseWordsInSentence.hpp; sourceTree = "<group>"; };
+		8E3ECBB024CC08BB004D4F4E /* LeftRotateString.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = LeftRotateString.cpp; sourceTree = "<group>"; };
+		8E3ECBB124CC08BB004D4F4E /* LeftRotateString.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = LeftRotateString.hpp; sourceTree = "<group>"; };
+		8E3ECBB424CC3370004D4F4E /* MaxInSlidingWindow.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = MaxInSlidingWindow.cpp; sourceTree = "<group>"; };
+		8E3ECBB524CC3370004D4F4E /* MaxInSlidingWindow.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = MaxInSlidingWindow.hpp; sourceTree = "<group>"; };
+		8E3ECBB824CC3B59004D4F4E /* QueueWithMax.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = QueueWithMax.cpp; sourceTree = "<group>"; };
+		8E3ECBB924CC3B59004D4F4E /* QueueWithMax.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = QueueWithMax.hpp; sourceTree = "<group>"; };
 		8E5CCE0624B9FF3D0081B5FF /* Review_1.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Review_1.cpp; sourceTree = "<group>"; };
 		8EB134DA24BA8E8D0055BDDF /* Review_2.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Review_2.cpp; sourceTree = "<group>"; };
 		8EB134DD24BDF2CD0055BDDF /* Print1ToMaxOfNDigits.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Print1ToMaxOfNDigits.cpp; sourceTree = "<group>"; };
@@ -324,6 +336,42 @@
 			path = ContinuousSquenceWithSum;
 			sourceTree = "<group>";
 		};
+		8E3ECBAB24CBFF10004D4F4E /* ReverseWordsInSentence */ = {
+			isa = PBXGroup;
+			children = (
+				8E3ECBAC24CBFF17004D4F4E /* ReverseWordsInSentence.cpp */,
+				8E3ECBAD24CBFF17004D4F4E /* ReverseWordsInSentence.hpp */,
+			);
+			path = ReverseWordsInSentence;
+			sourceTree = "<group>";
+		};
+		8E3ECBAF24CC08B3004D4F4E /* LeftRotateString */ = {
+			isa = PBXGroup;
+			children = (
+				8E3ECBB024CC08BB004D4F4E /* LeftRotateString.cpp */,
+				8E3ECBB124CC08BB004D4F4E /* LeftRotateString.hpp */,
+			);
+			path = LeftRotateString;
+			sourceTree = "<group>";
+		};
+		8E3ECBB324CC3368004D4F4E /* MaxInSlidingWindow */ = {
+			isa = PBXGroup;
+			children = (
+				8E3ECBB424CC3370004D4F4E /* MaxInSlidingWindow.cpp */,
+				8E3ECBB524CC3370004D4F4E /* MaxInSlidingWindow.hpp */,
+			);
+			path = MaxInSlidingWindow;
+			sourceTree = "<group>";
+		};
+		8E3ECBB724CC3B53004D4F4E /* QueueWithMax */ = {
+			isa = PBXGroup;
+			children = (
+				8E3ECBB824CC3B59004D4F4E /* QueueWithMax.cpp */,
+				8E3ECBB924CC3B59004D4F4E /* QueueWithMax.hpp */,
+			);
+			path = QueueWithMax;
+			sourceTree = "<group>";
+		};
 		8EB134DC24BDF2AB0055BDDF /* Print1ToMaxOfNDigits */ = {
 			isa = PBXGroup;
 			children = (
@@ -423,6 +471,10 @@
 		D2330A2624AF0FD500C6480D /* Algorithm_C */ = {
 			isa = PBXGroup;
 			children = (
+				8E3ECBB724CC3B53004D4F4E /* QueueWithMax */,
+				8E3ECBB324CC3368004D4F4E /* MaxInSlidingWindow */,
+				8E3ECBAF24CC08B3004D4F4E /* LeftRotateString */,
+				8E3ECBAB24CBFF10004D4F4E /* ReverseWordsInSentence */,
 				8E3ECBA724CBB105004D4F4E /* ContinuousSquenceWithSum */,
 				8E3ECBA324CBAD57004D4F4E /* TwoNumbersWithSum */,
 				8E3ECB9F24CBA6E7004D4F4E /* NumberAppearingOnce */,
@@ -826,6 +878,7 @@
 				8EB134DB24BA8E8D0055BDDF /* Review_2.cpp in Sources */,
 				D2FE54B824CAB0C100E5B5EA /* NumberOfK.cpp in Sources */,
 				D2CB579A24C7CBCA00B31AE3 /* MoreThanHalfNumber.cpp in Sources */,
+				8E3ECBBA24CC3B59004D4F4E /* QueueWithMax.cpp in Sources */,
 				D2330A2824AF0FD500C6480D /* main.cpp in Sources */,
 				8E3ECB9224C29779004D4F4E /* PrintTreesInZigzag.cpp in Sources */,
 				D2CB57AA24C836B700B31AE3 /* NumberOf1.cpp in Sources */,
@@ -846,6 +899,7 @@
 				D2FE54CC24CAD5F600E5B5EA /* BalancedBinaryTree.cpp in Sources */,
 				D2FE54B424CA94EC00E5B5EA /* FirstCommonNodesInLists.cpp in Sources */,
 				D250310124C94373007DCD5A /* SortArrayForMinNumber.cpp in Sources */,
+				8E3ECBAE24CBFF17004D4F4E /* ReverseWordsInSentence.cpp in Sources */,
 				D21EDC8C24C01DE300CBF16E /* KthNodeFromEnd.cpp in Sources */,
 				D2FE54B024CA8E6E00E5B5EA /* InversePairs.cpp in Sources */,
 				D21EDC9024C02C1900CBF16E /* EntryNodeInListLoop.cpp in Sources */,
@@ -855,6 +909,7 @@
 				8E3ECB7A24C28B42004D4F4E /* SymmetricalBinaryTree.cpp in Sources */,
 				D21EDC9924C066A000CBF16E /* MergeSortedLists.cpp in Sources */,
 				D250310524C965AC007DCD5A /* TranslateNumbersToStrings.cpp in Sources */,
+				8E3ECBB224CC08BB004D4F4E /* LeftRotateString.cpp in Sources */,
 				D2FE54BC24CAB71D00E5B5EA /* MissingNumber.cpp in Sources */,
 				D2D21CFE24C5A5BA008FD1E7 /* StringPermutation.cpp in Sources */,
 				D2D21CF624C5703D008FD1E7 /* ConvertBinarySearchTree.cpp in Sources */,
@@ -863,6 +918,7 @@
 				D2FE54C024CABC6900E5B5EA /* IntegerIdenticalToIndex.cpp in Sources */,
 				8EB134DF24BDF2CD0055BDDF /* Print1ToMaxOfNDigits.cpp in Sources */,
 				D2FE54C424CAC39F00E5B5EA /* KthNodeInBST.cpp in Sources */,
+				8E3ECBB624CC3370004D4F4E /* MaxInSlidingWindow.cpp in Sources */,
 				8E3ECB8624C28B73004D4F4E /* StackPushPopOrder.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
