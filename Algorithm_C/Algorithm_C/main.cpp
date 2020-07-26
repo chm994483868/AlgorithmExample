@@ -7,10 +7,8 @@
 //
 
 #include <iostream>
-
 #include <cstdio>
 #include <stdio.h>
-
 #include <string.h>
 #include <vector>
 #include <stack>
@@ -21,14 +19,6 @@
 #include <exception>
 
 using namespace std;
-
-extern void startTest_Power();
-extern void startTest_Print1ToMaxOfNDigits();
-extern void startTest_Match();
-extern void startTest_IsNumeric();
-extern void startTest_ReorderOddEven();
-extern void startTest_FindPathTree();
-extern void startTest_ComplexListNode_Clone();
 
 void printArray(string desc, int nums[], int count) {
     std::cout << desc;
@@ -1274,8 +1264,6 @@ int numberOf1_Three(int n) {
     return count;
 }
 
-// N = 10 进来:
-//
 void rec(int N) {
     if (N > 0) {
         rec(N - 10);
@@ -1285,14 +1273,6 @@ void rec(int N) {
     cout << "N=" << N << endl;
     cout << "最后一句了" << endl;
 }
-
-// 10
-// N = 0
-// N = -1
-// N = -2
-// N = -3
-// N = -4
-// 
 
 void prologue(const BinaryTreeNode* pRoot) {
     if (pRoot == nullptr) {
@@ -1324,8 +1304,7 @@ void prologue(const BinaryTreeNode* pRoot) {
 void fun(int n) {
     n--;
     
-    if ( 0 == n ) //跳出递归的条件
-    {
+    if ( 0 == n ) { //跳出递归的条件
         printf("end\n");
         return ;//出栈
     }
@@ -1338,91 +1317,31 @@ void fun(int n) {
 
 int main(int argc, const char * argv[]) {
     // insert code here...
-//    std::cout << "Hello, World!\n";
+    std::cout << "Hello, World!\n";
     
     int nums[] = {4, 6, 3, 2, 1, 8, 20, 14};
     printArray("排序前:", nums, 8);
     
     // 冒泡排序
-//    bubbleSort(nums, 8);
+    //    bubbleSort(nums, 8);
     // 插入排序
-//    insertSort(nums, 8);
+    //    insertSort(nums, 8);
     // 选择排序
-//    selectSort(nums, 8);
+    //    selectSort(nums, 8);
     // 希尔排序
-//    shellSort(nums, 8);
+    //    shellSort(nums, 8);
     // 希尔排序优化
-//    shellSortOptimize(nums, 8);
+    //    shellSortOptimize(nums, 8);
     // 快速排序
-//    quickSort(nums, 0, 7);
+    //    quickSort(nums, 0, 7);
     // 归并排序
-//    int temp[] = {};
-//    mergeSort(nums, 0, 7, temp);
+    //    int temp[] = {};
+    //    mergeSort(nums, 0, 7, temp);
     // 堆排序
-    heapSort(nums, 8);
-//    heap_sort(nums, 8);
-
+    //    heapSort(nums, 8);
+    //    heap_sort(nums, 8);
+    
     printArray("排序后:", nums, 8);
-    
-//    startTest_Power();
-//    startTest_Print1ToMaxOfNDigits();
-//    startTest_Match();
-//    startTest_IsNumeric();
-//    startTest_ReorderOddEven();
-//    startTest_FindPathTree();
-//    startTest_ComplexListNode_Clone();
-    
-//    std::cout << '\n';
-//    rec(10);
-    
-//    BinaryTreeNode* ten = new BinaryTreeNode();
-//    ten->m_nValue = 10;
-//    ten->m_pLeft = nullptr;
-//    ten->m_pRight = nullptr;
-//
-//    BinaryTreeNode* six = new BinaryTreeNode();
-//    six->m_nValue = 6;
-//    six->m_pLeft = nullptr;
-//    six->m_pRight = nullptr;
-//
-//    BinaryTreeNode* four = new BinaryTreeNode();
-//    four->m_nValue = 4;
-//    four->m_pLeft = nullptr;
-//    four->m_pRight = nullptr;
-//
-//    BinaryTreeNode* eight = new BinaryTreeNode();
-//    eight->m_nValue = 8;
-//    eight->m_pLeft = nullptr;
-//    eight->m_pRight = nullptr;
-//
-//    BinaryTreeNode* fourteen = new BinaryTreeNode();
-//    fourteen->m_nValue = 14;
-//    fourteen->m_pLeft = nullptr;
-//    fourteen->m_pRight = nullptr;
-//
-//    BinaryTreeNode* twelve = new BinaryTreeNode();
-//    twelve->m_nValue = 12;
-//    twelve->m_pLeft = nullptr;
-//    twelve->m_pRight = nullptr;
-//
-//    BinaryTreeNode* sixteen = new BinaryTreeNode();
-//    sixteen->m_nValue = 16;
-//    sixteen->m_pLeft = nullptr;
-//    sixteen->m_pRight = nullptr;
-//
-//    ten->m_pLeft = six;
-//    ten->m_pRight = fourteen;
-//
-//    six->m_pLeft = four;
-//    six->m_pRight = eight;
-//
-//    fourteen->m_pLeft = twelve;
-//    fourteen->m_pRight = sixteen;
-//
-//    prologue(ten);
-//    printf("\n");
-    
-//    fun(5);
     
     return 0;
 }

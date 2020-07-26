@@ -20,7 +20,7 @@ void buildProductionArray(const vector<double>& input, vector<double>& output) {
         }
         
         double temp = 1;
-        for (int i = length1 - 2; i >= 0; --i) {
+        for (unsigned long i = length1 - 2; i >= 0; --i) {
             temp *= input[i + 1];
             output[i] *= temp;
         }

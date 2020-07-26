@@ -15,6 +15,4 @@
 void reorderOddEven_1(int* pData, unsigned int length);
 void reorderOddEven_2(int* pData, unsigned int length);
 
-void startTest_ReorderOddEven();
-
 #endif /* ReorderArray_hpp */
