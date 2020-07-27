@@ -7,9 +7,29 @@
 //
 
 #include <iostream>
+#include "AssignmentOperator.hpp"
+#include "FindDuplication.hpp"
+#include "FindDuplicationNoEdit.hpp"
+#include "FindInPartiallySortedMatrix.hpp"
+#include "ReplaceSpaces.hpp"
+#include "PrintListInReversedOrder.hpp"
 
 int main(int argc, const char * argv[]) {
     // insert code here...
-    std::cout << "《Sword Offer》Review starting 🎉🎉🎉 \n";
+    std::cout << "《Sword of offer》Review starting 🎉🎉🎉 \n";
+    
+    // 1. 赋值运算符函数
+//    AssignmentOperator::Test();
+    // 3.(一) 找出数组中重复的数字
+//    FindDuplication::Test();
+    // 3.(二) 不修改数组找出重复的数字
+//    FindDuplicationNoEdit::Test();
+    // 4. 二维数组中的查找
+//    FindInPartiallySortedMatrix::Test();
+    // 5. 替换空格
+//    ReplaceSpaces::Test();
+    // 6. 从尾到头打印链表
+    PrintListInReversedOrder::Test();
+    
     return 0;
 }

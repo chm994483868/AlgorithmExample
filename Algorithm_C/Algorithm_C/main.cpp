@@ -1315,6 +1315,65 @@ void fun(int n) {
     //printf("fun --> %d\n" ,n);
 }
 
+void changeP(int* param) {
+//    int b = 10;
+//    param = &b;
+//    (*param)++;
+    *param = 10;
+}
+
+void swapint(int* a, int* b) {
+    int temp;
+    temp = *a;
+    *a = *b;
+    *b = temp;
+}
+
+// 值传递
+void change1(int n) {
+    std::cout << "值传递--函数操作地址 " << &n << std::endl;
+    n++;
+}
+
+// 引用传递
+void change2(int& n) {
+    std::cout << "引用传递--函数操作地址 " << &n << std::endl;
+    n++;
+}
+
+// 指针传递
+void change3(int* n) {
+    std::cout << "指针传递--函数操作地址 " << n << std::endl;
+    *n = *n + 1;
+}
+
+//    int a = 4;
+//    std::cout << "a = " << a << std::endl;
+//    changeP(&a);
+//    std::cout << "a = " << a << std::endl;
+    
+//    int a = 1;
+//    int b = 2;
+//    std::cout << "a = " << a << std::endl;
+//    std::cout << "b = " << b << std::endl;
+//
+//    swapint(&a, &b);
+//
+//    std::cout << "a = " << a << std::endl;
+//    std::cout << "b = " << b << std::endl;
+    
+//    int n = 10;
+//    std::cout << "实参的地址 " << &n << std::endl;
+    
+//    change1(n);
+//    std::cout << "after change1() n = " << n << std::endl;
+    
+//    change2(n);
+//    std::cout << "after change2() n = " << n << std::endl;
+    
+//    change3(&n);
+//    std::cout << "after change3() n = " << n << std::endl;
+
 int main(int argc, const char * argv[]) {
     // insert code here...
     std::cout << "Hello, World!\n";
