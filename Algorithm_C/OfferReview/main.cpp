@@ -13,6 +13,7 @@
 #include "FindInPartiallySortedMatrix.hpp"
 #include "ReplaceSpaces.hpp"
 #include "PrintListInReversedOrder.hpp"
+#include "ConstructBinaryTree.hpp"
 
 int main(int argc, const char * argv[]) {
     // insert code here...
@@ -29,7 +30,9 @@ int main(int argc, const char * argv[]) {
     // 5. 替换空格
 //    ReplaceSpaces::Test();
     // 6. 从尾到头打印链表
-    PrintListInReversedOrder::Test();
+//    PrintListInReversedOrder::Test();
+    // 7. 重建二叉树
+    ConstructBinaryTree::Test();
     
     return 0;
 }
