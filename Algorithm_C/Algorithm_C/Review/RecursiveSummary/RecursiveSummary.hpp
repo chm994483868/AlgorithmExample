@@ -11,4 +11,10 @@
 
 #include <stdio.h>
 
+// 包含递归解法的题目:
+
+// 06_PrintListInReversedOrder
+// 07_ConstructBinaryTree
+// 10_Fibonacci
+
 #endif /* RecursiveSummary_hpp */
