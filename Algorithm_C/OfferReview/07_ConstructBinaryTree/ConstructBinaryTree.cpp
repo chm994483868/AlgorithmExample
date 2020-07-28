@@ -9,34 +9,42 @@
 #include "ConstructBinaryTree.hpp"
 
 ConstructBinaryTree::BinaryTreeNode*  ConstructBinaryTree::constructCore(int* startPreorder, int* endPreorder, int* startInorder, int* endInorder) {
+    // 前序遍历序列的第一个数字是根节点的值
     int rootValue = startPreorder[0];
+    // 构建根节点
     BinaryTreeNode* root = new BinaryTreeNode();
     root->m_nValue = rootValue;
     root->m_pLeft = root->m_pRight = nullptr;
-    
+    // 判断是否是就一个根结点的树
     if (startPreorder == endPreorder) {
         if (startInorder == endInorder && *startPreorder == *startInorder) {
             return root;
         } else {
-            throw std::exception(); // 参数错误
+            throw std::exception(); // 入参错误
         }
     }
     
+    // 在中序遍历中找到根节点的值
     int* rootInorder = startInorder;
     while (rootInorder <= endInorder && *rootInorder != rootValue) {
         ++rootInorder;
     }
     
+    // 存在一种情况，中序遍历的结尾是根节点，即是一棵根节点只有左子树的树
     if (rootInorder == endInorder && *rootInorder != rootValue) {
-        throw std::exception(); // 参数错误
+        throw std::exception(); // 入参错误，在中序序列中没有找到根节点
     }
     
+    // 取得左子树的长度
     long leftLength = rootInorder - startInorder;
+    // 取得左子树前序遍历的终点
     int* leftPreorderEnd = startPreorder + leftLength;
+    
     if (leftLength > 0) {
         root->m_pLeft = constructCore(startPreorder + 1, leftPreorderEnd, startInorder, rootInorder - 1);
     }
     
+    // 这里 endPreorder - startPreorder 得到的是左子树和右子树的总长度，如果大于左子树的长度，则表明一定存在右子树
     if (leftLength < endPreorder - startPreorder) {
         root->m_pRight = constructCore(leftPreorderEnd + 1, endPreorder, rootInorder + 1, endInorder);
     }

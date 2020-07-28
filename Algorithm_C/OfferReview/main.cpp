@@ -14,6 +14,7 @@
 #include "ReplaceSpaces.hpp"
 #include "PrintListInReversedOrder.hpp"
 #include "ConstructBinaryTree.hpp"
+#include "NextNodeInBinaryTrees.hpp"
 
 int main(int argc, const char * argv[]) {
     // insert code here...
@@ -32,7 +33,9 @@ int main(int argc, const char * argv[]) {
     // 6. 从尾到头打印链表
 //    PrintListInReversedOrder::Test();
     // 7. 重建二叉树
-    ConstructBinaryTree::Test();
+//    ConstructBinaryTree::Test();
+    // 8. 二叉树的下一个结点
+    NextNodeInBinaryTrees::Test();
     
     return 0;
 }

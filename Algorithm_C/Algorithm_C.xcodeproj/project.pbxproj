@@ -31,6 +31,8 @@
 		8EA593E424CF0B40002785EF /* ConstructBinaryTree.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8EA593E224CF0B40002785EF /* ConstructBinaryTree.cpp */; };
 		8EB134DF24BDF2CD0055BDDF /* Print1ToMaxOfNDigits.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8EB134DD24BDF2CD0055BDDF /* Print1ToMaxOfNDigits.cpp */; };
 		8EB134E324C0913A0055BDDF /* SubstructureInTree.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8EB134E124C0913A0055BDDF /* SubstructureInTree.cpp */; };
+		D2090C0524CFA51E00FA4F51 /* NextNodeInBinaryTrees.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D2090C0324CFA51E00FA4F51 /* NextNodeInBinaryTrees.cpp */; };
+		D2090C0924CFAD4B00FA4F51 /* QueueWithTwoStacks.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D2090C0724CFAD4B00FA4F51 /* QueueWithTwoStacks.cpp */; };
 		D21B43A324CE83160078EEF9 /* FindDuplication.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D21B43A124CE83160078EEF9 /* FindDuplication.cpp */; };
 		D21B43A724CEA24B0078EEF9 /* FindDuplicationNoEdit.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D21B43A524CEA24B0078EEF9 /* FindDuplicationNoEdit.cpp */; };
 		D21B43AB24CEB54B0078EEF9 /* FindInPartiallySortedMatrix.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D21B43A924CEB54B0078EEF9 /* FindInPartiallySortedMatrix.cpp */; };
@@ -152,6 +154,10 @@
 		8EB134DE24BDF2CD0055BDDF /* Print1ToMaxOfNDigits.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = Print1ToMaxOfNDigits.hpp; sourceTree = "<group>"; };
 		8EB134E124C0913A0055BDDF /* SubstructureInTree.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = SubstructureInTree.cpp; sourceTree = "<group>"; };
 		8EB134E224C0913A0055BDDF /* SubstructureInTree.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = SubstructureInTree.hpp; sourceTree = "<group>"; };
+		D2090C0324CFA51E00FA4F51 /* NextNodeInBinaryTrees.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = NextNodeInBinaryTrees.cpp; sourceTree = "<group>"; };
+		D2090C0424CFA51E00FA4F51 /* NextNodeInBinaryTrees.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = NextNodeInBinaryTrees.hpp; sourceTree = "<group>"; };
+		D2090C0724CFAD4B00FA4F51 /* QueueWithTwoStacks.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = QueueWithTwoStacks.cpp; sourceTree = "<group>"; };
+		D2090C0824CFAD4B00FA4F51 /* QueueWithTwoStacks.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = QueueWithTwoStacks.hpp; sourceTree = "<group>"; };
 		D21B43A124CE83160078EEF9 /* FindDuplication.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = FindDuplication.cpp; sourceTree = "<group>"; };
 		D21B43A224CE83160078EEF9 /* FindDuplication.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = FindDuplication.hpp; sourceTree = "<group>"; };
 		D21B43A524CEA24B0078EEF9 /* FindDuplicationNoEdit.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = FindDuplicationNoEdit.cpp; sourceTree = "<group>"; };
@@ -517,6 +523,8 @@
 				D21B43AC24CEC0BB0078EEF9 /* 05_ReplaceSpaces */,
 				D21B43B024CED1220078EEF9 /* 06_PrintListInReversedOrder */,
 				8EA593E124CF0B27002785EF /* 07_ConstructBinaryTree */,
+				D2090C0224CFA50E00FA4F51 /* 08_NextNodeInBinaryTrees */,
+				D2090C0624CFAD3A00FA4F51 /* 09_QueueWithTwoStacks */,
 			);
 			path = OfferReview;
 			sourceTree = "<group>";
@@ -555,6 +563,24 @@
 				8EB134E224C0913A0055BDDF /* SubstructureInTree.hpp */,
 			);
 			path = SubstructureInTree;
+			sourceTree = "<group>";
+		};
+		D2090C0224CFA50E00FA4F51 /* 08_NextNodeInBinaryTrees */ = {
+			isa = PBXGroup;
+			children = (
+				D2090C0324CFA51E00FA4F51 /* NextNodeInBinaryTrees.cpp */,
+				D2090C0424CFA51E00FA4F51 /* NextNodeInBinaryTrees.hpp */,
+			);
+			path = 08_NextNodeInBinaryTrees;
+			sourceTree = "<group>";
+		};
+		D2090C0624CFAD3A00FA4F51 /* 09_QueueWithTwoStacks */ = {
+			isa = PBXGroup;
+			children = (
+				D2090C0724CFAD4B00FA4F51 /* QueueWithTwoStacks.cpp */,
+				D2090C0824CFAD4B00FA4F51 /* QueueWithTwoStacks.hpp */,
+			);
+			path = 09_QueueWithTwoStacks;
 			sourceTree = "<group>";
 		};
 		D21B43A024CE82E40078EEF9 /* 03_01_DuplicationInArray */ = {
@@ -1124,7 +1150,9 @@
 			buildActionMask = 2147483647;
 			files = (
 				8EA593E024CDBD0B002785EF /* AssignmentOperator.cpp in Sources */,
+				D2090C0924CFAD4B00FA4F51 /* QueueWithTwoStacks.cpp in Sources */,
 				D21B43A324CE83160078EEF9 /* FindDuplication.cpp in Sources */,
+				D2090C0524CFA51E00FA4F51 /* NextNodeInBinaryTrees.cpp in Sources */,
 				8EA593E424CF0B40002785EF /* ConstructBinaryTree.cpp in Sources */,
 				D21B43A724CEA24B0078EEF9 /* FindDuplicationNoEdit.cpp in Sources */,
 				D21B43AB24CEB54B0078EEF9 /* FindInPartiallySortedMatrix.cpp in Sources */,
