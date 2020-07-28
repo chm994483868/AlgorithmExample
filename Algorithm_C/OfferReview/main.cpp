@@ -22,6 +22,8 @@
 #include "StringPathInMatrix.hpp"
 #include "RobotMove.hpp"
 #include "NumberOf1InBinary.hpp"
+#include "CPower.hpp"
+#include "Print1ToMaxOfNDigits.hpp"
 
 int main(int argc, const char * argv[]) {
     // insert code here...
@@ -56,7 +58,12 @@ int main(int argc, const char * argv[]) {
     // 14. 机器人的运动范围
 //    RobotMove::Test();
     // 15. 二进制中1的个数
-    NumberOf1InBinary::Test();
+//    NumberOf1InBinary::Test();
+    // 16. 数值的整数次方
+//    CPower::Test();
+    // 17. 打印1到最大的n位数
+    Print1ToMaxOfNDigits::Test();
+    
     
     return 0;
 }

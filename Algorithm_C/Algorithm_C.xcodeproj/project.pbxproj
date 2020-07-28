@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		8E2572BD24D062C90080F598 /* CPower.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8E2572BB24D062C90080F598 /* CPower.cpp */; };
+		8E2572C124D0696F0080F598 /* Print1ToMaxOfNDigits.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8E2572BF24D0696F0080F598 /* Print1ToMaxOfNDigits.cpp */; };
 		8E3ECB7624C28B2C004D4F4E /* MirrorOfBinaryTree.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8E3ECB7524C28B2C004D4F4E /* MirrorOfBinaryTree.cpp */; };
 		8E3ECB7A24C28B42004D4F4E /* SymmetricalBinaryTree.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8E3ECB7824C28B42004D4F4E /* SymmetricalBinaryTree.cpp */; };
 		8E3ECB7E24C28B56004D4F4E /* PrintMatrix.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8E3ECB7C24C28B55004D4F4E /* PrintMatrix.cpp */; };
@@ -29,7 +31,6 @@
 		8EA593D924CDB969002785EF /* main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8EA593D824CDB969002785EF /* main.cpp */; };
 		8EA593E024CDBD0B002785EF /* AssignmentOperator.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8EA593DE24CDBD0B002785EF /* AssignmentOperator.cpp */; };
 		8EA593E424CF0B40002785EF /* ConstructBinaryTree.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8EA593E224CF0B40002785EF /* ConstructBinaryTree.cpp */; };
-		8EB134DF24BDF2CD0055BDDF /* Print1ToMaxOfNDigits.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8EB134DD24BDF2CD0055BDDF /* Print1ToMaxOfNDigits.cpp */; };
 		8EB134E324C0913A0055BDDF /* SubstructureInTree.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8EB134E124C0913A0055BDDF /* SubstructureInTree.cpp */; };
 		D2090C0524CFA51E00FA4F51 /* NextNodeInBinaryTrees.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D2090C0324CFA51E00FA4F51 /* NextNodeInBinaryTrees.cpp */; };
 		D2090C0924CFAD4B00FA4F51 /* QueueWithTwoStacks.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D2090C0724CFAD4B00FA4F51 /* QueueWithTwoStacks.cpp */; };
@@ -113,6 +114,10 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		8E2572BB24D062C90080F598 /* CPower.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = CPower.cpp; sourceTree = "<group>"; };
+		8E2572BC24D062C90080F598 /* CPower.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = CPower.hpp; sourceTree = "<group>"; };
+		8E2572BF24D0696F0080F598 /* Print1ToMaxOfNDigits.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Print1ToMaxOfNDigits.cpp; sourceTree = "<group>"; };
+		8E2572C024D0696F0080F598 /* Print1ToMaxOfNDigits.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = Print1ToMaxOfNDigits.hpp; sourceTree = "<group>"; };
 		8E3ECB7424C28B2C004D4F4E /* MirrorOfBinaryTree.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = MirrorOfBinaryTree.hpp; sourceTree = "<group>"; };
 		8E3ECB7524C28B2C004D4F4E /* MirrorOfBinaryTree.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = MirrorOfBinaryTree.cpp; sourceTree = "<group>"; };
 		8E3ECB7824C28B42004D4F4E /* SymmetricalBinaryTree.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = SymmetricalBinaryTree.cpp; sourceTree = "<group>"; };
@@ -156,8 +161,6 @@
 		8EA593DF24CDBD0B002785EF /* AssignmentOperator.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = AssignmentOperator.hpp; sourceTree = "<group>"; };
 		8EA593E224CF0B40002785EF /* ConstructBinaryTree.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = ConstructBinaryTree.cpp; sourceTree = "<group>"; };
 		8EA593E324CF0B40002785EF /* ConstructBinaryTree.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = ConstructBinaryTree.hpp; sourceTree = "<group>"; };
-		8EB134DD24BDF2CD0055BDDF /* Print1ToMaxOfNDigits.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Print1ToMaxOfNDigits.cpp; sourceTree = "<group>"; };
-		8EB134DE24BDF2CD0055BDDF /* Print1ToMaxOfNDigits.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = Print1ToMaxOfNDigits.hpp; sourceTree = "<group>"; };
 		8EB134E124C0913A0055BDDF /* SubstructureInTree.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = SubstructureInTree.cpp; sourceTree = "<group>"; };
 		8EB134E224C0913A0055BDDF /* SubstructureInTree.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = SubstructureInTree.hpp; sourceTree = "<group>"; };
 		D2090C0324CFA51E00FA4F51 /* NextNodeInBinaryTrees.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = NextNodeInBinaryTrees.cpp; sourceTree = "<group>"; };
@@ -298,6 +301,24 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		8E2572B724D05C450080F598 /* 16_Power */ = {
+			isa = PBXGroup;
+			children = (
+				8E2572BB24D062C90080F598 /* CPower.cpp */,
+				8E2572BC24D062C90080F598 /* CPower.hpp */,
+			);
+			path = 16_Power;
+			sourceTree = "<group>";
+		};
+		8E2572BE24D069470080F598 /* 17_Print1ToMaxOfNDigits */ = {
+			isa = PBXGroup;
+			children = (
+				8E2572BF24D0696F0080F598 /* Print1ToMaxOfNDigits.cpp */,
+				8E2572C024D0696F0080F598 /* Print1ToMaxOfNDigits.hpp */,
+			);
+			path = 17_Print1ToMaxOfNDigits;
+			sourceTree = "<group>";
+		};
 		8E3ECB7324C28B2C004D4F4E /* MirrorOfBinaryTree */ = {
 			isa = PBXGroup;
 			children = (
@@ -549,6 +570,8 @@
 				D2090C1624D0109B00FA4F51 /* 12_StringPathInMatrix */,
 				D2090C1A24D01FAF00FA4F51 /* 13_RobotMove */,
 				D2090C1E24D0292500FA4F51 /* 15_NumberOf1InBinary */,
+				8E2572B724D05C450080F598 /* 16_Power */,
+				8E2572BE24D069470080F598 /* 17_Print1ToMaxOfNDigits */,
 			);
 			path = OfferReview;
 			sourceTree = "<group>";
@@ -574,8 +597,6 @@
 		8EB134DC24BDF2AB0055BDDF /* Print1ToMaxOfNDigits */ = {
 			isa = PBXGroup;
 			children = (
-				8EB134DD24BDF2CD0055BDDF /* Print1ToMaxOfNDigits.cpp */,
-				8EB134DE24BDF2CD0055BDDF /* Print1ToMaxOfNDigits.hpp */,
 			);
 			path = Print1ToMaxOfNDigits;
 			sourceTree = "<group>";
@@ -1228,6 +1249,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				D2090C1124CFCF3600FA4F51 /* Fibonacci.cpp in Sources */,
+				8E2572C124D0696F0080F598 /* Print1ToMaxOfNDigits.cpp in Sources */,
 				D2090C2124D0293B00FA4F51 /* NumberOf1InBinary.cpp in Sources */,
 				8EA593E024CDBD0B002785EF /* AssignmentOperator.cpp in Sources */,
 				D2090C0924CFAD4B00FA4F51 /* QueueWithTwoStacks.cpp in Sources */,
@@ -1235,6 +1257,7 @@
 				D21B43A324CE83160078EEF9 /* FindDuplication.cpp in Sources */,
 				D2090C1524CFF75E00FA4F51 /* MinNumberInRotatedArray.cpp in Sources */,
 				D2090C0524CFA51E00FA4F51 /* NextNodeInBinaryTrees.cpp in Sources */,
+				8E2572BD24D062C90080F598 /* CPower.cpp in Sources */,
 				8EA593E424CF0B40002785EF /* ConstructBinaryTree.cpp in Sources */,
 				D21B43A724CEA24B0078EEF9 /* FindDuplicationNoEdit.cpp in Sources */,
 				D21B43AB24CEB54B0078EEF9 /* FindInPartiallySortedMatrix.cpp in Sources */,
@@ -1312,7 +1335,6 @@
 				8E3ECB8A24C28B8D004D4F4E /* PrintTreeFromTopToBottom.cpp in Sources */,
 				D26E5B5424CD275C006B75C9 /* ContinousCards.cpp in Sources */,
 				D2FE54C024CABC6900E5B5EA /* IntegerIdenticalToIndex.cpp in Sources */,
-				8EB134DF24BDF2CD0055BDDF /* Print1ToMaxOfNDigits.cpp in Sources */,
 				D2FE54C424CAC39F00E5B5EA /* KthNodeInBST.cpp in Sources */,
 				8E3ECBB624CC3370004D4F4E /* MaxInSlidingWindow.cpp in Sources */,
 				8E3ECB8624C28B73004D4F4E /* StackPushPopOrder.cpp in Sources */,
