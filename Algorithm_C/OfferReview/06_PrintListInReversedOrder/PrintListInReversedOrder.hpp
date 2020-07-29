@@ -13,7 +13,7 @@
 #include <stack>
 #include "List.hpp"
 
-using namespace CLisNode;
+using namespace List;
 
 namespace PrintListInReversedOrder {
 

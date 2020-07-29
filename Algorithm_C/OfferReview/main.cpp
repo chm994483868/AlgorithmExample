@@ -35,6 +35,8 @@
 #include "ReverseList.hpp"
 #include "MergeSortedLists.hpp"
 #include "SubstructureInTree.hpp"
+#include "MirrorOfBinaryTree.hpp"
+#include "SymmetricalBinaryTree.hpp"
 
 int main(int argc, const char * argv[]) {
     // insert code here...
@@ -93,7 +95,11 @@ int main(int argc, const char * argv[]) {
     // 26. 合并排序的链表
 //    MergeSortedLists::Test();
     // 27. 树的子结构
-    SubstructureInTree::Test();
+//    SubstructureInTree::Test();
+    // 28. 二叉树的镜像
+//    MirrorOfBinaryTree::Test();
+    // 29. 对称的二叉树
+    SymmetricalBinaryTree::Test();
     
     return 0;
 }

@@ -12,7 +12,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-namespace CLisNode {
+namespace List {
 
 struct ListNode {
     int m_nValue;

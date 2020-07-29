@@ -13,7 +13,7 @@
 #include <stdlib.h>
 #include "List.hpp"
 
-using namespace CLisNode;
+using namespace List;
 
 namespace ReverseList {
 

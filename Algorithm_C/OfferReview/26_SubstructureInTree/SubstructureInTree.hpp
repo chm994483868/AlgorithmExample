@@ -32,7 +32,6 @@ void DestroyTree(BinaryTreeNode* pRoot);
 
 // 测试代码
 void Test(char* testName, BinaryTreeNode* pRoot1, BinaryTreeNode* pRoot2, bool expected);
-
 // 树中结点含有分叉，树B是树A的子结构
 //                  8                8
 //              /       \           / \
@@ -42,7 +41,6 @@ void Test(char* testName, BinaryTreeNode* pRoot1, BinaryTreeNode* pRoot2, bool e
 //               / \
 //              4   7
 void Test1();
-
 // 树中结点含有分叉，树B不是树A的子结构
 //                  8                8
 //              /       \           / \
@@ -52,7 +50,6 @@ void Test1();
 //               / \
 //              4   7
 void Test2();
-
 // 树中结点只有左子结点，树B是树A的子结构
 //                8                  8
 //              /                   /
@@ -64,7 +61,6 @@ void Test2();
 //       /
 //      5
 void Test3();
-
 // 树中结点只有左子结点，树B不是树A的子结构
 //                8                  8
 //              /                   /
@@ -76,7 +72,6 @@ void Test3();
 //       /
 //      5
 void Test4();
-
 // 树中结点只有右子结点，树B是树A的子结构
 //       8                   8
 //        \                   \
@@ -88,7 +83,6 @@ void Test4();
 //              \
 //               5
 void Test5();
-
 // 树A中结点只有右子结点，树B不是树A的子结构
 //       8                   8
 //        \                   \
@@ -100,13 +94,10 @@ void Test5();
 //              \
 //               5
 void Test6();
-
-// 树A为空树
+// 树 A 为空树
 void Test7();
-
-// 树B为空树
+// 树 B 为空树
 void Test8();
-
 // 树A和树B都为空
 void Test9();
 

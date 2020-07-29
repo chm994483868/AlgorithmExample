@@ -9,7 +9,7 @@
 #include "List.hpp"
 
 // 辅助代码
-CLisNode::ListNode* CLisNode::CreateListNode(int value) {
+List::ListNode* List::CreateListNode(int value) {
     ListNode* pNode = new ListNode();
     pNode->m_nValue = value;
     pNode->m_pNext = nullptr;
@@ -17,7 +17,7 @@ CLisNode::ListNode* CLisNode::CreateListNode(int value) {
     return pNode;
 }
 
-void CLisNode::ConnectListNodes(ListNode* pCurrent, ListNode* pNext) {
+void List::ConnectListNodes(ListNode* pCurrent, ListNode* pNext) {
     if(pCurrent == nullptr) {
         printf("Error to connect two nodes.\n");
         exit(1);
@@ -26,7 +26,7 @@ void CLisNode::ConnectListNodes(ListNode* pCurrent, ListNode* pNext) {
     pCurrent->m_pNext = pNext;
 }
 
-void CLisNode::PrintListNode(ListNode* pNode) {
+void List::PrintListNode(ListNode* pNode) {
     if(pNode == nullptr) {
         printf("The node is nullptr\n");
     } else {
@@ -34,7 +34,7 @@ void CLisNode::PrintListNode(ListNode* pNode) {
     }
 }
 
-void CLisNode::PrintList(ListNode* pHead) {
+void List::PrintList(ListNode* pHead) {
     printf("PrintList starts.\n");
     
     ListNode* pNode = pHead;
@@ -46,7 +46,7 @@ void CLisNode::PrintList(ListNode* pHead) {
     printf("\nPrintList ends.\n");
 }
 
-void CLisNode::DestroyList(ListNode* pHead) {
+void List::DestroyList(ListNode* pHead) {
     ListNode* pNode = pHead;
     while(pNode != nullptr) {
         pHead = pHead->m_pNext;
