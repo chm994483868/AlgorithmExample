@@ -70,12 +70,38 @@ void Print1ToMaxOfNDigits::print1ToMaxOfNDigits_1(int n) {
     delete [] number;
 }
 
+void Print1ToMaxOfNDigits::print1ToMaxOfNDigitsRecursively(char* number, int length, int index) {
+    if (index == length - 1) {
+        printNumber(number);
+        return;
+    }
+    
+    for (int i = 0; i < 10; ++i) {
+        number[index + 1] = i + '0';
+        print1ToMaxOfNDigitsRecursively(number, length, index + 1);
+    }
+}
+
+void Print1ToMaxOfNDigits::print1ToMaxOfNDigits_2(int n) {
+    if (n <= 0) {
+        return;
+    }
+    
+    char* number = new char[n + 1];
+    number[n] = '\0';
+    
+    for (int i = 0; i < 10; ++i) {
+        number[0] = i + '0';
+        print1ToMaxOfNDigitsRecursively(number, n, 0);
+    }
+}
+
 // 测试代码
 void Print1ToMaxOfNDigits::Test(int n) {
     printf("Test for %d begins:\n", n);
 
     print1ToMaxOfNDigits_1(n);
-//    Print1ToMaxOfNDigits_2(n);
+    print1ToMaxOfNDigits_2(n);
 
     printf("\nTest for %d ends.\n", n);
 }

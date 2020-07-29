@@ -21,6 +21,9 @@ void printNumber(char* number);
 bool increment(char* number);
 void print1ToMaxOfNDigits_1(int n);
 
+void print1ToMaxOfNDigitsRecursively(char* number, int length, int index);
+void print1ToMaxOfNDigits_2(int n);
+
 // 测试代码
 void Test(int n);
 

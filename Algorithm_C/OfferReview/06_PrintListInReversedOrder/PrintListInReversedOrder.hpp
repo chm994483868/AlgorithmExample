@@ -11,13 +11,11 @@
 
 #include <stdio.h>
 #include <stack>
+#include "List.hpp"
+
+using namespace CLisNode;
 
 namespace PrintListInReversedOrder {
-
-struct ListNode {
-    int m_nValue;
-    ListNode* m_pNext;
-};
 
 // 开局的两个小题
 // 往链表末尾添加一个节点
@@ -29,13 +27,6 @@ void removeNode(ListNode** pHead, int value);
 // 题目：输入一个链表的头结点，从尾到头反过来打印出每个结点的值。
 void printListReversingly_Iteratively(ListNode* pHead);
 void printListReversingly_Recursively(ListNode* pHead);
-
-// 辅助函数
-ListNode* CreateListNode(int value);
-void ConnectListNodes(ListNode* pCurrent, ListNode* pNext);
-void PrintListNode(ListNode* pNode);
-void PrintList(ListNode* pHead);
-void DestroyList(ListNode* pHead);
 
 // 测试代码
 void Test(ListNode* pHead);

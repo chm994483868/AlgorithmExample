@@ -7,6 +7,7 @@
 //
 
 #include <iostream>
+
 #include "AssignmentOperator.hpp"
 #include "FindDuplication.hpp"
 #include "FindDuplicationNoEdit.hpp"
@@ -24,6 +25,16 @@
 #include "NumberOf1InBinary.hpp"
 #include "CPower.hpp"
 #include "Print1ToMaxOfNDigits.hpp"
+#include "DeleteNodeInList.hpp"
+#include "DeleteDuplicatedNode.hpp"
+#include "RegularExpressions.hpp"
+#include "NumericStrings.hpp"
+#include "ReorderArray.hpp"
+#include "KthNodeFromEnd.hpp"
+#include "EntryNodeInListLoop.hpp"
+#include "ReverseList.hpp"
+#include "MergeSortedLists.hpp"
+#include "SubstructureInTree.hpp"
 
 int main(int argc, const char * argv[]) {
     // insert code here...
@@ -60,9 +71,29 @@ int main(int argc, const char * argv[]) {
     // 15. 二进制中1的个数
 //    NumberOf1InBinary::Test();
     // 16. 数值的整数次方
-    CPower::Test();
+//    CPower::Test();
     // 17. 打印1到最大的n位数
 //    Print1ToMaxOfNDigits::Test();
+    // 18. 在O(1)时间删除链表结点。
+//    DeleteNodeInList::Test();
+    // 19. 删除链表中重复的结点。
+//    DeleteDuplicatedNode::Test();
+    // 20. 正则表达式匹配
+//    RegularExpressions::Test();
+    // 21. 表示数值的字符串
+//    NumericStrings::Test();
+    // 22. 调整数组顺序使奇数位于偶数前面
+//    ReorderArray::Test();
+    // 23. 链表中倒数第k个结点
+//    KthNodeFromEnd::Test();
+    // 24. 链表中环的入口结点
+//    EntryNodeInListLoop::Test();
+    // 25. 反转链表
+//    ReverseList::Test();
+    // 26. 合并排序的链表
+//    MergeSortedLists::Test();
+    // 27. 树的子结构
+    SubstructureInTree::Test();
     
     return 0;
 }

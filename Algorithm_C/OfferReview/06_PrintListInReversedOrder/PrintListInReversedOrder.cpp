@@ -87,57 +87,6 @@ void PrintListInReversedOrder::printListReversingly_Recursively(ListNode* pHead)
     }
 }
 
-
-// 辅助函数
-PrintListInReversedOrder::ListNode* PrintListInReversedOrder::CreateListNode(int value) {
-    ListNode* pNode = new ListNode();
-    pNode->m_nValue = value;
-    pNode->m_pNext = nullptr;
-    
-    return pNode;
-}
-
-void PrintListInReversedOrder::ConnectListNodes(ListNode* pCurrent, ListNode* pNext) {
-    if (pCurrent == nullptr) {
-        printf("Error to connect two nodes.\n");
-        exit(1);
-    }
-
-    pCurrent->m_pNext = pNext;
-}
-
-void PrintListInReversedOrder::PrintListNode(ListNode* pNode) {
-    if (pNode == nullptr) {
-        printf("The node is nullptr\n");
-    } else {
-        printf("The key in node is %d.\n", pNode->m_nValue);
-    }
-}
-
-void PrintListInReversedOrder::PrintList(ListNode* pHead) {
-    printf("PrintList starts.\n");
-    
-    ListNode* pNode = pHead;
-    while(pNode != nullptr) {
-        printf("%d\t", pNode->m_nValue);
-        pNode = pNode->m_pNext;
-    }
-
-    printf("\nPrintList ends.\n");
-}
-
-void PrintListInReversedOrder::DestroyList(ListNode* pHead) {
-    ListNode* pNode = pHead;
-    while(pNode != nullptr) {
-        // 先取得下一个节点
-        pHead = pHead->m_pNext;
-        // 释放当前节点
-        delete pNode;
-        // 更新当前节点
-        pNode = pHead;
-    }
-}
-
 // 测试代码
 void PrintListInReversedOrder::Test(ListNode* pHead) {
     PrintList(pHead);
