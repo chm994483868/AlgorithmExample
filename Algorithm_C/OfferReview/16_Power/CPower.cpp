@@ -35,26 +35,26 @@ double CPower::powerWithUnsignedExponent(double base, unsigned int exponent) {
     if (exponent == 0) {
         return 1;
     }
-    
+
     if (exponent == 1) {
         return base;
     }
-    
+
     double result = powerWithUnsignedExponent(base, exponent >> 1);
     result *= result;
-    
+
     if ((exponent & 0x1) == 1) {
         result *= base;
     }
-    
+
     return result;
 }
 
 double CPower::power(double base, int exponent) {
-//    g_InvalidInput = false;
+    g_InvalidInput = false;
     
     if (equal(base, 0.0) && exponent < 0) {
-//        g_InvalidInput = true;
+        g_InvalidInput = true;
         return 0.0;
     }
     
@@ -74,8 +74,7 @@ double CPower::power(double base, int exponent) {
 // 测试代码
 void CPower::Test(const char* testName, double base, int exponent, double expectedResult, bool expectedFlag) {
     double result = power(base, exponent);
-//    if (equal(result, expectedResult) && g_InvalidInput == expectedFlag)
-        if (equal(result, expectedResult))
+    if (equal(result, expectedResult) && g_InvalidInput == expectedFlag)
         std::cout << testName << " passed" << std::endl;
     else
         std::cout << testName << " FAILED" << std::endl;

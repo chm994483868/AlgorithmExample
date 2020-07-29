@@ -11,7 +11,8 @@
 void Print1ToMaxOfNDigits::printNumber(char* number) {
     bool isBeginning0 = true;
     unsigned long nLength = strlen(number);
-    for (unsigned long i = 0; i < nLength; ++i) {
+    unsigned long i = 0;
+    for (; i < nLength; ++i) {
         if (isBeginning0 && number[i] != '0') {
             isBeginning0 = false;
         }
@@ -28,9 +29,10 @@ bool Print1ToMaxOfNDigits::increment(char* number) {
     bool isOverflow = false;
     int nTakeOver = 0;
     unsigned long nLength = strlen(number);
-    for (unsigned long i = nLength - 1; i >= 0; --i) {
+    unsigned long i = nLength - 1;
+    
+    for (; i >= 0; --i) {
         int sum = number[i] - '0' + nTakeOver;
-        
         if (i == nLength - 1) {
             ++sum;
         }
@@ -41,10 +43,10 @@ bool Print1ToMaxOfNDigits::increment(char* number) {
             } else {
                 sum -= 10;
                 nTakeOver = 1;
-                number[i] = sum + '0';
+                number[i] = '0' + sum;
             }
         } else {
-            number[i] = sum + '0';
+            number[i] = '0' + sum;
             break;
         }
     }

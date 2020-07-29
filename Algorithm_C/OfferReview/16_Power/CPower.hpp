@@ -19,7 +19,7 @@ namespace CPower {
 // 16：数值的整数次方
 // 题目：实现函数double Power(double base, int exponent)，求base的exponent
 // 次方。不得使用库函数，同时不需要考虑大数问题。
-//bool g_InvalidInput = false;
+static bool g_InvalidInput = false;
 bool equal(double num1, double num2);
 double powerWithUnsignedExponent(double base, unsigned int exponent);
 

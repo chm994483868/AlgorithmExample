@@ -60,10 +60,9 @@ int main(int argc, const char * argv[]) {
     // 15. 二进制中1的个数
 //    NumberOf1InBinary::Test();
     // 16. 数值的整数次方
-//    CPower::Test();
+    CPower::Test();
     // 17. 打印1到最大的n位数
-    Print1ToMaxOfNDigits::Test();
-    
+//    Print1ToMaxOfNDigits::Test();
     
     return 0;
 }
