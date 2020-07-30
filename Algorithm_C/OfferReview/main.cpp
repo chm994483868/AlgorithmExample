@@ -37,6 +37,12 @@
 #include "SubstructureInTree.hpp"
 #include "MirrorOfBinaryTree.hpp"
 #include "SymmetricalBinaryTree.hpp"
+#include "StackWithMin.hpp"
+#include "StackPushPopOrder.hpp"
+#include "PrintTreeFromTopToBottom.hpp"
+#include "PrintTreesInLines.hpp"
+#include "PrintTreesInZigzag.hpp"
+#include "SquenceOfBST.hpp"
 
 int main(int argc, const char * argv[]) {
     // insert code here...
@@ -99,7 +105,19 @@ int main(int argc, const char * argv[]) {
     // 28. 二叉树的镜像
 //    MirrorOfBinaryTree::Test();
     // 29. 对称的二叉树
-    SymmetricalBinaryTree::Test();
+//    SymmetricalBinaryTree::Test();
+    // 30. 包含min函数的栈
+//    StackWithMin::Test();
+    // 31. 栈的压入、弹出序列
+//    StackPushPopOrder::Test();
+    // 32. 不分行从上往下打印二叉树
+//    PrintTreeFromTopToBottom::Test();
+    // 32. 分行从上到下打印二叉树
+//    PrintTreesInLines::Test();
+    // 32. 之字形打印二叉树
+//    PrintTreesInZigzag::Test();
+    // 33. 二叉搜索树的后序遍历序列
+    SquenceOfBST::Test();
     
     return 0;
 }
