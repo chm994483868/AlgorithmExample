@@ -47,6 +47,7 @@
 #include "CopyComplexList.hpp"
 #include "ConvertBinarySearchTree.hpp"
 #include "SerializeBinaryTrees.hpp"
+#include "MoreThanHalfNumber.hpp"
 
 int main(int argc, const char * argv[]) {
     // insert code here...
@@ -129,7 +130,9 @@ int main(int argc, const char * argv[]) {
     // 36. 二叉搜索树与双向链表
 //    ConvertBinarySearchTree::Test();
     // 37. 序列化二叉树
-    SerializeBinaryTrees::Test();
+//    SerializeBinaryTrees::Test();
+    // 39. 数组中出现次数超过一半的数字
+    MoreThanHalfNumber::Test();
     
     return 0;
 }

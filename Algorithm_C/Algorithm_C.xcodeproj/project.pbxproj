@@ -12,6 +12,9 @@
 		8E2572C524D1B3AE0080F598 /* MirrorOfBinaryTree.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8E2572C324D1B3AE0080F598 /* MirrorOfBinaryTree.cpp */; };
 		8E2572C824D1B45D0080F598 /* BinaryTree.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8E2572C624D1B45D0080F598 /* BinaryTree.cpp */; };
 		8E2572CC24D1C3780080F598 /* SymmetricalBinaryTree.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8E2572CA24D1C3780080F598 /* SymmetricalBinaryTree.cpp */; };
+		8E2572D024D3039B0080F598 /* StringPermutation.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8E2572CE24D3039B0080F598 /* StringPermutation.cpp */; };
+		8E2572D524D304690080F598 /* MoreThanHalfNumber.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8E2572D324D304690080F598 /* MoreThanHalfNumber.cpp */; };
+		8E2572D824D304DE0080F598 /* Array.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8E2572D624D304DE0080F598 /* Array.cpp */; };
 		8E5CCE0724B9FF3D0081B5FF /* Review_1.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8E5CCE0624B9FF3D0081B5FF /* Review_1.cpp */; };
 		8EA593D924CDB969002785EF /* main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8EA593D824CDB969002785EF /* main.cpp */; };
 		8EA593E024CDBD0B002785EF /* AssignmentOperator.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8EA593DE24CDBD0B002785EF /* AssignmentOperator.cpp */; };
@@ -87,6 +90,12 @@
 		8E2572C724D1B45D0080F598 /* BinaryTree.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = BinaryTree.hpp; sourceTree = "<group>"; };
 		8E2572CA24D1C3780080F598 /* SymmetricalBinaryTree.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = SymmetricalBinaryTree.cpp; sourceTree = "<group>"; };
 		8E2572CB24D1C3780080F598 /* SymmetricalBinaryTree.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = SymmetricalBinaryTree.hpp; sourceTree = "<group>"; };
+		8E2572CE24D3039B0080F598 /* StringPermutation.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = StringPermutation.cpp; sourceTree = "<group>"; };
+		8E2572CF24D3039B0080F598 /* StringPermutation.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = StringPermutation.hpp; sourceTree = "<group>"; };
+		8E2572D324D304690080F598 /* MoreThanHalfNumber.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = MoreThanHalfNumber.cpp; sourceTree = "<group>"; };
+		8E2572D424D304690080F598 /* MoreThanHalfNumber.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = MoreThanHalfNumber.hpp; sourceTree = "<group>"; };
+		8E2572D624D304DE0080F598 /* Array.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Array.cpp; sourceTree = "<group>"; };
+		8E2572D724D304DE0080F598 /* Array.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = Array.hpp; sourceTree = "<group>"; };
 		8E5CCE0624B9FF3D0081B5FF /* Review_1.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Review_1.cpp; sourceTree = "<group>"; };
 		8EA593D624CDB969002785EF /* OfferReview */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = OfferReview; sourceTree = BUILT_PRODUCTS_DIR; };
 		8EA593D824CDB969002785EF /* main.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
@@ -224,6 +233,71 @@
 				8E2572CB24D1C3780080F598 /* SymmetricalBinaryTree.hpp */,
 			);
 			path = 28_SymmetricalBinaryTree;
+			sourceTree = "<group>";
+		};
+		8E2572CD24D303870080F598 /* 38_StringPermutation */ = {
+			isa = PBXGroup;
+			children = (
+				8E2572CE24D3039B0080F598 /* StringPermutation.cpp */,
+				8E2572CF24D3039B0080F598 /* StringPermutation.hpp */,
+			);
+			path = 38_StringPermutation;
+			sourceTree = "<group>";
+		};
+		8E2572D124D304370080F598 /* 01_38 */ = {
+			isa = PBXGroup;
+			children = (
+				8EA593DD24CDBCF8002785EF /* 01_AssignmentOperator */,
+				D21B43A024CE82E40078EEF9 /* 03_01_DuplicationInArray */,
+				D21B43A424CEA23C0078EEF9 /* 03_02_DuplicationInArrayNoEdit */,
+				D21B43A824CEB5350078EEF9 /* 04_FindInPartiallySortedMatrix */,
+				D21B43AC24CEC0BB0078EEF9 /* 05_ReplaceSpaces */,
+				D21B43B024CED1220078EEF9 /* 06_PrintListInReversedOrder */,
+				8EA593E124CF0B27002785EF /* 07_ConstructBinaryTree */,
+				D2090C0224CFA50E00FA4F51 /* 08_NextNodeInBinaryTrees */,
+				D2090C0624CFAD3A00FA4F51 /* 09_QueueWithTwoStacks */,
+				D2090C0A24CFB9CA00FA4F51 /* 09_02_StackWithTwoQueues */,
+				D2090C0E24CFCEA200FA4F51 /* 10_Fibonacci */,
+				D2090C1224CFF73A00FA4F51 /* 11_MinNumberInRotatedArray */,
+				D2090C1624D0109B00FA4F51 /* 12_StringPathInMatrix */,
+				D2090C1A24D01FAF00FA4F51 /* 13_RobotMove */,
+				D2090C1E24D0292500FA4F51 /* 15_NumberOf1InBinary */,
+				8E2572B724D05C450080F598 /* 16_Power */,
+				8E2572BE24D069470080F598 /* 17_Print1ToMaxOfNDigits */,
+				D227130524D10B11009B180D /* 18_01_DeleteNodeInList */,
+				D227130924D11342009B180D /* 18_02_DeleteDuplicatedNode */,
+				D227130D24D11DA9009B180D /* 19_RegularExpressionsMatching */,
+				D227131124D126E5009B180D /* 20_NumericStrings */,
+				D227131524D139A4009B180D /* 21_ReorderArray */,
+				D227131924D14BDF009B180D /* 22_KthNodeFromEnd */,
+				D227131D24D15772009B180D /* 23_EntryNodeInListLoop */,
+				D227132124D16596009B180D /* 24_ReverseList */,
+				D227132524D16CAC009B180D /* 25_MergeSortedLists */,
+				D227132D24D17AAC009B180D /* 26_SubstructureInTree */,
+				8E2572C224D1B3990080F598 /* 27_MirrorOfBinaryTree */,
+				8E2572C924D1C3630080F598 /* 28_SymmetricalBinaryTree */,
+				D237C63C24D245E7001E0B21 /* 30_MinInStack */,
+				D237C64024D25A1E001E0B21 /* 31_StackPushPopOrder */,
+				D237C64424D26592001E0B21 /* 32_01_PrintTreeFromTopToBottom */,
+				D237C64824D26CDF001E0B21 /* 32_02_PrintTreesInLines */,
+				D237C64C24D27637001E0B21 /* 32_03_PrintTreesInZigzag */,
+				D237C65024D27FE2001E0B21 /* 33_SquenceOfBST */,
+				D237C65424D29F11001E0B21 /* 34_PathInTree */,
+				D237C65824D2AAAD001E0B21 /* 35_CopyComplexList */,
+				D237C65F24D2BC07001E0B21 /* 36_ConvertBinarySearchTree */,
+				D237C66324D2C722001E0B21 /* 37_SerializeBinaryTrees */,
+				8E2572CD24D303870080F598 /* 38_StringPermutation */,
+			);
+			path = 01_38;
+			sourceTree = "<group>";
+		};
+		8E2572D224D304590080F598 /* 39_MoreThanHalfNumber */ = {
+			isa = PBXGroup;
+			children = (
+				8E2572D324D304690080F598 /* MoreThanHalfNumber.cpp */,
+				8E2572D424D304690080F598 /* MoreThanHalfNumber.hpp */,
+			);
+			path = 39_MoreThanHalfNumber;
 			sourceTree = "<group>";
 		};
 		8E3ECB7324C28B2C004D4F4E /* MirrorOfBinaryTree */ = {
@@ -427,46 +501,9 @@
 			isa = PBXGroup;
 			children = (
 				8EA593D824CDB969002785EF /* main.cpp */,
+				8E2572D124D304370080F598 /* 01_38 */,
 				D227132924D16E36009B180D /* Utilities */,
-				8EA593DD24CDBCF8002785EF /* 01_AssignmentOperator */,
-				D21B43A024CE82E40078EEF9 /* 03_01_DuplicationInArray */,
-				D21B43A424CEA23C0078EEF9 /* 03_02_DuplicationInArrayNoEdit */,
-				D21B43A824CEB5350078EEF9 /* 04_FindInPartiallySortedMatrix */,
-				D21B43AC24CEC0BB0078EEF9 /* 05_ReplaceSpaces */,
-				D21B43B024CED1220078EEF9 /* 06_PrintListInReversedOrder */,
-				8EA593E124CF0B27002785EF /* 07_ConstructBinaryTree */,
-				D2090C0224CFA50E00FA4F51 /* 08_NextNodeInBinaryTrees */,
-				D2090C0624CFAD3A00FA4F51 /* 09_QueueWithTwoStacks */,
-				D2090C0A24CFB9CA00FA4F51 /* 09_02_StackWithTwoQueues */,
-				D2090C0E24CFCEA200FA4F51 /* 10_Fibonacci */,
-				D2090C1224CFF73A00FA4F51 /* 11_MinNumberInRotatedArray */,
-				D2090C1624D0109B00FA4F51 /* 12_StringPathInMatrix */,
-				D2090C1A24D01FAF00FA4F51 /* 13_RobotMove */,
-				D2090C1E24D0292500FA4F51 /* 15_NumberOf1InBinary */,
-				8E2572B724D05C450080F598 /* 16_Power */,
-				8E2572BE24D069470080F598 /* 17_Print1ToMaxOfNDigits */,
-				D227130524D10B11009B180D /* 18_01_DeleteNodeInList */,
-				D227130924D11342009B180D /* 18_02_DeleteDuplicatedNode */,
-				D227130D24D11DA9009B180D /* 19_RegularExpressionsMatching */,
-				D227131124D126E5009B180D /* 20_NumericStrings */,
-				D227131524D139A4009B180D /* 21_ReorderArray */,
-				D227131924D14BDF009B180D /* 22_KthNodeFromEnd */,
-				D227131D24D15772009B180D /* 23_EntryNodeInListLoop */,
-				D227132124D16596009B180D /* 24_ReverseList */,
-				D227132524D16CAC009B180D /* 25_MergeSortedLists */,
-				D227132D24D17AAC009B180D /* 26_SubstructureInTree */,
-				8E2572C224D1B3990080F598 /* 27_MirrorOfBinaryTree */,
-				8E2572C924D1C3630080F598 /* 28_SymmetricalBinaryTree */,
-				D237C63C24D245E7001E0B21 /* 30_MinInStack */,
-				D237C64024D25A1E001E0B21 /* 31_StackPushPopOrder */,
-				D237C64424D26592001E0B21 /* 32_01_PrintTreeFromTopToBottom */,
-				D237C64824D26CDF001E0B21 /* 32_02_PrintTreesInLines */,
-				D237C64C24D27637001E0B21 /* 32_03_PrintTreesInZigzag */,
-				D237C65024D27FE2001E0B21 /* 33_SquenceOfBST */,
-				D237C65424D29F11001E0B21 /* 34_PathInTree */,
-				D237C65824D2AAAD001E0B21 /* 35_CopyComplexList */,
-				D237C65F24D2BC07001E0B21 /* 36_ConvertBinarySearchTree */,
-				D237C66324D2C722001E0B21 /* 37_SerializeBinaryTrees */,
+				8E2572D224D304590080F598 /* 39_MoreThanHalfNumber */,
 			);
 			path = OfferReview;
 			sourceTree = "<group>";
@@ -760,6 +797,8 @@
 				8E2572C724D1B45D0080F598 /* BinaryTree.hpp */,
 				D237C65C24D2AB63001E0B21 /* ComplexList.cpp */,
 				D237C65D24D2AB63001E0B21 /* ComplexList.hpp */,
+				8E2572D624D304DE0080F598 /* Array.cpp */,
+				8E2572D724D304DE0080F598 /* Array.hpp */,
 			);
 			path = Utilities;
 			sourceTree = "<group>";
@@ -1260,6 +1299,7 @@
 				8E2572CC24D1C3780080F598 /* SymmetricalBinaryTree.cpp in Sources */,
 				D237C65B24D2AAF8001E0B21 /* CopyComplexList.cpp in Sources */,
 				D237C65E24D2AB63001E0B21 /* ComplexList.cpp in Sources */,
+				8E2572D024D3039B0080F598 /* StringPermutation.cpp in Sources */,
 				D2090C1D24D01FCC00FA4F51 /* RobotMove.cpp in Sources */,
 				D237C63F24D24648001E0B21 /* StackWithMin.cpp in Sources */,
 				D21B43A324CE83160078EEF9 /* FindDuplication.cpp in Sources */,
@@ -1272,12 +1312,14 @@
 				8EA593E424CF0B40002785EF /* ConstructBinaryTree.cpp in Sources */,
 				D21B43A724CEA24B0078EEF9 /* FindDuplicationNoEdit.cpp in Sources */,
 				D21B43AB24CEB54B0078EEF9 /* FindInPartiallySortedMatrix.cpp in Sources */,
+				8E2572D524D304690080F598 /* MoreThanHalfNumber.cpp in Sources */,
 				D2090C1924D010B800FA4F51 /* StringPathInMatrix.cpp in Sources */,
 				D21B43B324CED1390078EEF9 /* PrintListInReversedOrder.cpp in Sources */,
 				D227132C24D16E6B009B180D /* List.cpp in Sources */,
 				8EA593D924CDB969002785EF /* main.cpp in Sources */,
 				D227130C24D11360009B180D /* DeleteDuplicatedNode.cpp in Sources */,
 				D2090C0D24CFBCC600FA4F51 /* StackWithTwoQueues.cpp in Sources */,
+				8E2572D824D304DE0080F598 /* Array.cpp in Sources */,
 				D237C65724D29F3A001E0B21 /* PathInTree.cpp in Sources */,
 				D237C65324D27FEE001E0B21 /* SquenceOfBST.cpp in Sources */,
 				8E2572C524D1B3AE0080F598 /* MirrorOfBinaryTree.cpp in Sources */,
