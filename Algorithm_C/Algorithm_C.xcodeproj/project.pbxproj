@@ -47,6 +47,11 @@
 		D237C64B24D26CED001E0B21 /* PrintTreesInLines.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D237C64924D26CED001E0B21 /* PrintTreesInLines.cpp */; };
 		D237C64F24D27648001E0B21 /* PrintTreesInZigzag.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D237C64D24D27648001E0B21 /* PrintTreesInZigzag.cpp */; };
 		D237C65324D27FEE001E0B21 /* SquenceOfBST.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D237C65124D27FEE001E0B21 /* SquenceOfBST.cpp */; };
+		D237C65724D29F3A001E0B21 /* PathInTree.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D237C65524D29F3A001E0B21 /* PathInTree.cpp */; };
+		D237C65B24D2AAF8001E0B21 /* CopyComplexList.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D237C65924D2AAF8001E0B21 /* CopyComplexList.cpp */; };
+		D237C65E24D2AB63001E0B21 /* ComplexList.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D237C65C24D2AB63001E0B21 /* ComplexList.cpp */; };
+		D237C66224D2BC31001E0B21 /* ConvertBinarySearchTree.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D237C66024D2BC31001E0B21 /* ConvertBinarySearchTree.cpp */; };
+		D237C66624D2C730001E0B21 /* SerializeBinaryTrees.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D237C66424D2C730001E0B21 /* SerializeBinaryTrees.cpp */; };
 		D28F813A24C6E60E00EE7EF3 /* RecursiveSummary.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D28F813824C6E60E00EE7EF3 /* RecursiveSummary.cpp */; };
 /* End PBXBuildFile section */
 
@@ -152,6 +157,16 @@
 		D237C64E24D27648001E0B21 /* PrintTreesInZigzag.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = PrintTreesInZigzag.hpp; sourceTree = "<group>"; };
 		D237C65124D27FEE001E0B21 /* SquenceOfBST.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = SquenceOfBST.cpp; sourceTree = "<group>"; };
 		D237C65224D27FEE001E0B21 /* SquenceOfBST.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = SquenceOfBST.hpp; sourceTree = "<group>"; };
+		D237C65524D29F3A001E0B21 /* PathInTree.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = PathInTree.cpp; sourceTree = "<group>"; };
+		D237C65624D29F3A001E0B21 /* PathInTree.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = PathInTree.hpp; sourceTree = "<group>"; };
+		D237C65924D2AAF8001E0B21 /* CopyComplexList.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = CopyComplexList.cpp; sourceTree = "<group>"; };
+		D237C65A24D2AAF8001E0B21 /* CopyComplexList.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = CopyComplexList.hpp; sourceTree = "<group>"; };
+		D237C65C24D2AB63001E0B21 /* ComplexList.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = ComplexList.cpp; sourceTree = "<group>"; };
+		D237C65D24D2AB63001E0B21 /* ComplexList.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = ComplexList.hpp; sourceTree = "<group>"; };
+		D237C66024D2BC31001E0B21 /* ConvertBinarySearchTree.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = ConvertBinarySearchTree.cpp; sourceTree = "<group>"; };
+		D237C66124D2BC31001E0B21 /* ConvertBinarySearchTree.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = ConvertBinarySearchTree.hpp; sourceTree = "<group>"; };
+		D237C66424D2C730001E0B21 /* SerializeBinaryTrees.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = SerializeBinaryTrees.cpp; sourceTree = "<group>"; };
+		D237C66524D2C730001E0B21 /* SerializeBinaryTrees.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = SerializeBinaryTrees.hpp; sourceTree = "<group>"; };
 		D2407F3D24BD626B0018D876 /* LearnedList.strings */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; path = LearnedList.strings; sourceTree = "<group>"; };
 		D28F813824C6E60E00EE7EF3 /* RecursiveSummary.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = RecursiveSummary.cpp; sourceTree = "<group>"; };
 		D28F813924C6E60E00EE7EF3 /* RecursiveSummary.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = RecursiveSummary.hpp; sourceTree = "<group>"; };
@@ -448,6 +463,10 @@
 				D237C64824D26CDF001E0B21 /* 32_02_PrintTreesInLines */,
 				D237C64C24D27637001E0B21 /* 32_03_PrintTreesInZigzag */,
 				D237C65024D27FE2001E0B21 /* 33_SquenceOfBST */,
+				D237C65424D29F11001E0B21 /* 34_PathInTree */,
+				D237C65824D2AAAD001E0B21 /* 35_CopyComplexList */,
+				D237C65F24D2BC07001E0B21 /* 36_ConvertBinarySearchTree */,
+				D237C66324D2C722001E0B21 /* 37_SerializeBinaryTrees */,
 			);
 			path = OfferReview;
 			sourceTree = "<group>";
@@ -739,6 +758,8 @@
 				D227132B24D16E6B009B180D /* List.hpp */,
 				8E2572C624D1B45D0080F598 /* BinaryTree.cpp */,
 				8E2572C724D1B45D0080F598 /* BinaryTree.hpp */,
+				D237C65C24D2AB63001E0B21 /* ComplexList.cpp */,
+				D237C65D24D2AB63001E0B21 /* ComplexList.hpp */,
 			);
 			path = Utilities;
 			sourceTree = "<group>";
@@ -832,6 +853,42 @@
 				D237C65224D27FEE001E0B21 /* SquenceOfBST.hpp */,
 			);
 			path = 33_SquenceOfBST;
+			sourceTree = "<group>";
+		};
+		D237C65424D29F11001E0B21 /* 34_PathInTree */ = {
+			isa = PBXGroup;
+			children = (
+				D237C65524D29F3A001E0B21 /* PathInTree.cpp */,
+				D237C65624D29F3A001E0B21 /* PathInTree.hpp */,
+			);
+			path = 34_PathInTree;
+			sourceTree = "<group>";
+		};
+		D237C65824D2AAAD001E0B21 /* 35_CopyComplexList */ = {
+			isa = PBXGroup;
+			children = (
+				D237C65924D2AAF8001E0B21 /* CopyComplexList.cpp */,
+				D237C65A24D2AAF8001E0B21 /* CopyComplexList.hpp */,
+			);
+			path = 35_CopyComplexList;
+			sourceTree = "<group>";
+		};
+		D237C65F24D2BC07001E0B21 /* 36_ConvertBinarySearchTree */ = {
+			isa = PBXGroup;
+			children = (
+				D237C66024D2BC31001E0B21 /* ConvertBinarySearchTree.cpp */,
+				D237C66124D2BC31001E0B21 /* ConvertBinarySearchTree.hpp */,
+			);
+			path = 36_ConvertBinarySearchTree;
+			sourceTree = "<group>";
+		};
+		D237C66324D2C722001E0B21 /* 37_SerializeBinaryTrees */ = {
+			isa = PBXGroup;
+			children = (
+				D237C66424D2C730001E0B21 /* SerializeBinaryTrees.cpp */,
+				D237C66524D2C730001E0B21 /* SerializeBinaryTrees.hpp */,
+			);
+			path = 37_SerializeBinaryTrees;
 			sourceTree = "<group>";
 		};
 		D2407F3824BD3D9A0018D876 /* Review */ = {
@@ -1201,6 +1258,8 @@
 				D2090C0924CFAD4B00FA4F51 /* QueueWithTwoStacks.cpp in Sources */,
 				D237C64324D25B20001E0B21 /* StackPushPopOrder.cpp in Sources */,
 				8E2572CC24D1C3780080F598 /* SymmetricalBinaryTree.cpp in Sources */,
+				D237C65B24D2AAF8001E0B21 /* CopyComplexList.cpp in Sources */,
+				D237C65E24D2AB63001E0B21 /* ComplexList.cpp in Sources */,
 				D2090C1D24D01FCC00FA4F51 /* RobotMove.cpp in Sources */,
 				D237C63F24D24648001E0B21 /* StackWithMin.cpp in Sources */,
 				D21B43A324CE83160078EEF9 /* FindDuplication.cpp in Sources */,
@@ -1219,14 +1278,17 @@
 				8EA593D924CDB969002785EF /* main.cpp in Sources */,
 				D227130C24D11360009B180D /* DeleteDuplicatedNode.cpp in Sources */,
 				D2090C0D24CFBCC600FA4F51 /* StackWithTwoQueues.cpp in Sources */,
+				D237C65724D29F3A001E0B21 /* PathInTree.cpp in Sources */,
 				D237C65324D27FEE001E0B21 /* SquenceOfBST.cpp in Sources */,
 				8E2572C524D1B3AE0080F598 /* MirrorOfBinaryTree.cpp in Sources */,
 				D237C64F24D27648001E0B21 /* PrintTreesInZigzag.cpp in Sources */,
 				D21B43AF24CEC0CD0078EEF9 /* ReplaceSpaces.cpp in Sources */,
 				D227132024D1577D009B180D /* EntryNodeInListLoop.cpp in Sources */,
 				D237C64B24D26CED001E0B21 /* PrintTreesInLines.cpp in Sources */,
+				D237C66624D2C730001E0B21 /* SerializeBinaryTrees.cpp in Sources */,
 				D237C64724D265B0001E0B21 /* PrintTreeFromTopToBottom.cpp in Sources */,
 				D227131024D11DB5009B180D /* RegularExpressions.cpp in Sources */,
+				D237C66224D2BC31001E0B21 /* ConvertBinarySearchTree.cpp in Sources */,
 				8E2572C824D1B45D0080F598 /* BinaryTree.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
