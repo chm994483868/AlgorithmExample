@@ -48,6 +48,13 @@
 #include "ConvertBinarySearchTree.hpp"
 #include "SerializeBinaryTrees.hpp"
 #include "MoreThanHalfNumber.hpp"
+#include "KLeastNumbers.hpp"
+#include "StreamMedian.hpp"
+#include "GreatestSumOfSubarrays.hpp"
+#include "NumberOf1.hpp"
+#include "DigitsInSequence.hpp"
+#include "TranslateNumbersToStrings.hpp"
+#include "MaxValueOfGifts.hpp"
 
 int main(int argc, const char * argv[]) {
     // insert code here...
@@ -132,7 +139,21 @@ int main(int argc, const char * argv[]) {
     // 37. 序列化二叉树
 //    SerializeBinaryTrees::Test();
     // 39. 数组中出现次数超过一半的数字
-    MoreThanHalfNumber::Test();
+//    MoreThanHalfNumber::Test();
+    // 40. 最小的k个数
+//    KLeastNumbers::Test();
+    // 41. 数据流中的中位数
+//    StreamMedian::Test();
+    // 42. 连续子数组的最大和
+//    GreatestSumOfSubarrays::Test();
+    // 43. 从1到n整数中1出现的次数
+//    NumberOf1::Test();
+    // 44. 数字序列中某一位的数字
+//    DigitsInSequence::Test();
+    // 46. 把数字翻译成字符串
+//    TranslateNumbersToStrings::Test();
+    // 47. 礼物的最大价值
+    MaxValueOfGifts::Test();
     
     return 0;
 }
