@@ -153,7 +153,36 @@ int main(int argc, const char * argv[]) {
     // 46. 把数字翻译成字符串
 //    TranslateNumbersToStrings::Test();
     // 47. 礼物的最大价值
-    MaxValueOfGifts::Test();
+//    MaxValueOfGifts::Test();
+    
+//    union U1 {
+//        int n;
+//        char s[11];
+//        double d;
+//    };
+//
+//    union U2 {
+//        int n;
+//        char s[5];
+//        double d;
+//    };
+//
+//    U1 u1;
+//    U2 u2;
+//
+//    std::cout << "u1 长度: " << sizeof(u1) << std::endl;
+//    std::cout << "u2 长度: " << sizeof(u2) << std::endl;
+//    std::cout << "u1 各数据地址: " << &u1 << "\t" << "\t" << &u1.s << "\t" << &u1.n << std::endl;
+//    std::cout << "u2 各数据地址: " << &u2 << "\t" << "\t" << &u2.s << "\t" << &u2.n << std::endl;
+    
+    struct A {
+        char a; // 2
+        short c; // 4
+//        double b; // 8
+    };
+    
+    struct A x;
+    std::cout << "x 长度: " << sizeof(x) << std::endl;
     
     return 0;
 }
