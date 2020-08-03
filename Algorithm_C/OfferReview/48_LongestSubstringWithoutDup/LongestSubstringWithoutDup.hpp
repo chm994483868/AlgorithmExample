@@ -42,6 +42,71 @@ namespace LongestSubstringWithoutDup {
 //
 //void Test();
 
+void swap(int* num1, int* num2) {
+    int temp = *num1;
+    *num1 = *num2;
+    *num2 = temp;
+}
+
+// 冒泡排序
+void bubbleSort(int numbers[], int length) {
+    if (numbers == nullptr || length <= 0) {
+        return;
+    }
+    
+    int k = length - 1;
+    for (int i = 0; i < length - 1; ++i) {
+        bool noExchange = true;
+        int n = 0;
+        for (int j = 0; j < k; ++j) {
+            if (numbers[j] > numbers[j + 1]) {
+                swap(&numbers[j], &numbers[j + 1]);
+                noExchange = false;
+                n = j;
+            }
+        }
+        
+        if (noExchange) {
+            break;
+        }
+        k = n;
+    }
+}
+
+// 快速排序
+void quickSort(int numbers[], int length, int start, int end) {
+    if (numbers == nullptr || length <= 0 || start < 0 || end >= length) {
+        return;
+    }
+    
+    if (start >= end) {
+        return;
+    }
+    
+    int i = start, j = end, temp = numbers[i];
+    while (i < j) {
+        while (i < j && numbers[j] >= temp) {
+            --j;
+        }
+        
+        if (i < j) {
+            numbers[i++] = numbers[j];
+        }
+        
+        while (i < j && numbers[i] < temp) {
+            ++i;
+        }
+        
+        if (i < j) {
+            numbers[j--] = numbers[i];
+        }
+    }
+    
+    numbers[i] = temp;
+    quickSort(numbers, length, start, i - 1);
+    quickSort(numbers, length, i + 1, end);
+}
+    
 }
 
 #endif /* LongestSubstringWithoutDup_hpp */
