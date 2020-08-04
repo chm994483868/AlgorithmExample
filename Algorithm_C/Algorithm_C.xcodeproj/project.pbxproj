@@ -1324,13 +1324,13 @@
 		D2EB010424D91318009EAFD6 /* Sort */ = {
 			isa = PBXGroup;
 			children = (
-				D2EB012D24D96442009EAFD6 /* 07_HeapSort */,
-				D2EB012924D95F48009EAFD6 /* 06_MergeSort */,
-				D2EB012224D959DA009EAFD6 /* 05_QuickSort */,
-				D2EB011B24D955B8009EAFD6 /* 04_SelectSort */,
-				D2EB011424D93626009EAFD6 /* 03_ShellSort */,
 				D2EB010724D91339009EAFD6 /* 01_bubbleSort */,
 				D2EB010D24D92F5B009EAFD6 /* 02_InsertSort */,
+				D2EB011424D93626009EAFD6 /* 03_ShellSort */,
+				D2EB011B24D955B8009EAFD6 /* 04_SelectSort */,
+				D2EB012224D959DA009EAFD6 /* 05_QuickSort */,
+				D2EB012924D95F48009EAFD6 /* 06_MergeSort */,
+				D2EB012D24D96442009EAFD6 /* 07_HeapSort */,
 			);
 			path = Sort;
 			sourceTree = "<group>";
@@ -1338,13 +1338,13 @@
 		D2EB010524D9131D009EAFD6 /* Sort */ = {
 			isa = PBXGroup;
 			children = (
-				D2EB013424D97385009EAFD6 /* 07_HeapSort */,
-				D2EB013124D96A5C009EAFD6 /* 06_MergeSort */,
-				D2EB012624D95C6F009EAFD6 /* 05_QuickSort */,
-				D2EB011F24D9581D009EAFD6 /* 04_SelectSort */,
-				D2EB011824D93E71009EAFD6 /* 03_ShellSort */,
 				D2EB010624D91326009EAFD6 /* 01_bubbleSort */,
 				D2EB011124D93397009EAFD6 /* 02_InsertSort */,
+				D2EB011824D93E71009EAFD6 /* 03_ShellSort */,
+				D2EB011F24D9581D009EAFD6 /* 04_SelectSort */,
+				D2EB012624D95C6F009EAFD6 /* 05_QuickSort */,
+				D2EB013124D96A5C009EAFD6 /* 06_MergeSort */,
+				D2EB013424D97385009EAFD6 /* 07_HeapSort */,
 			);
 			path = Sort;
 			sourceTree = "<group>";

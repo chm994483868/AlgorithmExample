@@ -21,6 +21,8 @@ class ShellSort {
 //                for j in stride(from: i - gap, through: 0, by: -gap) {
 //                    if array[j] > array[j + gap] {
 //                        array.swapAt(j, j + gap)
+//                    } else {
+//                        break
 //                    }
 //                }
 //            }
@@ -32,7 +34,7 @@ class ShellSort {
                 var j = i + gap
                 while j < count {
                     var k = j - gap
-                    while k > 0 && array[k] > array[k + gap] {
+                    while k >= 0 && array[k] > array[k + gap] {
                         array.swapAt(k, k + gap)
                         k -= gap
                     }

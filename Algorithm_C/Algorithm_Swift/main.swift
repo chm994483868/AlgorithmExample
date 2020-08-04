@@ -15,7 +15,7 @@ print("🎉🎉🎉 Hello, World!")
 // 2. 插入排序
 //InsertSort.Test()
 // 3. 希尔排序
-//ShellSort.Test()
+ShellSort.Test()
 // 4. 选择排序
 //SelectSort.Test()
 // 5. 快速排序
@@ -23,5 +23,5 @@ print("🎉🎉🎉 Hello, World!")
 // 6. 归并排序
 //MergeSort.Test()
 // 7. 堆排序
-HeapSort.Test()
+//HeapSort.Test()
 
