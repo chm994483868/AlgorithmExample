@@ -8,6 +8,14 @@
 
 #include <iostream>
 
+#include "BubbleSort.hpp"
+#include "InsertSort.hpp"
+#include "ShellSort.hpp"
+#include "SelectSort.hpp"
+#include "QuickSort.hpp"
+#include "MergeSort.hpp"
+#include "HeapSort.hpp"
+
 #include "AssignmentOperator.hpp"
 #include "FindDuplication.hpp"
 #include "FindDuplicationNoEdit.hpp"
@@ -59,6 +67,21 @@
 int main(int argc, const char * argv[]) {
     // insert code here...
     std::cout << "《Sword of offer》Review starting 🎉🎉🎉 \n";
+    
+    // 1. 冒泡排序
+//    BubbleSort::Test();
+    // 2. 插入排序
+//    InsertSort::Test();
+    // 3. 希尔排序
+//    ShellSort::Test();
+    // 4. 选择排序
+//    SelectSort::Test();
+    // 5. 快速排序
+//    QuickSort::Test();
+    // 6. 归并排序
+//    MergeSort::Test();
+    // 7. 堆排序
+//    HeapSort::Test();
     
     // 1. 赋值运算符函数
 //    AssignmentOperator::Test();
@@ -154,35 +177,6 @@ int main(int argc, const char * argv[]) {
 //    TranslateNumbersToStrings::Test();
     // 47. 礼物的最大价值
 //    MaxValueOfGifts::Test();
-    
-//    union U1 {
-//        int n;
-//        char s[11];
-//        double d;
-//    };
-//
-//    union U2 {
-//        int n;
-//        char s[5];
-//        double d;
-//    };
-//
-//    U1 u1;
-//    U2 u2;
-//
-//    std::cout << "u1 长度: " << sizeof(u1) << std::endl;
-//    std::cout << "u2 长度: " << sizeof(u2) << std::endl;
-//    std::cout << "u1 各数据地址: " << &u1 << "\t" << "\t" << &u1.s << "\t" << &u1.n << std::endl;
-//    std::cout << "u2 各数据地址: " << &u2 << "\t" << "\t" << &u2.s << "\t" << &u2.n << std::endl;
-    
-    struct A {
-        char a; // 2
-        short c; // 4
-//        double b; // 8
-    };
-    
-    struct A x;
-    std::cout << "x 长度: " << sizeof(x) << std::endl;
     
     return 0;
 }

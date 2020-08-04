@@ -8,6 +8,15 @@
 
 #include "Array.hpp"
 
+void Partition::printArray(std::string desc, int nums[], int count) {
+    std::cout << desc;
+    for (int i = 0; i < count; i++) {
+        std::cout << " " << nums[i] << " ";
+    }
+    
+    std::cout << "\n";
+}
+
 void Partition::swap(int* num1, int* num2) {
     int temp = *num1;
     *num1 = *num2;

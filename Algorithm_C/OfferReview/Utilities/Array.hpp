@@ -9,12 +9,15 @@
 #ifndef Array_hpp
 #define Array_hpp
 
+#include <iostream>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string>
 #include <exception>
 
 namespace Partition {
 
+void printArray(std::string desc, int nums[], int count);
 void swap(int* num1, int* num2);
 int randomInRange(int min, int max);
 
