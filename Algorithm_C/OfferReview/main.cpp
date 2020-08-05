@@ -104,7 +104,7 @@ int main(int argc, const char * argv[]) {
     // 10. 用两个队列实现栈
 //    StackWithTwoQueues::Test();
     // 11. 斐波那契数列
-    Fibonacci::Test();
+//    Fibonacci::Test();
     // 12. 旋转数组的最小数字。
 //    MinNumberInRotatedArray::Test();
     // 13. 矩阵中的路径
