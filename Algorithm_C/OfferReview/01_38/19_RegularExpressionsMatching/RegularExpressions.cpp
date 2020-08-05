@@ -83,3 +83,30 @@ void RegularExpressions::Test() {
     Test("Test29", "bbbba", ".*a*a", true);
     Test("Test30", "bcbbabab", ".*a*a", false);
 }
+
+class Solution {
+public:
+    bool isMatch(string s, string p) {
+        if (s.length() == 0 && p.length() == 0) {
+            return true;
+        }
+        
+        if (s.length() > 0 && p.length() == 0) {
+            return false;
+        }
+        
+        if (p[1] == '*') {
+            if (s[0] == p[0] || (p[0] == '.' && s.length() != 0)) {
+                return isMatch(s, p.substr(2)) || isMatch(s.substr(1), p) || isMatch(s.substr(1), p.substr(2));
+            } else {
+                return isMatch(s, p.substr(2));
+            }
+        } else {
+            if (s[0] == p[0] || (p[0] == '.' && s.length() != 0)) {
+                return isMatch(s.substr(1), p.substr(1));
+            }
+        }
+        
+        return false;
+    }
+};

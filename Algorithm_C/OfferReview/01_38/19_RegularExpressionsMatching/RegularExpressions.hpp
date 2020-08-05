@@ -10,6 +10,9 @@
 #define RegularExpressions_hpp
 
 #include <stdio.h>
+#include <string>
+
+using namespace std;
 
 namespace RegularExpressions {
 

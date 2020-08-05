@@ -102,3 +102,52 @@ void CPower::Test() {
     // 底数为0、指数为负数
     Test("Test7", 0, -4, 0, true);
 }
+
+class Solution {
+public:
+    bool isEqual(double num1, double num2) {
+        if (num1 - num2 > -0.0000001 && num1 - num2 < 0.0000001) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+    
+    double myPowCore(double x, unsigned int n) {
+        if (n == 0) {
+            return 1;
+        }
+        
+        if (n == 1) {
+            return x;
+        }
+        
+        double result = myPowCore(x, n >> 1);
+        result *= result;
+        
+        if (n & 0x1) {
+            result *= x;
+        }
+        
+        return result;
+    }
+    
+    double myPow(double x, int n) {
+        if (isEqual(x, 0.0) && n < 0) {
+            return 0.0;
+        }
+        
+        unsigned int m = (unsigned int)n;
+        if (n < 0) {
+            m = (unsigned int)(-n);
+        }
+        
+        double result = myPowCore(x, m);
+        
+        if (n < 0) {
+            result = 1 / result;
+        }
+        
+        return result;
+    }
+};

@@ -113,3 +113,55 @@ void Print1ToMaxOfNDigits::Test() {
     Test(0);
     Test(-1);
 }
+
+class Solution {
+public:
+    
+    bool increment(char* number) {
+        bool isOverflow = false;
+        int nTakeOver = 0;
+        unsigned long length = strlen(number);
+        unsigned long i = length - 1;
+        for (; i >= 0; --i) {
+            int sum = number[i] - '0' + nTakeOver;
+            if (i == length - 1) {
+                ++sum;
+            }
+            
+            if (sum > 10) {
+                if (i == 0) {
+                    isOverflow = true;
+                } else {
+                    sum -= 10;
+                    nTakeOver = 1;
+                    number[i] = '0' + sum;
+                }
+            } else {
+                number[i] = '0' + sum;
+                break;
+            }
+        }
+        
+        return isOverflow;
+    }
+    
+    vector<int> printNumbers(int n) {
+        vector<int> b;
+        
+        if (n <= 0) {
+            return b;
+        }
+        
+        char* numbers = new char[n + 1];
+        memset(numbers, '0', n);
+        numbers[n] = '\0';
+        
+        while (!increment(numbers)) {
+            b.push_back(atoi(numbers));
+        }
+        
+        delete [] numbers;
+        
+        return b;
+    }
+};

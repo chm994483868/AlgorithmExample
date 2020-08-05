@@ -83,18 +83,6 @@ int main(int argc, const char * argv[]) {
     // 7. 堆排序
 //    HeapSort::Test();
     
-    int a = 2;
-//    int& m = a;
-//    printf("%d\n", m);
-//    printf("%p\n", &m);
-    printf("%p\n", &a);
-    
-    int* n = &a;
-    printf("%d\n", *n);
-    printf("%p\n", n);
-    printf("%p\n", &n);
-    
-    
     // 1. 赋值运算符函数
 //    AssignmentOperator::Test();
     // 3.(一) 找出数组中重复的数字
@@ -116,7 +104,7 @@ int main(int argc, const char * argv[]) {
     // 10. 用两个队列实现栈
 //    StackWithTwoQueues::Test();
     // 11. 斐波那契数列
-//    Fibonacci::Test();
+    Fibonacci::Test();
     // 12. 旋转数组的最小数字。
 //    MinNumberInRotatedArray::Test();
     // 13. 矩阵中的路径

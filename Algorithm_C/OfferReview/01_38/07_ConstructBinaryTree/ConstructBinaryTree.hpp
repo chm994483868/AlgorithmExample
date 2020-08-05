@@ -10,7 +10,10 @@
 #define ConstructBinaryTree_hpp
 
 #include <stdio.h>
+#include <vector>
 #include <exception>
+
+using namespace std;
 
 namespace ConstructBinaryTree {
 

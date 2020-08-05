@@ -55,7 +55,6 @@ AssignmentOperator::CMyString& AssignmentOperator::CMyString::operator=(const CM
 //    return *this;
     // 二：考虑异常安全性的解法
     if (this != &str) {
-        
         // 1. 调用复制构造函数，创建一个 CMyString 的临时变量
         CMyString strTemp(str);
         // 2. 取出临时变量的 m_pData 等待复制给 this->m_pData

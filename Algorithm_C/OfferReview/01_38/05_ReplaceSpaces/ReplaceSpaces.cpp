@@ -47,6 +47,31 @@ void ReplaceSpaces::replaceBlank(char str[], int length) {
     }
 }
 
+string ReplaceSpaces::replaceSpace(string s) {
+    unsigned long originalLength = s.length() - 1;
+    int i = 0;
+    for (; i < s.length(); ++i) {
+        if (s[i] == ' ') {
+            s += "00";
+        }
+    }
+    
+    unsigned long newLength = s.length() - 1;
+    while (originalLength >= 0 && newLength > originalLength) {
+        if (s[originalLength] == ' ') {
+            s[newLength--] = '0';
+            s[newLength--] = '2';
+            s[newLength--] = '%';
+        } else {
+            s[newLength--] = s[originalLength];
+        }
+
+        --originalLength;
+    }
+    
+    return s;
+}
+
 // 测试代码
 void ReplaceSpaces::Test(char* testName, char str[], int length, char expected[]) {
     if(testName != nullptr)

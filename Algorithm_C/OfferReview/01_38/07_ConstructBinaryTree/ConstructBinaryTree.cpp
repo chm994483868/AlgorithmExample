@@ -23,32 +23,32 @@ ConstructBinaryTree::BinaryTreeNode*  ConstructBinaryTree::constructCore(int* st
             throw std::exception(); // 入参错误
         }
     }
-    
+
     // 在中序遍历中找到根节点的值
     int* rootInorder = startInorder;
     while (rootInorder <= endInorder && *rootInorder != rootValue) {
         ++rootInorder;
     }
-    
+
     // 存在一种情况，中序遍历的结尾是根节点，即是一棵根节点只有左子树的树
     if (rootInorder == endInorder && *rootInorder != rootValue) {
         throw std::exception(); // 入参错误，在中序序列中没有找到根节点
     }
-    
+
     // 取得左子树的长度
     long leftLength = rootInorder - startInorder;
     // 取得左子树前序遍历的终点
     int* leftPreorderEnd = startPreorder + leftLength;
-    
+
     if (leftLength > 0) {
         root->m_pLeft = constructCore(startPreorder + 1, leftPreorderEnd, startInorder, rootInorder - 1);
     }
-    
+
     // 这里 endPreorder - startPreorder 得到的是左子树和右子树的总长度，如果大于左子树的长度，则表明一定存在右子树
     if (leftLength < endPreorder - startPreorder) {
         root->m_pRight = constructCore(leftPreorderEnd + 1, endPreorder, rootInorder + 1, endInorder);
     }
-    
+
     return root;
 }
 
@@ -244,3 +244,68 @@ void ConstructBinaryTree::Test() {
     Test6();
     Test7();
 }
+
+class Solution {
+    struct TreeNode {
+        int val;
+        TreeNode *left;
+        TreeNode *right;
+        TreeNode(int x) : val(x), left(NULL), right(NULL) {}
+    };
+    
+public:
+    TreeNode* buildTree(vector<int>& preorder, vector<int>& inorder) {
+        if (preorder.empty() || inorder.empty()) {
+            return nullptr;
+        }
+        
+        // 1. 从前序遍历中找到根节点
+        int rootValue = preorder[0];
+        TreeNode* root = new TreeNode(rootValue);
+        
+        if (preorder.size() == 1) {
+            if (inorder.size() == 1 && preorder[0] == inorder[0]) {
+                return root;
+            } else {
+                return nullptr;
+            }
+        }
+        
+        // 2. 从中序遍历中找到根节点
+        int rootInorderIdnex = -1;
+        for (int i = 0; i < inorder.size(); ++i) {
+            if (inorder[i] == rootValue) {
+                rootInorderIdnex = i;
+                break;
+            }
+        }
+        
+        if (rootInorderIdnex == -1) {
+            return nullptr;
+        }
+        
+        int numOfLeftTreeNode = rootInorderIdnex + 1;
+        
+        if (rootInorderIdnex > 0) {
+            vector<int> leftPreorder;
+            leftPreorder.assign(preorder.begin() + 1, preorder.begin() + numOfLeftTreeNode);
+
+            vector<int> leftInorder;
+            leftInorder.assign(inorder.begin(), inorder.begin() + numOfLeftTreeNode);
+
+            root->left = buildTree(leftPreorder, leftInorder);
+        }
+        
+        if (rootInorderIdnex < (inorder.size() - 1)) {
+            vector<int> rightPreorder;
+            rightPreorder.assign(preorder.begin() + numOfLeftTreeNode + 1, preorder.end());
+
+            vector<int> rightInorder;
+            rightInorder.assign(inorder.begin() + numOfLeftTreeNode + 2, inorder.end());
+
+            root->right = buildTree(rightPreorder, rightInorder);
+        }
+        
+        return root;
+    }
+};

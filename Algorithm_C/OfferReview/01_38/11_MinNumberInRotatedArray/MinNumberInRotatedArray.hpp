@@ -12,6 +12,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <exception>
+#include <vector>
+
+using namespace std;
 
 namespace MinNumberInRotatedArray {
 

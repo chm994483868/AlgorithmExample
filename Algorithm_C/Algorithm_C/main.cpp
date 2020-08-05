@@ -1110,31 +1110,8 @@ void change3(int* n) {
 
 int main(int argc, const char * argv[]) {
     // insert code here...
-    std::cout << "Hello, World!\n";
+    std::cout << "🎉🎉🎉 Hello, World!\n";
     
-    int nums[] = {4, 6, 3, 2, 1, 8, 20, 14};
-    printArray("排序前:", nums, 8);
-    
-    // 冒泡排序
-    //    bubbleSort(nums, 8);
-    // 插入排序
-    //    insertSort(nums, 8);
-    // 选择排序
-    //    selectSort(nums, 8);
-    // 希尔排序
-    //    shellSort(nums, 8);
-    // 希尔排序优化
-    //    shellSortOptimize(nums, 8);
-    // 快速排序
-    //    quickSort(nums, 0, 7);
-    // 归并排序
-    //    int temp[] = {};
-    //    mergeSort(nums, 0, 7, temp);
-    // 堆排序
-    //    heapSort(nums, 8);
-    //    heap_sort(nums, 8);
-    
-    printArray("排序后:", nums, 8);
     
     return 0;
 }

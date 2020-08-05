@@ -76,3 +76,16 @@ void NumberOf1InBinary::Test() {
     // 输入0x80000000（负数），期待的输出是1
     Test(0x80000000, 1);
 }
+
+//class Solution {
+//public:
+//    int hammingWeight(uint32_t n) {
+//        int count = 0;
+//        while (n) {
+//            n = (n - 1) & n;
+//            ++count;
+//        }
+//        return count;
+//    }
+//};
+

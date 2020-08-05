@@ -11,9 +11,11 @@
 
 #include <stdio.h>
 #include <stack>
+#include <vector>
 #include "List.hpp"
 
 using namespace List;
+using namespace std;
 
 namespace PrintListInReversedOrder {
 

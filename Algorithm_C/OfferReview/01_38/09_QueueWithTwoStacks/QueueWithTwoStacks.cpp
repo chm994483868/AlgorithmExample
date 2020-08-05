@@ -72,3 +72,36 @@ void QueueWithTwoStacks::Test() {
     Test(head, 'e');
 }
 
+class CQueue {
+public:
+    CQueue() {
+
+    }
+    
+    void appendTail(int value) {
+        stack1.push(value);
+    }
+    
+    int deleteHead() {
+        if (stack2.empty()) {
+            while (!stack1.empty()) {
+                int temp = stack1.top();
+                stack2.push(temp);
+                stack1.pop();
+            }
+        }
+        
+        if (stack2.empty()) {
+            return NULL;
+        }
+        
+        int top = stack2.top();
+        stack2.pop();
+        
+        return top;
+    }
+    
+private:
+    std::stack<int> stack1;
+    std::stack<int> stack2;
+};

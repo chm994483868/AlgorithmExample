@@ -19,6 +19,7 @@ namespace AssignmentOperator {
 
 // 1：赋值运算符函数
 // 题目：如下为类型 CMyString 的声明，请为该类型添加赋值运算符函数。
+
 class CMyString {
 public:
     CMyString(const char* pData = nullptr); // 构造函数，pData 参数默认为 nullptr

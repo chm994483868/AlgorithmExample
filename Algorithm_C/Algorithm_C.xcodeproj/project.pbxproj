@@ -80,6 +80,7 @@
 		D2EB013024D96467009EAFD6 /* HeapSort.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D2EB012E24D96467009EAFD6 /* HeapSort.cpp */; };
 		D2EB013324D96A81009EAFD6 /* MergeSort.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2EB013224D96A81009EAFD6 /* MergeSort.swift */; };
 		D2EB013624D97392009EAFD6 /* HeapSort.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2EB013524D97392009EAFD6 /* HeapSort.swift */; };
+		D2EB013B24DA2DC8009EAFD6 /* TwoSum.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D2EB013924DA2DC8009EAFD6 /* TwoSum.cpp */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -253,6 +254,8 @@
 		D2EB012F24D96467009EAFD6 /* HeapSort.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = HeapSort.hpp; sourceTree = "<group>"; };
 		D2EB013224D96A81009EAFD6 /* MergeSort.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MergeSort.swift; sourceTree = "<group>"; };
 		D2EB013524D97392009EAFD6 /* HeapSort.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HeapSort.swift; sourceTree = "<group>"; };
+		D2EB013924DA2DC8009EAFD6 /* TwoSum.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = TwoSum.cpp; sourceTree = "<group>"; };
+		D2EB013A24DA2DC8009EAFD6 /* TwoSum.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = TwoSum.hpp; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -927,6 +930,7 @@
 		D2330A2624AF0FD500C6480D /* Algorithm_C */ = {
 			isa = PBXGroup;
 			children = (
+				D2EB013724DA2D8A009EAFD6 /* LeetCode */,
 				8EA593D024CDB58D002785EF /* First */,
 				D2330A2724AF0FD500C6480D /* main.cpp */,
 			);
@@ -1468,6 +1472,23 @@
 			path = 07_HeapSort;
 			sourceTree = "<group>";
 		};
+		D2EB013724DA2D8A009EAFD6 /* LeetCode */ = {
+			isa = PBXGroup;
+			children = (
+				D2EB013824DA2DAC009EAFD6 /* 01_TwoSum */,
+			);
+			path = LeetCode;
+			sourceTree = "<group>";
+		};
+		D2EB013824DA2DAC009EAFD6 /* 01_TwoSum */ = {
+			isa = PBXGroup;
+			children = (
+				D2EB013924DA2DC8009EAFD6 /* TwoSum.cpp */,
+				D2EB013A24DA2DC8009EAFD6 /* TwoSum.hpp */,
+			);
+			path = 01_TwoSum;
+			sourceTree = "<group>";
+		};
 		D2FE54A924CA698500E5B5EA /* FirstNotRepeatingChar */ = {
 			isa = PBXGroup;
 			children = (
@@ -1709,6 +1730,7 @@
 			files = (
 				D28F813A24C6E60E00EE7EF3 /* RecursiveSummary.cpp in Sources */,
 				D2330A2824AF0FD500C6480D /* main.cpp in Sources */,
+				D2EB013B24DA2DC8009EAFD6 /* TwoSum.cpp in Sources */,
 				8E5CCE0724B9FF3D0081B5FF /* Review_1.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

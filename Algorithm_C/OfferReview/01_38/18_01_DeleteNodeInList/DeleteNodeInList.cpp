@@ -124,3 +124,51 @@ void DeleteNodeInList::Test() {
     Test4();
     Test5();
 }
+
+/**
+ * Definition for singly-linked list.
+ * struct ListNode {
+ *     int val;
+ *     ListNode *next;
+ *     ListNode(int x) : val(x), next(NULL) {}
+ * };
+ */
+class Solution {
+    struct ListNode {
+        int val;
+        ListNode *next;
+        ListNode(int x) : val(x), next(NULL) {}
+    };
+    
+public:
+    ListNode* deleteNode(ListNode* head, int val) {
+        if (head == nullptr) {
+            return nullptr;
+        }
+        
+        ListNode* pNode = head;
+        ListNode* pDeletedNode = nullptr;
+        ListNode* pNewHeadNode = head;
+        
+        if (pNode->val == val) {
+            pDeletedNode = pNode;
+            pNewHeadNode = pNode->next;
+        }
+        
+        while (pNode->next != nullptr && pNode->next->val != val) {
+            pNode = pNode->next;
+        }
+        
+        if (pNode->next != nullptr && pNode->next->val == val) {
+            pDeletedNode = pNode->next;
+            pNode->next = pNode->next->next;
+        }
+        
+        if (pDeletedNode != nullptr) {
+            delete pDeletedNode;
+            pDeletedNode = nullptr;
+        }
+        
+        return pNewHeadNode;
+    }
+};

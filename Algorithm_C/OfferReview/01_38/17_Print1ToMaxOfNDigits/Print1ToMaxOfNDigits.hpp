@@ -11,6 +11,9 @@
 
 #include <stdio.h>
 #include <memory>
+#include <vector>
+
+using namespace std;
 
 namespace Print1ToMaxOfNDigits {
 

@@ -57,11 +57,14 @@ long long Fibonacci::fibonacci_Solution2(unsigned int n) {
 
 // 测试代码
 void Fibonacci::Test(int n, int expected) {
+    printf("fibonacci_Solution1 = %lld", fibonacci_Solution1(n));
+    
     if(fibonacci_Solution1(n) == expected)
         printf("Test for %d in solution1 passed.\n", n);
     else
         printf("Test for %d in solution1 failed.\n", n);
     
+    printf("fibonacci_Solution2 = %lld", fibonacci_Solution2(n));
     if(fibonacci_Solution2(n) == expected)
         printf("Test for %d in solution2 passed.\n", n);
     else
@@ -82,4 +85,34 @@ void Fibonacci::Test() {
     Test(10, 55);
     
     Test(40, 102334155);
+    
+    Test(45, 22222);
 }
+
+class Solution {
+public:
+    int fib(int n) {
+        if (n == 0) {
+            return 0;
+        }
+        
+        if (n == 1) {
+            return 1;
+        }
+        
+        // 0 1 2 3 4 5 6
+        // 0 1 1 2 3 5 8
+        
+        int fibOne = 0;
+        int fibTwo = 1;
+        int fibN = 0;
+        for (int i = 2; i <= n; ++i) {
+            fibN = fibOne + fibTwo;
+            
+            fibOne = fibTwo;
+            fibTwo = fibN;
+        }
+        
+        return fibN;
+    }
+};

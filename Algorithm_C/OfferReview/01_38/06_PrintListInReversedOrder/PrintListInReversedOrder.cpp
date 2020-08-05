@@ -138,3 +138,55 @@ void PrintListInReversedOrder::Test() {
     Test2();
     Test3();
 }
+
+/**
+* Definition for singly-linked list.
+* struct ListNode {
+*     int val;
+*     ListNode *next;
+*     ListNode(int x) : val(x), next(NULL) {}
+* };
+*/
+
+class Solution {
+    struct ListNode {
+        int val;
+        ListNode *next;
+        ListNode(int x) : val(x), next(NULL) {}
+    };
+    
+public:
+    vector<int> reversePrint(ListNode* head) {
+        // 1. Iteratively
+        //        vector<int> b;
+        //        stack<ListNode*> nodeStack;
+        //        ListNode* pNode = head;
+        //        while (pNode != nullptr) {
+        //            nodeStack.push(pNode);
+        //            pNode = pNode->next;
+        //        }
+        //
+        //        while (!nodeStack.empty()) {
+        //            ListNode* node = nodeStack.top();
+        //            b.push_back(node->val);
+        //            nodeStack.pop();
+        //        }
+        //
+        //        return b;
+        
+        // 2. Recursively
+        vector<int> b;
+        reversePrint(head, &b);
+        return b;
+    }
+    
+    void reversePrint(ListNode* head, vector<int>* b) {
+        if (head != nullptr) {
+            if (head->next != nullptr) {
+                reversePrint(head->next, b);
+            }
+            
+            (*b).push_back(head->val);
+        }
+    }
+};

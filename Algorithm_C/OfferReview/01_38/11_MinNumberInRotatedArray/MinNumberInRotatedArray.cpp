@@ -183,3 +183,45 @@ void MinNumberInRotatedArray::Test() {
     // 输入nullptr
     Test(nullptr, 0, 0);
 }
+
+class Solution {
+public:
+    int minArray(vector<int>& numbers) {
+        if (numbers.empty()) {
+            return -1;
+        }
+        
+        while (numbers.size() > 1 && numbers.back() == numbers[0]) numbers.pop_back();
+        
+        unsigned long index1 = 0;
+        unsigned long index2 = numbers.size() - 1;
+        unsigned long indexMid = index1;
+        
+        while (numbers[index1] >= numbers[index2]) {
+            if (index2 - index1 == 1) {
+                indexMid = index2;
+                break;
+            }
+            
+            indexMid = ((index2 - index1) >> 1) + index1;
+            
+//            if (numbers[index1] == numbers[index2] && numbers[index1] == numbers[indexMid]) {
+//                int min = numbers[0];
+//                for (int i = 1; i < numbers.size(); ++i) {
+//                    if (numbers[i] < min) {
+//                        min = numbers[i];
+//                    }
+//                }
+//                return min;
+//            }
+            
+            if (numbers[indexMid] >= numbers[index1]) {
+                index1 = indexMid;
+            } else if (numbers[indexMid] <= numbers[index2]) {
+                index2 = indexMid;
+            }
+        }
+        
+        return numbers[indexMid];
+    }
+};
