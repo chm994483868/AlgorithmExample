@@ -2,6 +2,26 @@
 > 主要介绍 OS X Snow Leopard(10.6) 和 iOS 4 引入的 C 语言扩充功能 “Blocks” 。究竟是如何扩充 C 语言的，扩充之后又有哪些优点呢？下面通过其实现来一步一步探究。
 ## 什么是 Blocks 
 Blocks 是 C 语言的扩充功能。可以用一句话来表示 Blocks 的扩充功能：带有自动变量（局部变量）的匿名函数。(对于程序员而言，命名就是工作的本质。)
+### 首先何谓匿名，下面的示例代码可完美解释
+```
+typedef void(^Blk_T)(int);
+// block 定义(匿名)
+int i = 10;
+Blk_T a = ^void (int event) {
+    printf("buttonID: %d event = %d\n", i, event);
+};
+// 函数定义
+void Func(int event) {
+    printf("buttonID: %d event = %d\n", i, event);
+};
+void (*funcPtr)(int) = &Func;
+```
+匿名是针对有名而言的，如上代码 Blk_T a 等号后面的 block 定义是不需要取名的，而下面的 Func 函数定义必须给它一个函数名。
+
+完整形式的 Block 语法与一般的 C 语言函数定义相比，仅有两点不同：
+1. 没有函数名。
+2. 带有 “^”。
+
 > 回顾下 C 语言的函数中可能使用的变量：
 > + 自动变量（局部变量）
 > + 函数的参数
