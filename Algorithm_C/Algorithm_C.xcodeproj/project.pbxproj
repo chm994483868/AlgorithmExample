@@ -82,6 +82,7 @@
 		D2EB013624D97392009EAFD6 /* HeapSort.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2EB013524D97392009EAFD6 /* HeapSort.swift */; };
 		D2EB013B24DA2DC8009EAFD6 /* TwoSum.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D2EB013924DA2DC8009EAFD6 /* TwoSum.cpp */; };
 		D2EB014324DB7A5C009EAFD6 /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = D2EB014224DB7A5C009EAFD6 /* main.m */; };
+		D2EB014C24DBB132009EAFD6 /* BlockStruct.c in Sources */ = {isa = PBXBuildFile; fileRef = D2EB014B24DBB132009EAFD6 /* BlockStruct.c */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -269,6 +270,8 @@
 		D2EB014024DB7A5C009EAFD6 /* Block */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = Block; sourceTree = BUILT_PRODUCTS_DIR; };
 		D2EB014224DB7A5C009EAFD6 /* main.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = main.m; sourceTree = "<group>"; };
 		D2EB014724DB7B3A009EAFD6 /* BlockNotes.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = BlockNotes.md; sourceTree = "<group>"; };
+		D2EB014A24DBB132009EAFD6 /* BlockStruct.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = BlockStruct.h; sourceTree = "<group>"; };
+		D2EB014B24DBB132009EAFD6 /* BlockStruct.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = BlockStruct.c; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -1514,6 +1517,8 @@
 		D2EB014124DB7A5C009EAFD6 /* Block */ = {
 			isa = PBXGroup;
 			children = (
+				D2EB014A24DBB132009EAFD6 /* BlockStruct.h */,
+				D2EB014B24DBB132009EAFD6 /* BlockStruct.c */,
 				D2EB014224DB7A5C009EAFD6 /* main.m */,
 				D2EB014724DB7B3A009EAFD6 /* BlockNotes.md */,
 			);
@@ -1806,6 +1811,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				D2EB014C24DBB132009EAFD6 /* BlockStruct.c in Sources */,
 				D2EB014324DB7A5C009EAFD6 /* main.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

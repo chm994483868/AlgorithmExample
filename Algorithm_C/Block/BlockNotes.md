@@ -140,3 +140,17 @@ printf("🎉🎉 val = %d\n", *val); // block 执行时把 *val 修改为 22
 // 🎉 Block 内部：val = 20
 // 🎉🎉 val = 22
 ```
+以上不能修改（或者理解为为其赋值）时，可以用 __block 说明符来修饰该变量。该变量称为 __block 变量。
+> 注意：
+> 在 Block 内部不能使用 C 语言数组：
+```
+const char text[] = "Hello"; 
+void (^blk)(void) = ^{ 
+  printf("%c\n", text[0]); // Cannot refer to declaration with an array type inside block 这是因为现在的 Blocks 截获自动变量的方法并没有实现对 C 语言数组的截获。
+}; 
+```
+
+> 向截获的 NSMutableArray 变量赋值会产生编译错误。源码中截获的变量值为 NSMutableArray 类的对象，如果用 C 语言来描述，即是截获 NSMutableArray 类对象用的结构体实例指针。
+
+## Block 的实质
+Block 是 “带有自动变量的匿名函数”，但 Block 究竟是什么呢？语法看上去很特别，但它实际上是作为极普通的 C 语言源码来处理的。通过支持 Block 的编译器，含有 Block 语法的源代码转换为一般 C 语言编译器能够处理的源代码，并作为极为普通的 C 语言源代码被编译。这不过是概念上的问题，在实际编译时无法转换成我们能够理解的源代码，但 clang(LLVM 编译器)具有转换为我们可读源代码的功能。通过 "-rewrite-objc" 选项就能将含有 Block 语法的源代码转换为 C++ 的源代码。说是 C++，其实也仅仅是使用了 struct 结构，其本质是 C 语言源代码。

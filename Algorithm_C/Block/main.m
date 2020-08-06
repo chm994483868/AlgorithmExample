@@ -42,26 +42,26 @@ int main(int argc, const char * argv[]) {
 //        // 运行结果：val = 10
 
         // 示例 2：
-        int dmy = 256;
-        int temp = 10;
-        int* val = &temp;
-        
-        printf("🎉🎉 val 初始值：= %d\n", *val);
-        
-        const char* fmt = "🎉 Block 内部：val = %d\n";
-        void (^blk)(void) = ^{
-            printf(fmt, *val);
-//            int temp2 = 30;
-//            val = &temp2;
-            *val = 22;
-        };
-
-        *val = 20; // 修改 val
-        fmt = "These values were changed. val = %d\n";
-
-        blk();
-        
-        printf("🎉🎉 val = %d\n", *val); // block 执行时把 *val 修改为 22
+//        int dmy = 256;
+//        int temp = 10;
+//        int* val = &temp;
+//
+//        printf("🎉🎉 val 初始值：= %d\n", *val);
+//
+//        const char* fmt = "🎉 Block 内部：val = %d\n";
+//        void (^blk)(void) = ^{
+//            printf(fmt, *val);
+////            int temp2 = 30;
+////            val = &temp2;
+//            *val = 22;
+//        };
+//
+//        *val = 20; // 修改 val
+//        fmt = "These values were changed. val = %d\n";
+//
+//        blk();
+//
+//        printf("🎉🎉 val = %d\n", *val); // block 执行时把 *val 修改为 22
         
         // 运行结果：val = 20
 
@@ -78,6 +78,12 @@ int main(int argc, const char * argv[]) {
 //
 //        blk();
 //        // 运行结果：val = 2
+        
+        void (^blk)(void) = ^ {
+            printf("Block 内部打印\n");
+        };
+        
+        blk();
     }
     
     return 0;
