@@ -8,6 +8,10 @@
 
 #import <Foundation/Foundation.h>
 
+#import "Son.h"
+#import "Father.h"
+#import "GrandSon.h"
+
 //typedef void(^Blk_T)(int);
 //
 //// block 定义(匿名)
@@ -79,11 +83,27 @@ int main(int argc, const char * argv[]) {
 //        blk();
 //        // 运行结果：val = 2
         
-        void (^blk)(void) = ^ {
-            printf("Block 内部打印\n");
-        };
+//        void (^blk)(void) = ^ {
+//            printf("Block 内部打印\n");
+//        };
+//
+//        blk();
         
-        blk();
+//        Son *son = [[Son alloc] init];
+//        [son run];
+        
+//        [Son ClassRun];
+        
+//        GrandSon* grandSon = [[GrandSon alloc] init];
+//        [grandSon run];
+        
+        [GrandSon TEST];
+        
+//        [son eat];
+        
+//        Father *father = [[Father alloc] init];
+//        [father run];
+        
     }
     
     return 0;

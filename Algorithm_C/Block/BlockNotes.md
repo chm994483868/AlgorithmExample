@@ -1,3 +1,81 @@
+# + (void)initialize
+临时插入一个 initialize 函数的话题：
+`+(void)initialize;` 类方法，在该类收到第一条消息前初始化该类。
+1. 一般情况下，每个类这一方法自己只主动调用一次，如果程序从没使用过该类，则该方法不会执行。
+2. 若分类重写 initialize 方法后，则只会调用分类的 initialize 实现，而原类的该方法不会被调用，即分类里面的实现会覆盖原类。
+3. Father 和 Son 同时实现该方法时，Father 会在 Son 之前收到该消息，且双方各执行一次。**父类一定早已子类执行**
+4. 若只在 Father 里面实现该方法，则 Father 里面会执行两次，self 一次是 Father 一次是 son，其实是 Father 和 Son 类分别进行了初始化。
+
+**特殊情况：**
++ 只是在 Father 里面实现 initialize 方法，在 Son 里面不实现且 Son 里面不使用 `[super initialize];` 主动调用时，Father 里面会执行两次，两次其实是 Father 和 Son 分别进行了一次初始化：
+```
+// 第一次的 self 是 Father
+Father --> self == Father, functionString == +[Father initialize]
+// 第二次的 self 是 Son
+Father --> self == Son, functionString == +[Father initialize]
+```
++ 在 Son 里面主动使用一次 `[super initialize];`，Father 里面会执行三次，第三次的调用是 super 调用那次产生的，因为看似是用的 super 实际传进去的是 Son。连续调用，则 Father 里面连续执行：
+```
+// 第一次的 self 是 Father
+Father --> self == Father, functionString == +[Father initialize]
+// 第二次的 self 是 Son
+Father --> self == Son, functionString == +[Father initialize]
+
+// 第三次的 self 是 Son，且这次执行是因为在 Son 里面主动调用了 initialize
+Father --> self == Son, functionString == +[Father initialize]
+
+// 连续调用 initialize，在 Father 里面会连续调用，且 self 都是 Son
+[super initialize];
+[super initialize];
+[super initialize];
+
+```
++  如果想使类本身 `+(void) initialize` 方法保护自己部分内容不被多次运行，可以如下书写：
+```
+@implementation Father
++ (void)initialize {
+    NSLog(@"会被调用几次～～ functionString == %s", __FUNCTION__);
+    if (self == [Father class]) {
+        // 这里只会执行一次，就是在 Father 类初始化的时候执行一次，其它再进入该方法时，self 都是 Father 的子类
+        NSLog(@"Father --> self == %@, functionString == %s", [self class], __FUNCTION__);
+    }
+}
+@end
+```
++ 还有一个点，如果有 `Father <= Son <= GrandSon` 三层继承，每个类如果自身不实现 initialize 方法，则它初始化时或主动调用 `[super initialize]`方法时 ，会去找它最近的一层父类里面看有没有实现，如果实现了则会执行一次 initialize 方法，通过打印 self 可以看出规律:
+```
+// 1. 只在 Father 里面实现 initialize 方法，且在 GrandSon 里面主动调用了一次 [super initialize];
+Father --> self == Father, functionString == +[Father initialize]
+Father --> self == Son, functionString == +[Father initialize]
+Father --> self == GrandSon, functionString == +[Father initialize]
+Father --> self == GrandSon, functionString == +[Father initialize]
+
+// 2. 都实现 initialize 方法，且在 GrandSon 里面主动调用了一次 [super initialize];
+Father --> self == Father, functionString == +[Father initialize]
+Son --> self == Son, functionString == +[Son initialize]
+GrandSon --> self == GrandSon, functionString == +[GrandSon initialize]
+// 在 GrandSon 里面主动调用 [super initialize]，实现是到了 Son 里面
+Son --> self == GrandSon, functionString == +[Son initialize]
+
+// 3. 在 Son 和 GrandSon 里面实现，且在 GrandSon 里面主动调用了一次 [super initialize];
+Son --> self == Son, functionString == +[Son initialize]
+GrandSon --> self == GrandSon, functionString == +[GrandSon initialize]
+// 主动这次进入了 Son 里面
+Son --> self == GrandSon, functionString == +[Son initialize]
+
+// 4. 只在 Son 和 Father 里面实现，且在 GrandSon 里面主动调用了一次 [super initialize];
+Father --> self == Father, functionString == +[Father initialize]
+Son --> self == Son, functionString == +[Son initialize]
+Son --> self == GrandSon, functionString == +[Son initialize]
+Son --> self == GrandSon, functionString == +[Son initialize]
+
+// 5. 只在 Son 和 Father 里面实现，可以看到三个类都执行初始化，且 GrandSon 的执行在 Son 里面
+Father --> self == Father, functionString == +[Father initialize]
+Son --> self == Son, functionString == +[Son initialize]
+Son --> self == GrandSon, functionString == +[Son initialize]
+```
+
+
 #  Blocks
 > 主要介绍 OS X Snow Leopard(10.6) 和 iOS 4 引入的 C 语言扩充功能 “Blocks” 。究竟是如何扩充 C 语言的，扩充之后又有哪些优点呢？下面通过其实现来一步一步探究。
 ## 什么是 Blocks 
