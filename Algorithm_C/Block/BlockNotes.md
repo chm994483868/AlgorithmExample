@@ -30,13 +30,14 @@ Father --> self == Son, functionString == +[Father initialize]
 [super initialize];
 
 ```
-+  如果想使类本身 `+(void) initialize` 方法保护自己部分内容不被多次运行，可以如下书写：
++  **特别注意：如果想使类本身 `+(void) initialize` 方法保护自己部分内容不被多次运行，可以如下书写，建议如果重写了 initialize 方法一定加下面的 if 判断，防止被子类重复执行：**
 ```
 @implementation Father
 + (void)initialize {
     NSLog(@"会被调用几次～～ functionString == %s", __FUNCTION__);
     if (self == [Father class]) {
-        // 这里只会执行一次，就是在 Father 类初始化的时候执行一次，其它再进入该方法时，self 都是 Father 的子类
+        // 这里只会执行一次，就是在 Father 类初始化的时候执行一次，
+        // 其它再进入该方法时，self 都是 Father 的子类
         NSLog(@"Father --> self == %@, functionString == %s", [self class], __FUNCTION__);
     }
 }
@@ -147,7 +148,9 @@ void (^blk)(void) = ^{
     printf(fmt, val);
 };
 
-val = 2; // 虽然改写了 val，blk 只是截获了 val 的瞬间值去初始化 block 结构体，val 的值无论再怎么改写，都与 blk 内的值再无瓜葛
+// 虽然改写了 val，blk 只是截获了 val 的瞬间值去初始化 block 结构体，
+// val 的值无论再怎么改写，都与 blk 内的值再无瓜葛
+val = 2;
 fmt = "These values were changed. val = %d\n";
 
 blk();
@@ -161,8 +164,8 @@ const char* fmt = "val = %d\n";
 void (^blk)(void) = ^{
     printf(fmt, *val);
 };
-
-*val = 20; // 直接改写 val 指向的地址内的值，blk 截获的 val 指向的地址
+// 直接改写 val 指向的地址内的值，blk 截获的 val 指向的地址
+*val = 20; 
 fmt = "These values were changed. val = %d\n";
 
 blk();
@@ -176,7 +179,10 @@ void (^blk)(void) = ^{
     printf(fmt, val);
 };
 
-val = 2; // val 用 __block 修饰后，blk 内部持有的也是 val 的地址，这里也代表着修改了内存地址里面存放的值，所以 blk 执行时，读出来的也是这个 2
+// val 用 __block 修饰后，blk 内部持有的也是 val 的地址，
+// 这里也代表着修改了内存地址里面存放的值，
+// 所以 blk 执行时，读出来的也是这个 2
+val = 2;
 fmt = "These values were changed. val = %d\n";
 
 blk();
@@ -203,7 +209,9 @@ const char* fmt = "🎉 Block 内部：val = %d\n";
 void (^blk)(void) = ^{
     printf(fmt, *val);
     int temp2 = 30;
-    val = &temp2; // !!!!!!!!! 这里报错 Variable is not assignable (missing __block type specifier)
+    // !!!!!!!!! 这里报错 
+    // Variable is not assignable (missing __block type specifier)
+    val = &temp2;
     *val = 22;
 };
 
@@ -224,11 +232,91 @@ printf("🎉🎉 val = %d\n", *val); // block 执行时把 *val 修改为 22
 ```
 const char text[] = "Hello"; 
 void (^blk)(void) = ^{ 
-  printf("%c\n", text[0]); // Cannot refer to declaration with an array type inside block 这是因为现在的 Blocks 截获自动变量的方法并没有实现对 C 语言数组的截获。
+  // Cannot refer to declaration with an array type inside block 
+  // 这是因为现在的 Blocks 截获自动变量的方法并没有实现对 C 语言数组的截获。
+  printf("%c\n", text[0]);
 }; 
 ```
 
 > 向截获的 NSMutableArray 变量赋值会产生编译错误。源码中截获的变量值为 NSMutableArray 类的对象，如果用 C 语言来描述，即是截获 NSMutableArray 类对象用的结构体实例指针。
 
 ## Block 的实质
-Block 是 “带有自动变量的匿名函数”，但 Block 究竟是什么呢？语法看上去很特别，但它实际上是作为极普通的 C 语言源码来处理的。通过支持 Block 的编译器，含有 Block 语法的源代码转换为一般 C 语言编译器能够处理的源代码，并作为极为普通的 C 语言源代码被编译。这不过是概念上的问题，在实际编译时无法转换成我们能够理解的源代码，但 clang(LLVM 编译器)具有转换为我们可读源代码的功能。通过 "-rewrite-objc" 选项就能将含有 Block 语法的源代码转换为 C++ 的源代码。说是 C++，其实也仅仅是使用了 struct 结构，其本质是 C 语言源代码。
+Block 是 “带有自动变量的匿名函数”，但 Block 究竟是什么呢？
+语法看上去很特别，但它实际上是作为**极普通的 C 语言源码**来处理的。通过**支持 Block 的编译器**，含有 Block 语法的源代码转换为一般 C 语言编译器能够处理的源代码，并作为极为普通的 C 语言源代码被编译。
+这不过是概念上的问题，在实际编译时无法转换成我们能够理解的源代码，但 clang(LLVM 编译器)具有转换为我们可读源代码的功能。通过 "-rewrite-objc" 选项就能将含有 Block 语法的源代码转换为 C++ 的源代码。说是 C++，其实也**仅仅是使用了 struct 结构，其本质是 C 语言源代码**。
+
+> clang -rewrite-objc 源代码文件名
+
+如下源代码通过 clang 可变换为: 
+
+```
+int main() {
+void (^blk)(void) = ^{ printf("Block\n"); };
+blk();
+
+return 0;
+}
+```
+
+ **__block_impl**
+ ```
+ struct __block_impl {
+   void *isa;
+   int Flags;
+   int Reserved;
+   void *FuncPtr;
+ };
+ ```
+ 
+ **__main_block_impl_0**
+ ```
+ struct __main_block_impl_0 {
+   struct __block_impl impl;
+   struct __main_block_desc_0* Desc;
+   
+   // 结构体构造函数 
+   __main_block_impl_0(void *fp, struct __main_block_desc_0 *desc, int flags=0) {
+     impl.isa = &_NSConcreteStackBlock;
+     impl.Flags = flags;
+     impl.FuncPtr = fp;
+     Desc = desc;
+   }
+ };
+ ```
+ 
+ **__main_block_func_0**
+ ```
+ static void __main_block_func_0(struct __main_block_impl_0 *__cself) {
+     printf("Block\n");
+ }
+ ```
+ 
+ **__main_block_desc_0**
+ ```
+ static struct __main_block_desc_0 {
+   size_t reserved;
+   size_t Block_size;
+ } __main_block_desc_0_DATA = { 0, sizeof(struct __main_block_impl_0)};
+ ```
+ 
+**main 函数内部**
+```
+int main(int argc, const char * argv[]) {
+    /* @autoreleasepool */ { __AtAutoreleasePool __autoreleasepool; 
+    NSLog((NSString *)&__NSConstantStringImpl__var_folders_24_5w9yv8jx63bgfg69gvgclmm40000gn_T_main_948e6f_mi_0);
+        
+    // 首先是等号左边是一个返回值和参数都是 void 的函数指针: void (*blk)(void)
+    // 等号右边去掉 &(取地址符) 前面的强制类型转换后，可看到后面是创建了一个
+    // __main_block_impl_0 结构体实例，所以此处可以理解为在栈上创建了一个 Block 结构体实例
+    // 并把它的地址转化为了一个函数指针
+    void (*blk)(void) = ((void (*)())&__main_block_impl_0((void *)__main_block_func_0, &__main_block_desc_0_DATA));
+    
+    // 取出 __block_impl 里面的 FuncPtr 函数执行
+    ((void (*)(__block_impl *))((__block_impl *)blk)->FuncPtr)((__block_impl *)blk);
+    }
+
+    return 0;
+}
+```
+如变换后的源代码所示，通过 Blocks 使用的匿名函数实际上**被作为简单的 C 语言函数来处理**(__main_block_func_0 函数)。另外，***根据 Block 语法所属的函数名（此处为 main）和该 Block 语法在该函数出现的顺序值（此处为 0）来给经 clang 变换的函数命名**。
+该函数的参数 __cself 相当于 C++ 实例方法中指向实例自身的变量 this，或是 OC 实例方法中指向对象自身的变量 self，即参数 __cself 为指向 Block 值的变量。（__main_block_impl_0）
