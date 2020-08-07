@@ -10,9 +10,9 @@
 
 @implementation Son
 
-+ (void)initialize {
-    NSLog(@"Son --> self == %@, functionString == %s", [self class], __FUNCTION__);
-}
+//+ (void)initialize {
+//    NSLog(@"Son --> self == %@, functionString == %s", [self class], __FUNCTION__);
+//}
 
 - (void)eat {
     NSLog(@"Son --> self == %@, functionString == %s", [self class], __FUNCTION__);
@@ -28,6 +28,7 @@
 //    [super initialize];
 //    [super initialize];
 //    [super initialize];
+    [self initialize];
 }
 
 @end

@@ -10,9 +10,9 @@
 
 @implementation GrandSon
 
-//+ (void)initialize {
-//    NSLog(@"GrandSon --> self == %@, functionString == %s", [self class], __FUNCTION__);
-//}
++ (void)initialize {
+    NSLog(@"GrandSon --> self == %@, functionString == %s", [self class], __FUNCTION__);
+}
 
 - (void)run {
 //    [super run];
@@ -22,7 +22,7 @@
 
 + (void)TEST {
 //    [super initialize];
-    
+    [self initialize];
 }
 
 @end
