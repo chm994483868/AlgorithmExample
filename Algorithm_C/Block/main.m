@@ -50,10 +50,50 @@
 //typedef void(^BLK)(void);
 //BLK blk;
 
+//void (^blk)(void) = ^{ printf("全局区的 _NSConcreteGlobalBlock Block！global_val = %d static_global_val = %d \n", global_val, static_global_val); };
+
+//typedef int(^BLK)(int);
+
+typedef int(^BLK)(int);
+typedef int(^BLK2)(int);
+
+BLK myFuncTEST(BLK2 block) {
+    BLK temp = ^(int count){ return block(10) * count; };
+    return temp;
+    
+//    return ^(int count){ return rate * count; };
+//    return block();
+}
+
 int main(int argc, const char * argv[]) {
     @autoreleasepool {
         // insert code here...
         NSLog(@"🎉🎉🎉 Hello, World!");
+        
+        int temp = myFuncTEST(^int(int temp) {
+            return temp * 2;
+        })(2);
+        
+//        int temp = func(10)(30);
+        printf("temp = %d\n", temp);
+        
+//        blk();
+        
+//        BLK __weak blk;
+//        {
+//            NSObject *object = [[NSObject alloc] init];
+//            // NSObject * __weak object2 = object;
+//            // void (^strongBlk)(void) = ^{
+//            // NSLog(@"object = %@", object);
+//            // };
+//
+//            blk = ^{
+//                NSLog(@"object = %@", object);
+//            };
+//        }
+//
+//        // blk();
+//        printf("blk = %p\n", blk);
         
 //        const char* fmt = "val = %d\n";
 //        int val = 10;

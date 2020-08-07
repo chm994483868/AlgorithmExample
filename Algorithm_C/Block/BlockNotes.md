@@ -751,8 +751,9 @@ printf(fmt, (val->__forwarding->val));
 
 }
 ```
-**已知：当Block 截获对象类型变量时（如 NSObject NSMutableArray）会有如下的 copy 和 dispose 函数**
-**当使用 __block 变量时会有如下的 copy 和 dispose 函数**
+**1. 已知：当Block 截获对象类型变量时（如 NSObject NSMutableArray）会有如下的 copy 和 dispose 函数**
+**2. 当使用 __block 变量时会有如下的 copy 和 dispose 函数**
+**3. 当函数返回值和参数类型都是 Block 类型时也会有如下的 copy 和 dispose 函数**
 
 第一次出现的： `__main_block_copy_0`, // `BLOCK_FIELD_IS_BYREF` 后面研究 
 ```
@@ -1062,3 +1063,236 @@ __OBJC_RW_DLLIMPORT void *_NSConcreteStackBlock[32];
 |  -----  |  -----  |
 | Block |  栈上 Block 的结构体实例  |
 | __block 变量  | 栈上 __block 变量的结构体实例 |
+
+通过之前的说明可知 **Block 也是 OC 对象**。将 Block 当作 OC 对象来看时，该 Block 的类为 `_NSConcreteStackBlock`。同时还有 `_NSConcreteGlobalBlock`、`_NSConcreteMallocBlock`。 由名称中含有 `stack` 可知，该类的对象 Block 设置在栈上。同样由 `global` 可知，与全局变量一样，设置在程序的数据区域（.data 区）中。`malloc` 设置在由 `malloc` 函数分配的内存块（即堆）中。
+|类|设置对象的存储域|
+|---|---|
+|_NSConcreteStackBlock|栈|
+|_NSConcreteGlobalBlock|程序的数据区域(.data 区)|
+|_NSConcreteMallocBlock|堆|
+
+应用程序的内存分配
+1. 程序区域 .text 区
+2. 数据区域 .data 区
+3. 堆
+4. 栈
+
+**在记述全局变量的地方使用 Block 语法**时，生成的 Block 为 _NSConcreteGlobalBlock 类对象。
+如下:
+```
+void (^blk)(void) = ^{ printf("全局区的 _NSConcreteGlobalBlock Block！\n"); };
+
+int main(int argc, const char * argv[]) {
+    @autoreleasepool {
+        // insert code here...
+        NSLog(@"🎉🎉🎉 Hello, World!");
+        
+        blk();
+    }
+}
+
+// 转换后:
+
+// 命名都是以 __blk 开始的，对应该全局 Block 的名字 blk
+// __blk_block_impl_0
+struct __blk_block_impl_0 {
+  struct __block_impl impl;
+  struct __blk_block_desc_0* Desc;
+  
+  // 构造函数
+  __blk_block_impl_0(void *fp, struct __blk_block_desc_0 *desc, int flags=0) {
+    // isa 指向了 _NSConcreteGlobalBlock 
+    impl.isa = &_NSConcreteGlobalBlock;
+    impl.Flags = flags;
+    impl.FuncPtr = fp;
+    Desc = desc;
+  }
+};
+
+// __blk_block_func_0
+static void __blk_block_func_0(struct __blk_block_impl_0 *__cself) {
+ printf("全局区的 _NSConcreteGlobalBlock Block！\n"); 
+}
+
+// __blk_block_desc_0
+static struct __blk_block_desc_0 {
+  size_t reserved;
+  size_t Block_size;
+} __blk_block_desc_0_DATA = { 0, sizeof(struct __blk_block_impl_0)};
+
+// 创建 __blk_block_impl_0 实例
+static __blk_block_impl_0 __global_blk_block_impl_0((void *)__blk_block_func_0, &__blk_block_desc_0_DATA);
+
+// blk 
+void (*blk)(void) = ((void (*)())&__global_blk_block_impl_0);
+
+int main(int argc, const char * argv[]) {
+    /* @autoreleasepool */ { __AtAutoreleasePool __autoreleasepool; 
+
+        NSLog((NSString *)&__NSConstantStringImpl__var_folders_24_5w9yv8jx63bgfg69gvgclmm40000gn_T_main_b56a4a_mi_0);
+
+        // 调用 blk
+        ((void (*)(__block_impl *))((__block_impl *)blk)->FuncPtr)((__block_impl *)blk);
+    }
+
+    return 0;
+}
+```
+此 Block 即该 Block 用结构体实例设置在程序的数据区域中。因为在使用全局变量的地方不能使用自动变量，所以不存在对自动变量进行截获。由此 Block 用结构体实例的内容不依赖于执行时的状态，所以整个程序中只需要一个实例。因此将 Block 用结构体实例设置在与全局变量相同的数据区域中即可。
+
+&ensp;只在截获自动变量时，Block 用结构体实例截获的值才会根据执行时的状态变化。
+
+```
+// 状态变化，每次截获 i
+for (int i = 0; i < 5; ++i) {
+    
+    void (^blk)(int) = ^(int count) {
+        printf("count = %d i = %d\n", count, i);
+    };
+    
+    blk(23);
+}
+```
+
+```
+// 状态不变，不截获自动变量
+for (int i = 0; i < 5; ++i) {
+    
+    void (^blk)(int) = ^(int count) {
+        printf("count = %d\n", count);
+    };
+    
+    blk(23);
+}
+```
+
+**也就是说，即使在函数内而不在记述广域变量的地方使用 Block 语法时，只要 Block 不截获自动变量，就可以将 Block 用结构体实例设置在程序的数据区域。**
+**虽然通过 clang 转换的源代码通常是 _NSConcreteStackBlock 类对象，但实现上却有不同。总结如下:**
++ 记述全局变量的地方有 Block 语法时
++ Block 语法的表达式中不使用应截获的自动变量时
+以上情况下，Block 为 _NSConcreteGlobalBlock 类对象，即 Block 配置在程序的数据区域中。除此之外 Block 语法生成的 Block 为 _NSConcreteStackBlock 类对象，且设置在栈上。
+```
+for (int i = 0; i < 5; ++i) {
+    
+    int a = i;
+    NSObject *object = [[NSObject alloc] init];
+    
+    void (^blk)(int) = ^(int count) {
+        printf("count = %d i = %d \n", count, i);
+    };
+    
+    blk(23);
+    
+    printf("blk = %p a = %p object = %p \n", blk, &a, object);
+}
+
+// 打印
+count = 23 i = 0 
+blk = 0x102003150 a = 0x7ffeefbff578 object = 0x1020164d0 
+count = 23 i = 1 
+blk = 0x102003150 a = 0x7ffeefbff578 object = 0x1020164d0 
+count = 23 i = 2 
+blk = 0x102003150 a = 0x7ffeefbff578 object = 0x1020164d0 
+count = 23 i = 3 
+blk = 0x102003150 a = 0x7ffeefbff578 object = 0x100512950 
+count = 23 i = 4 
+blk = 0x102003150 a = 0x7ffeefbff578 object = 0x1020164d0 
+```
+ 配置在全局变量上的 Block ，从变量作用域外也可以通过指针安全的使用，但设置在栈上的 Block，如果其所属的变量作用域结束，该 Block 就被废弃。由于 __Block 变量也配置在栈上，同样的，如果其所属的变量作用域结束，则该 __block 变量也会被废弃。
+ 
+ 示例代码:
+ ```
+ // block 不持有 object2
+ void (^blk)(void);
+ {
+     NSObject *object = [[NSObject alloc] init];
+     NSObject * __weak object2 = object;
+     blk = ^{
+         NSLog(@"object2 = %@", object2);
+     };
+ }
+ blk();
+ //打印：
+ object2 = (null)
+ 
+ // block 持有 object
+ void (^blk)(void);
+ {
+     NSObject *object = [[NSObject alloc] init];
+     // NSObject * __weak object2 = object;
+     blk = ^{
+         NSLog(@"object = %@", object);
+     };
+ }
+ blk();
+ // 打印：
+ object = <NSObject: 0x10059cee0>
+ ```
+ 
+ &ensp;Blocks 提供了将 Block 和 __block 变量从栈上复制到堆上的方法来解决这个问题。将配置在栈上的 Block 复制到堆上，这样即使 Block 语法记述的变量作用域结束，堆上的 Block 还可以继续存在。
+
+复制到堆上的 Block isa 会指向 _NSConcreteMallocBlock，即 impl.isa = &_NSConcreteMallocBlock;
+**__block 变量用结构体成员变量 __forwarding 可以实现无论 __block 变量配置在栈上还是堆上时都能够正确地访问 __block 变量。**
+**有时在 __block 变量配置在堆上的状态下，也可以访问栈上的 __block 变量。只要栈上的结构体实例成员变量 __forwarding 指向堆上的结构体实例，那么不管是从栈上的 __block 变量还是从堆上的 __block 变量都能够正确访问。**
+Blocks 提供的复制方法的用途。实际上 ARC  有效时，大多数情形下编译器会恰当的进行判断，自动生成将 Block 从栈复制到堆上的代码。
+
+> 碰到两个问题好奇怪，都是用中间变量接一下就正常了：
+```
+// 问题一：
+// 用 clang -rewrite-objc 能执行成功
+typedef int(^BLK)(int);
+
+BLK func(int rate) {
+    BLK temp = ^(int count){ return rate * count; };
+    return temp;
+}
+
+// 执行失败，改成上面就会成功，（用中间变量接收一下）
+typedef int(^BLK)(int);
+
+BLK func(int rate) {
+    return ^(int count){ return rate * count; };
+}
+
+// 失败描述:
+returning block that lives on the local stack
+return ^(int count){ return rate * count; };
+           ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+64 warnings and 1 error generated.
+
+// 问题二:
+BLK __weak blk;
+{
+    NSObject *object = [[NSObject alloc] init];
+    // NSObject * __weak object2 = object;
+    void (^strongBlk)(void) = ^{
+        NSLog(@"object = %@", object);
+    };
+
+    blk = strongBlk;
+}
+
+// blk();
+printf("blk = %p\n", blk);
+// 打印正常，出了花括号，block 结构体实例释放了:
+blk = 0x0
+
+BLK __weak blk;
+{
+    NSObject *object = [[NSObject alloc] init];
+    // NSObject * __weak object2 = object;
+    // void (^strongBlk)(void) = ^{
+    // NSLog(@"object = %@", object);
+    // };
+
+    blk = ^{
+        NSLog(@"object = %@", object);
+    };
+}
+
+// blk();
+printf("blk = %p\n", blk);
+// 打印：
+blk = 0x7ffeefbff538
+```
+
