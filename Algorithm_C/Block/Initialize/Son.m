@@ -31,4 +31,9 @@
     [self initialize];
 }
 
++ (id)getBlockArray {
+    int val = 10;
+    return [[NSArray alloc] initWithObjects:[^{NSLog(@"blk0: %d", val);} copy], [^{NSLog(@"blk1: %d", val);} copy], nil];
+}
+
 @end

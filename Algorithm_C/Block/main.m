@@ -52,30 +52,39 @@
 
 //void (^blk)(void) = ^{ printf("全局区的 _NSConcreteGlobalBlock Block！global_val = %d static_global_val = %d \n", global_val, static_global_val); };
 
+//typedef void(^BLK)(void);
+
 //typedef int(^BLK)(int);
+//typedef int(^BLK2)(int);
+//
+//BLK myFuncTEST(BLK2 block) {
+//    BLK temp = ^(int count){ return block(10) * count; };
+//    return temp;
+//
+////    return ^(int count){ return rate * count; };
+////    return block();
+//}
 
-typedef int(^BLK)(int);
-typedef int(^BLK2)(int);
+//typedef int (^blk_t)(int);
+//blk_t func(int rate) {
+//    return ^(int count) {
+//        return rate * count;
+//    };
+//}
 
-BLK myFuncTEST(BLK2 block) {
-    BLK temp = ^(int count){ return block(10) * count; };
-    return temp;
-    
-//    return ^(int count){ return rate * count; };
-//    return block();
-}
+typedef void(^blk_t)(id);
 
 int main(int argc, const char * argv[]) {
     @autoreleasepool {
         // insert code here...
         NSLog(@"🎉🎉🎉 Hello, World!");
         
-        int temp = myFuncTEST(^int(int temp) {
-            return temp * 2;
-        })(2);
-        
-//        int temp = func(10)(30);
-        printf("temp = %d\n", temp);
+//        int temp = myFuncTEST(^int(int temp) {
+//            return temp * 2;
+//        })(2);
+//
+////        int temp = func(10)(30);
+//        printf("temp = %d\n", temp);
         
 //        blk();
         
@@ -83,13 +92,17 @@ int main(int argc, const char * argv[]) {
 //        {
 //            NSObject *object = [[NSObject alloc] init];
 //            // NSObject * __weak object2 = object;
-//            // void (^strongBlk)(void) = ^{
-//            // NSLog(@"object = %@", object);
-//            // };
+//             void (^strongBlk)(void) = ^{
+//             NSLog(@"object = %@", object);
+//             };
 //
-//            blk = ^{
-//                NSLog(@"object = %@", object);
-//            };
+////            blk = ^{
+////                NSLog(@"object = %@", object);
+////            };
+//
+////            printf("内部 blk = %p\n", blk);
+//
+//            blk = strongBlk;
 //        }
 //
 //        // blk();
@@ -215,6 +228,10 @@ int main(int argc, const char * argv[]) {
 //        Father *father = [[Father alloc] init];
 //        [father run];
         
+//        __block int m_nVal = 222;
+//        __block NSMutableArray *m_pArray = [NSMutableArray array];
+//        NSLog(@"m_pArray %@", [m_pArray class]);
+//
 //        static int static_val = 3;
 //        void (^blk)(void) = ^{
 //            global_val *= 2;
@@ -225,9 +242,41 @@ int main(int argc, const char * argv[]) {
 //        static_val = 12;
 //
 //        blk();
-        
+//
 //        static_val = 111;
+//
 //        printf("static_val = %d, global_val = %d, static_global_val = %d\n", static_val, global_val, static_global_val);
+        
+//        id obj = [Son getBlockArray];
+//        void (^blk)(void) = [obj objectAtIndex:0];
+//        blk();
+        
+//        __block int val = 0;
+//        void (^blk)(void) = [^{++val;} copy];
+//        ++val;
+//        blk();
+//        NSLog(@"val = %d", val);
+        
+        blk_t blk;
+        {
+            id array = [[NSMutableArray alloc] init];
+//            id array = [NSMutableArray array];
+            id array2 = array;
+
+            blk = [^(id obj){
+                id __strong array3 = array2;
+                
+                [array3 addObject:obj];
+                
+                NSLog(@"array count = %ld", [array3 count]);
+            } copy];
+        }
+
+        blk([[NSObject alloc] init]);
+        blk([[NSObject alloc] init]);
+        blk([[NSObject alloc] init]);
+        
+//        __block id obj = [[NSObject alloc] init];
     }
     
     return 0;
