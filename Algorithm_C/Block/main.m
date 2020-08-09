@@ -75,6 +75,14 @@
 
 typedef void(^blk_t)(id);
 
+//blk_t blk = ^(id obj){
+////    [array addObject:obj];
+//
+//    NSLog(@"⛈⛈⛈ array count = %@", obj);
+//};
+
+blk_t blk;
+
 int main(int argc, const char * argv[]) {
     @autoreleasepool {
         // insert code here...
@@ -258,30 +266,93 @@ int main(int argc, const char * argv[]) {
 //        blk();
 //        NSLog(@"val = %d", val);
         
-        blk_t blk;
+//        blk_t blk;
+//
+//        id array = [[NSMutableArray alloc] init];
+//        {
+//            NSLog(@"⛈⛈⛈ array retainCount = %lu", (unsigned long)[array arcDebugRetainCount]);
+//
+//            blk = ^(id obj) {
+//                [array addObject:obj];
+//                NSLog(@"⛈⛈⛈  Block array retainCount = %lu", (unsigned long)[array arcDebugRetainCount]);
+//            };
+//
+//            NSLog(@"⛈⛈⛈ array retainCount = %lu", (unsigned long)[array arcDebugRetainCount]);
+//        }
+//
+//        NSLog(@"⛈⛈⛈ array retainCount = %lu", (unsigned long)[array arcDebugRetainCount]);
+//
+//        if (blk != nil) {
+//            blk([[NSObject alloc] init]);
+//            blk([[NSObject alloc] init]);
+//            blk([[NSObject alloc] init]);
+//        }
+//
+//        blk = nil;
+//        NSLog(@"⛈⛈⛈ array retainCount = %lu", (unsigned long)[array arcDebugRetainCount]);
         
-        id array = [[NSMutableArray alloc] init];
-        {
-            NSLog(@"⛈⛈⛈ array retainCount = %lu", (unsigned long)[array arcDebugRetainCount]);
-            
-            blk = ^(id obj) {
-                [array addObject:obj];
-                NSLog(@"⛈⛈⛈  Block array retainCount = %lu", (unsigned long)[array arcDebugRetainCount]);
-            };
-            
-            NSLog(@"⛈⛈⛈ array retainCount = %lu", (unsigned long)[array arcDebugRetainCount]);
-        }
+//        id object = [[NSObject alloc] init];
+//        __weak id weakObj = object;
+//        NSLog(@"⛈⛈⛈ object retainCount = %lu", (unsigned long)[object arcDebugRetainCount]);
+////        blk = ^(){
+////            NSLog(@"⛈⛈⛈ object = %@", weakObj);
+////
+////            if (weakObj == nil) {
+////                return ;
+////            }
+////
+////            dispatch_async(dispatch_queue_create(DISPATCH_QUEUE_PRIORITY_DEFAULT, NULL), ^{
+////
+//////                for (int i = 0; i < 1000000; ++i) {
+//////                    // 模拟耗时任务
+//////                }
+////
+////                NSLog(@"⛈⛈⛈ 耗时的任务 结束! object = %@", weakObj);
+////            });
+////        };
+//
+//
+//                    dispatch_async(dispatch_queue_create(DISPATCH_QUEUE_PRIORITY_DEFAULT, NULL), ^{
+//
+//        //                for (int i = 0; i < 1000000; ++i) {
+//        //                    // 模拟耗时任务
+//        //                }
+//
+//                        NSLog(@"⛈⛈⛈ 耗时的任务 结束! object = %@", weakObj);
+//                    });
+//
+//        NSLog(@"⛈⛈⛈ after block object retainCount = %lu", (unsigned long)[object arcDebugRetainCount]);
         
-        NSLog(@"⛈⛈⛈ array retainCount = %lu", (unsigned long)[array arcDebugRetainCount]);
+//        {
+//            id array = [[NSMutableArray alloc] init];
+//            blk = ^(id obj){
+//                [array addObject:obj];
+//
+//                NSLog(@"⛈⛈⛈ array count = %@", array);
+//            };
+//        }
+//
+//        blk([[NSObject alloc] init]);
+//        blk([[NSObject alloc] init]);
+//        blk([[NSObject alloc] init]);
         
-        if (blk != nil) {
-            blk([[NSObject alloc] init]);
-            blk([[NSObject alloc] init]);
-            blk([[NSObject alloc] init]);
-        }
+//        {
+//            id array = [[NSMutableArray alloc] init];
+           blk = [^(id obj){
+//                [array addObject:obj];
+                
+//                NSLog(@"⛈⛈⛈ array count = %@", array);
+               NSLog(@"⛈⛈⛈ obj = %@", obj);
+            } copy];
         
-        blk = nil;
-        NSLog(@"⛈⛈⛈ array retainCount = %lu", (unsigned long)[array arcDebugRetainCount]);
+        
+//        }
+        
+        blk([[NSObject alloc] init]);
+        blk([[NSObject alloc] init]);
+        blk([[NSObject alloc] init]);
+        
+//        blk();
     }
     
     return 0;

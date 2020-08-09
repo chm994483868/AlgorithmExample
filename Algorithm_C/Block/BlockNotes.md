@@ -1225,10 +1225,18 @@ for (int i = 0; i < 5; ++i) {
 ```
 
 **也就是说，即使在函数内而不在记述广域变量的地方使用 Block 语法时，只要 Block 不截获自动变量，就可以将 Block 用结构体实例设置在程序的数据区域。**
+
+**对于没有要截获自动变量的 block，我们不需要依赖于其运行时的状态【捕获的变量】，这样我们就不涉及到 block 的 copy 情况，因此是放在数据区。**
+
+**此外要注意的是，通过 clang 编译出来的 isa 在第二种情况下会显示成 stackblock，这是因为 OC 是一门动态语言，真正的元类还是在运行的情况下确定的，这种情况下可以使用 lldb 调试器查看。**
+
 **虽然通过 clang 转换的源代码通常是 _NSConcreteStackBlock 类对象，但实现上却有不同。总结如下:**
+
 + 记述全局变量的地方有 Block 语法时
-+ Block 语法的表达式中不使用应截获的自动变量时
-以上情况下，Block 为 _NSConcreteGlobalBlock 类对象，即 Block 配置在程序的数据区域中。除此之外 Block 语法生成的 Block 为 _NSConcreteStackBlock 类对象，且设置在栈上。
++ Block 语法的表达式中不使用截获的自动变量时
+
+以上情况下，Block 为 `_NSConcreteGlobalBlock` 类对象，即 Block 配置在程序的数据区域中。除此之外 Block 语法生成的 Block 为 _NSConcreteStackBlock 类对象，且设置在栈上。
+
 ```
 for (int i = 0; i < 5; ++i) {
     
@@ -1288,6 +1296,13 @@ blk = 0x102003150 a = 0x7ffeefbff578 object = 0x1020164d0
  ```
  
  &ensp;Blocks 提供了将 Block 和 __block 变量从栈上复制到堆上的方法来解决这个问题。将配置在栈上的 Block 复制到堆上，这样即使 Block 语法记述的变量作用域结束，堆上的 Block 还可以继续存在。
+
++ 不会有任何一个块一上来就被存在堆区，请牢记这一点！
++ `_NSConcreteMallocBlock` 存在的意义和 `autorelease` 一样，就是为了能延长 block 的作用域
++ 我们将 block 对象和 __blcok 对象从栈区复制到堆区，这样就算栈上的 block 被废弃了，还是可以使用堆上那一个
++ 可以联想我们在 ARC 是如何处理返回值中的 __strong 的，大概同理
+
+**在这里要思考一个问题：在栈上和堆上同时有一个 block 的情况下，我们的赋值，修改，废弃操作应该怎样管理？**
 
 复制到堆上的 Block isa 会指向 _NSConcreteMallocBlock，即 impl.isa = &_NSConcreteMallocBlock;
 **__block 变量用结构体成员变量 __forwarding 可以实现无论 __block 变量配置在栈上还是堆上时都能够正确地访问 __block 变量。**
@@ -1429,11 +1444,15 @@ return objc_autoreleaseReturnValue(tmp);
 前面说大部分情况下编译器会适当的进行判断，不过在此之外的情况下需要**手动**（自己调用 copy 函数）生成代码，将 Block 从栈上复制到 **堆** （_Block_copy 函数的注释已经说了，它是创建基于堆的 block 副本）上，即我们自己主动调用 “copy” 实例方法。
 
 **编译器不能进行判断究竟是什么样的状况呢？**
+
 + 向方法或函数的参数中传递 Block 时。
 但是如果在方法或函数 **中** 适当的复制了传递过来的参数，那么就不必在调用该方法或函数前手动复制了。
-以下方法或函数不用手动复制:
+
+以下方法或函数不用手动复制，编译器会给我们自动复制:
+
 + Cocoa 框架的方法且方法名中含有 usingBlock 等时
 + Grand Central Dispatch 的 API
++ 将 Block 赋值给类的附有 __strong 修饰符的 id 类型或 Block 类型成员变量时【当然这种情况就是最多的，只要赋值一个block变量就会进行复制】
 
 NSArray 的 enumerateObjectsUsingBlock 以及 dispatch_async 函数就不用手动复制。
 NSArray 的 initWithObjects 上传递 Block 时需要手动复制。
@@ -1477,9 +1496,12 @@ blk();
 |堆|被 Block 持有|
 
 若在一个 Block 中使用 __block 变量，当该 Block 从栈复制到堆时，使用的所有 __block 变量也必定配置在栈上，这些 __block 变量也全部被从栈复制到堆。此时，Block 持有 __block 变量，即使在该 Block 已复制到堆的情形下，复制 Block 也对所使用的 __block 变量没有任何影响。
+
 **使用 __block 变量的 Block 持有 __block 变量。如果 Block被废弃，它所持有的 __block 变量也就被释放。**
+
 回顾 __block 变量用结构体成员变量 __forwarding 的原因：**不管 __block 变量配置在栈上还是在堆上，都能够正确的访问该变量。**
 通过 Block 的复制，__block 变量也从栈上复制到堆上。此时可同时访问栈上的 __block 变量和堆上的 __block 变量。
+
 源代码如下:
 ```
 __block int val = 0;
