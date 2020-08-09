@@ -1747,6 +1747,34 @@ copy 函数持有所使用的 __block 变量、dispose 函数释放所使用的 
         blk([[NSObject alloc] init]);
         blk([[NSObject alloc] init]);
         blk([[NSObject alloc] init]);
+        
+// 示例 2：
+blk_t blk;
+{
+    id array = [[NSMutableArray alloc] init];
+    // array = [NSMutableArray array];
+    // __unsafe_unretained id array2 = array;
+    NSLog(@"⛈⛈⛈ array retainCount = %lu", (unsigned long)[array arcDebugRetainCount]);
+    blk = ^(id obj){
+        // id __strong array3 = array2;
+        [array addObject:obj];
+        NSLog(@"array count = %ld", [array count]);
+        // NSLog(@"⛈⛈⛈ array retainCount = %lu", (unsigned long)[array arcDebugRetainCount]);
+    };
+
+    NSLog(@"⛈⛈⛈ array retainCount = %lu", (unsigned long)[array arcDebugRetainCount]);
+}
+
+blk([[NSObject alloc] init]);
+blk([[NSObject alloc] init]);
+blk([[NSObject alloc] init]);
+
+// 打印：
+⛈⛈⛈ array retainCount = 1
+⛈⛈⛈ array retainCount = 3
+array count = 1
+array count = 2
+array count = 3
 ```
 
 ## __block 变量和对象
@@ -1893,25 +1921,177 @@ array count = 3
 
 // 5. 报错 Cannot capture __autoreleasing variable in a block
 id __autoreleasing array2 = array;
+
+// 6. 把 array 赋值给 __block id array2 则较复杂
+ id array = [[NSMutableArray alloc] init];
+ // array = [NSMutableArray array];
+__block id array2 = array;
+
+// 转换后：
+ id array = ((NSMutableArray *(*)(id, SEL))(void *)objc_msgSend)((id)((NSMutableArray *(*)(id, SEL))(void *)objc_msgSend)((id)objc_getClass("NSMutableArray"), sel_registerName("alloc")), sel_registerName("init"));
+
+// 看到 __Block_byref_array2_0 结构体初始化传入了 array 赋值给它的 array2 成员变量
+__attribute__((__blocks__(byref))) __Block_byref_array2_0 array2 = 
+{
+(void*)0,
+(__Block_byref_array2_0 *)&array2,
+33554432,
+sizeof(__Block_byref_array2_0),
+__Block_byref_id_object_copy_131,
+__Block_byref_id_object_dispose_131,
+array
+};
+
+// 这个 Block 调用 copy 函数也有必要认真看一下
+blk = 
+(blk_t)((id (*)(id, SEL))(void *)objc_msgSend)((id)((void (*)(id))&__main_block_impl_0((void *)__main_block_func_0, &__main_block_desc_0_DATA, (__Block_byref_array2_0 *)&array2, 570425344)), sel_registerName("copy"));
 ```
 
 ## Block 循环引用
+如果在 Block 中使用附有 strong 修饰符的对象类型自动变量，那么当 block 从栈复制到堆时，该对象为 block 所持有。不复制也会持有的，block 结构体初始化的时候已经将其捕获。
+示例：
+```
+// 1. 
+id array = [[NSMutableArray alloc] init];
+{
+    NSLog(@"⛈⛈⛈ array retainCount = %lu", (unsigned long)[array arcDebugRetainCount]);
+    
+    ^(id obj) {
+        [array addObject:obj];
+        NSLog(@"⛈⛈⛈ array retainCount = %lu", (unsigned long)[array arcDebugRetainCount]);
+    };
+    
+    NSLog(@"⛈⛈⛈ array retainCount = %lu", (unsigned long)[array arcDebugRetainCount]);
+}
+NSLog(@"⛈⛈⛈ array retainCount = %lu", (unsigned long)[array arcDebugRetainCount]);
 
+// 打印：
+⛈⛈⛈ array retainCount = 1 // array 持有
+⛈⛈⛈ array retainCount = 2 // array 和 栈上 block 同时持有
+⛈⛈⛈ array retainCount = 1 // 出了花括号，栈上 block 释放，只剩下 array 持有
+
+// 2.
+id array = [[NSMutableArray alloc] init];
+{
+    NSLog(@"⛈⛈⛈ array retainCount = %lu", (unsigned long)[array arcDebugRetainCount]);
+    
+    blk = ^(id obj) {
+        [array addObject:obj];
+        NSLog(@"⛈⛈⛈  Block array retainCount = %lu", (unsigned long)[array arcDebugRetainCount]);
+    };
+    
+    NSLog(@"⛈⛈⛈ array retainCount = %lu", (unsigned long)[array arcDebugRetainCount]);
+}
+NSLog(@"⛈⛈⛈ array retainCount = %lu", (unsigned long)[array arcDebugRetainCount]);
+
+if (blk != nil) {
+    blk([[NSObject alloc] init]);
+    blk([[NSObject alloc] init]);
+    blk([[NSObject alloc] init]);
+}
+// 打印：
+⛈⛈⛈ array retainCount = 1 // array 持有
+⛈⛈⛈ array retainCount = 3 // 花括号内，栈上 block 持有、复制到堆的 block 持有、array 持有，总共是 3
+⛈⛈⛈ array retainCount = 2 // 这里减 1 是栈上 block 出了花括号释放，同时也释放了 array，所以这里减 1
+⛈⛈⛈  Block array retainCount = 2 // 这里 block 执行 3 次打印都是 2，此时 array 持有和堆上的 block blk 持有
+⛈⛈⛈  Block array retainCount = 2
+⛈⛈⛈  Block array retainCount = 2
+
+// 3.
+id array = [[NSMutableArray alloc] init];
+{
+    NSLog(@"⛈⛈⛈ array retainCount = %lu", (unsigned long)[array arcDebugRetainCount]);
+    
+    blk = ^(id obj) {
+        [array addObject:obj];
+        NSLog(@"⛈⛈⛈  Block array retainCount = %lu", (unsigned long)[array arcDebugRetainCount]);
+    };
+    
+    NSLog(@"⛈⛈⛈ array retainCount = %lu", (unsigned long)[array arcDebugRetainCount]);
+}
+
+NSLog(@"⛈⛈⛈ array retainCount = %lu", (unsigned long)[array arcDebugRetainCount]);
+
+if (blk != nil) {
+    blk([[NSObject alloc] init]);
+    blk([[NSObject alloc] init]);
+    blk([[NSObject alloc] init]);
+}
+
+blk = nil;
+NSLog(@"⛈⛈⛈ array retainCount = %lu", (unsigned long)[array arcDebugRetainCount]);
+// 打印：
+⛈⛈⛈ array retainCount = 1
+⛈⛈⛈ array retainCount = 3
+⛈⛈⛈ array retainCount = 2
+⛈⛈⛈  Block array retainCount = 2
+⛈⛈⛈  Block array retainCount = 2
+⛈⛈⛈  Block array retainCount = 2
+⛈⛈⛈ array retainCount = 1 // 只有这里，blk 三次执行完毕后，blk 赋值 空，blk 释放，同时释放 array，所以还剩下 array 持有，retainCount 为 1
+
+// 4.
+{
+    id array = [[NSMutableArray alloc] init];
+    NSLog(@"⛈⛈⛈ array retainCount = %lu", (unsigned long)[array arcDebugRetainCount]);
+    
+    blk = ^(id obj) {
+        [array addObject:obj];
+        NSLog(@"⛈⛈⛈  Block array retainCount = %lu", (unsigned long)[array arcDebugRetainCount]);
+    };
+    
+    NSLog(@"⛈⛈⛈ array retainCount = %lu", (unsigned long)[array arcDebugRetainCount]);
+}
+
+// NSLog(@"⛈⛈⛈ array retainCount = %lu", (unsigned long)[array arcDebugRetainCount]);
+
+if (blk != nil) {
+    blk([[NSObject alloc] init]);
+    blk([[NSObject alloc] init]);
+    blk([[NSObject alloc] init]);
+}
+// 打印：
+⛈⛈⛈ array retainCount = 1 // 对象创建时为 1
+⛈⛈⛈ array retainCount = 3 // 栈上 block 持有和复制到堆时堆上 block 持有 
+                             // 出了花括号以后，栈上 block 释放，array 局部变量释放
+                             // 剩下的 1 是堆上的 block 持有的
+                             // 所以下面 block 指向时，打印都是 1
+⛈⛈⛈  Block array retainCount = 1 // 出了花括号以后变量 array 释放，还剩下 block blk 自己持有，所以打印 1
+⛈⛈⛈  Block array retainCount = 1
+⛈⛈⛈  Block array retainCount = 1
+```
 ```
 - (id)init {
     self = [super init];
     blk_ = ^{ NSLog(@"self = %@", self);};
     return self;
 }
+
+// 依然会捕获 self,对编译器而言，obj_ 只不过是对象用结构体的成员变量。
+// blk_ = ^{ NSLog(@"obj_ = %@", self->obj_); };
+
+- (id)init {
+    self = [super init];
+    blk_ = ^{
+        NSLog(@"obj_ = %@", obj_);
+        };
+        
+    return self;    
+}
+
+// 除了 __weak self 也可用:
+id __weak obj = obj_;
+blk_ = ^{ NSLog(@"obj_ = %@", obj); };
 ```
+该源代码中，由于 Block 存在时，持有该 Block 的 Object 对象即赋值在变量 tmp 中的self 必定存在，因此不需要判断变量 tmp 的值是否为 nil。
+在 iOS 4 和 OS X 10.6 中，可以用 _unsafe_unretained 代替 __weak 修饰符，此处即可代替，且不必担心悬垂指针。
 
-**并且由于Block语法赋值在了成员变量 blk_ 中，因此通过 Block 语法生成在栈上的 Block 此时由栈复制到堆上，并持有所使用的 self.**
+**由于Block语法赋值在了成员变量 blk_ 中，因此通过 Block 语法生成在栈上的 Block 此时由栈复制到堆上，并持有所使用的 self.**
 
-在为避免循环引用而使用 __weak 修饰符时，虽说可以确认使用附有 __weak 修饰符的变量时是否为 nil，但更有必要使之生存以使用赋值给附有 __weak 修饰符变量的对象。
+在为避免循环引用而使用 __weak 修饰符时，虽说可以确认使用附有 __weak 修饰符的变量时，是否为 nil，但更有必要使之生存，以使用赋值给附有 __weak 修饰符变量的对象。（意思就比如上面，block 表达式开始执行时，首先判断 self 是否是 nil，如果不是 nil 才有必要继续往下执行，在往下执行的过程中并且希望 self 一直存在，不要正在使用时，竟被释放了，如果是单线程则无需考虑，但是在多线程开发时一定要考虑到这一点。）
 
-**在 Block 里面加 __strong 修饰 weakSelf 取得 strongSelf，防止 block 结构体实例的 self 成员变量过早释放。Block从外界所捕获的对象和在Block内部强使用__strong强引用的对象,差别就在于一个是在定义的时候就会影响对象的引用计数(理由就是上面编译后的代码),一个是在Block运行的时候才强引用对象,执行完毕还是会-1**
+**在 Block 里面加 __strong 修饰 weakSelf 取得 strongSelf，防止 block 结构体实例的 self 成员变量过早释放。Block 从外界所捕获的对象和在 Block 内部使用 __strong 强引用的对象，差别就在于一个是在 定义的时候 就会影响对象的引用计数, 一个是在 Block 运行的时候才强引用对象，且 block 表达式执行完毕还是会 -1**
 
-**__weak修饰的对象被Block引用,不会影响对象的释放,而__strong在Block内部修饰的对象,会保证,在使用这个对象在scope内,这个对象都不会被释放,出了scope,引用计数就会-1,且__strong主要是用在多线程运用中,若果只使用单线程,只需要使用__weak即可**
+**__weak 修饰的对象被 Block 引用，不会影响对象的释放，而 __strong 在 Block 内部修饰的对象，会保证，在使用这个对象在 scope 内，这个对象都不会被释放，出了 scope，引用计数就会 -1，且 __strong 主要是用在多线程运用中，如果只使用单线程，则只需要使用 __weak 即可。**
 
 用 __block 变量来避免循环引用，原理是在 Block 内部对捕获的变量赋值为 nil，硬性破除引用环。
 ```
@@ -1924,12 +2104,16 @@ id __autoreleasing array2 = array;
     };
 }
 ```
-优点：
+
+**对使用 __block 变量避免循环引用的方法和使用 __weak 修饰符及 __unsafe_unretained 修饰符避免循环引用的方法做比较:**
+
+__block 优点：
 + 通过 __block 变量可控制对象的持有期间。
-+ 在不能使用 __weak 修饰符的环境中不使用 __unsafe_unretained 修饰符。（不必担心悬垂指针）
++ 在不能使用 __weak 修饰符的环境中不使用 __unsafe_unretained 修饰符即可（不必担心访问悬垂指针）
 + 在执行 Block 时可动态决定是否将 nil 或其他对象赋值在 __block  变量中。
-缺点:
+
+__block 缺点:
 + 为避免循环引用必须执行 Block。
 
 ## copy/release
-
+ARC  无效时，一般需要手动将 Block 从栈复制到堆，另外，由于 ARC 无效，所以肯定要手动释放复制的 Block。此时可用 copy 实例方法来复制，用 release 实例方法来释放。

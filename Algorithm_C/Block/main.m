@@ -7,6 +7,7 @@
 //
 
 #import <Foundation/Foundation.h>
+#import "NSObject+ArcDebugRetainCount.h"
 
 //#import "Son.h"
 //#import "Father.h"
@@ -258,25 +259,29 @@ int main(int argc, const char * argv[]) {
 //        NSLog(@"val = %d", val);
         
         blk_t blk;
-        {
-            id array = [[NSMutableArray alloc] init];
-//            id array = [NSMutableArray array];
-            id array2 = array;
-
-            blk = [^(id obj){
-                id __strong array3 = array2;
-                
-                [array3 addObject:obj];
-                
-                NSLog(@"array count = %ld", [array3 count]);
-            } copy];
-        }
-
-        blk([[NSObject alloc] init]);
-        blk([[NSObject alloc] init]);
-        blk([[NSObject alloc] init]);
         
-//        __block id obj = [[NSObject alloc] init];
+        id array = [[NSMutableArray alloc] init];
+        {
+            NSLog(@"⛈⛈⛈ array retainCount = %lu", (unsigned long)[array arcDebugRetainCount]);
+            
+            blk = ^(id obj) {
+                [array addObject:obj];
+                NSLog(@"⛈⛈⛈  Block array retainCount = %lu", (unsigned long)[array arcDebugRetainCount]);
+            };
+            
+            NSLog(@"⛈⛈⛈ array retainCount = %lu", (unsigned long)[array arcDebugRetainCount]);
+        }
+        
+        NSLog(@"⛈⛈⛈ array retainCount = %lu", (unsigned long)[array arcDebugRetainCount]);
+        
+        if (blk != nil) {
+            blk([[NSObject alloc] init]);
+            blk([[NSObject alloc] init]);
+            blk([[NSObject alloc] init]);
+        }
+        
+        blk = nil;
+        NSLog(@"⛈⛈⛈ array retainCount = %lu", (unsigned long)[array arcDebugRetainCount]);
     }
     
     return 0;

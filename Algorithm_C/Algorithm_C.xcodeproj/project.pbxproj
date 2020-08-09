@@ -87,6 +87,7 @@
 		D2EB015524DC00CE009EAFD6 /* Son.m in Sources */ = {isa = PBXBuildFile; fileRef = D2EB015424DC00CE009EAFD6 /* Son.m */; };
 		D2EB015824DC04F0009EAFD6 /* Father+Test.m in Sources */ = {isa = PBXBuildFile; fileRef = D2EB015724DC04F0009EAFD6 /* Father+Test.m */; };
 		D2EB015B24DC0593009EAFD6 /* Son+Test.m in Sources */ = {isa = PBXBuildFile; fileRef = D2EB015A24DC0592009EAFD6 /* Son+Test.m */; };
+		D2F305B524DF90890020A5C2 /* NSObject+ArcDebugRetainCount.m in Sources */ = {isa = PBXBuildFile; fileRef = D2F305B424DF90890020A5C2 /* NSObject+ArcDebugRetainCount.m */; settings = {COMPILER_FLAGS = "-fno-objc-arc"; }; };
 		D2FF2CD224DC1B200029E56E /* GrandSon.m in Sources */ = {isa = PBXBuildFile; fileRef = D2FF2CD124DC1B200029E56E /* GrandSon.m */; };
 /* End PBXBuildFile section */
 
@@ -285,6 +286,8 @@
 		D2EB015724DC04F0009EAFD6 /* Father+Test.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = "Father+Test.m"; sourceTree = "<group>"; };
 		D2EB015924DC0592009EAFD6 /* Son+Test.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "Son+Test.h"; sourceTree = "<group>"; };
 		D2EB015A24DC0592009EAFD6 /* Son+Test.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = "Son+Test.m"; sourceTree = "<group>"; };
+		D2F305B324DF90890020A5C2 /* NSObject+ArcDebugRetainCount.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "NSObject+ArcDebugRetainCount.h"; sourceTree = "<group>"; };
+		D2F305B424DF90890020A5C2 /* NSObject+ArcDebugRetainCount.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = "NSObject+ArcDebugRetainCount.m"; sourceTree = "<group>"; };
 		D2FF2CD024DC1B200029E56E /* GrandSon.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = GrandSon.h; sourceTree = "<group>"; };
 		D2FF2CD124DC1B200029E56E /* GrandSon.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = GrandSon.m; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -1553,6 +1556,8 @@
 				D2EB014724DB7B3A009EAFD6 /* BlockNotes.md */,
 				D2EB014A24DBB132009EAFD6 /* BlockStruct.h */,
 				D2EB014B24DBB132009EAFD6 /* BlockStruct.c */,
+				D2F305B324DF90890020A5C2 /* NSObject+ArcDebugRetainCount.h */,
+				D2F305B424DF90890020A5C2 /* NSObject+ArcDebugRetainCount.m */,
 				D2EB014224DB7A5C009EAFD6 /* main.m */,
 			);
 			path = Block;
@@ -1849,6 +1854,7 @@
 				D2EB015524DC00CE009EAFD6 /* Son.m in Sources */,
 				D2EB014C24DBB132009EAFD6 /* BlockStruct.c in Sources */,
 				D2EB014F24DC0002009EAFD6 /* Father.m in Sources */,
+				D2F305B524DF90890020A5C2 /* NSObject+ArcDebugRetainCount.m in Sources */,
 				D2EB014324DB7A5C009EAFD6 /* main.m in Sources */,
 				D2FF2CD224DC1B200029E56E /* GrandSon.m in Sources */,
 			);
