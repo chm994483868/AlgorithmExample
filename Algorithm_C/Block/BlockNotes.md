@@ -2117,3 +2117,39 @@ __block 缺点:
 
 ## copy/release
 ARC  无效时，一般需要手动将 Block 从栈复制到堆，另外，由于 ARC 无效，所以肯定要手动释放复制的 Block。此时可用 copy 实例方法来复制，用 release 实例方法来释放。
+
+```
+void (^blk_on_heap)(void) = [blk_on_stack copy];
+[blk_on_heap release];
+```
+
+只要 Block 有一次 **复制并配置在堆上**，就可通过 **retain 实例方法** 持有。
+
+```
+[blk_on_heap retain];
+```
+但是对于 **配置在栈上的 Block  调用 retain 实例方法则不起作用**。
+```
+[blk_on_stack retain];
+```
+该源代码中，虽然对赋值给 blk_on_stack 的栈上的 Block 调用了 retain 实例方法，**但实际上对此源代码不起任何作用**。因此**推荐使用 copy 实例方法来持有 Block**。
+
+另外，由于 Blocks 是 C 语言的扩展，所以在 C 语言中也可以使用 Block 语法。此时使用 “Block_copy 函数” 和 “Block_release 函数” 代替 copy/release 实例方法。使用方法以及引用计数的思考方式与 OC 中的 copy/release 实例方法相同。
+```
+// 把栈上的 block 复制到堆上
+void (^blk_on_heap)(void) = Block_copy(blk_on_stack);
+// 释放堆上的 block
+Block_release(blk_on_heap);
+```
+Block_copy 函数就是之前出现过的 _Block_copy 函数，即 OC  运行时库所使用的为 C 语言而准备的函数。释放堆上的 Block 时也同样调用 OC 运行时库的 Block_release 函数。
+
+另外极其重要的一个知识点:
+另外极其重要的一个知识点:
+另外极其重要的一个知识点:
+
+**ARC 无效时，__Block 说明符被用来避免 Block 中的循环引用，这是由于当 Block 从栈复制到堆时，若 Block 使用的变量为附有 __block 说明符的 id 类型或对象类型的自动变量，不会被 retain；若 Block 使用变量为没有 __block 说明符的 id 类型或对象类型的自动变量，则被 retain。**
+
+由于 ARC 有效时和无效时 __block 说明符的用途有很大区别，因此编写源代码时，必须知道源代码是在 ARC 有效情况下编译还是无效情况下编译。
+
+# Block 部分 完结撒花 🎉🎉🎉
+
