@@ -12,9 +12,6 @@ NS_ASSUME_NONNULL_BEGIN
 
 @interface GrandSon : Son
 
-- (void)run;
-+ (void)TEST;
-
 @end
 
 NS_ASSUME_NONNULL_END

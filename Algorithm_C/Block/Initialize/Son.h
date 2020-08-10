@@ -12,12 +12,6 @@ NS_ASSUME_NONNULL_BEGIN
 
 @interface Son : Father
 
-- (void)eat;
-- (void)run;
-+ (void)ClassRun;
-
-+ (id)getBlockArray;
-
 @end
 
 NS_ASSUME_NONNULL_END

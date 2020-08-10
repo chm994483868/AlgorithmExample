@@ -73,7 +73,7 @@
 //    };
 //}
 
-typedef void(^blk_t)(id);
+//typedef void(^blk_t)(id);
 
 //blk_t blk = ^(id obj){
 ////    [array addObject:obj];
@@ -81,7 +81,12 @@ typedef void(^blk_t)(id);
 //    NSLog(@"⛈⛈⛈ array count = %@", obj);
 //};
 
-blk_t blk;
+//int global_val = 1;
+//static int static_global_val = 2;
+
+//blk_t blk;
+
+//void (^blk)(void) = ^{ printf("全局区的 _NSConcreteGlobalBlock Block！\n"); };
 
 int main(int argc, const char * argv[]) {
     @autoreleasepool {
@@ -336,23 +341,112 @@ int main(int argc, const char * argv[]) {
 //        blk([[NSObject alloc] init]);
 //        blk([[NSObject alloc] init]);
         
-//        {
-//            id array = [[NSMutableArray alloc] init];
-           blk = [^(id obj){
-//                [array addObject:obj];
-                
-//                NSLog(@"⛈⛈⛈ array count = %@", array);
-               NSLog(@"⛈⛈⛈ obj = %@", obj);
-            } copy];
+////        {
+////            id array = [[NSMutableArray alloc] init];
+//           blk = [^(id obj){
+////                [array addObject:obj];
+//
+////                NSLog(@"⛈⛈⛈ array count = %@", array);
+//               NSLog(@"⛈⛈⛈ obj = %@", obj);
+//            } copy];
+//
+//
+////        }
+//
+//        blk([[NSObject alloc] init]);
+//        blk([[NSObject alloc] init]);
+//        blk([[NSObject alloc] init]);
+//
+////        blk();
         
-        
-//        }
-        
-        blk([[NSObject alloc] init]);
-        blk([[NSObject alloc] init]);
-        blk([[NSObject alloc] init]);
-        
+//        int a = 10;
+//        __block int* b = &a;
+//        void (^blk)(void) = ^{
+//            NSLog(@"⛈⛈⛈ block 内部 b 修改前: b = %d", *b);
+//            *b = 20; // 修改后外部 b 也是 20
+//        };
+//
+//        NSLog(@"⛈⛈⛈ b = %d", *b);
+//        a = 30;
+//        NSLog(@"⛈⛈⛈ b = %d", *b);
+//
 //        blk();
+//
+//        NSLog(@"⛈⛈⛈ b = %d", *b);
+//        NSLog(@"⛈⛈⛈ a = %d", a);
+        
+//        static int static_val = 3;
+//        void (^blk)(void) = ^{
+//           global_val *= 2;
+//           static_global_val *= 2;
+//           static_val *= 3;
+//        };
+//
+//        static_val = 12;
+//        blk();
+//
+//        // static_val = 111;
+//        printf("static_val = %d, global_val = %d, static_global_val = %d\n", static_val, global_val, static_global_val);
+        
+//        // 不捕获外部自动变量是 global
+//        void (^globalBlock)(void) = ^{
+//            NSLog(@"❄️❄️❄️ 测试 block isa");
+//        };
+//
+//        // 这个 a 是位于栈区 __Block_byref_a_0 结构体实例，已经不是 int 类型
+//        __block int a = 2;
+//
+//        // 下面 block 被复制到堆区，a 也同时被复制到 堆区
+//        void (^mallocBlock)(void) = ^{
+//            // a->__forwarding->a 自增
+//            // 堆上 a 的 __forwarding 指向自己
+//            ++a;
+//            NSLog(@"❄️❄️❄️ 测试 block isa a = %d", a);
+//        };
+//
+//        // 下面的 a 还是在栈区的 __Block_byref_a_0 结构体实例，
+//        // 但是它的 __forwrding 指针是指向上面被复制堆区的 a 的，
+//        // 这样不管是栈区 a 还是 堆区 a，当操作 int a = 2，这个数值 a 时都是同一个。
+//        ++a;
+//
+////        globalBlock();
+////        mallocBlock();
+////
+////        NSLog(@"❄️❄️❄️ globalBlock isa: %@", globalBlock);
+////        NSLog(@"❄️❄️❄️ mallocBlock isa: %@", mallocBlock);
+////        // 栈区 block,
+////        NSLog(@"❄️❄️❄️ stackBlock isa: %@", ^{ NSLog(@"❄️❄️❄️ a = %d", a); });
+        
+//        blk_t blk;
+//        {
+//            // id array = [[NSMutableArray alloc] init];
+//            @autoreleasepool {
+//
+//                id array = [NSMutableArray array];
+//                id __weak array2 = array;
+//
+//                blk = [^(id obj){
+//                    [array2 addObject:obj];
+//
+//                    NSLog(@"❄️❄️❄️ array count = %ld", [array2 count]);
+//                } copy];
+//
+//            }
+//
+//            ^(id obj) {
+//                NSLog(@"%@", obj);
+//            };
+//
+//            ^(void) {
+//                NSLog(@"%d", 12);
+//            };
+//
+//
+//        }
+//
+//        blk([[NSObject alloc] init]);
+//        blk([[NSObject alloc] init]);
+//        blk([[NSObject alloc] init]);
     }
     
     return 0;

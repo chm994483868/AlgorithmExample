@@ -8,9 +8,6 @@
 
 #import "Father+Test.h"
 
-#import <AppKit/AppKit.h>
-
-
 @implementation Father (Test)
 
 //+ (void)initialize {

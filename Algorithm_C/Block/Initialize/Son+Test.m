@@ -8,9 +8,6 @@
 
 #import "Son+Test.h"
 
-#import <AppKit/AppKit.h>
-
-
 @implementation Son (Test)
 
 //+ (void)initialize {

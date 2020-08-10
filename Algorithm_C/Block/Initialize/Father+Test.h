@@ -6,9 +6,6 @@
 //  Copyright © 2020 CHM. All rights reserved.
 //
 
-#import <AppKit/AppKit.h>
-
-
 #import "Father.h"
 
 NS_ASSUME_NONNULL_BEGIN
