@@ -159,6 +159,9 @@ warning: could not execute support code to read Objective-C class data in the pr
 load 的源码在 objc4 中分析。
 
 #  Blocks
+
+**堆 Block __NSMallocblock__ 内存由 ARC 控制，没有强指针指向时释放。而在 MRC 中，赋值不会执行 copy 操作，所以左侧 block 依然存在于栈中，所以在 MRC 中一般都需要执行 copy，否则很容易造成 crash.在 ARC 中，当 Block 作为属性被 strong、copy 修饰或被强指针引用或作为返回值时，都会默认执行 copy。而 MRC 中，只有被 copy 修饰时，block 才会执行 copy。所以 MRC 中 Block 都需要用 copy 修饰，而在 ARC 中用 copy 修饰只是沿用了 MRC 的习惯，此时用 copy 和 strong效果是相同的。**
+
 > 主要介绍 OS X Snow Leopard(10.6) 和 iOS 4 引入的 C 语言扩充功能 “Blocks” 。究竟是如何扩充 C 语言的，扩充之后又有哪些优点呢？下面通过其实现来一步一步探究。
 ## 什么是 Blocks 
 Blocks 是 C 语言的扩充功能。可以用一句话来表示 Blocks 的扩充功能：带有自动变量（局部变量）的匿名函数。(对于程序员而言，命名就是工作的本质。)
