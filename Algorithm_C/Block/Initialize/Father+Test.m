@@ -18,4 +18,8 @@
 ////    }
 //}
 
++ (void)load {
+    NSLog(@"💭💭💭 Father (Test) --> self == %@, functionString == %s", [self class], __FUNCTION__);
+}
+
 @end

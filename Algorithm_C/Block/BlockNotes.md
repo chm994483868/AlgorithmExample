@@ -98,6 +98,65 @@ Father --> self == Son, functionString == +[Father initialize]
 warning: could not execute support code to read Objective-C class data in the process. This may reduce the quality of type information available.
 ```
 
+initialize 的源码在 objc4 中分析。
+
+# +(void)load
+临时插入一个 load 函数的话题：
+load 方法使用频次不算太高。
+load 方法是在加载类和分类时系统调用的，一般不手动调用，
+如果想要在类或分类加载时做一些事情，可以重写类或者分类的 load 方法。
+每个类、分类的 load 在程序运行过程中只调用一次。
+
+## 使用场景：
+1. hook 方法的时候
+2. 涉及到组件化开发中不同组件间通信，在 load 中注册相关协议等。
+## 调用时机
+在 pre-main 阶段（即 main 函数之前），这点大家都知道。所以 load 应该尽可能的简单，不然影响 App 启动速度。
+## load 执行顺序
+父类、子类、category 都实现 load 方法，那么 load 的加载顺序是如何呢？
+1. 首先是父类一定早于子类执行，父类和子类一定早于其分类执行。
+2. 当父类的分类和子类的分类都实现时，此时根它们的编译顺序有关，可调整 Compile Sources 里面编译顺序自己验证（先编译，先调用)。
+3. 类要优先于分类调用 +load 方法。
+4. 子类调用 +load 方法时，要先要调用父类的 +load 方法；(父类优先与子类，与继承不同)。
+5. 不同的类按照编译先后顺序调用 +load 方法（先编译，先调用)。
+6. 分类的按照编译先后顺序调用 +load方法（先编译，先调用）。
+
+## 特殊情况，如果自己主动调用 [super load];
+1. 在 son 的 load 里面调用 [super load]时：
+// 示例 1:
+💭💭💭 Father --> self == Father, functionString == +[Father load]
+// 此处多执行了一次 Father 里面的 load，且 self 传的是 Son
+// 如果 Father 的分类也实现了 load，则会去分类里面执行
+💭💭💭 Father --> self == Son, functionString == +[Father load]
+💭💭💭 Son --> self == Son, functionString == +[Son load]
+💭💭💭 GrandSon --> self == GrandSon, functionString == +[GrandSon load]
+
+// 示例 2: 在 Son 的 load 里面调用 [super load]，且 Father 的分类里面实现了 load
+💭💭💭 Father --> self == Father, functionString == +[Father load]
+// 看到 这里插入了一条 Father 分类的执行，且 self == son
+💭💭💭 Father (Test) --> self == Son, functionString == +[Father(Test) load]
+💭💭💭 Son --> self == Son, functionString == +[Son load]
+💭💭💭 GrandSon --> self == GrandSon, functionString == +[GrandSon load]
+
+// 示例 3: 在 Son 的 load 里面调用 [self load]，且 Son 的分类也实现了 lod，则会执行分类里的
+// 看到先去 Son 分类里面执行
+💭💭💭 Son (Test) --> self == Son, functionString == +[Son(Test) load]
+💭💭💭 Son --> self == Son, functionString == +[Son load]
+
+// 示例 4: 当如果 Son 分类没有实现，且只有 Son 自己实现 load，且在 load 里面调 [self load] 会崩溃。
+warning: could not execute support code to read Objective-C class data in the process. This may reduce the quality of type information available.
+
+// 示例 5: 如果 Father 有两个分类都实现了 load，都会执行，且谁编译在前谁先执行
+💭💭💭 Father (Test2) --> self == Son, functionString == +[Father(Test2) load]
+💭💭💭 Father (Test) --> self == Father, functionString == +[Father(Test) load]
+
+// 示例 6: 如果在 Son 里面执行 [super load]，且 Father 两个分类都实现了 load，则会去后编译的那个里面执行
+💭💭💭 Father (Test2) --> self == Son, functionString == +[Father(Test2) load]
+💭💭💭 Son --> self == Son, functionString == +[Son load]
+
+上面这个顺序是能猜到了，这个涉及到同一个类的多个分类中添加了同样的方法，此时如果去执行，后编译的分类的方法会添加到方法列表的前面。让后方法执行时去方法列表里面找执行，当找到第一个后编译的方法后就直接返回执行了。
+
+load 的源码在 objc4 中分析。
 
 #  Blocks
 > 主要介绍 OS X Snow Leopard(10.6) 和 iOS 4 引入的 C 语言扩充功能 “Blocks” 。究竟是如何扩充 C 语言的，扩充之后又有哪些优点呢？下面通过其实现来一步一步探究。

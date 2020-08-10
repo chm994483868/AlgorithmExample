@@ -65,6 +65,14 @@
 		D239E78424D4161800DA0BE5 /* MaxValueOfGifts.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D239E78224D4161800DA0BE5 /* MaxValueOfGifts.cpp */; };
 		D239E78824D4290200DA0BE5 /* LongestSubstringWithoutDup.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D239E78624D4290200DA0BE5 /* LongestSubstringWithoutDup.cpp */; };
 		D28F813A24C6E60E00EE7EF3 /* RecursiveSummary.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D28F813824C6E60E00EE7EF3 /* RecursiveSummary.cpp */; };
+		D2A32AD324E1477300ECE821 /* GrandSon+Test.m in Sources */ = {isa = PBXBuildFile; fileRef = D2A32AD224E1477300ECE821 /* GrandSon+Test.m */; };
+		D2A32AD624E14D5500ECE821 /* OtherFather.m in Sources */ = {isa = PBXBuildFile; fileRef = D2A32AD524E14D5500ECE821 /* OtherFather.m */; };
+		D2A32AD924E14D9200ECE821 /* OtherSon.m in Sources */ = {isa = PBXBuildFile; fileRef = D2A32AD824E14D9200ECE821 /* OtherSon.m */; };
+		D2A32ADC24E14DC700ECE821 /* OtherGrandSon.m in Sources */ = {isa = PBXBuildFile; fileRef = D2A32ADB24E14DC700ECE821 /* OtherGrandSon.m */; };
+		D2A32ADF24E1538100ECE821 /* Father+Test2.m in Sources */ = {isa = PBXBuildFile; fileRef = D2A32ADE24E1538100ECE821 /* Father+Test2.m */; };
+		D2A32AE224E153CF00ECE821 /* OtherFather+Test.m in Sources */ = {isa = PBXBuildFile; fileRef = D2A32AE124E153CF00ECE821 /* OtherFather+Test.m */; };
+		D2A32AE524E153EF00ECE821 /* OtherSon+Test.m in Sources */ = {isa = PBXBuildFile; fileRef = D2A32AE424E153EF00ECE821 /* OtherSon+Test.m */; };
+		D2A32AE824E1541B00ECE821 /* OtherGrandSon+Test.m in Sources */ = {isa = PBXBuildFile; fileRef = D2A32AE724E1541B00ECE821 /* OtherGrandSon+Test.m */; };
 		D2EB010024D912C6009EAFD6 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2EB00FF24D912C6009EAFD6 /* main.swift */; };
 		D2EB010924D9136D009EAFD6 /* BubbleSort.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2EB010824D9136D009EAFD6 /* BubbleSort.swift */; };
 		D2EB010C24D91F91009EAFD6 /* BubbleSort.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D2EB010A24D91F91009EAFD6 /* BubbleSort.cpp */; };
@@ -248,6 +256,22 @@
 		D2407F3D24BD626B0018D876 /* LearnedList.strings */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; path = LearnedList.strings; sourceTree = "<group>"; };
 		D28F813824C6E60E00EE7EF3 /* RecursiveSummary.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = RecursiveSummary.cpp; sourceTree = "<group>"; };
 		D28F813924C6E60E00EE7EF3 /* RecursiveSummary.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = RecursiveSummary.hpp; sourceTree = "<group>"; };
+		D2A32AD124E1477300ECE821 /* GrandSon+Test.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "GrandSon+Test.h"; sourceTree = "<group>"; };
+		D2A32AD224E1477300ECE821 /* GrandSon+Test.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = "GrandSon+Test.m"; sourceTree = "<group>"; };
+		D2A32AD424E14D5500ECE821 /* OtherFather.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = OtherFather.h; sourceTree = "<group>"; };
+		D2A32AD524E14D5500ECE821 /* OtherFather.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = OtherFather.m; sourceTree = "<group>"; };
+		D2A32AD724E14D9200ECE821 /* OtherSon.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = OtherSon.h; sourceTree = "<group>"; };
+		D2A32AD824E14D9200ECE821 /* OtherSon.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = OtherSon.m; sourceTree = "<group>"; };
+		D2A32ADA24E14DC700ECE821 /* OtherGrandSon.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = OtherGrandSon.h; sourceTree = "<group>"; };
+		D2A32ADB24E14DC700ECE821 /* OtherGrandSon.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = OtherGrandSon.m; sourceTree = "<group>"; };
+		D2A32ADD24E1538100ECE821 /* Father+Test2.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "Father+Test2.h"; sourceTree = "<group>"; };
+		D2A32ADE24E1538100ECE821 /* Father+Test2.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = "Father+Test2.m"; sourceTree = "<group>"; };
+		D2A32AE024E153CF00ECE821 /* OtherFather+Test.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "OtherFather+Test.h"; sourceTree = "<group>"; };
+		D2A32AE124E153CF00ECE821 /* OtherFather+Test.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = "OtherFather+Test.m"; sourceTree = "<group>"; };
+		D2A32AE324E153EF00ECE821 /* OtherSon+Test.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "OtherSon+Test.h"; sourceTree = "<group>"; };
+		D2A32AE424E153EF00ECE821 /* OtherSon+Test.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = "OtherSon+Test.m"; sourceTree = "<group>"; };
+		D2A32AE624E1541B00ECE821 /* OtherGrandSon+Test.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "OtherGrandSon+Test.h"; sourceTree = "<group>"; };
+		D2A32AE724E1541B00ECE821 /* OtherGrandSon+Test.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = "OtherGrandSon+Test.m"; sourceTree = "<group>"; };
 		D2EB00FD24D912C6009EAFD6 /* Algorithm_Swift */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = Algorithm_Swift; sourceTree = BUILT_PRODUCTS_DIR; };
 		D2EB00FF24D912C6009EAFD6 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
 		D2EB010824D9136D009EAFD6 /* BubbleSort.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BubbleSort.swift; sourceTree = "<group>"; };
@@ -430,14 +454,30 @@
 			children = (
 				D2EB014D24DC0002009EAFD6 /* Father.h */,
 				D2EB014E24DC0002009EAFD6 /* Father.m */,
+				D2A32AD424E14D5500ECE821 /* OtherFather.h */,
+				D2A32AD524E14D5500ECE821 /* OtherFather.m */,
+				D2A32AE024E153CF00ECE821 /* OtherFather+Test.h */,
+				D2A32AE124E153CF00ECE821 /* OtherFather+Test.m */,
 				D2EB015624DC04F0009EAFD6 /* Father+Test.h */,
 				D2EB015724DC04F0009EAFD6 /* Father+Test.m */,
+				D2A32ADD24E1538100ECE821 /* Father+Test2.h */,
+				D2A32ADE24E1538100ECE821 /* Father+Test2.m */,
 				D2EB015324DC00CE009EAFD6 /* Son.h */,
 				D2EB015424DC00CE009EAFD6 /* Son.m */,
-				D2FF2CD024DC1B200029E56E /* GrandSon.h */,
-				D2FF2CD124DC1B200029E56E /* GrandSon.m */,
+				D2A32AD724E14D9200ECE821 /* OtherSon.h */,
+				D2A32AD824E14D9200ECE821 /* OtherSon.m */,
+				D2A32AE324E153EF00ECE821 /* OtherSon+Test.h */,
+				D2A32AE424E153EF00ECE821 /* OtherSon+Test.m */,
 				D2EB015924DC0592009EAFD6 /* Son+Test.h */,
 				D2EB015A24DC0592009EAFD6 /* Son+Test.m */,
+				D2FF2CD024DC1B200029E56E /* GrandSon.h */,
+				D2FF2CD124DC1B200029E56E /* GrandSon.m */,
+				D2A32ADA24E14DC700ECE821 /* OtherGrandSon.h */,
+				D2A32ADB24E14DC700ECE821 /* OtherGrandSon.m */,
+				D2A32AE624E1541B00ECE821 /* OtherGrandSon+Test.h */,
+				D2A32AE724E1541B00ECE821 /* OtherGrandSon+Test.m */,
+				D2A32AD124E1477300ECE821 /* GrandSon+Test.h */,
+				D2A32AD224E1477300ECE821 /* GrandSon+Test.m */,
 			);
 			path = Initialize;
 			sourceTree = "<group>";
@@ -1849,14 +1889,22 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				D2EB015B24DC0593009EAFD6 /* Son+Test.m in Sources */,
 				D2EB015824DC04F0009EAFD6 /* Father+Test.m in Sources */,
-				D2EB015524DC00CE009EAFD6 /* Son.m in Sources */,
-				D2EB014C24DBB132009EAFD6 /* BlockStruct.c in Sources */,
+				D2A32AE224E153CF00ECE821 /* OtherFather+Test.m in Sources */,
+				D2A32AD624E14D5500ECE821 /* OtherFather.m in Sources */,
 				D2EB014F24DC0002009EAFD6 /* Father.m in Sources */,
-				D2F305B524DF90890020A5C2 /* NSObject+ArcDebugRetainCount.m in Sources */,
-				D2EB014324DB7A5C009EAFD6 /* main.m in Sources */,
+				D2A32AD924E14D9200ECE821 /* OtherSon.m in Sources */,
+				D2EB015524DC00CE009EAFD6 /* Son.m in Sources */,
+				D2A32ADC24E14DC700ECE821 /* OtherGrandSon.m in Sources */,
 				D2FF2CD224DC1B200029E56E /* GrandSon.m in Sources */,
+				D2A32AD324E1477300ECE821 /* GrandSon+Test.m in Sources */,
+				D2A32AE824E1541B00ECE821 /* OtherGrandSon+Test.m in Sources */,
+				D2A32ADF24E1538100ECE821 /* Father+Test2.m in Sources */,
+				D2EB015B24DC0593009EAFD6 /* Son+Test.m in Sources */,
+				D2EB014C24DBB132009EAFD6 /* BlockStruct.c in Sources */,
+				D2F305B524DF90890020A5C2 /* NSObject+ArcDebugRetainCount.m in Sources */,
+				D2A32AE524E153EF00ECE821 /* OtherSon+Test.m in Sources */,
+				D2EB014324DB7A5C009EAFD6 /* main.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

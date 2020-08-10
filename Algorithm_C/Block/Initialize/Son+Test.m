@@ -14,4 +14,8 @@
 //    NSLog(@"Son (Test) Son --> ⬜️ self == %@, functionString == %s", [self class], __FUNCTION__);
 //}
 
++ (void)load {
+    NSLog(@"💭💭💭 Son (Test) --> self == %@, functionString == %s", [self class], __FUNCTION__);
+}
+
 @end
