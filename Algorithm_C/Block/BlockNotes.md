@@ -159,6 +159,142 @@ warning: could not execute support code to read Objective-C class data in the pr
 load 的源码在 objc4 中分析。
 
 #  Blocks
+
+_Block_object_assign 源码分析之前:
+
+```
+BLOCK_EXPORT void _Block_object_assign(void *, const void *, const int)
+__OSX_AVAILABLE_STARTING(__MAC_10_6, __IPHONE_3_2);
+```
+const int 参数对应一个枚举:
+
+Block_private.h 文件 332 行:
+```
+// Runtime support functions used by compiler when generating copy/dispose helpers
+// 当编译器生成 copy/dispose helpers 时 Runtime 支持的函数
+// Values for _Block_object_assign() and _Block_object_dispose() parameters
+// 作为 _Block_object_assign() 和 _Block_object_dispose() 函数的参数
+enum {
+    // see function implementation for a more complete description of these fields and combinations
+    // 有关这些字段及其组合的更完整说明，参见函数实现
+    
+    // OC 对象类型
+    BLOCK_FIELD_IS_OBJECT   =  3,  // id, NSObject, __attribute__((NSObject)), block, ...
+    // 为另一个 Block
+    BLOCK_FIELD_IS_BLOCK    =  7,  // a block variable
+    // 为一个被 __block 修饰后生成的结构体
+    BLOCK_FIELD_IS_BYREF    =  8,  // the on stack structure holding the __block variable
+    // 被 __weak 修饰过的弱引用，只在 Block_byref 管理内部对象内存时使用
+    // 也就是 __block __weak id;
+    BLOCK_FIELD_IS_WEAK     = 16,  // declared __weak, only used in byref copy helpers
+    // 在处理 Block_byref 内部对象内存的时候会加一个额外标记，配合上面的枚举一起使用
+    BLOCK_BYREF_CALLER      = 128, // called from __block (byref) copy/dispose support routines.
+};
+
+enum {
+    // 上述情况的整合，即以上都会包含 copy_dispose 助手
+    BLOCK_ALL_COPY_DISPOSE_FLAGS = 
+        BLOCK_FIELD_IS_OBJECT | BLOCK_FIELD_IS_BLOCK | BLOCK_FIELD_IS_BYREF |
+        BLOCK_FIELD_IS_WEAK | BLOCK_BYREF_CALLER
+};
+```
+源码验证：
+```
+NSObject *is_object = [[NSObject alloc] init]; // 对象类型
+void (^is_block)() = ^{ NSLog(@"is_block 参数"); }; // block 
+__block NSObject *is_byref = [[NSObject alloc] init]; // __block 对象
+NSObject *tt = [[NSObject alloc] init];
+__block __unsafe_unretained NSObject *is_weak = tt; // __weak __block 同时修饰
+
+NSLog(@"⛈⛈⛈ is_byref retainCount = %lu ---%p---%p", (unsigned long)[is_byref arcDebugRetainCount], is_byref, &is_byref); // 堆区 栈区
+
+void (^aBlock)() = ^{
+    NSLog(@"⛈⛈⛈ is_object retainCount = %lu ---%p---%p", (unsigned long)[is_object arcDebugRetainCount], is_object, &is_object);
+    is_block();
+    
+    NSLog(@"⛈⛈⛈ is_byref retainCount = %lu ---%p---%p", (unsigned long)[is_byref arcDebugRetainCount], is_byref, &is_byref);
+    NSLog(@"⛈⛈⛈ is_weak retainCount = %lu ---%p---%p", (unsigned long)[is_weak arcDebugRetainCount], is_weak, &is_weak);
+    NSLog(@"⛈⛈⛈ is_only_weak retainCount = %lu ---%p---%p", (unsigned long)[is_only_weak arcDebugRetainCount], is_only_weak, &is_only_weak);
+};
+
+// 部分转换后的代码:
+
+struct __main_block_impl_1 {
+  struct __block_impl impl;
+  struct __main_block_desc_1* Desc;
+  
+  // 捕获的变量
+  NSObject *is_object;
+  struct __block_impl *is_block;
+  NSObject *is_only_weak;
+  __Block_byref_is_byref_0 *is_byref; // by ref
+  __Block_byref_is_weak_1 *is_weak; // by ref
+    
+  __main_block_impl_1(void *fp, struct __main_block_desc_1 *desc, NSObject *_is_object, void *_is_block, NSObject *_is_only_weak, __Block_byref_is_byref_0 *_is_byref, __Block_byref_is_weak_1 *_is_weak, int flags=0) : is_object(_is_object), is_block((struct __block_impl *)_is_block), is_only_weak(_is_only_weak), is_byref(_is_byref->__forwarding), is_weak(_is_weak->__forwarding) {
+    impl.isa = &_NSConcreteStackBlock;
+    impl.Flags = flags;
+    impl.FuncPtr = fp;
+    Desc = desc;
+  }
+};
+
+// copy
+static void __main_block_copy_1(struct __main_block_impl_1*dst, struct __main_block_impl_1*src) {
+    
+    _Block_object_assign((void*)&dst->is_object, (void*)src->is_object, 3/*BLOCK_FIELD_IS_OBJECT*/);
+    _Block_object_assign((void*)&dst->is_block, (void*)src->is_block, 7/*BLOCK_FIELD_IS_BLOCK*/);
+    _Block_object_assign((void*)&dst->is_byref, (void*)src->is_byref, 8/*BLOCK_FIELD_IS_BYREF*/);
+    _Block_object_assign((void*)&dst->is_weak, (void*)src->is_weak, 8/*BLOCK_FIELD_IS_BYREF*/);
+    _Block_object_assign((void*)&dst->is_only_weak, (void*)src->is_only_weak, 3/*BLOCK_FIELD_IS_OBJECT*/);
+    
+}
+
+// dispose
+static void __main_block_dispose_1(struct __main_block_impl_1*src) {
+    
+    _Block_object_dispose((void*)src->is_object, 3/*BLOCK_FIELD_IS_OBJECT*/);
+    _Block_object_dispose((void*)src->is_block, 7/*BLOCK_FIELD_IS_BLOCK*/);
+    _Block_object_dispose((void*)src->is_byref, 8/*BLOCK_FIELD_IS_BYREF*/);
+    _Block_object_dispose((void*)src->is_weak, 8/*BLOCK_FIELD_IS_BYREF*/);
+    _Block_object_dispose((void*)src->is_only_weak, 3/*BLOCK_FIELD_IS_OBJECT*/);
+    
+}
+
+```
+
+
+
+**这里针对 __block 变量解释一下：**
++ __block NSObject *object = [[NSObject alloc] init]; 
++ __Block_byref_object_0 结构体
++ 首先 NSObject 对象是处于堆区的，__block 结构体实例是处于栈区的。
++ Block 发生 copy 操作从栈区到堆区时：原始的 NSObject 对象是不动的，是 __block 结构体实例被复制到了堆区。
++ 且复制以后，原始栈区的 __block 结构体实例会断开对 NSObject 对象的引用
++ 堆区的 __block 结构体实例持有 NSObject 对象实例，NSObject 对象实例的引用计数此时还是 1
+```
+__block NSObject *object = [[NSObject alloc] init];
+NSLog(@"⛈⛈⛈ object retainCount = %lu ---%p---%p", (unsigned long)[object arcDebugRetainCount], object, &object); // 堆区 栈区
+
+void (^aBlock)() = ^{
+    NSLog(@"⛈⛈⛈ object retainCount = %lu ---%p---%p", (unsigned long)[object arcDebugRetainCount], object, &object);
+};
+
+aBlock(); // 堆区 堆区
+void (^bBlock)() = [aBlock copy];
+bBlock(); // 堆区 堆区
+NSObject *temp = object;
+bBlock(); // 堆区 堆区
+aBlock(); // 堆区 堆区
+NSLog(@"⛈⛈⛈ object retainCount = %lu ---%p---%p", (unsigned long)[object arcDebugRetainCount], object, &object); // 堆区 堆区
+// 打印：
+⛈⛈⛈ object retainCount = 1 ---0x100738890---0x7ffeefbff578
+⛈⛈⛈ object retainCount = 1 ---0x100738890---0x10073a628
+⛈⛈⛈ object retainCount = 1 ---0x100738890---0x10073a628
+⛈⛈⛈ object retainCount = 2 ---0x100738890---0x10073a628
+⛈⛈⛈ object retainCount = 2 ---0x100738890---0x10073a628
+⛈⛈⛈ object retainCount = 2 ---0x100738890---0x10073a628
+```
+
 **block 捕获的对象类型变量，在block 结构体中有个对应的对象类型指针，一直指向该对象类型的实例。**
 **__block 结构体实例的对象类型的成员变量作为一个指针，一直指向该对象的实例。**
 
@@ -293,7 +429,6 @@ NSLog(@"⛈⛈⛈ object retainCount = %lu ---%p---%p", (unsigned long)[object a
 ⛈⛈⛈ object retainCount = 2 ---0x10053e1b0---0x10053e988
 ```
 
-
 **堆 Block __NSMallocblock__ 内存由 ARC 控制，没有强指针指向时释放。而在 MRC 中，赋值不会执行 copy 操作，所以左侧 block 依然存在于栈中，所以在 MRC 中一般都需要执行 copy，否则很容易造成 crash.在 ARC 中，当 Block 作为属性被 strong、copy 修饰或被强指针引用或作为返回值时，都会默认执行 copy。而 MRC 中，只有被 copy 修饰时，block 才会执行 copy。所以 MRC 中 Block 都需要用 copy 修饰，而在 ARC 中用 copy 修饰只是沿用了 MRC 的习惯，此时用 copy 和 strong效果是相同的。**
 
 **Block 在捕获外部变量的操作基本一致，都是在生成结构体的时候将所有 Block 里用到的外部变量作为属性保存起来。self.block 里面调用 self 会造成循环引用，因为 Block 捕获了 self 并把 self 当做一个值保存了起来。**
@@ -302,10 +437,9 @@ NSLog(@"⛈⛈⛈ object retainCount = %lu ---%p---%p", (unsigned long)[object a
 
 **同样的，捕获对象时也是对指针的copy，生成一个指针指向obj对象，所以如果在Block中直接让obj指针指向另外一个对象也会报错。这点编译器已经加了注释 // bound by copy。**
 
-**多了__main_block_copy_0和__main_block_dispose_0这两个函数，并在描述__main_block_desc_0结构体中保存了这两个函数指针。这就是上面所说的copy_dispose助手，C语言结构体中，编译器很难处理对象的初始化和销毁操作，所以使用runtime来管理相关内存。BLOCK_FIELD_IS_OBJECT是在捕获对象时添加的特别标识，此时是3，下面会细讲。**
+**多了__main_block_copy_0 和 __main_block_dispose_0 这两个函数，并在描述 __main_block_desc_0 结构体中保存了这两个函数指针。这就是上面所说的 copy_dispose 助手，C 语言结构体中，编译器很难处理对象的初始化和销毁操作，所以使用 runtime 来管理相关内存。BLOCK_FIELD_IS_OBJECT 是在捕获对象时添加的特别标识，此时是3，下面会细讲。**
 
-**此Block是为栈Block_NSConcreteStackBlock，不过在ARC中，因为赋值给aBlock，会执行一次copy，将其中栈中copy到堆中，所以在MRC中aBlock为_NSConcreteStackBlock，在ARC中就是_NSConcreteMallocBlock。**
-
+**此 Block 是为栈 Block_NSConcreteStackBlock，不过在 ARC 中，因为赋值给 aBlock，会执行一次 copy，将其中栈中 copy 到堆中，所以在 MRC 中 aBlock 为 _NSConcreteStackBlock，在 ARC 中就是 _NSConcreteMallocBlock。**
 
 > 主要介绍 OS X Snow Leopard(10.6) 和 iOS 4 引入的 C 语言扩充功能 “Blocks” 。究竟是如何扩充 C 语言的，扩充之后又有哪些优点呢？下面通过其实现来一步一步探究。
 

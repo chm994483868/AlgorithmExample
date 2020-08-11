@@ -84,14 +84,23 @@
 //int global_val = 1;
 //static int static_global_val = 2;
 
-//blk_t blk;
+// blk_t blk;
 
-//void (^blk)(void) = ^{ printf("全局区的 _NSConcreteGlobalBlock Block！\n"); };
+// void (^blk)(void) = ^{ printf("全局区的 _NSConcreteGlobalBlock Block！\n"); };
+
+void exampleA() {
+    // 栈区 Block
+    char a = 'A';
+    NSLog(@"%@", ^{ printf("%c\n", a);});
+}
 
 int main(int argc, const char * argv[]) {
     @autoreleasepool {
         // insert code here...
         NSLog(@"🎉🎉🎉 Hello, World!");
+        
+        exampleA();
+        
         
 //        int temp = myFuncTEST(^int(int temp) {
 //            return temp * 2;
@@ -448,19 +457,50 @@ int main(int argc, const char * argv[]) {
 //        blk([[NSObject alloc] init]);
 //        blk([[NSObject alloc] init]);
         
-        __block NSObject *object = [[NSObject alloc] init];
-        NSLog(@"⛈⛈⛈ object retainCount = %lu ---%p---%p", (unsigned long)[object arcDebugRetainCount], object, &object); // 堆区 栈区
+//        NSObject *is_object = [[NSObject alloc] init];
+//        void (^is_block)() = ^{ NSLog(@"is_block 参数"); };
+//        __block NSObject *is_byref = [[NSObject alloc] init];
+//        NSObject *tt = [[NSObject alloc] init];
+//        NSObject *pp = [[NSObject alloc] init];
+//
+//        __block __unsafe_unretained NSObject *is_weak = tt;
+//        __unsafe_unretained NSObject *is_only_weak = pp;
+//
+//        NSLog(@"⛈⛈⛈ is_byref retainCount = %lu ---%p---%p", (unsigned long)[is_byref arcDebugRetainCount], is_byref, &is_byref); // 堆区 栈区
+//
+//        void (^aBlock)() = ^{
+//            NSLog(@"⛈⛈⛈ is_object retainCount = %lu ---%p---%p", (unsigned long)[is_object arcDebugRetainCount], is_object, &is_object);
+//            is_block();
+//
+//            NSLog(@"⛈⛈⛈ is_byref retainCount = %lu ---%p---%p", (unsigned long)[is_byref arcDebugRetainCount], is_byref, &is_byref);
+//            NSLog(@"⛈⛈⛈ is_weak retainCount = %lu ---%p---%p", (unsigned long)[is_weak arcDebugRetainCount], is_weak, &is_weak);
+//            NSLog(@"⛈⛈⛈ is_only_weak retainCount = %lu ---%p---%p", (unsigned long)[is_only_weak arcDebugRetainCount], is_only_weak, &is_only_weak);
+//        };
+//
+//        aBlock(); // 堆区 堆区
+//        void (^bBlock)() = [aBlock copy];
+//        bBlock(); // 堆区 堆区
+//        aBlock(); // 堆区 堆区
+//        NSLog(@"⛈⛈⛈ is_byref retainCount = %lu ---%p---%p", (unsigned long)[is_byref arcDebugRetainCount], is_byref, &is_byref); // 堆区 堆区
         
-        void (^aBlock)() = ^{
-            NSLog(@"⛈⛈⛈ object retainCount = %lu ---%p---%p", (unsigned long)[object arcDebugRetainCount], object, &object);
-        };
-        
-        NSObject *temp = object;
-        aBlock(); // 堆区 堆区
-        void (^bBlock)() = [aBlock copy];
-        bBlock(); // 堆区 堆区
-        aBlock(); // 堆区 堆区
-        NSLog(@"⛈⛈⛈ object retainCount = %lu ---%p---%p", (unsigned long)[object arcDebugRetainCount], object, &object); // 堆区 堆区
+//        // 不捕获外部自动变量是 global
+//        void (^globalBlock)(void) = ^{
+//            NSLog(@"❄️❄️❄️ 测试 block isa");
+//        };
+//
+//        int a = 2;
+//        // 右边栈区 block 赋值给左侧 block 时，会被复制到堆区
+//        void (^mallocBlock)(void) = ^{
+//            NSLog(@"❄️❄️❄️ 测试 block isa a = %d", a);
+//        };
+//
+//        globalBlock();
+//        mallocBlock();
+//
+//        NSLog(@"❄️❄️❄️ globalBlock isa: %@", globalBlock);
+//        NSLog(@"❄️❄️❄️ mallocBlock isa: %@", mallocBlock);
+//        // 栈区 block
+//        NSLog(@"❄️❄️❄️ stackBlock isa: %@", ^{ NSLog(@"❄️❄️❄️ a = %d", a); });
         
     }
     
