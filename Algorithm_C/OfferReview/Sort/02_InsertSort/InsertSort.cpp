@@ -70,4 +70,3 @@ void InsertSort::Test() {
     test5();
     test6();
 }
-
