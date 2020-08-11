@@ -171,7 +171,7 @@ int main(int argc, const char * argv[]) {
 //        exampleB();
 //        exampleC();
 //        exampleD();
-        exampleE();
+//        exampleE();
         
 //        int temp = myFuncTEST(^int(int temp) {
 //            return temp * 2;
