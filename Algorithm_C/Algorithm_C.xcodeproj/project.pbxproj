@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		8E15F1D324E2D29600660C93 /* TestObject.m in Sources */ = {isa = PBXBuildFile; fileRef = 8E15F1D224E2D29600660C93 /* TestObject.m */; };
 		8E2572BD24D062C90080F598 /* CPower.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8E2572BB24D062C90080F598 /* CPower.cpp */; };
 		8E2572C124D0696F0080F598 /* Print1ToMaxOfNDigits.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8E2572BF24D0696F0080F598 /* Print1ToMaxOfNDigits.cpp */; };
 		8E2572C524D1B3AE0080F598 /* MirrorOfBinaryTree.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8E2572C324D1B3AE0080F598 /* MirrorOfBinaryTree.cpp */; };
@@ -139,6 +140,8 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		8E15F1D124E2D29600660C93 /* TestObject.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TestObject.h; sourceTree = "<group>"; };
+		8E15F1D224E2D29600660C93 /* TestObject.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TestObject.m; sourceTree = "<group>"; };
 		8E2572BB24D062C90080F598 /* CPower.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = CPower.cpp; sourceTree = "<group>"; };
 		8E2572BC24D062C90080F598 /* CPower.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = CPower.hpp; sourceTree = "<group>"; };
 		8E2572BF24D0696F0080F598 /* Print1ToMaxOfNDigits.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Print1ToMaxOfNDigits.cpp; sourceTree = "<group>"; };
@@ -1600,6 +1603,8 @@
 				D2EB014B24DBB132009EAFD6 /* BlockStruct.c */,
 				D2F305B324DF90890020A5C2 /* NSObject+ArcDebugRetainCount.h */,
 				D2F305B424DF90890020A5C2 /* NSObject+ArcDebugRetainCount.m */,
+				8E15F1D124E2D29600660C93 /* TestObject.h */,
+				8E15F1D224E2D29600660C93 /* TestObject.m */,
 				D2EB014224DB7A5C009EAFD6 /* main.m */,
 			);
 			path = Block;
@@ -1903,6 +1908,7 @@
 				D2A32AE824E1541B00ECE821 /* OtherGrandSon+Test.m in Sources */,
 				D2A32ADF24E1538100ECE821 /* Father+Test2.m in Sources */,
 				D2EB015B24DC0593009EAFD6 /* Son+Test.m in Sources */,
+				8E15F1D324E2D29600660C93 /* TestObject.m in Sources */,
 				D2EB014C24DBB132009EAFD6 /* BlockStruct.c in Sources */,
 				D2F305B524DF90890020A5C2 /* NSObject+ArcDebugRetainCount.m in Sources */,
 				D2A32AE524E153EF00ECE821 /* OtherSon+Test.m in Sources */,

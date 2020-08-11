@@ -8,6 +8,7 @@
 
 #import <Foundation/Foundation.h>
 #import "NSObject+ArcDebugRetainCount.h"
+#import "TestObject.h"
 
 //#import "Son.h"
 //#import "Father.h"
@@ -573,6 +574,27 @@ int main(int argc, const char * argv[]) {
 //        // 栈区 block
 //        NSLog(@"❄️❄️❄️ stackBlock isa: %@", ^{ NSLog(@"❄️❄️❄️ a = %d", a); });
         
+        TestObject *object1 = [[TestObject alloc] init];
+        __block TestObject *object2 = [[TestObject alloc] init];
+
+        object1.name = @"Mike";
+        object2.name = @"Sean";
+
+        __block int vi = 1;
+
+        void (^handler)(NSString *) = ^(NSString *name) {
+            object1.name = name;
+            object2.name = name;
+            vi = 2;
+        };
+
+        handler(@"Lucy");
+
+        NSLog(object1.name);
+        NSLog(object2.name);
+
+        NSLog(@"%i", vi);
+        NSLog(@"%@", handler);
     }
     
     return 0;
