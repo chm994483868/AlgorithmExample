@@ -13,8 +13,8 @@
 
 @implementation OtherFather (Test)
 
-+ (void)load {
-    NSLog(@"💭💭💭 OtherFather (Test) --> self == %@, functionString == %s", [self class], __FUNCTION__);
-}
+//+ (void)load {
+//    NSLog(@"💭💭💭 OtherFather (Test) --> self == %@, functionString == %s", [self class], __FUNCTION__);
+//}
 
 @end

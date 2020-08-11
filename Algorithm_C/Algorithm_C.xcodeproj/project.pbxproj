@@ -211,6 +211,7 @@
 		D227132B24D16E6B009B180D /* List.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = List.hpp; sourceTree = "<group>"; };
 		D227132E24D17AD9009B180D /* SubstructureInTree.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = SubstructureInTree.cpp; sourceTree = "<group>"; };
 		D227132F24D17ADA009B180D /* SubstructureInTree.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = SubstructureInTree.hpp; sourceTree = "<group>"; };
+		D23152E924E23CCC009A5B4E /* Temp.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = Temp.md; sourceTree = "<group>"; };
 		D2330A2424AF0FD500C6480D /* Algorithm_C */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = Algorithm_C; sourceTree = BUILT_PRODUCTS_DIR; };
 		D2330A2724AF0FD500C6480D /* main.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
 		D237C63D24D24648001E0B21 /* StackWithMin.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = StackWithMin.cpp; sourceTree = "<group>"; };
@@ -1595,6 +1596,7 @@
 				8E2572DA24DC44650080F598 /* Initialize */,
 				D2EB014724DB7B3A009EAFD6 /* BlockNotes.md */,
 				D2EB014A24DBB132009EAFD6 /* BlockStruct.h */,
+				D23152E924E23CCC009A5B4E /* Temp.md */,
 				D2EB014B24DBB132009EAFD6 /* BlockStruct.c */,
 				D2F305B324DF90890020A5C2 /* NSObject+ArcDebugRetainCount.h */,
 				D2F305B424DF90890020A5C2 /* NSObject+ArcDebugRetainCount.m */,

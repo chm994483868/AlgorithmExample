@@ -10,8 +10,8 @@
 
 @implementation OtherGrandSon (Test)
 
-+ (void)load {
-    NSLog(@"💭💭💭 OtherGrandSon (Test) --> self == %@, functionString == %s", [self class], __FUNCTION__);
-}
+//+ (void)load {
+//    NSLog(@"💭💭💭 OtherGrandSon (Test) --> self == %@, functionString == %s", [self class], __FUNCTION__);
+//}
 
 @end

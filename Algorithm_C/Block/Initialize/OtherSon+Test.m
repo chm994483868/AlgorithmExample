@@ -10,8 +10,8 @@
 
 @implementation OtherSon (Test)
 
-+ (void)load {
-    NSLog(@"💭💭💭 OtherSon (Test) --> self == %@, functionString == %s", [self class], __FUNCTION__);
-}
+//+ (void)load {
+//    NSLog(@"💭💭💭 OtherSon (Test) --> self == %@, functionString == %s", [self class], __FUNCTION__);
+//}
 
 @end

@@ -159,10 +159,156 @@ warning: could not execute support code to read Objective-C class data in the pr
 load 的源码在 objc4 中分析。
 
 #  Blocks
+**block 捕获的对象类型变量，在block 结构体中有个对应的对象类型指针，一直指向该对象类型的实例。**
+**__block 结构体实例的对象类型的成员变量作为一个指针，一直指向该对象的实例。**
+
+**堆区地址小于栈区地址，基本类型存在栈区**
+
+// 这里
+
+```
+// 示例 1：
+NSObject *obj = [[NSObject alloc] init];
+__block NSObject *object = obj;
+NSLog(@"⛈⛈⛈ obj retainCount = %lu", (unsigned long)[obj arcDebugRetainCount]);
+// 打印：
+⛈⛈⛈ obj retainCount = 2 // 被 obj 和 object 持有
+
+// 示例 2:
+__block NSObject *object = [[NSObject alloc] init];
+NSLog(@"⛈⛈⛈ object retainCount = %lu", (unsigned long)[object arcDebugRetainCount]);
+// 打印：
+⛈⛈⛈ object retainCount = 1 // 只被 object 持有
+
+// 示例 3:
+__block NSObject *object = [[NSObject alloc] init];
+^{
+    NSLog(@"%@", object);
+};
+
+NSLog(@"⛈⛈⛈ object retainCount = %lu", (unsigned long)[object arcDebugRetainCount]);
+// 打印：
+⛈⛈⛈ object retainCount = 1 // 只被 object 持有，栈区的 block 持有 object 结构体 
+
+// 示例 4：对比上面不用 __block 修饰，引用为 2，一次被变量 object 持有，一次被 block 持有
+// 接下来为了区分变量在栈区还是堆区，打印它们的地址方便比较
+NSObject *object = [[NSObject alloc] init];
+NSLog(@"⛈⛈⛈ object retainCount = %lu ---%p---%p", (unsigned long)[object arcDebugRetainCount], object, &object);
+^{
+    NSLog(@"⛈⛈⛈ object retainCount = %lu ---%p---%p", (unsigned long)[object arcDebugRetainCount], object, &object);
+}();
+
+NSLog(@"⛈⛈⛈ object retainCount = %lu ---%p---%p", (unsigned long)[object arcDebugRetainCount], object, &object);
+// 打印：这里有个细节，看三次 object 打印地址是相同的，都指向原始的 NSObject 对象，这没有问题，
+// 第二行 block 内部的打印 &object 地址不同与上下两次，因为这个 object 是 block 结构体的 object 成员变量的地址
+// 上下两次还是栈中的 object 变量
+⛈⛈⛈ object retainCount = 1 ---0x102800750---0x7ffeefbff578
+⛈⛈⛈ object retainCount = 2 ---0x102800750---0x7ffeefbff560
+⛈⛈⛈ object retainCount = 2 ---0x102800750---0x7ffeefbff578
+
+// 示例 5：
+ __block NSObject *object = [[NSObject alloc] init];
+ NSLog(@"⛈⛈⛈ object retainCount = %lu ---%p---%p", (unsigned long)[object arcDebugRetainCount], object, &object);
+^{
+    NSLog(@"⛈⛈⛈ object retainCount = %lu ---%p---%p", (unsigned long)[object arcDebugRetainCount], object, &object);
+}();
+
+NSLog(@"⛈⛈⛈ object retainCount = %lu ---%p---%p", (unsigned long)[object arcDebugRetainCount], object, &object);
+
+// 打印：都是 1 ，只被 __block 变量 object 持有，在栈 Block中，自始只有强指针指向 object，就是__block生成的结构体。
+// 三次地址完全相同，这里涉及到 __block 变量对应的结构体中的 __forwarding 指针
+// 上下是：
+// &(object.__forwarding->object)
+// 中间 block 执行是：
+&(object->__forwarding->object)
+// 至此取的的 object 就是原始的 NSObject 对象
+⛈⛈⛈ object retainCount = 1 ---0x102802820---0x7ffeefbff578
+⛈⛈⛈ object retainCount = 1 ---0x102802820---0x7ffeefbff578
+⛈⛈⛈ object retainCount = 1 ---0x102802820---0x7ffeefbff578
+
+// 示例 6:
+ __block NSObject *object = [[NSObject alloc] init];
+ NSLog(@"⛈⛈⛈ object retainCount = %lu ---%p---%p", (unsigned long)[object arcDebugRetainCount], object, &object);
+void (^aBlock)() = ^{
+    NSLog(@"⛈⛈⛈ object retainCount = %lu ---%p---%p", (unsigned long)[object arcDebugRetainCount], object, &object);
+};
+aBlock();
+
+NSLog(@"⛈⛈⛈ object retainCount = %lu ---%p---%p", (unsigned long)[object arcDebugRetainCount], object, &object);
+// 打印：
+
+// 极其重要的一句: "并断开栈中的obj结构体对obj对象的指向" "并断开栈中的obj结构体对obj对象的指向" "并断开栈中的obj结构体对obj对象的指向" 
+
+可以看到，obj的内存地址一直在栈中，而执行了BlockCopy后，obj指针的地址从栈变到了堆中，而obj的引用计数一直是1。在copy操作之后，结构体obj也被复制到了堆中，并断开栈中的obj结构体对obj对象的指向。那如果这个时候取栈中的obj不就有问题了？__forwarding就派上用场了，上面编译的结果发现，结构体对象在使用obj的时候会使用obj->__forwarding->obj，如果所有__forwarding都指向自己，这一步还有什么意义？栈Block在执行copy操作后，栈obj结构体的__forwarding就会指向copy到堆中的obj结构体。此时再取值，操作的就是同一份指针了。证明如下:
+
+// 示例 7：
+__block NSObject *object = [[NSObject alloc] init];
+NSLog(@"⛈⛈⛈ object retainCount = %lu ---%p---%p", (unsigned long)[object arcDebugRetainCount], object, &object);
+
+void (^aBlock)() = ^{
+    NSLog(@"⛈⛈⛈ object retainCount = %lu ---%p---%p", (unsigned long)[object arcDebugRetainCount], object, &object);
+};
+
+aBlock();
+void (^bBlock)() = [aBlock copy];
+bBlock();
+aBlock();
+NSLog(@"⛈⛈⛈ object retainCount = %lu ---%p---%p", (unsigned long)[object arcDebugRetainCount], object, &object);
+
+// MRC 下打印：
+⛈⛈⛈ object retainCount = 1 ---0x10065bd50---0x7ffeefbff570 // 原始状态: 堆区 栈区
+⛈⛈⛈ object retainCount = 1 ---0x10065bd50---0x7ffeefbff570 // 堆区 栈区 // 这里虽然发生了赋值操作，但是并没有主动被复制到堆区
+
+⛈⛈⛈ object retainCount = 1 ---0x10065bd50---0x1010083f8 // 堆区 堆区 // 这里开始主动调用了 copy 才被复制到堆区
+⛈⛈⛈ object retainCount = 1 ---0x10065bd50---0x1010083f8 // 堆区 堆区
+⛈⛈⛈ object retainCount = 1 ---0x10065bd50---0x1010083f8 // 堆区 堆区
+
+// ARC 下打印：
+⛈⛈⛈ object retainCount = 1 ---0x1006002e0---0x7ffeefbff578  // 原始状态: // 堆区 栈区
+⛈⛈⛈ object retainCount = 1 ---0x1006002e0---0x1007396e8 // 堆区 堆区 // 这里发生了赋值操作，__block 变量被复制到堆区
+⛈⛈⛈ object retainCount = 1 ---0x1006002e0---0x1007396e8 // 堆区 堆区
+⛈⛈⛈ object retainCount = 1 ---0x1006002e0---0x1007396e8 // 堆区 堆区
+⛈⛈⛈ object retainCount = 1 ---0x1006002e0---0x1007396e8 // 堆区 堆区
+
+由上可知，在copy之前，aBlock的打印结果都是初始化生成的指针，而copy之后打印就和bBlock的打印结果相同了。总结一下就是，在栈中的obj结构体__forwarding指向的就是栈中的自己，执行copy之后，会在堆中生成一份obj结构体并断开栈中对obj的引用，此时堆中的obj结构体__forwarding就指向自己，而栈中的__forwarding就指向堆中的obj结构体。下面也会通过分析源码来具体解释。
+
+__block NSObject *object = [[NSObject alloc] init];
+NSLog(@"⛈⛈⛈ object retainCount = %lu ---%p---%p", (unsigned long)[object arcDebugRetainCount], object, &object); // 堆区 栈区
+
+void (^aBlock)() = ^{
+    NSLog(@"⛈⛈⛈ object retainCount = %lu ---%p---%p", (unsigned long)[object arcDebugRetainCount], object, &object);
+};
+
+NSObject *temp = object; // + 1
+aBlock(); // 堆区 堆区
+void (^bBlock)() = [aBlock copy];
+bBlock(); // 堆区 堆区
+aBlock(); // 堆区 堆区
+NSLog(@"⛈⛈⛈ object retainCount = %lu ---%p---%p", (unsigned long)[object arcDebugRetainCount], object, &object); // 堆区 堆区
+// 打印：
+⛈⛈⛈ object retainCount = 1 ---0x10053e1b0---0x7ffeefbff578
+⛈⛈⛈ object retainCount = 2 ---0x10053e1b0---0x10053e988
+⛈⛈⛈ object retainCount = 2 ---0x10053e1b0---0x10053e988
+⛈⛈⛈ object retainCount = 2 ---0x10053e1b0---0x10053e988
+⛈⛈⛈ object retainCount = 2 ---0x10053e1b0---0x10053e988
+```
+
 
 **堆 Block __NSMallocblock__ 内存由 ARC 控制，没有强指针指向时释放。而在 MRC 中，赋值不会执行 copy 操作，所以左侧 block 依然存在于栈中，所以在 MRC 中一般都需要执行 copy，否则很容易造成 crash.在 ARC 中，当 Block 作为属性被 strong、copy 修饰或被强指针引用或作为返回值时，都会默认执行 copy。而 MRC 中，只有被 copy 修饰时，block 才会执行 copy。所以 MRC 中 Block 都需要用 copy 修饰，而在 ARC 中用 copy 修饰只是沿用了 MRC 的习惯，此时用 copy 和 strong效果是相同的。**
 
+**Block 在捕获外部变量的操作基本一致，都是在生成结构体的时候将所有 Block 里用到的外部变量作为属性保存起来。self.block 里面调用 self 会造成循环引用，因为 Block 捕获了 self 并把 self 当做一个值保存了起来。**
+
+**Block里的a只是copy过去的a的值，在Block里改变a的值也不会影响外面，编译器避免这个错误就报错。**
+
+**同样的，捕获对象时也是对指针的copy，生成一个指针指向obj对象，所以如果在Block中直接让obj指针指向另外一个对象也会报错。这点编译器已经加了注释 // bound by copy。**
+
+**多了__main_block_copy_0和__main_block_dispose_0这两个函数，并在描述__main_block_desc_0结构体中保存了这两个函数指针。这就是上面所说的copy_dispose助手，C语言结构体中，编译器很难处理对象的初始化和销毁操作，所以使用runtime来管理相关内存。BLOCK_FIELD_IS_OBJECT是在捕获对象时添加的特别标识，此时是3，下面会细讲。**
+
+**此Block是为栈Block_NSConcreteStackBlock，不过在ARC中，因为赋值给aBlock，会执行一次copy，将其中栈中copy到堆中，所以在MRC中aBlock为_NSConcreteStackBlock，在ARC中就是_NSConcreteMallocBlock。**
+
+
 > 主要介绍 OS X Snow Leopard(10.6) 和 iOS 4 引入的 C 语言扩充功能 “Blocks” 。究竟是如何扩充 C 语言的，扩充之后又有哪些优点呢？下面通过其实现来一步一步探究。
+
 ## 什么是 Blocks 
 Blocks 是 C 语言的扩充功能。可以用一句话来表示 Blocks 的扩充功能：带有自动变量（局部变量）的匿名函数。(对于程序员而言，命名就是工作的本质。)
 ### 首先何谓匿名，下面的示例代码可完美解释

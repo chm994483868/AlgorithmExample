@@ -447,6 +447,21 @@ int main(int argc, const char * argv[]) {
 //        blk([[NSObject alloc] init]);
 //        blk([[NSObject alloc] init]);
 //        blk([[NSObject alloc] init]);
+        
+        __block NSObject *object = [[NSObject alloc] init];
+        NSLog(@"⛈⛈⛈ object retainCount = %lu ---%p---%p", (unsigned long)[object arcDebugRetainCount], object, &object); // 堆区 栈区
+        
+        void (^aBlock)() = ^{
+            NSLog(@"⛈⛈⛈ object retainCount = %lu ---%p---%p", (unsigned long)[object arcDebugRetainCount], object, &object);
+        };
+        
+        NSObject *temp = object;
+        aBlock(); // 堆区 堆区
+        void (^bBlock)() = [aBlock copy];
+        bBlock(); // 堆区 堆区
+        aBlock(); // 堆区 堆区
+        NSLog(@"⛈⛈⛈ object retainCount = %lu ---%p---%p", (unsigned long)[object arcDebugRetainCount], object, &object); // 堆区 堆区
+        
     }
     
     return 0;
