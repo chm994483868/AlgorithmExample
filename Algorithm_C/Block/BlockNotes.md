@@ -159,6 +159,56 @@ warning: could not execute support code to read Objective-C class data in the pr
 load 的源码在 objc4 中分析。
 
 #  Blocks
+```
+typedef void(^Blk_T)(void);
+void (^globalBlock0)(void) = ^{
+    NSLog(@"全局区的 block");
+};
+
+int main(int argc, const char * argv[]) {
+    @autoreleasepool {
+        
+        // 0. 在全局区定义的 NSGlobalBlock
+        NSLog(@"🎉🎉🎉 GlobalBlock0 is %@", globalBlock0);
+        
+        // 1. 不捕获外部变量时是 NSGlobalBlock。
+        //（此处即使发生赋值时 ARC 下会调用 copy，但是由于左值是 NSGlobalBlock，它调用 copy 函数时依然返回它自己）
+        void (^globalBlock1)(void) = ^{ };
+        NSLog(@"🎉🎉🎉 GlobalBlock1 is %@", globalBlock1);
+        
+        static int b = 10;
+        // 2. 仅捕获外部静态局部变量的是 NSGlobalBlock
+        //（此处即使发生赋值时 ARC 下会调用 copy，但是由于左值是 NSGlobalBlock，它调用 copy 函数时依然返回它自己）
+        void (^globalBlock2)(void) = ^{
+            b = 20;
+        };
+        NSLog(@"🎉🎉🎉 GlobalBlock2 is %@", globalBlock2);
+
+        int a = 0;
+        // 3. 仅捕获外部局部变量是的 NSStackBlock
+        NSLog(@"🎉🎉🎉 StackBlock is %@", ^{ NSLog(@"%d", a); });
+
+        // 4. ARC 下 NSStackBlock 赋值给 __strong 变量时发生 copy，创建一个 NSMallocBlock 赋给右值
+        // MRC 下编译器不会自动发生 copy，赋值以后右值同样也是 NSStackBlock，如果想实现和 ARC 同样效果需要手动调用 copy
+        void (^mallocBlock)(void) = ^{
+            NSLog(@"%d", a);
+        };
+        NSLog(@"🎉🎉🎉 MallocBlock is %@", mallocBlock);
+        
+        // 5. ARC 或 MRC 下赋值给 __weak/__unsafe_unretained 变量均不发生 copy，
+        // 手动调用 copy 是可转为 NSMallocBlock
+        // __unsafe_unretained / __weak
+        __unsafe_unretained Blk_T mallocBlock2;
+        mallocBlock2 = ^{
+            NSLog(@"%d", a);
+        };
+        // mallocBlock2 是：NSStackBlock，其实应该和上面的 StackBlock 写在一起
+        NSLog(@"🎉🎉🎉 MallocBlock2 is %@", mallocBlock2);
+        
+    }
+    return 0;
+}
+```
 
 **小测试**
 + A:
@@ -205,6 +255,7 @@ void exampleB_addBlockToArray(NSMutableArray *array) {
 void exampleB() {
     NSMutableArray *array = [NSMutableArray array];
     exampleB_addBlockToArray(array);
+    
     NSLog(@"🔔🔔🔔 %@", [array objectAtIndex:0]);
     
     void(^block)() = [array objectAtIndex:0];
@@ -236,9 +287,11 @@ void exampleC() {
     NSLog(@"🔔🔔🔔 %@", block);
     block();
 }
+
 // ARC: 🔔🔔🔔 <__NSGlobalBlock__: 0x100002068>
         🔔🔔🔔 <__NSGlobalBlock__: 0x100002068>
         🔔🔔🔔 C
+        
 // MRC: 🔔🔔🔔 <__NSGlobalBlock__: 0x100001078>
         🔔🔔🔔 <__NSGlobalBlock__: 0x100001078>
         🔔🔔🔔 C
@@ -276,9 +329,10 @@ eBlock exampleE_getBlock() {
 }
 
 void exampleE() {
-    NSLog(@"🔔🔔🔔 %@", exampleE_getBlock());
+    NSLog(@"one 🔔🔔🔔 %@", exampleE_getBlock());
+    
     eBlock block = exampleE_getBlock();
-    NSLog(@"🔔🔔🔔 %@", block);
+    NSLog(@"two 🔔🔔🔔 %@", block);
     block();
 }
 // MRC 下即使是栈区 Block 也正常执行了，且两次调用函数返回的是一样的地址
@@ -2771,5 +2825,5 @@ Block_copy 函数就是之前出现过的 _Block_copy 函数，即 OC  运行时
 
 由于 ARC 有效时和无效时 __block 说明符的用途有很大区别，因此编写源代码时，必须知道源代码是在 ARC 有效情况下编译还是无效情况下编译。
 
-# Block 部分 完结撒花 🎉🎉🎉
+# Block 部分 完结撒花 🎉🎉🎉 感谢陪伴 🎉🎉🎉
 

@@ -63,17 +63,70 @@
 #include "DigitsInSequence.hpp"
 #include "TranslateNumbersToStrings.hpp"
 #include "MaxValueOfGifts.hpp"
+using namespace std;
+
+//// 定义类型别名
+//#define DSting std::string // 不建议使用
+//typedef std::string TString; // 使用 typedef 的方式
+//using UString = std::string; // 使用 using typeName_Self = stdTypeName;
+//// 定义函数指针
+//typedef void (*tFunc)(string);
+//using uFunc = void (*)(string);
+//
+//void tempFunc(string parm) {
+//    std::cout << "🎉🎉" << parm << std::endl;
+//}
+
+class Base {
+public:
+    Base(){}
+    ~Base(){};
+    void func1() {
+        std::cout << "1⃣️ func1 被调用" << std::endl;
+    }
+    
+    void func2() {
+        std::cout << "2⃣️ func2 被调用" << std::endl;
+    }
+};
+
+class Sub: private Base {
+public:
+    using Base::func1;
+    
+    void func2Invoke() {
+        // Base 的 func2 函数只能在 Sub 定义内部使用，
+        // 外界只能通过 Sub 的 func2Invoke 来间接调用 func2 函数
+        this->func2();
+    }
+};
 
 int main(int argc, const char * argv[]) {
     // insert code here...
     std::cout << "《Sword of offer》Review starting 🎉🎉🎉 \n";
+    
+    Sub sub;
+    sub.func1();
+    sub.func2Invoke();
+    // sub.func2(); // 报错：'func2' is a private member of 'Base'
+    
+//    DSting ds("define string");
+//    TString ts("typedef string");
+//    UString us("using string");
+//
+//    tFunc funcPtr = tempFunc;
+//    (*funcPtr)(ts);
+//
+//    uFunc funcPtr2 = tempFunc;
+//    (*funcPtr2)(us);
+//    (*funcPtr2)(ds);
     
     // 1. 冒泡排序
 //    BubbleSort::Test();
     // 2. 插入排序
 //    InsertSort::Test();
     // 3. 希尔排序
-    ShellSort::Test();
+//    ShellSort::Test();
     // 4. 选择排序
 //    SelectSort::Test();
     // 5. 快速排序

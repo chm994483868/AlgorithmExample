@@ -135,10 +135,14 @@ void exampleC() {
 
 typedef void(^dBlock)();
 dBlock exampleD_getBlock() {
-    char d = 'D';
-    return [^{
-        printf("🔔🔔🔔 %c\n", d);
-    } copy];
+//    char d = 'D';
+//    return [^{
+//        printf("🔔🔔🔔 %c\n", d);
+//    } copy];
+    
+    return ^{
+        printf("🔔🔔🔔 %c\n", 111);
+    };
 }
 
 void exampleD() {
@@ -149,17 +153,19 @@ void exampleD() {
 typedef void(^eBlock)();
 eBlock exampleE_getBlock() {
     char e = 'E';
+    
     void(^block)() = ^{
         printf("🔔🔔🔔 %c\n", e);
     };
+    
     NSLog(@"🔔🔔🔔 %@", block);
     return block;
 }
 
 void exampleE() {
-    NSLog(@"🔔🔔🔔 %@", exampleE_getBlock());
+    NSLog(@"one 🔔🔔🔔 %@", exampleE_getBlock());
     eBlock block = exampleE_getBlock();
-    NSLog(@"🔔🔔🔔 %@", block);
+    NSLog(@"two 🔔🔔🔔 %@", block);
     block();
 }
 
@@ -172,7 +178,7 @@ int main(int argc, const char * argv[]) {
 //        exampleB();
 //        exampleC();
 //        exampleD();
-//        exampleE();
+        exampleE();
         
 //        int temp = myFuncTEST(^int(int temp) {
 //            return temp * 2;
@@ -574,27 +580,29 @@ int main(int argc, const char * argv[]) {
 //        // 栈区 block
 //        NSLog(@"❄️❄️❄️ stackBlock isa: %@", ^{ NSLog(@"❄️❄️❄️ a = %d", a); });
         
-        TestObject *object1 = [[TestObject alloc] init];
-        __block TestObject *object2 = [[TestObject alloc] init];
-
-        object1.name = @"Mike";
-        object2.name = @"Sean";
-
-        __block int vi = 1;
-
-        void (^handler)(NSString *) = ^(NSString *name) {
-            object1.name = name;
-            object2.name = name;
-            vi = 2;
-        };
-
-        handler(@"Lucy");
-
-        NSLog(object1.name);
-        NSLog(object2.name);
-
-        NSLog(@"%i", vi);
-        NSLog(@"%@", handler);
+//        TestObject *object1 = [[TestObject alloc] init];
+//        __block TestObject *object2 = [[TestObject alloc] init];
+//
+//        object1.name = @"Mike";
+//        object2.name = @"Sean";
+//
+//        __block int vi = 1;
+//
+//        void (^handler)(NSString *) = ^(NSString *name) {
+//            object1.name = name;
+//            object2.name = name;
+//            vi = 2;
+//        };
+//
+//        handler(@"Lucy");
+//
+//        NSLog(object1.name);
+//        NSLog(object2.name);
+//
+//        NSLog(@"%i", vi);
+//        NSLog(@"%@", handler);
+        
+        
     }
     
     return 0;
