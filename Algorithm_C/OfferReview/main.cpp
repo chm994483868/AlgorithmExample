@@ -101,6 +101,21 @@ public:
     }
 };
 
+template <typename N>
+class TLClass {
+public:
+    TLClass(N parm): mV(parm) {}
+    ~TLClass(){}
+    
+    void func() {
+        std::cout << "🎉🎉🎉 " << mV << std::endl;
+    }
+private:
+    N mV;
+};
+
+using UTLCass = TLClass<int>;
+
 int main(int argc, const char * argv[]) {
     // insert code here...
     std::cout << "《Sword of offer》Review starting 🎉🎉🎉 \n";
@@ -109,6 +124,9 @@ int main(int argc, const char * argv[]) {
     sub.func1();
     sub.func2Invoke();
     // sub.func2(); // 报错：'func2' is a private member of 'Base'
+    
+    UTLCass cls(20);
+    cls.func();
     
 //    DSting ds("define string");
 //    TString ts("typedef string");
