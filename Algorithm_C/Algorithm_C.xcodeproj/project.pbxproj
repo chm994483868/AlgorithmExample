@@ -7,7 +7,6 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		8E15F1D324E2D29600660C93 /* TestObject.m in Sources */ = {isa = PBXBuildFile; fileRef = 8E15F1D224E2D29600660C93 /* TestObject.m */; };
 		8E2572BD24D062C90080F598 /* CPower.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8E2572BB24D062C90080F598 /* CPower.cpp */; };
 		8E2572C124D0696F0080F598 /* Print1ToMaxOfNDigits.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8E2572BF24D0696F0080F598 /* Print1ToMaxOfNDigits.cpp */; };
 		8E2572C524D1B3AE0080F598 /* MirrorOfBinaryTree.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8E2572C324D1B3AE0080F598 /* MirrorOfBinaryTree.cpp */; };
@@ -91,7 +90,6 @@
 		D2EB013624D97392009EAFD6 /* HeapSort.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2EB013524D97392009EAFD6 /* HeapSort.swift */; };
 		D2EB013B24DA2DC8009EAFD6 /* TwoSum.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D2EB013924DA2DC8009EAFD6 /* TwoSum.cpp */; };
 		D2EB014324DB7A5C009EAFD6 /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = D2EB014224DB7A5C009EAFD6 /* main.m */; };
-		D2EB014C24DBB132009EAFD6 /* BlockStruct.c in Sources */ = {isa = PBXBuildFile; fileRef = D2EB014B24DBB132009EAFD6 /* BlockStruct.c */; };
 		D2EB014F24DC0002009EAFD6 /* Father.m in Sources */ = {isa = PBXBuildFile; fileRef = D2EB014E24DC0002009EAFD6 /* Father.m */; };
 		D2EB015524DC00CE009EAFD6 /* Son.m in Sources */ = {isa = PBXBuildFile; fileRef = D2EB015424DC00CE009EAFD6 /* Son.m */; };
 		D2EB015824DC04F0009EAFD6 /* Father+Test.m in Sources */ = {isa = PBXBuildFile; fileRef = D2EB015724DC04F0009EAFD6 /* Father+Test.m */; };
@@ -140,8 +138,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		8E15F1D124E2D29600660C93 /* TestObject.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TestObject.h; sourceTree = "<group>"; };
-		8E15F1D224E2D29600660C93 /* TestObject.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TestObject.m; sourceTree = "<group>"; };
+		8E15F1D424E423FE00660C93 /* iOS消息转发机制.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS消息转发机制.md"; sourceTree = "<group>"; };
 		8E2572BB24D062C90080F598 /* CPower.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = CPower.cpp; sourceTree = "<group>"; };
 		8E2572BC24D062C90080F598 /* CPower.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = CPower.hpp; sourceTree = "<group>"; };
 		8E2572BF24D0696F0080F598 /* Print1ToMaxOfNDigits.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Print1ToMaxOfNDigits.cpp; sourceTree = "<group>"; };
@@ -276,9 +273,8 @@
 		D2A32AE424E153EF00ECE821 /* OtherSon+Test.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = "OtherSon+Test.m"; sourceTree = "<group>"; };
 		D2A32AE624E1541B00ECE821 /* OtherGrandSon+Test.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "OtherGrandSon+Test.h"; sourceTree = "<group>"; };
 		D2A32AE724E1541B00ECE821 /* OtherGrandSon+Test.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = "OtherGrandSon+Test.m"; sourceTree = "<group>"; };
-		D2E526C624E39F3100ACD06F /* 截屏2020-08-12上午11.48.10.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "截屏2020-08-12上午11.48.10.png"; sourceTree = "<group>"; };
-		D2E526C724E3CEA600ACD06F /* using.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = using.md; sourceTree = "<group>"; };
-		D2E526C824E3CECA00ACD06F /* memmove.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = memmove.md; sourceTree = "<group>"; };
+		D2E526C724E3CEA600ACD06F /* using关键字使用.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "using关键字使用.md"; sourceTree = "<group>"; };
+		D2E526C824E3CECA00ACD06F /* memmove函数使用.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "memmove函数使用.md"; sourceTree = "<group>"; };
 		D2E526CA24E3E5E300ACD06F /* LP64等数据模型以及内存对齐.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "LP64等数据模型以及内存对齐.md"; sourceTree = "<group>"; };
 		D2EB00FD24D912C6009EAFD6 /* Algorithm_Swift */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = Algorithm_Swift; sourceTree = BUILT_PRODUCTS_DIR; };
 		D2EB00FF24D912C6009EAFD6 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
@@ -308,8 +304,6 @@
 		D2EB014024DB7A5C009EAFD6 /* Block */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = Block; sourceTree = BUILT_PRODUCTS_DIR; };
 		D2EB014224DB7A5C009EAFD6 /* main.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = main.m; sourceTree = "<group>"; };
 		D2EB014724DB7B3A009EAFD6 /* BlockNotes.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = BlockNotes.md; sourceTree = "<group>"; };
-		D2EB014A24DBB132009EAFD6 /* BlockStruct.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = BlockStruct.h; sourceTree = "<group>"; };
-		D2EB014B24DBB132009EAFD6 /* BlockStruct.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = BlockStruct.c; sourceTree = "<group>"; };
 		D2EB014D24DC0002009EAFD6 /* Father.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Father.h; sourceTree = "<group>"; };
 		D2EB014E24DC0002009EAFD6 /* Father.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = Father.m; sourceTree = "<group>"; };
 		D2EB015324DC00CE009EAFD6 /* Son.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Son.h; sourceTree = "<group>"; };
@@ -457,7 +451,7 @@
 			path = 39_MoreThanHalfNumber;
 			sourceTree = "<group>";
 		};
-		8E2572DA24DC44650080F598 /* Initialize */ = {
+		8E2572DA24DC44650080F598 /* Initialize_load */ = {
 			isa = PBXGroup;
 			children = (
 				D2EB014D24DC0002009EAFD6 /* Father.h */,
@@ -487,7 +481,7 @@
 				D2A32AD124E1477300ECE821 /* GrandSon+Test.h */,
 				D2A32AD224E1477300ECE821 /* GrandSon+Test.m */,
 			);
-			path = Initialize;
+			path = Initialize_load;
 			sourceTree = "<group>";
 		};
 		8E3ECB7324C28B2C004D4F4E /* MirrorOfBinaryTree */ = {
@@ -1429,10 +1423,10 @@
 			children = (
 				D23152E924E23CCC009A5B4E /* Temp.md */,
 				D2EB014724DB7B3A009EAFD6 /* BlockNotes.md */,
-				D2E526C824E3CECA00ACD06F /* memmove.md */,
-				D2E526C724E3CEA600ACD06F /* using.md */,
-				D2E526C624E39F3100ACD06F /* 截屏2020-08-12上午11.48.10.png */,
+				D2E526C824E3CECA00ACD06F /* memmove函数使用.md */,
+				D2E526C724E3CEA600ACD06F /* using关键字使用.md */,
 				D2E526CA24E3E5E300ACD06F /* LP64等数据模型以及内存对齐.md */,
+				8E15F1D424E423FE00660C93 /* iOS消息转发机制.md */,
 			);
 			path = md;
 			sourceTree = "<group>";
@@ -1614,13 +1608,9 @@
 			isa = PBXGroup;
 			children = (
 				D2E526C924E3CEEC00ACD06F /* md */,
-				8E2572DA24DC44650080F598 /* Initialize */,
-				D2EB014A24DBB132009EAFD6 /* BlockStruct.h */,
-				D2EB014B24DBB132009EAFD6 /* BlockStruct.c */,
+				8E2572DA24DC44650080F598 /* Initialize_load */,
 				D2F305B324DF90890020A5C2 /* NSObject+ArcDebugRetainCount.h */,
 				D2F305B424DF90890020A5C2 /* NSObject+ArcDebugRetainCount.m */,
-				8E15F1D124E2D29600660C93 /* TestObject.h */,
-				8E15F1D224E2D29600660C93 /* TestObject.m */,
 				D2EB014224DB7A5C009EAFD6 /* main.m */,
 			);
 			path = Block;
@@ -1924,8 +1914,6 @@
 				D2A32AE824E1541B00ECE821 /* OtherGrandSon+Test.m in Sources */,
 				D2A32ADF24E1538100ECE821 /* Father+Test2.m in Sources */,
 				D2EB015B24DC0593009EAFD6 /* Son+Test.m in Sources */,
-				8E15F1D324E2D29600660C93 /* TestObject.m in Sources */,
-				D2EB014C24DBB132009EAFD6 /* BlockStruct.c in Sources */,
 				D2F305B524DF90890020A5C2 /* NSObject+ArcDebugRetainCount.m in Sources */,
 				D2A32AE524E153EF00ECE821 /* OtherSon+Test.m in Sources */,
 				D2EB014324DB7A5C009EAFD6 /* main.m in Sources */,
