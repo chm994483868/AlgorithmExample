@@ -120,13 +120,13 @@ int main(int argc, const char * argv[]) {
     // insert code here...
     std::cout << "《Sword of offer》Review starting 🎉🎉🎉 \n";
     
-    Sub sub;
-    sub.func1();
-    sub.func2Invoke();
-    // sub.func2(); // 报错：'func2' is a private member of 'Base'
-    
-    UTLCass cls(20);
-    cls.func();
+//    Sub sub;
+//    sub.func1();
+//    sub.func2Invoke();
+//    // sub.func2(); // 报错：'func2' is a private member of 'Base'
+//
+//    UTLCass cls(20);
+//    cls.func();
     
 //    DSting ds("define string");
 //    TString ts("typedef string");
@@ -138,6 +138,15 @@ int main(int argc, const char * argv[]) {
 //    uFunc funcPtr2 = tempFunc;
 //    (*funcPtr2)(us);
 //    (*funcPtr2)(ds);
+    
+    char s[] = "Golden Global view";
+    char m[19];
+    printf("🎉🎉🎉 前：%s\n", s);
+    memmove(m, s, strlen(s) + 1);
+    printf("🎉🎉🎉 m：%s\n", m);
+    memmove(s, s + 7, strlen(s) + 1 - 7);
+    
+    printf("🎉🎉🎉 后：%s\n", s);
     
     // 1. 冒泡排序
 //    BubbleSort::Test();

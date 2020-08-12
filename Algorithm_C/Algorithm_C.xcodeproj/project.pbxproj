@@ -277,6 +277,8 @@
 		D2A32AE624E1541B00ECE821 /* OtherGrandSon+Test.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "OtherGrandSon+Test.h"; sourceTree = "<group>"; };
 		D2A32AE724E1541B00ECE821 /* OtherGrandSon+Test.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = "OtherGrandSon+Test.m"; sourceTree = "<group>"; };
 		D2E526C624E39F3100ACD06F /* 截屏2020-08-12上午11.48.10.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "截屏2020-08-12上午11.48.10.png"; sourceTree = "<group>"; };
+		D2E526C724E3CEA600ACD06F /* using.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = using.md; sourceTree = "<group>"; };
+		D2E526C824E3CECA00ACD06F /* memmove.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = memmove.md; sourceTree = "<group>"; };
 		D2EB00FD24D912C6009EAFD6 /* Algorithm_Swift */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = Algorithm_Swift; sourceTree = BUILT_PRODUCTS_DIR; };
 		D2EB00FF24D912C6009EAFD6 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
 		D2EB010824D9136D009EAFD6 /* BubbleSort.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BubbleSort.swift; sourceTree = "<group>"; };
@@ -1421,6 +1423,18 @@
 			path = StringPermutation;
 			sourceTree = "<group>";
 		};
+		D2E526C924E3CEEC00ACD06F /* md */ = {
+			isa = PBXGroup;
+			children = (
+				D23152E924E23CCC009A5B4E /* Temp.md */,
+				D2EB014724DB7B3A009EAFD6 /* BlockNotes.md */,
+				D2E526C824E3CECA00ACD06F /* memmove.md */,
+				D2E526C724E3CEA600ACD06F /* using.md */,
+				D2E526C624E39F3100ACD06F /* 截屏2020-08-12上午11.48.10.png */,
+			);
+			path = md;
+			sourceTree = "<group>";
+		};
 		D2EB00FE24D912C6009EAFD6 /* Algorithm_Swift */ = {
 			isa = PBXGroup;
 			children = (
@@ -1597,11 +1611,9 @@
 		D2EB014124DB7A5C009EAFD6 /* Block */ = {
 			isa = PBXGroup;
 			children = (
+				D2E526C924E3CEEC00ACD06F /* md */,
 				8E2572DA24DC44650080F598 /* Initialize */,
-				D2EB014724DB7B3A009EAFD6 /* BlockNotes.md */,
 				D2EB014A24DBB132009EAFD6 /* BlockStruct.h */,
-				D23152E924E23CCC009A5B4E /* Temp.md */,
-				D2E526C624E39F3100ACD06F /* 截屏2020-08-12上午11.48.10.png */,
 				D2EB014B24DBB132009EAFD6 /* BlockStruct.c */,
 				D2F305B324DF90890020A5C2 /* NSObject+ArcDebugRetainCount.h */,
 				D2F305B424DF90890020A5C2 /* NSObject+ArcDebugRetainCount.m */,
