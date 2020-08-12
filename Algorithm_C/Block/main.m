@@ -178,7 +178,7 @@ int main(int argc, const char * argv[]) {
 //        exampleB();
 //        exampleC();
 //        exampleD();
-        exampleE();
+//        exampleE();
         
 //        int temp = myFuncTEST(^int(int temp) {
 //            return temp * 2;
@@ -602,7 +602,17 @@ int main(int argc, const char * argv[]) {
 //        NSLog(@"%i", vi);
 //        NSLog(@"%@", handler);
         
+        NSNumber *number1 = @1;
+        NSNumber *number2 = @2;
+        NSNumber *number3 = @3;
+        NSNumber *numberFFFF = @(0xFFFF);
+        NSNumber *numberObject = @(0xEFFFFFFFFFFFFFFF);
         
+        NSLog(@"number1 pointer is %p", number1);
+        NSLog(@"number2 pointer is %p", number2);
+        NSLog(@"number3 pointer is %p", number3);
+        NSLog(@"numFFFF pointer is %p", numberFFFF);
+        NSLog(@"numffff pointer is %p", numberObject);
     }
     
     return 0;
