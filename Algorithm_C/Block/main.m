@@ -95,7 +95,9 @@ int main(int argc, const char * argv[]) {
     @autoreleasepool {
         // insert code here...
         NSLog(@"🎉🎉🎉 Hello, World!");
-        // 
+        //
+        
+        NSLog(@"🌸🌸🌸 NSString \t %s", @encode(NSString));
     
     }
     return 0;
