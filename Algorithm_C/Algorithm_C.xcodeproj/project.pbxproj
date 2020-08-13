@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		8E15F1D824E5768C00660C93 /* HHStaff.m in Sources */ = {isa = PBXBuildFile; fileRef = 8E15F1D724E5768C00660C93 /* HHStaff.m */; };
+		8E15F1DB24E5774B00660C93 /* HHManager.m in Sources */ = {isa = PBXBuildFile; fileRef = 8E15F1DA24E5774B00660C93 /* HHManager.m */; };
 		8E2572BD24D062C90080F598 /* CPower.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8E2572BB24D062C90080F598 /* CPower.cpp */; };
 		8E2572C124D0696F0080F598 /* Print1ToMaxOfNDigits.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8E2572BF24D0696F0080F598 /* Print1ToMaxOfNDigits.cpp */; };
 		8E2572C524D1B3AE0080F598 /* MirrorOfBinaryTree.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8E2572C324D1B3AE0080F598 /* MirrorOfBinaryTree.cpp */; };
@@ -139,6 +141,10 @@
 
 /* Begin PBXFileReference section */
 		8E15F1D424E423FE00660C93 /* iOS消息转发机制.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS消息转发机制.md"; sourceTree = "<group>"; };
+		8E15F1D624E5768C00660C93 /* HHStaff.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = HHStaff.h; sourceTree = "<group>"; };
+		8E15F1D724E5768C00660C93 /* HHStaff.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = HHStaff.m; sourceTree = "<group>"; };
+		8E15F1D924E5774B00660C93 /* HHManager.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = HHManager.h; sourceTree = "<group>"; };
+		8E15F1DA24E5774B00660C93 /* HHManager.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = HHManager.m; sourceTree = "<group>"; };
 		8E2572BB24D062C90080F598 /* CPower.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = CPower.cpp; sourceTree = "<group>"; };
 		8E2572BC24D062C90080F598 /* CPower.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = CPower.hpp; sourceTree = "<group>"; };
 		8E2572BF24D0696F0080F598 /* Print1ToMaxOfNDigits.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Print1ToMaxOfNDigits.cpp; sourceTree = "<group>"; };
@@ -1616,6 +1622,10 @@
 				D2F305B324DF90890020A5C2 /* NSObject+ArcDebugRetainCount.h */,
 				D2F305B424DF90890020A5C2 /* NSObject+ArcDebugRetainCount.m */,
 				D2EB014224DB7A5C009EAFD6 /* main.m */,
+				8E15F1D624E5768C00660C93 /* HHStaff.h */,
+				8E15F1D724E5768C00660C93 /* HHStaff.m */,
+				8E15F1D924E5774B00660C93 /* HHManager.h */,
+				8E15F1DA24E5774B00660C93 /* HHManager.m */,
 			);
 			path = Block;
 			sourceTree = "<group>";
@@ -1909,11 +1919,13 @@
 				D2EB015824DC04F0009EAFD6 /* Father+Test.m in Sources */,
 				D2A32AE224E153CF00ECE821 /* OtherFather+Test.m in Sources */,
 				D2A32AD624E14D5500ECE821 /* OtherFather.m in Sources */,
+				8E15F1DB24E5774B00660C93 /* HHManager.m in Sources */,
 				D2EB014F24DC0002009EAFD6 /* Father.m in Sources */,
 				D2A32AD924E14D9200ECE821 /* OtherSon.m in Sources */,
 				D2EB015524DC00CE009EAFD6 /* Son.m in Sources */,
 				D2A32ADC24E14DC700ECE821 /* OtherGrandSon.m in Sources */,
 				D2FF2CD224DC1B200029E56E /* GrandSon.m in Sources */,
+				8E15F1D824E5768C00660C93 /* HHStaff.m in Sources */,
 				D2A32AD324E1477300ECE821 /* GrandSon+Test.m in Sources */,
 				D2A32AE824E1541B00ECE821 /* OtherGrandSon+Test.m in Sources */,
 				D2A32ADF24E1538100ECE821 /* Father+Test2.m in Sources */,
