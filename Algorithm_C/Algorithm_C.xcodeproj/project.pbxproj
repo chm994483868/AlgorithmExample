@@ -276,6 +276,8 @@
 		D2E526C724E3CEA600ACD06F /* using关键字使用.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "using关键字使用.md"; sourceTree = "<group>"; };
 		D2E526C824E3CECA00ACD06F /* memmove函数使用.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "memmove函数使用.md"; sourceTree = "<group>"; };
 		D2E526CA24E3E5E300ACD06F /* LP64等数据模型以及内存对齐.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "LP64等数据模型以及内存对齐.md"; sourceTree = "<group>"; };
+		D2E526D124E4B2E200ACD06F /* 深入理解Objective-C中的Class.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "深入理解Objective-C中的Class.md"; sourceTree = "<group>"; };
+		D2E526D824E4DAFD00ACD06F /* Objective-C类型编码.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "Objective-C类型编码.md"; sourceTree = "<group>"; };
 		D2EB00FD24D912C6009EAFD6 /* Algorithm_Swift */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = Algorithm_Swift; sourceTree = BUILT_PRODUCTS_DIR; };
 		D2EB00FF24D912C6009EAFD6 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
 		D2EB010824D9136D009EAFD6 /* BubbleSort.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BubbleSort.swift; sourceTree = "<group>"; };
@@ -1427,6 +1429,8 @@
 				D2E526C724E3CEA600ACD06F /* using关键字使用.md */,
 				D2E526CA24E3E5E300ACD06F /* LP64等数据模型以及内存对齐.md */,
 				8E15F1D424E423FE00660C93 /* iOS消息转发机制.md */,
+				D2E526D124E4B2E200ACD06F /* 深入理解Objective-C中的Class.md */,
+				D2E526D824E4DAFD00ACD06F /* Objective-C类型编码.md */,
 			);
 			path = md;
 			sourceTree = "<group>";

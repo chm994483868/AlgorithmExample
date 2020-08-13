@@ -1,19 +1,37 @@
-# iOS消息转发机制
-当 OC 对象接收到**无法解读的消息**后，就会启动 “消息转发” 机制。
-我们可以经由此过程告诉对象应该如何处理未知消息。消息转发过程大致可以分 3 个阶段：
-1. 动态方法解析。
-2. 查找备援接收者。
-3. 完整的消息转发。
+# iOS Runtime 消息转发机制原理和实际用途
+当 OC 对象接收到**无法解读的消息**后，就会启动 “消息转发” 机制。如果转发机制无法响应的话就会抛出 crash，控制类会有类似如下打印:
+```
+unrecognized selector sent to instance 0x100502750
+*** Terminating app due to uncaught exception 'NSInvalidArgumentException', reason: '-[TestMessage noImplementationMethod]: unrecognized selector sent to instance 0x100502750'
+```
+这个错误可能是任何一个 iOS 开发者一眼就能看出问题所在: **调用的方法没有被实现**。
+什么情况下最容易遇到？
++ 一般是在对子类和父类之间做类型转换后，忽略了原始对象类型中并没有实现对应的方法。
++ 使用 `performSelector` 系列函数来执行函数调用（此时编译器会警告，`Undeclared selector 'testFunction'`），执行时函数没有实现且转发失败的话会抛 crash。
++ 还有一种情况可能是我们一时马虎在 .h 中定义了函数，但是在 .m 中忘记实现了。😂
 
 ```
+TestMessage *test = [[TestMessage alloc] init];
+[test performSelector:@selector(testFunction)];
+[test noImplementationMethod];
+
+```
+
+***假装这里有一张消息转发过程的结构图***
+
+我们可以经由此过程告诉对象应该如何处理未知消息。
+消息转发机制共分为 3 个步骤：
+1. Method resolution 方法解析处理阶段。
+2. Fast forwarding 快速转发阶段（如果可以的话返回一个备用响应对象）。
+3. Normal forwarding 常规转发阶段（完整的消息转发）。
+
+```
+
 resolveInstanceMethod:
 resolveClassMethod:
-
 forwardingTargetForSelector:
-
 forwardInvocation:
 methodSignatureForSelector:
-
 doesNotRecognizeSelector:
 ```
 `id returnValue = [someObject methodName:parameter];` **someObject** 为 "接收者"(receiver), **methodName** 为 "选择子"(selector)，选择子和参数和称为 **"消息"(message)**。
@@ -54,5 +72,9 @@ forwardInvocation 方法可以实现的很简单：只需要改变调用目标�
 当然，还有一种比较有用的实现方法：先以某种方式改变消息，比如追加参数、替换选择子等。
 实现 forwardInvocation 方法时，如果发现某调用操作不应该本类操作，则需要调用 super 的同名方法，直至 NSObject。如果最后调用了 NSObject 类的方法，那么该方法还会继续调用 `doesNotRecognizeSelector`  从而抛出 crash。
 
+**第三步还需要手动将响应方法切换给备用响应对象。**
+
+
 **参考链接:**
 [Objective-C 的消息转发机制](https://www.jianshu.com/p/03f4a95e43d8)
+[iOS Runtime 消息转发机制原理和实际用途](https://www.jianshu.com/p/fdd8f5225f0c)

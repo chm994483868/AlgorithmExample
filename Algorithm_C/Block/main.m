@@ -13,83 +13,6 @@
 //#import "Father.h"
 //#import "GrandSon.h"
 
-//typedef void(^Blk_T)(int);
-//
-//// block 定义(匿名)
-//int i = 10;
-//Blk_T a = ^void (int event) {
-//    printf("buttonID: %d event = %d\n", i, event);
-//};
-//// 函数定义
-//void Func(int event) {
-//    printf("buttonID: %d event = %d\n", i, event);
-//};
-//void (*funcPtr)(int) = &Func;
-
-// Block 结构体命名测试
-//int test() {
-//    @autoreleasepool {
-//        void (^block1)(void) = ^{
-//            printf("测试 Block1 结构体名字\n");
-//        };
-//
-//        block1();
-//
-//        void (^block2)(void) = ^{
-//            printf("测试 Block2 结构体名字\n");
-//        };
-//
-//        block2();
-//    }
-//
-//    return 0;
-//}
-
-//int global_val = 1;
-//static int static_global_val = 2;
-//
-//typedef void(^BLK)(void);
-//BLK blk;
-
-//void (^blk)(void) = ^{ printf("全局区的 _NSConcreteGlobalBlock Block！global_val = %d static_global_val = %d \n", global_val, static_global_val); };
-
-//typedef void(^BLK)(void);
-
-//typedef int(^BLK)(int);
-//typedef int(^BLK2)(int);
-//
-//BLK myFuncTEST(BLK2 block) {
-//    BLK temp = ^(int count){ return block(10) * count; };
-//    return temp;
-//
-////    return ^(int count){ return rate * count; };
-////    return block();
-//}
-
-//typedef int (^blk_t)(int);
-//blk_t func(int rate) {
-//    return ^(int count) {
-//        return rate * count;
-//    };
-//}
-
-//typedef void(^blk_t)(id);
-
-//blk_t blk = ^(id obj){
-////    [array addObject:obj];
-//
-//    NSLog(@"⛈⛈⛈ array count = %@", obj);
-//};
-
-//int global_val = 1;
-//static int static_global_val = 2;
-
-// blk_t blk;
-
-// void (^blk)(void) = ^{ printf("全局区的 _NSConcreteGlobalBlock Block！\n"); };
-
-//NSLog(@"🔔🔔🔔 %@", ^{ printf("%c\n", a);});
-
 void exampleA() {
     // ARC 和 MRC 下均为栈区 Block
 //    char a = 'A';
@@ -172,9 +95,8 @@ int main(int argc, const char * argv[]) {
     @autoreleasepool {
         // insert code here...
         NSLog(@"🎉🎉🎉 Hello, World!");
+        // 
     
-        
     }
-    
     return 0;
 }
