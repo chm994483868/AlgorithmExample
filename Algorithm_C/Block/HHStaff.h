@@ -11,11 +11,15 @@
 NS_ASSUME_NONNULL_BEGIN
 
 @interface HHStaff : NSObject {
-    NSString *name;
+    // Class isa; 补0 偏0 长8 //在 继承的 NSObject 中还有一个 Class isa; 成员变量
+    int _age; // 补0 偏8 长12
+    int _height; // 补0 偏12 长16
+    NSString *_name; // 补0 偏16 长24
 }
 
-- (void)doInstanceStaffWork; // 对象方法
-+ (void)doClassStaffWork; // 类方法
+//
+//- (void)doInstanceStaffWork; // 对象方法
+//+ (void)doClassStaffWork; // 类方法
 
 @end
 

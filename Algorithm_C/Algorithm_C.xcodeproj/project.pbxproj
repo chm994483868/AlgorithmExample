@@ -184,6 +184,10 @@
 		D2090C1C24D01FCC00FA4F51 /* RobotMove.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = RobotMove.hpp; sourceTree = "<group>"; };
 		D2090C1F24D0293B00FA4F51 /* NumberOf1InBinary.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = NumberOf1InBinary.cpp; sourceTree = "<group>"; };
 		D2090C2024D0293B00FA4F51 /* NumberOf1InBinary.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = NumberOf1InBinary.hpp; sourceTree = "<group>"; };
+		D20B34FF24E6791600092DE5 /* iOS底层class_getInstanceSize和malloc_size.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS底层class_getInstanceSize和malloc_size.md"; sourceTree = "<group>"; };
+		D21333F124E63A9D00A6175C /* 深入理解Objective-C中的isa.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "深入理解Objective-C中的isa.md"; sourceTree = "<group>"; };
+		D21333F224E63B6C00A6175C /* 深入理解Objective-C中的alloc和init.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "深入理解Objective-C中的alloc和init.md"; sourceTree = "<group>"; };
+		D21333F324E6610E00A6175C /* 内存对齐原则.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "内存对齐原则.md"; sourceTree = "<group>"; };
 		D21B43A124CE83160078EEF9 /* FindDuplication.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = FindDuplication.cpp; sourceTree = "<group>"; };
 		D21B43A224CE83160078EEF9 /* FindDuplication.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = FindDuplication.hpp; sourceTree = "<group>"; };
 		D21B43A524CEA24B0078EEF9 /* FindDuplicationNoEdit.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = FindDuplicationNoEdit.cpp; sourceTree = "<group>"; };
@@ -281,7 +285,7 @@
 		D2A32AE724E1541B00ECE821 /* OtherGrandSon+Test.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = "OtherGrandSon+Test.m"; sourceTree = "<group>"; };
 		D2E526C724E3CEA600ACD06F /* using关键字使用.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "using关键字使用.md"; sourceTree = "<group>"; };
 		D2E526C824E3CECA00ACD06F /* memmove函数使用.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "memmove函数使用.md"; sourceTree = "<group>"; };
-		D2E526CA24E3E5E300ACD06F /* LP64等数据模型以及内存对齐.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "LP64等数据模型以及内存对齐.md"; sourceTree = "<group>"; };
+		D2E526CA24E3E5E300ACD06F /* LP64等数据模型.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "LP64等数据模型.md"; sourceTree = "<group>"; };
 		D2E526D124E4B2E200ACD06F /* 深入理解Objective-C中的Class.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "深入理解Objective-C中的Class.md"; sourceTree = "<group>"; };
 		D2E526D824E4DAFD00ACD06F /* Objective-C类型编码.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "Objective-C类型编码.md"; sourceTree = "<group>"; };
 		D2EB00FD24D912C6009EAFD6 /* Algorithm_Swift */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = Algorithm_Swift; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -1433,10 +1437,14 @@
 				D2EB014724DB7B3A009EAFD6 /* BlockNotes.md */,
 				D2E526C824E3CECA00ACD06F /* memmove函数使用.md */,
 				D2E526C724E3CEA600ACD06F /* using关键字使用.md */,
-				D2E526CA24E3E5E300ACD06F /* LP64等数据模型以及内存对齐.md */,
+				D2E526CA24E3E5E300ACD06F /* LP64等数据模型.md */,
 				8E15F1D424E423FE00660C93 /* iOS消息转发机制.md */,
 				D2E526D124E4B2E200ACD06F /* 深入理解Objective-C中的Class.md */,
+				D21333F124E63A9D00A6175C /* 深入理解Objective-C中的isa.md */,
+				D21333F224E63B6C00A6175C /* 深入理解Objective-C中的alloc和init.md */,
 				D2E526D824E4DAFD00ACD06F /* Objective-C类型编码.md */,
+				D21333F324E6610E00A6175C /* 内存对齐原则.md */,
+				D20B34FF24E6791600092DE5 /* iOS底层class_getInstanceSize和malloc_size.md */,
 			);
 			path = md;
 			sourceTree = "<group>";

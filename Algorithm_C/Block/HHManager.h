@@ -10,12 +10,13 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
-@interface HHManager : HHStaff {
-    NSInteger officeNum;
-}
-
-- (void)doInstanceManagerWork;
-+ (void)doClassManagerWork;
+@interface HHManager : HHStaff
+//{
+//    NSInteger officeNum;
+//}
+//
+//- (void)doInstanceManagerWork;
+//+ (void)doClassManagerWork;
 
 @end
 

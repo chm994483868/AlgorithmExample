@@ -211,9 +211,170 @@ objc_getClass(const char * _Nonnull name)
 由打印结果可知：实例对象可以有多个，类对象和元类对象各自只有一个。
 
 ### isa 和 superclass
-通过上一小节
+通过上一小节，我们知道类里边的信息并不是存在一个地方，而是分开存放在实例对象、类对象和元类对象里面。这些对象依靠 isa 和 superclass 指针连系起来。
+#### isa
+`isa` 用来连系一个类的实例对象、类对象和元类对象。
+目前可以看到的是:
+|-| isa 类型|
+|---|---|
+| 实例对象 | Class |
+| 类对象 | isa_t（union）|
+| 元类对象 | isa_t（union）|
+#### superclass
+superclass 是用来在继承体系中搜寻父类的。（只有类对象和元类对象有 superclas(struct objc_class *) ）。
++ 对于类对象：子类（HHManager）的类对象的 superclass 指向父类（HHStaff）的类对象，父类的类对象的 superclass 指向它的父类的类对象。
++ 对于元类对象：子类（HHManager）的元类对象的 superclass 指向父类（HHStaff）的元类对象，父类的元类对象的 superclass 指向它的父类的元类对象。
 
+**假装这里有一张继承关系和 isa 、superclass 指向的经典图**
 
+```
+int main(int argc, const char * argv[]) {
+    @autoreleasepool {
+        // insert code here...
+        // 创建 HHManager 实例对象
+        HHManager *mgr = [[HHManager alloc] init];
+        NSLog(@"🕐🕐🕐 %@", mgr);
+        NSLog(@"🕐🕐🕐 %p", &mgr);
+        [mgr doInstanceStaffWork];
+    }
+    
+    return 0;
+}
+// 打印：
+🕐🕐🕐 <HHManager: 0x1028050a0> // 实例对象位于堆区
+🕐🕐🕐 0x7ffeefbff5c0 // 对象指针，可以看出指针是位于栈区的
+📢📢📢 -[HHStaff doInstanceStaffWork] self = <HHManager: 0x1028050a0> // 父类函数执行，这里的 self 入参是 HHManager 实例对象
+```
+对象方法存放在类对象里面，所以首先根据 mgr 的 isa 指针找到它的类对象，然后在类对象的方法列表里边查找这个方法，发现找不到，接着根据类对象的 superclass 指针找到父类的类对象，然后在父类的类对象里边查找该方法，如果还找不到就根据父类的 superclass 指针沿着继承体系继续向上找，直到根类，如果还是找不到就会执行消息转发的流程。
+如果是类方法则通过类对象的 isa 指针找到元类对象，然后就依照类似查找对象方法的方式查找类方法，只不过这次是在元类对象的继承体系里边查找。
+上边的逻辑省略了一个非常重要的缓存问题，即在每一级查找时，都会先去查找缓存，然后才去查找方法列表。找到之后，也会在缓存里边存一份（即使是在父类的类对象或元类对象里边找到的，也要始终缓存在当前类对象或元类对象里），以便提高查找效率。
+
+#### 验证特例:
+Root class(meta) 根元类的 superclass 指向根类，根类的 superclass 指向 nil，根元类的 isa 指向自己。
+```
+// 1. 这里用 HHStaff 类以调用类方法的方式执行
+// 最终执行了基类的类对象里边存储的对象方法。
+[HHStaff doInstanceWork];
+// 2. 这里用 HHStaff 实例对象以调用实例方法的方式执行
+HHStaff *staff = [[HHStaff alloc] init];
+[staff doInstanceWork];
+
+// 打印：
+📢📢📢 -[NSObject(Extern) doInstanceWork] self = HHStaff
+📢📢📢 -[NSObject(Extern) doInstanceWork] self = <HHStaff: 0x100501960>
+```
+```
+OBJC_EXPORT id _Nullable
+objc_msgSend(id _Nullable self, SEL _Nonnull op, ...)
+    OBJC_AVAILABLE(10.0, 2.0, 9.0, 1.0, 2.0);
+```
+`[HHStaff doInstanceWork]` 最终执行了基类的类对象里边存储的对象方法，可以这么来理解，OC 的方法调用经编译后都会被转成这样的函数调用:
+`objc_msgSend(object, @select(methodName))`, 这里并没有指明是`类方法`还是`对象方法`，也就是不关心是对象方法还是类方法，如果 object 是实例对象，就会去类对象里查找方法，如果 object 是类对象，就会去元类对象里边查找。这里的 C 函数执行只关心 object 类型。
+
+如果在 NSObject 的 Extern 里面实现，如下的函数：
+```
+- (void)doInstanceWork;
++ (void)doInstanceWork;
+```
+那么 `[HHStaff doInstanceWork]` 在根元类的方法列表里面就找到了对应的函数实现了。
+
+当只有 `- (void)doInstanceWork;` 时，函数开始执行时，从 HHStaff 的元类的方法列表开始查找，一直沿着 superclass 继承体系向上查找，直到找到 NSObject 类对象，因为当前继承体系下根元类的 superclass 指向 NSObject 类对象。
+
+这里还有个知识点，我们在写 OC 函数时是严格区分实例函数和类函数的，编译以后，其实这里 类对象的方法列表中存放的实例函数和元类方法列表中存放的类函数都是完全一样的。
+**我们完全可以把它们当作 C 函数来看待，即使是在继承体系中查找函数时，我们潜意识里面也应该这样认定。**
+
+## Class 的结构
+类中的方法、属性、协议等重要信息都存放在 `类对象` 和 `元类对象` 里面，且这两者的结构相同，都是 Class 类型的，而 Class 的结构体实际是 `struct objc_class`，此节我们的目的就是要弄清楚 `struct objc_class` 的结构。
+
+在 `Project Headers => objc-runtime-new.h`  (P1244) 中可看到 `struct objc_class` 的定义，这个结构体定义超级长，差不多有 400 多行：
+```
+struct objc_class : objc_object {
+// Class ISA; // 可增加一个 isa_t isa; 继承自 objc_object
+Class superclass; 
+cache_t cache; // 1. 方法缓存  // formerly cache pointer and vtable
+class_data_bits_t bits;    // class_rw_t * plus custom rr/alloc flags
+
+class_rw_t *data() const { // 2. 超级重要的的 class_rw_t
+    return bits.data();
+}
+
+// 忽略下面的函数🥺...
+
+}
+```
+看到 objc_class 继承自 objc_object:
+在 `Project Headers => objc-private.h` (P82) 中看到 `struct objc_object` 的定义，由于函数较多这里先看的它成员变量定义:
+```
+struct objc_object {
+private:
+    isa_t isa; // 3. ias 私有成员变量
+
+public:
+
+    // ISA() assumes this is NOT a tagged pointer object
+    Class ISA(); // 不是一个 tagged pointer 对象
+
+    // rawISA() assumes this is NOT a tagged pointer object or a non pointer ISA
+    Class rawISA(); // 返回的可能是一个 tagged pointer 对象
+
+    // getIsa() allows this to be a tagged pointer object
+    Class getIsa(); // 返回的是一个 tagged pointer 对象
+    
+    // 忽略下面的函数🥺...
+    
+}
+```
+
+`struct objc_class` 方法定义中涉及这几个重要的宏，来标识不同情况下该函数是否存在：
+
+**FAST_HAS_DEFAULT_RR**
+```
+// class or superclass has default retain/release/autorelease/retainCount/
+//   _tryRetain/_isDeallocating/retainWeakReference/allowsWeakReference
+#define FAST_HAS_DEFAULT_RR     (1UL<<2)
+```
+**FAST_CACHE_HAS_DEFAULT_AWZ**
+```
+// AWZ 是 allocWithZone 的缩写
+// class or superclass has default alloc/allocWithZone: implementation
+// Note this is is stored in the metaclass.
+#define FAST_CACHE_HAS_DEFAULT_AWZ    (1<<14)
+```
+**FAST_CACHE_HAS_DEFAULT_CORE**
+```
+// class or superclass has default new/self/class/respondsToSelector/isKindOfClass
+#define FAST_CACHE_HAS_DEFAULT_CORE   (1<<15)
+```
+**FAST_CACHE_HAS_CXX_CTOR**
+**FAST_CACHE_HAS_CXX_DTOR**
+// 是否有 C++ 的构造和析构函数
+```
+// class or superclass has .cxx_construct/.cxx_destruct implementation
+//   FAST_CACHE_HAS_CXX_DTOR is chosen to alias with isa_t::has_cxx_dtor
+#define FAST_CACHE_HAS_CXX_CTOR       (1<<1)
+#define FAST_CACHE_HAS_CXX_DTOR       (1<<2)
+```
+**FAST_CACHE_REQUIRES_RAW_ISA**
+```
+// class's instances requires raw isa
+#define FAST_CACHE_REQUIRES_RAW_ISA   (1<<13)
+```
+**RW_FORBIDS_ASSOCIATED_OBJECTS**
+// 不允许类实例关联对象
+```
+// class does not allow associated objects on its instances
+#define RW_FORBIDS_ASSOCIATED_OBJECTS       (1<<20)
+```
+**RW_INITIALIZING**
+```
+// class is initializing
+#define RW_INITIALIZING       (1<<28)
+```
+
+等等...
+
+### struct objc_class 中的 cache_t cache;
+位于 `Project Headers => objc-runtime-new.h` (P267)
 
 
 **参考链接:**

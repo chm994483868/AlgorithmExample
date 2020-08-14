@@ -7,30 +7,21 @@
 //
 
 #import <Foundation/Foundation.h>
-#import "HHManager.h"
 #import <objc/runtime.h>
+#import <malloc/malloc.h>
+
+#include <stddef.h>
+
+#import "HHStaff.h"
 
 int main(int argc, const char * argv[]) {
     @autoreleasepool {
         // insert code here...
-        // NSLog(@"🎉🎉🎉 Hello, World!");
-        
-        HHStaff *staffA = [[HHStaff alloc] init];
-        HHStaff *staffB = [[HHStaff alloc] init];
-        
-        NSLog(@"♻️♻️♻️ 实例对象: %p - %p", staffA, staffB);
-        
-        Class staffClassA = [staffA class];
-        Class staffClassB = objc_getClass(object_getClassName(staffB));
-        Class staffClassB2 = object_getClass(staffB);
-        Class staffClassC = [HHStaff class];
-        
-        NSLog(@"♻️♻️♻️ 类  对象: %p - %p - %p - %p", staffClassA, staffClassB, staffClassB2, staffClassC);
-        
-        Class staffMetaClassA = object_getClass(staffClassA);
-        Class staffMetaClassB = object_getClass(staffClassB);
-        
-        NSLog(@"♻️♻️♻️ 元类对象: %p - %p", staffMetaClassA, staffMetaClassB);
+        HHStaff *staff = [[HHStaff alloc] init];
+//        NSObject *staff = [[NSObject alloc] init];
+        NSLog(@"🧚‍♂️🧚‍♂️🧚‍♂️ class_getInstanceSize => %zd", class_getInstanceSize([staff class]));
+        NSLog(@"🧚‍♂️🧚‍♂️🧚‍♂️ malloc_size => %zd", malloc_size(CFBridgingRetain(staff)));
+        NSLog(@"🧚‍♂️🧚‍♂️🧚‍♂️ sizeof => %zd", sizeof(staff));
     }
     
     return 0;

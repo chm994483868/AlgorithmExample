@@ -10,12 +10,12 @@
 
 @implementation HHManager
 
-- (void)doInstanceManagerWork {
-    NSLog(@"✳️✳️✳️ %s", __FUNCTION__);
-}
-
-+ (void)doClassManagerWork {
-    NSLog(@"✳️✳️✳️ %s", __FUNCTION__);
-}
+//- (void)doInstanceManagerWork {
+//    NSLog(@"✳️✳️✳️ %s", __FUNCTION__);
+//}
+//
+//+ (void)doClassManagerWork {
+//    NSLog(@"✳️✳️✳️ %s", __FUNCTION__);
+//}
 
 @end
