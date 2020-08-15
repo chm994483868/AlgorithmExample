@@ -1,6 +1,6 @@
 #  iOS底层class_getInstanceSize和malloc_size
 示例代码：
-```
+```Objective-C
 #import <Foundation/Foundation.h>
 #import <objc/runtime.h> // class_getInstanceSize 在这里定义
 #import <malloc/malloc.h> // malloc_size 在这里定义

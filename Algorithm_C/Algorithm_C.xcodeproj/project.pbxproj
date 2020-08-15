@@ -185,6 +185,8 @@
 		D2090C1F24D0293B00FA4F51 /* NumberOf1InBinary.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = NumberOf1InBinary.cpp; sourceTree = "<group>"; };
 		D2090C2024D0293B00FA4F51 /* NumberOf1InBinary.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = NumberOf1InBinary.hpp; sourceTree = "<group>"; };
 		D20B34FF24E6791600092DE5 /* iOS底层class_getInstanceSize和malloc_size.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS底层class_getInstanceSize和malloc_size.md"; sourceTree = "<group>"; };
+		D20B350024E79A0A00092DE5 /* iOS底层isa指向探究.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS底层isa指向探究.md"; sourceTree = "<group>"; };
+		D20B350224E7EFAE00092DE5 /* iOS底层-isa结构(isa_t).md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS底层-isa结构(isa_t).md"; sourceTree = "<group>"; };
 		D21333F124E63A9D00A6175C /* 深入理解Objective-C中的isa.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "深入理解Objective-C中的isa.md"; sourceTree = "<group>"; };
 		D21333F224E63B6C00A6175C /* 深入理解Objective-C中的alloc和init.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "深入理解Objective-C中的alloc和init.md"; sourceTree = "<group>"; };
 		D21333F324E6610E00A6175C /* 内存对齐原则.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "内存对齐原则.md"; sourceTree = "<group>"; };
@@ -1445,6 +1447,8 @@
 				D2E526D824E4DAFD00ACD06F /* Objective-C类型编码.md */,
 				D21333F324E6610E00A6175C /* 内存对齐原则.md */,
 				D20B34FF24E6791600092DE5 /* iOS底层class_getInstanceSize和malloc_size.md */,
+				D20B350024E79A0A00092DE5 /* iOS底层isa指向探究.md */,
+				D20B350224E7EFAE00092DE5 /* iOS底层-isa结构(isa_t).md */,
 			);
 			path = md;
 			sourceTree = "<group>";

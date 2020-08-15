@@ -154,7 +154,14 @@ warning: could not execute support code to read Objective-C class data in the pr
 💭💭💭 Father (Test2) --> self == Son, functionString == +[Father(Test2) load]
 💭💭💭 Son --> self == Son, functionString == +[Son load]
 
-上面这个顺序是能猜到了，这个涉及到同一个类的多个分类中添加了同样的方法，此时如果去执行，后编译的分类的方法会添加到方法列表的前面。让后方法执行时去方法列表里面找执行，当找到第一个后编译的方法后就直接返回执行了。
+// 示例 7: 在 son 的 load 中调用 [super load].
+💭💭💭 Father --> self == Father, functionString == +[Father load]
+💭💭💭 Father (Test2) --> self == Son, functionString == +[Father(Test2) load]
+💭💭💭 Son --> self == Son, functionString == +[Son load]
+💭💭💭 Father (Test) --> self == Father, functionString == +[Father(Test) load]
+💭💭💭 Father (Test2) --> self == Father, functionString == +[Father(Test2) load]
+
+上面这个顺序是能猜到了，这个涉及到同一个类的多个分类中添加了同样的方法，此时如果去执行，后编译的分类的方法会添加到方法列表的前面。然后方法执行时去方法列表里面找执行，当找到第一个后编译的方法后就直接返回执行了。
 
 load 的源码在 objc4 中分析。
 
