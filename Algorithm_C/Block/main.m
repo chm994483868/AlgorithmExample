@@ -73,6 +73,12 @@ int main(int argc, const char * argv[]) {
 //        NSLog(@"👗👗👗四 父类 - %p %@", class1, class1);
 //        class1 = [class1 superclass];
 //        NSLog(@"👗👗👗五 父类 - %p %@", class1, class1);
+        
+//        Class cls = NSClassFromString(@"HHStaff");
+//        NSLog(@"👗👗👗 %p %@ %p", cls, cls, &cls);
+        
+//        👗👗👗 0x100002838 HHStaff 0x7ffeefbff528
+        
     }
     
     return 0;

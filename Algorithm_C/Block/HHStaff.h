@@ -11,6 +11,12 @@
 NS_ASSUME_NONNULL_BEGIN
 
 @interface HHStaff : NSObject
+{
+    NSString *_hhName;
+}
+
+@property (nonatomic, copy) NSString *_hhNick;
+
 //{
 //    // Class isa; 补0 偏0 长8 //在 继承的 NSObject 中还有一个 Class isa; 成员变量
 //    int _age; // 补0 偏8 长12
