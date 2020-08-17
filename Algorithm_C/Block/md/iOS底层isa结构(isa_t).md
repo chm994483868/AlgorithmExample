@@ -208,7 +208,7 @@ union isa_t {
 
 [ISA_MAGIC_VALUE](图片地址...)
 
-bits 是 64 字节，struct 是位域:
+bits 是 64 位（8 个字节），struct 是位域:
 + nonpointer
 `nonpointer : 1;` (在 bits 的 64 位中，第 0 位用于 `nonpointer` 信息存储 )
 表示是否对 isa 指针开启指针优化；0 代表纯 isa 指针，1 代表不止是类对象指针，还包含了类信息、对象的引用计数等；
