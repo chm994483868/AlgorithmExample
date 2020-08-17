@@ -8,11 +8,11 @@ cache_t  是用来缓存 class 调用过的实例方法。但是其本身的工�
 > 方法缓存原理：
 > 1. 缓存第一个实例方法的时候，初始化一个 mask 容量为 3 的表，往里面存方法信息并记录缓存数量为 1.
 > 2. 当有方法需要缓存的时候，如果需要缓存的方法数量 （当前缓存数量 + 1）<= 当前容量 + 1 的 3/4, 直接缓存并记录缓存数量 + 1
-> 3. 当有方法需要缓存的时候，如果需要缓存的方法数量（当前缓存数量 + 1）> 当前容量的 3/4, 按照之前的容量 x ( (x + 1) * 2 - 1) 重新分配存储容量，并清除之前缓存的方法信息，然后再存储，并记录缓存数量为 1.（扩容以后并不会把以前的数据复制到新内存中，而是直接舍弃）
+> 3. 当有方法需要缓存的时候，如果需要缓存的方法数量（当前缓存数量 + 1）> 当前容量的 3/4, 按照之前的容量 x ( (x + 1) 2 - 1) 重新分配存储容量，并清除之前缓存的方法信息，然后再存储，并记录缓存数量为 1.（扩容以后并不会把以前的数据复制到新内存中，而是直接舍弃）
 
 > mask 的机制
 > 1.  初始化为 4 - 1
-> 2. 当需要存储数量 > 当前容量 + 1 的 3/4，重新分配容量 （（当前容量 + 1））* 2 - 1
+> 2. 当需要存储数量 > 当前容量 + 1 的 3/4，重新分配容量 （（当前容量 + 1））2 - 1
 
 **看 cache_t 源码结构之前延展学习 C++ 原子操作 std::atomic<T> :**
 ## std::atomic<T>
@@ -149,7 +149,7 @@ public:
 #endif
 
     static size_t bytesForCapacity(uint32_t cap);
-    static struct bucket_t * endMarker(struct bucket_t *b, uint32_t cap);
+    static struct bucket_t endMarker(struct bucket_t *b, uint32_t cap);
 
     void reallocate(mask_t oldCapacity, mask_t newCapacity, bool freeOld);
     void insert(Class cls, SEL sel, IMP imp, id receiver);
@@ -161,7 +161,7 @@ public:
 struct bucket_t {
 private:
     // IMP-first is better for arm64e ptrauth and no worse for arm64.
-    // SEL-first is better for armv7* and i386 and x86_64.
+    // SEL-first is better for armv7and i386 and x86_64.
 #if __arm64__
     explicit_atomic<uintptr_t> _imp; // 获取方法实现
     explicit_atomic<SEL> _sel; // 以方法名为 key，选择子
@@ -327,11 +327,172 @@ _occupied = 3 // 已占用是 3
 
 | 调用过实例方法数量 |0|1|2|3|4|5|6|7|8|
 |---|---|---|---|---|---|---|---|---|---|
-|_mask|3|3|7|---|---|---|---|---|---|
-|_occupied|2|3|1|---|---|---|---|---|---|
+|_mask|3|3|7|7|7|7|7|7|15|
+|_occupied|2|3|1|2|3|4|5|6|1|
+
+### 从源码看缓存机制
+从哪里入手呢？先看 mask 是怎么来的
+在 cache_t  中有一个 mask() 的方法，那就找这个方法
+```
+typedef uint32_t mask_t; // mask_t 是无符号 32 位 int，占 4 个字节
+
+// memory_order::memory_order_relaxed
+// Relaxed ordering: 在单个线程内，所有原子操作是顺序进行的。按照什么顺序？基本上就是代码顺序（sequenced-before）。这就是唯一的限制了！两个来自不同线程的原子操作是什么顺序？两个字：任意。
+
+mask_t cache_t::mask() 
+{
+    return _mask.load(memory_order::memory_order_relaxed);
+}
+
+```
+```
+// objc-cache.mm 文件开头注释
+ Method cache locking (GrP 2001-1-14)
+
+For speed, objc_msgSend does not acquire any locks when it reads method caches.
+为了提高速度，objc_msgSend在读取方法缓存时不获取任何锁。
+
+Instead, all cache changes are performed so that any objc_msgSend running concurrently with the cache mutator will not crash or hang or get an incorrect result from the cache.
+相反，将执行所有高速缓存更改，以便与高速缓存更改器同时运行的任何objc_msgSend都不会崩溃或挂起，或从高速缓存中获取错误的结果。
+
+When cache memory becomes unused (e.g. the old cache after cache expansion), it is not immediately freed, because a concurrent objc_msgSend could still be using it.
+当缓存内存未使用时（例如，缓存扩展后的旧缓存），它不会立即被释放，因为并发objc_msgSend可能仍在使用它。
+
+Instead, the memory is disconnected from the data structures and placed on a garbage list.
+而是将内存与数据结构断开连接，并将其放置在垃圾清单上。
+
+The memory is now only accessible to instances of objc_msgSend that were running when the memory was disconnected; any further calls to objc_msgSend will not see the garbage memory because the other data structures don't point to it anymore.
+现在，只有断开内存时正在运行的objc_msgSend实例才能访问该内存；进一步调用objc_msgSend将看不到垃圾内存，因为其他数据结构不再指向该内存。
+
+The collecting_in_critical function checks the PC of all threads and returns FALSE when all threads are found to be outside objc_msgSend.
+collect_in_critical 函数检查 PC 的所有线程，并在发现所有线程不在objc_msgSend之外时返回FALSE。
+
+This means any call to objc_msgSend that could have had access to the garbage has finished or moved past the cache lookup stage, so it is safe to free the memory.
+这意味着对objc_msgSend的所有本可以访问垃圾的调用都已完成或移到了高速缓存查找阶段，因此可以安全地释放内存。
+
+All functions that modify cache data or structures must acquire the cacheUpdateLock to prevent interference from concurrent modifications.
+所有修改缓存数据或结构的函数都必须获取 cacheUpdateLock，以防止并发修改造成干扰。
+
+The function that frees cache garbage must acquire the cacheUpdateLock and use collecting_in_critical() to flush out cache readers.
+释放缓存垃圾的函数必须获取 cacheUpdateLock 并使用 collection_in_critical（）刷新缓存读取器。
+
+The cacheUpdateLock is also used to protect the custom allocator used for large method cache blocks.
+cacheUpdateLock还用于保护用于大型方法缓存块的自定义分配器。
+
+Cache readers (PC-checked by collecting_in_critical())
+objc_msgSend*
+cache_getImp
+
+Cache writers (hold cacheUpdateLock while reading or writing; not PC-checked)
+cache_fill         (acquires lock)
+cache_expand       (only called from cache_fill) 
+cache_create       (only called from cache_expand)
+bcopy               (only called from instrumented cache_expand)
+flush_caches        (acquires lock)
+cache_flush        (only called from cache_fill and flush_caches)
+cache_collect_free (only called from cache_expand and cache_flush)
+
+UNPROTECTED cache readers (NOT thread-safe; used for debug info only)
+cache_print
+
+_class_printMethodCaches
+_class_printDuplicateCacheEntries
+_class_printMethodCacheStatistics
+
+```
+入口，`cache_fill`:
+```
+void cache_fill(Class cls, SEL sel, IMP imp, id receiver)
+{
+    runtimeLock.assertLocked();
+
+#if !DEBUG_TASK_THREADS
+    // Never cache before +initialize is done
+    if (cls->isInitialized()) {
+        cache_t *cache = getCache(cls);
+// #if CONFIG_USE_CACHE_LOCK
+//        mutex_locker_t lock(cacheUpdateLock);
+// #endif
+        cache->insert(cls, sel, imp, receiver);
+    }
+// #else
+//    _collecting_in_critical();
+// #endif
+}
+
+cache_t *getCache(Class cls) 
+{
+    ASSERT(cls);
+    return &cls->cache;
+}
+
+// 步骤 1 插入缓存信息
+
+ALWAYS_INLINE
+void cache_t::insert(Class cls, SEL sel, IMP imp, id receiver) // 插入缓存
+{
+#if CONFIG_USE_CACHE_LOCK
+    cacheUpdateLock.assertLocked();
+#else
+    runtimeLock.assertLocked();
+#endif
+
+    ASSERT(sel != 0 && cls->isInitialized());
+
+    // Use the cache as-is if it is less than 3/4 full
+    // 如果缓存未满 3/4，则按原样使用它 （按照第一次缓存来走流程）
+    // occupied() = 0 newOccupied = 1
+    mask_t newOccupied = occupied() + 1;
+    
+    unsigned oldCapacity = capacity(), capacity = oldCapacity;
+    
+    if (slowpath(isConstantEmptyCache())) { // 如果缓存是空的，这里很可能为 假，然后用的 slowpath
+        // Cache is read-only. Replace it. // 因为缓存是只读，直接替换
+        if (!capacity) capacity = INIT_CACHE_SIZE;
+        reallocate(oldCapacity, capacity, /* freeOld */false);
+    }
+    else if (fastpath(newOccupied + CACHE_END_MARKER <= capacity / 4 * 3)) {
+        // Cache is less than 3/4 full. Use it as-is.
+    }
+    else {
+        capacity = capacity ? capacity * 2 : INIT_CACHE_SIZE;
+        if (capacity > MAX_CACHE_SIZE) {
+            capacity = MAX_CACHE_SIZE;
+        }
+        reallocate(oldCapacity, capacity, true);
+    }
+
+    bucket_t *b = buckets();
+    mask_t m = capacity - 1;
+    mask_t begin = cache_hash(sel, m);
+    mask_t i = begin;
+
+    // Scan for the first unused slot and insert there.
+    // There is guaranteed to be an empty slot because the
+    // minimum size is 4 and we resized at 3/4 full.
+    do {
+        if (fastpath(b[i].sel() == 0)) {
+            incrementOccupied();
+            b[i].set<Atomic, Encoded>(sel, imp, cls);
+            return;
+        }
+        if (b[i].sel() == sel) {
+            // The entry was added to the cache by some other thread
+            // before we grabbed the cacheUpdateLock.
+            return;
+        }
+    } while (fastpath((i = cache_next(i, m)) != begin));
+
+    cache_t::bad_cache(receiver, (SEL)sel, cls);
+}
+
+
+```
+
 
 **参考链接:🔗**
 [C++11 并发指南六( <atomic> 类型详解二 std::atomic )](https://www.cnblogs.com/haippy/p/3301408.html)
+[如何理解 C++11 的六种 memory order？](https://www.zhihu.com/question/24301047)
 
 
 
