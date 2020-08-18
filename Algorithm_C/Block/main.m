@@ -7,12 +7,54 @@
 //
 
 #import <Foundation/Foundation.h>
-#import <objc/runtime.h>
-#import <malloc/malloc.h>
+//#import <objc/runtime.h>
+//#import <malloc/malloc.h>
 
-#include <stddef.h>
+//#include <stddef.h>
 
-#import "HHStaff.h"
+//#import "HHStaff.h"
+
+///// Defines a property attribute
+//typedef struct {
+//    const char * _Nonnull name;           /**< The name of the attribute */
+//    const char * _Nonnull value;          /**< The value of the attribute (usually empty) */
+//} objc_property_attribute_t;
+
+//// 添加一个 nonatomic、copy 修饰符的 NSString
+//void hh_class_addProperty(Class targetClass, const char* propertyName) {
+//    objc_property_attribute_t type = {"T", [[NSString stringWithFormat:@"@\"%@\"", NSStringFromClass([NSString class])] UTF8String]};
+//    objc_property_attribute_t ownership0 = {"C", ""}; // C = copy
+//    objc_property_attribute_t ownership = {"N", ""}; // N = nonatomic
+//    objc_property_attribute_t backingivar = {"V", [NSString stringWithFormat:@"_%@", [NSString stringWithCString:propertyName encoding:NSUTF8StringEncoding]].UTF8String};
+//    objc_property_attribute_t attrs[] = {type, ownership0, ownership, backingivar};
+//
+//    class_addProperty(targetClass, propertyName, attrs, 4); // 4: attrs 元素的个数
+//}
+//
+//// 打印属性
+//void hh_printerProperty(Class targetClass) {
+//    unsigned int outCount, i;
+//    objc_property_t *properties = class_copyPropertyList(targetClass, &outCount);
+//    for (i = 0; i < outCount; ++i) {
+//        objc_property_t property = properties[i];
+//        fprintf(stdout, "%s %s\n", property_getName(property), property_getAttributes(property));
+//    }
+//}
+//
+//// 打印成员变量
+//void hh_printerIvar(Class targetClass) {
+//    unsigned int count = 0;
+//    Ivar *ivars = class_copyIvarList(targetClass, &count);
+//    for (unsigned int i = 0; i < count; ++i) {
+//        Ivar const ivar = ivars[i];
+//        const char *cName = ivar_getName(ivar);
+//        NSString *ivarName = [NSString stringWithUTF8String:cName];
+//        NSLog(@"ivarName: %@", ivarName);
+//    }
+//
+//    free(ivars);
+//    printf("ivar count = %u\n", count);
+//}
 
 int main(int argc, const char * argv[]) {
     @autoreleasepool {

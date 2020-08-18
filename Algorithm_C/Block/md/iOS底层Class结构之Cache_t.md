@@ -327,12 +327,22 @@ _occupied = 3 // 已占用是 3
 
 | 调用过实例方法数量 |0|1|2|3|4|5|6|7|8|
 |---|---|---|---|---|---|---|---|---|---|
+|_capacity|4|4|8|8|8|8|8|8|16|
 |_mask|3|3|7|7|7|7|7|7|15|
 |_occupied|2|3|1|2|3|4|5|6|1|
 
 ### 从源码看缓存机制
 从哪里入手呢？先看 mask 是怎么来的
 在 cache_t  中有一个 mask() 的方法，那就找这个方法
+
+**第一个重点: 分配时容量和实际可用的容量**
+**首先要记得 mask 始终是 capacity - 1，capacity 代表的是给 bucket_t * 分配的容量，比如起始分配的是 4，但是 mask 等于 capacity - 1,mask 是 3，occupied 代表当前缓存占用量即当前缓存了几个函数，那它就是几。**
+
+**第二个重点: 扩容机制**
+1. 缓存第一个方法时，初始化 capacity 为 4， mask 为 3，往里面存方法信息并把 occupied 置为 1.
+2. 第一次之外的缓存方法时，首先判断 occupied + 1 <= capcity / 4 * 3，则不需要扩容，直接能进行缓存，并把 occupied 加 1。
+3. 另外的情况就需要扩容了，新 capacity 等于 旧 capactiy * 2，然后 mask 依然置为 新 capacity - 1，新方法存入，且occupied 置为 1。 
+
 ```
 typedef uint32_t mask_t; // mask_t 是无符号 32 位 int，占 4 个字节
 
@@ -408,6 +418,7 @@ void cache_fill(Class cls, SEL sel, IMP imp, id receiver)
 
 #if !DEBUG_TASK_THREADS
     // Never cache before +initialize is done
+    // 在完成初始化之前不要进行缓存
     if (cls->isInitialized()) {
         cache_t *cache = getCache(cls);
 // #if CONFIG_USE_CACHE_LOCK
@@ -420,6 +431,7 @@ void cache_fill(Class cls, SEL sel, IMP imp, id receiver)
 // #endif
 }
 
+// 取得类的缓存 struct cache_t *
 cache_t *getCache(Class cls) 
 {
     ASSERT(cls);
@@ -427,38 +439,45 @@ cache_t *getCache(Class cls)
 }
 
 // 步骤 1 插入缓存信息
-
 ALWAYS_INLINE
 void cache_t::insert(Class cls, SEL sel, IMP imp, id receiver) // 插入缓存
 {
 #if CONFIG_USE_CACHE_LOCK
     cacheUpdateLock.assertLocked();
 #else
-    runtimeLock.assertLocked();
+    runtimeLock.assertLocked(); // 这里使用 runtimeLock
 #endif
 
     ASSERT(sel != 0 && cls->isInitialized());
 
     // Use the cache as-is if it is less than 3/4 full
-    // 如果缓存未满 3/4，则按原样使用它 （按照第一次缓存来走流程）
+    // 如果缓存未满 3/4，则按原样使用它 （
+    // 按照第一次缓存来走流程）
     // occupied() = 0 newOccupied = 1
-    mask_t newOccupied = occupied() + 1;
+    mask_t newOccupied = occupied() + 1; // occupied 由 0 加 1
     
     unsigned oldCapacity = capacity(), capacity = oldCapacity;
-    
     if (slowpath(isConstantEmptyCache())) { // 如果缓存是空的，这里很可能为 假，然后用的 slowpath
+        // 如果是第一次进来，则为 cache_t 开辟空间 
         // Cache is read-only. Replace it. // 因为缓存是只读，直接替换
-        if (!capacity) capacity = INIT_CACHE_SIZE;
+        if (!capacity) capacity = INIT_CACHE_SIZE; // 如果 capacity 是 0，初始化为 4 1<<2，且只能是 2 的次方。
+        // 根据当前数据重新分配内存(bucket_t *newBuckets = allocateBuckets(newCapacity);)
+        // 且再往里面 (setBucketsAndMask(newBuckets, newCapacity - 1);) 把 _occupied 置为 0
         reallocate(oldCapacity, capacity, /* freeOld */false);
     }
     else if (fastpath(newOccupied + CACHE_END_MARKER <= capacity / 4 * 3)) {
         // Cache is less than 3/4 full. Use it as-is.
+        // 如果占用 newOccupied(旧占用量加 1) 小于等于容量加 1 的四分之三，就不用做其他操作
     }
     else {
+        // 现在需要扩容了
+        // 如果新占用数大于容量 + 1 的 3/4，就需要重新分配
+        // 重新赋值为 capacity 的 2 倍，（capacity 是 mask + 1），所以是 8、16、32 等
         capacity = capacity ? capacity * 2 : INIT_CACHE_SIZE;
         if (capacity > MAX_CACHE_SIZE) {
             capacity = MAX_CACHE_SIZE;
         }
+        // 根据当前数据重新分配 bucket_t *，存储新的数据，并清除已有缓存
         reallocate(oldCapacity, capacity, true);
     }
 
@@ -471,23 +490,84 @@ void cache_t::insert(Class cls, SEL sel, IMP imp, id receiver) // 插入缓存
     // There is guaranteed to be an empty slot because the
     // minimum size is 4 and we resized at 3/4 full.
     do {
-        if (fastpath(b[i].sel() == 0)) {
-            incrementOccupied();
-            b[i].set<Atomic, Encoded>(sel, imp, cls);
+        if (fastpath(b[i].sel() == 0)) { // 如果没有找到需要缓存的方法
+            incrementOccupied(); // _occupied ++
+            b[i].set<Atomic, Encoded>(sel, imp, cls); // 混存方法
             return;
         }
         if (b[i].sel() == sel) {
             // The entry was added to the cache by some other thread
             // before we grabbed the cacheUpdateLock.
+            // 如果找到了需要缓存的方法，即表示已经存在缓存中了，则直接 return。
             return;
         }
-    } while (fastpath((i = cache_next(i, m)) != begin));
+    } while (fastpath((i = cache_next(i, m)) != begin)); // 继续循环
 
     cache_t::bad_cache(receiver, (SEL)sel, cls);
 }
-
-
 ```
+```
+ALWAYS_INLINE
+void cache_t::reallocate(mask_t oldCapacity, mask_t newCapacity, bool freeOld)
+{
+    bucket_t *oldBuckets = buckets();
+    bucket_t *newBuckets = allocateBuckets(newCapacity);
+
+    // Cache's old contents are not propagated. 
+    // This is thought to save cache memory at the cost of extra cache fills.
+    // fixme re-measure this
+
+    ASSERT(newCapacity > 0);
+    ASSERT((uintptr_t)(mask_t)(newCapacity-1) == newCapacity-1);
+    // 这个方法是重新赋值 buckets、mask 和 occupied 
+    // mask 的值是 capacity - 1，所以最后新值是 4 -1, 8 - 1, 16 - 1 等等
+    
+    setBucketsAndMask(newBuckets, newCapacity - 1);
+    
+    if (freeOld) { // 释放之前的 buckets
+        cache_collect_free(oldBuckets, oldCapacity);
+    }
+}
+```
+```
+void cache_t::setBucketsAndMask(struct bucket_t *newBuckets, mask_t newMask)
+{
+    // objc_msgSend uses mask and buckets with no locks.
+    // It is safe for objc_msgSend to see new buckets but old mask.
+    // (It will get a cache miss but not overrun the buckets' bounds).
+    // It is unsafe for objc_msgSend to see old buckets and new mask.
+    // Therefore we write new buckets, wait a lot, then write new mask.
+    // objc_msgSend reads mask first, then buckets.
+
+#ifdef __arm__
+    // ensure other threads see buckets contents before buckets pointer
+    mega_barrier();
+
+    _buckets.store(newBuckets, memory_order::memory_order_relaxed);
+    
+    // ensure other threads see new buckets before new mask
+    mega_barrier();
+    
+    _mask.store(newMask, memory_order::memory_order_relaxed);
+    _occupied = 0;
+#elif __x86_64__ || i386
+    // ensure other threads see buckets contents before buckets pointer
+    _buckets.store(newBuckets, memory_order::memory_order_release);
+    
+    // ensure other threads see new buckets before new mask
+    _mask.store(newMask, memory_order::memory_order_release);
+    _occupied = 0;
+#else
+#error Don't know how to do setBucketsAndMask on this architecture.
+#endif
+}
+```
+
+750 不想再看分析了！！！
+
+二个版本的区别：
+781 是上来就判断需要不需要扩容如果需要就直接扩容，然后才进行缓存判断。
+750 则是先判断当前有没有缓存，如果有的话直接返回了，没有的话再按需扩容。
 
 
 **参考链接:🔗**
