@@ -1,8 +1,8 @@
 #  iOS底层runtime应用之动态添加属性:成员变量
 
 ## 抛出结论
-1. 编译完成的类，**不能**对其添加**变量/属性**。
-2. 运行时创建的类，**能**对其添加**变量/属性**。
+1. 编译完成的类，**不能**对其添加**变量**，**能**对其添加**属性**。
+2. 运行时创建的类，**能**对其添加**变量(注册之前)/属性(任意时刻)**。
 
 ```
 // 添加一个 nonatomic、copy 修饰符的 NSString
@@ -85,7 +85,7 @@ hh_printerIvar([LGPerson class]); // 打印成员变量
 hhName T@"NSString",C,N,V_hhName // 属性添加成功
 ivar count = 0 // 属性添加成功，但是没有自动添加相应的成员变量
 ```
-> 从打印结果看，属性添加成功，只是没有自动添加一个带下划线的成员变量。
+> 从打印结果看，属性添加成功，只是没有自动添加一个带下划线的成员变量。如果要使用该属性的话还需要给它添加 setter 和 getter 方法才行。而运行时添加的成员变量可以直接用 kvc 的方式修改和读取。
 
 通过控制台 LLDB 来打印看看 data() 里面究竟有什么内容：
 ```
@@ -598,6 +598,15 @@ NSLog(@"🍔🍔🍔 %@", [person valueForKey:@"hhName"]);
 
 ### 2.2 运行时：添加属性
 ```
+void hh_Setter(NSString *value){
+    printf("🍿🍿🍿 %s\n",__func__);
+}
+
+NSString *hh_Name(){
+    printf("🍿🍿🍿 %s\n",__func__);
+    return @"hh_Name value";
+}
+
 // 创建类
 Class student = objc_allocateClassPair([NSObject class], "HHStudent", 0);
 // 注册到内存
@@ -623,11 +632,11 @@ NSLog(@"🍿🍩🍩🍿 %@", [stu valueForKey:@"subject"]);
 🏓🏓🏓 subject T@"NSString",C,N,V_subject // 表示属性添加成功
 🍿🍿🍿 hh_Setter // 这里是 setter 函数被调用，但是 hh_Setter 里面只有一行打印，是怎么做到赋值的呢？
 🍿🍿🍿 hh_Name // 这里是 getter 函数被调用
-2020-08-18 14:47:02.668302+0800 KCObjc[11585:483063] 🍿🍩🍩🍿 hh_Name value
+🍿🍩🍩🍿 hh_Name value // 这里打印的是 "hh_Name value" 不是 setValue 赋值给的 student value
 ```
 > 从打印结果看，`可以动态创建类并动态添加属性`
 > 请注意:
-> 添加的属性 `必须要实现其 set、get 方法才能正常进行赋值`，因为动态添加的属性，是在运行时的，编译器没有为其自动生成 set、get、成员变量。
+> 添加的属性 `必须要实现其 set、get 方法才能正常进行赋值`，因为动态添加的属性，是在运行时的，编译器没有为其自动生成 set、get、成员变量。（同时还有 setter 和 getter 方法）
 
 `objc_registerClassPair(student);` 可以写在最后面，也就是说，动态创建属性，可以在注册类之前，也可以在注册类之后。
 
