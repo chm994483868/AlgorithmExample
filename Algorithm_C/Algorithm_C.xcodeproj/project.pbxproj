@@ -193,7 +193,7 @@
 		D20B5C7B24EB64500077EF6D /* iOS底层runtime应用之动态添加属性:成员变量.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS底层runtime应用之动态添加属性:成员变量.md"; sourceTree = "<group>"; };
 		D20B5C7C24EBB92B0077EF6D /* iOS底层懒加载类:非懒加载类.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS底层懒加载类:非懒加载类.md"; sourceTree = "<group>"; };
 		D20B5C8024EBCEFE0077EF6D /* iOS底层weak修饰对象存储原理.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS底层weak修饰对象存储原理.md"; sourceTree = "<group>"; };
-		D20B5C8124ECFF120077EF6D /* iOS底层spinlock_t.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS底层spinlock_t.md"; sourceTree = "<group>"; };
+		D20B5C8124ECFF120077EF6D /* iOS_spinlock_t.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = iOS_spinlock_t.md; sourceTree = "<group>"; };
 		D20B5C8224ED0D270077EF6D /* =default 和 = delete使用.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "=default 和 = delete使用.md"; sourceTree = "<group>"; };
 		D20B5D3024ED2B890077EF6D /* constexpr关键字使用.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "constexpr关键字使用.md"; sourceTree = "<group>"; };
 		D21333F124E63A9D00A6175C /* 深入理解Objective-C中的isa.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "深入理解Objective-C中的isa.md"; sourceTree = "<group>"; };
@@ -202,7 +202,9 @@
 		D2164F0524EE10650000A6AA /* volatile关键字使用.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "volatile关键字使用.md"; sourceTree = "<group>"; };
 		D2164F0624EE113B0000A6AA /* 学习统计.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "学习统计.md"; sourceTree = "<group>"; };
 		D2164F0724EE28500000A6AA /* noexcept关键字学习.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "noexcept关键字学习.md"; sourceTree = "<group>"; };
-		D2164F0824EE45A60000A6AA /* iOS底层os_unfair_lock.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS底层os_unfair_lock.md"; sourceTree = "<group>"; };
+		D2164F0824EE45A60000A6AA /* iOS_os_unfair_lock.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = iOS_os_unfair_lock.md; sourceTree = "<group>"; };
+		D2164F0924EF67410000A6AA /* dispatch_async的block中是否该使用_weak self的思考.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "dispatch_async的block中是否该使用_weak self的思考.md"; sourceTree = "<group>"; };
+		D2164F0D24EFD9710000A6AA /* iOS_pthread_mutex_t.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = iOS_pthread_mutex_t.md; sourceTree = "<group>"; };
 		D21B43A124CE83160078EEF9 /* FindDuplication.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = FindDuplication.cpp; sourceTree = "<group>"; };
 		D21B43A224CE83160078EEF9 /* FindDuplication.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = FindDuplication.hpp; sourceTree = "<group>"; };
 		D21B43A524CEA24B0078EEF9 /* FindDuplicationNoEdit.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = FindDuplicationNoEdit.cpp; sourceTree = "<group>"; };
@@ -1473,8 +1475,10 @@
 				D20B5C7B24EB64500077EF6D /* iOS底层runtime应用之动态添加属性:成员变量.md */,
 				D20B5C7C24EBB92B0077EF6D /* iOS底层懒加载类:非懒加载类.md */,
 				D20B5C8024EBCEFE0077EF6D /* iOS底层weak修饰对象存储原理.md */,
-				D20B5C8124ECFF120077EF6D /* iOS底层spinlock_t.md */,
-				D2164F0824EE45A60000A6AA /* iOS底层os_unfair_lock.md */,
+				D20B5C8124ECFF120077EF6D /* iOS_spinlock_t.md */,
+				D2164F0824EE45A60000A6AA /* iOS_os_unfair_lock.md */,
+				D2164F0D24EFD9710000A6AA /* iOS_pthread_mutex_t.md */,
+				D2164F0924EF67410000A6AA /* dispatch_async的block中是否该使用_weak self的思考.md */,
 			);
 			path = md;
 			sourceTree = "<group>";
