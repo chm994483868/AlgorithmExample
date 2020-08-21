@@ -135,10 +135,12 @@ class mutex_tt : nocopy_t {
         // 只能使用 &self->_unfairL
         // 先拿到成员变量 _unfairL，然后再取地址
         os_unfair_lock_lock(&self->_unfairL); // 加锁
+        // os_unfair_lock_lock(&self->_unfairL); // 重复加锁会直接 crash
         for (unsigned int i = 0; i < 10000; ++i) {
             self.sum++;
         }
         // OSSpinLockUnlock(&_lock);
+        // os_unfair_lock_unlock(&self->_unfairL); // 解锁
         os_unfair_lock_unlock(&self->_unfairL); // 解锁
 
         NSLog(@"⏰⏰⏰ %ld", self.sum);
