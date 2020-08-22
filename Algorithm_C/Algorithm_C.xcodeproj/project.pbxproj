@@ -205,6 +205,7 @@
 		D2164F0824EE45A60000A6AA /* iOS_os_unfair_lock.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = iOS_os_unfair_lock.md; sourceTree = "<group>"; };
 		D2164F0924EF67410000A6AA /* dispatch_async的block中是否该使用_weak self的思考.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "dispatch_async的block中是否该使用_weak self的思考.md"; sourceTree = "<group>"; };
 		D2164F0D24EFD9710000A6AA /* iOS_pthread_mutex_t.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = iOS_pthread_mutex_t.md; sourceTree = "<group>"; };
+		D2164F0E24F118060000A6AA /* iOS_NSLock.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = iOS_NSLock.md; sourceTree = "<group>"; };
 		D21B43A124CE83160078EEF9 /* FindDuplication.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = FindDuplication.cpp; sourceTree = "<group>"; };
 		D21B43A224CE83160078EEF9 /* FindDuplication.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = FindDuplication.hpp; sourceTree = "<group>"; };
 		D21B43A524CEA24B0078EEF9 /* FindDuplicationNoEdit.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = FindDuplicationNoEdit.cpp; sourceTree = "<group>"; };
@@ -1478,6 +1479,7 @@
 				D20B5C8124ECFF120077EF6D /* iOS_spinlock_t.md */,
 				D2164F0824EE45A60000A6AA /* iOS_os_unfair_lock.md */,
 				D2164F0D24EFD9710000A6AA /* iOS_pthread_mutex_t.md */,
+				D2164F0E24F118060000A6AA /* iOS_NSLock.md */,
 				D2164F0924EF67410000A6AA /* dispatch_async的block中是否该使用_weak self的思考.md */,
 			);
 			path = md;
