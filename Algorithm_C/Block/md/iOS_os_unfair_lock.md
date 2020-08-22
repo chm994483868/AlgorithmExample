@@ -65,6 +65,8 @@ class mutex_tt : nocopy_t {
 
 ## 正片
 
+设计宗旨在于替换 `OSSpinLock`，从 iOS 10 之后开始支持，跟 `OSSpinLock` 不同，等待 `os_unfair_lock` 的线程会处于休眠状态（类似 `Runloop` 那样），不是忙等（`busy-wait`）。
+
 ### 使用示例
 在 `usr/include/os/lock.h` 中看到 `os_unfair_lock` 的定义。
 使用 `os_unfair_lock` 首先需要引入 `#import <os/lock.h>` 
@@ -353,6 +355,7 @@ dispatch_async(globalQueue_DEFAULT, ^{
 os_unfair_lock_assert_not_owner(&self->_unfairL);
 ```
 
-// 待读:
+**参考链接:🔗**
 [iOS锁-OSSpinLock与os_unfair_lock](https://www.jianshu.com/p/40adc41735b6)
 [os_unfair_lock pthread_mutex](https://www.jianshu.com/p/6ff0dfe719bf)
+[iOS 锁 部分一](https://www.jianshu.com/p/8ce323dbc491)
