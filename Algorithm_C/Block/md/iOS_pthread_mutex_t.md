@@ -21,7 +21,7 @@
   然后在异步线程里面再 `lock` 该递归锁时，则会导致死锁。
   即因为主线递归锁没有执行解锁，又在另外的队列异步获取锁则直接导致死锁。
   
-  **异步线程的死锁，虽然用block 里面用了 __weak 的self 依然导致 ViewController 不会执行 dealloc！**
+  **异步线程的死锁，虽然 block 里面用的 __weak 的self 依然导致 ViewController 不会执行 dealloc！**
 
 
 ## 使用示例
