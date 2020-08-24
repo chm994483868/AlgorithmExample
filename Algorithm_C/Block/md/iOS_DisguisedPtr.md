@@ -3,13 +3,13 @@
 > 为了全面透彻的理解 weak 等关键字，现在从最底层的数据结构开始挖掘，力求构建一个完整的认知体系。
 
 ## DisguisedPtr
-`Project Headers/objc-private.h` Line 904
+定义位于: `Project Headers/objc-private.h` Line 904
 
 指针伪装模版类 `Disguised<T>`，与此对应的概念是**指针伪装**。
 
-Disguised<T> 
+DisguisedPtr<T> 通过运算使指针隐藏于系统工具（如 leaks 工具），同时保持指针的能力，其作用是通过计算把保存的 T 的指针隐藏起来，实现指针到整数的全射。 
 
- 根据 `Disguised` 这个英文单词我们或许能猜出一部分信息，`Ptr` 是 `Pointer` （指针）的缩写，硬翻译的话可以理解为：`掩藏指针`，`封装指针`，看它的定义再直白一点话，大概就是指针本身的地址值与 `unsigned long` 来回相互转化。
+ 根据 `Disguised` 这个英文单词我们或许能猜出一部分信息，`Ptr` 是 `Pointer` （指针）的缩写，硬翻译的话可以理解为：`掩藏指针`，`封装指针`，看它的定义再直白一点的话，大概就是指针本身的地址值与 `unsigned long` 来回相互转化。
 ```
 Disguised /dɪs'ɡaɪz/
 vt. 假装；掩饰；隐瞒
@@ -52,7 +52,7 @@ class DisguisedPtr {
     DisguisedPtr() { } // 构造函数
     
     // 初始化列表，显式初始化 value 成员变量
-    DisguisedPtr(T* ptr) : value(disguise(ptr)) { }
+    DisguisedPtr(T* ptr) : value(disguise(ptr)) { } // 指针隐藏
     DisguisedPtr(const DisguisedPtr<T>& ptr) : value(ptr.value) { }
 
     // T* 赋值函数
@@ -67,16 +67,16 @@ class DisguisedPtr {
         return *this;
     }
 
-    // 这大概是重载运算符吗 ？
+    // 重载运算符
     operator T* () const {
-        return undisguise(value);
+        return undisguise(value); // 转为指针
     }
     
     T* operator -> () const { 
-        return undisguise(value);
+        return undisguise(value); // 转为指针
     }
     T& operator * () const { 
-        return *undisguise(value);
+        return *undisguise(value); // 转化为指针并取出该指针指向的内容
     }
     T& operator [] (size_t i) const {
         return undisguise(value)[i];
@@ -88,6 +88,14 @@ class DisguisedPtr {
     // because we don't currently use them anywhere
     // 因为目前我们不在任何地方使用它
 };
+
+// fixme type id is weird and not identical to objc_object*
+static inline bool operator == (DisguisedPtr<objc_object> lhs, id rhs) {
+    return lhs == (objc_object *)rhs;
+}
+static inline bool operator != (DisguisedPtr<objc_object> lhs, id rhs) {
+    return lhs != (objc_object *)rhs;
+}
 ```
 
 **参考链接:🔗**
@@ -95,3 +103,4 @@ class DisguisedPtr {
 [OC Runtime之Weak(2)---weak_entry_t](https://www.jianshu.com/p/045294e1f062)
 [iOS 关联对象 - DisguisedPtr](https://www.jianshu.com/p/cce56659791b)
 [Objective-C运行时-动态特性](https://zhuanlan.zhihu.com/p/59624358)
+[Objective-C runtime机制(7)——SideTables, SideTable, weak_table, weak_entry_t](https://blog.csdn.net/u013378438/article/details/82790332)
