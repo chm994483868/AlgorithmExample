@@ -245,7 +245,30 @@
 2. `OSSpinLock` (`iOS 10` 之前)
 3. `dispatch_semaphore` (`iOS` 版本兼容性好)
 4. `pthread_mutex_t` (`iOS` 版本兼容性好)
-5. `NSLock` ()
+5. `NSLock` (基于 `pthread_mutex_t` 封装)
+6. `NSCondition` (基于 `pthread_mutex_t` 封装)
+7. `pthread_mutex_t(recursive)` 递归锁的优先推荐
+8. `NSRecursiveLock` (基于 `pthread_mutex_t` 封装)
+9. `NSConditionLock` (基于 `NSCondition` 封装)
+10. `@synchronized`
+  1. `iOS 12` 之前基于 `pthread_mutex_t` 封装
+  2. `iOS 12` 之后基于 `os_unfair_lock` 封装（iOS 12 之后它的效率应该不是最低，应该在 3/4 左右）
+
+2. 自旋锁和互斥锁的取舍
+自旋锁和互斥锁怎么选择，其实这个问题已经没有什么意义，因为自旋锁 `OSSpinLock` 在 `iOS 10` 之后已经废弃了，而它的替换方案 `os_unfair_lock` 是互斥锁，但是我们仍然做一下对比:
+**自旋锁:**
++ 预计线程需要等待的时间较短
++ 多核处理器
++ `CPU` 的资源不紧张
+**互斥锁:**
++ 预计线程需要等待的时间较长
++ 单核处理器
++ 临界区（加锁解锁之间的部分）有 I/O 操作
++ 临界区的较为复杂和循环了比较大
+
+**其它:**
+
+加锁和解锁的实现一定要配套出现，不然就会出现死锁的现象。
 
 **参考链接:🔗**
 [iOS 锁 部分四](https://www.jianshu.com/p/6ebb208f9a4c)
