@@ -1,5 +1,12 @@
 # iOS_SideTables和SideTable
 
+## SideTables
+
+```c++
+static StripedMap<SideTable>& SideTables() {
+    return SideTablesMap.get();
+}
+```
 
 ## `SideTable`
 
