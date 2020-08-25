@@ -14,10 +14,10 @@ enum { CacheLineSize = 64 };
 template<typename T>
 class StripedMap {
 #if TARGET_OS_IPHONE && !TARGET_OS_SIMULATOR
-    // iOS 设备的 StripeCount = 8
+    // iOS 设备且非模拟器的情况下是 StripeCount = 8
     enum { StripeCount = 8 };
 #else
-    // iOS 设备之外的比如: 模拟器的 StripeCount = 64
+    // iOS 设备之外的比如: 模拟器的等情况下是 StripeCount = 64
     enum { StripeCount = 64 };
 #endif
 
@@ -40,7 +40,7 @@ class StripedMap {
         uintptr_t addr = reinterpret_cast<uintptr_t>(p);
         
         // addr 右移 4 位的值与 addr 右移 9 位的值做异或操作，然后对 StripeCount 取模 
-        return ((addr >> 4) ^ (addr >> 9)) % StripeCount; // 最后取余，防止 index 越界
+        return ((addr >> 4) ^ (addr >> 9)) % StripeCount; // 最后取模，防止 index 越界
     }
 
  public:
@@ -104,6 +104,7 @@ class StripedMap {
 #if DEBUG
     StripedMap() {
         // Verify alignment expectations.
+      	// 验证是不是按 CacheLineSize（值为 64）个字节内存对齐的
         uintptr_t base = (uintptr_t)&array[0].value;
         uintptr_t delta = (uintptr_t)&array[1].value - base;
         ASSERT(delta % CacheLineSize == 0);
@@ -119,6 +120,7 @@ class StripedMap {
 reinterpret_cast<new_type> (expression)
 ```
 `hash` 定位的算法，把 `void *` 指针转化为整数，然后右移 4 位和右移 9 位的值做异或操作，然后对 `StripedMap`(值为 8) 取模，防止 `index` 越界。
+
 ```c++
 // 该方法以 void * 作为 key 来获取 void * 对应在 StripedMap 的 array 中的索引
 static unsigned int indexForPointer(const void *p) {
@@ -144,7 +146,7 @@ struct PaddedT {
 接下来 `struct PaddedT` 被放在数组 `array` 中：
 ```c++
 // 所有 struct PaddedT 类型数据被存储在 array 数组中
-// TARGET_OS_IPHONE 设备 StripeCount == 8
+// TARGET_OS_IPHONE 设备且非模拟器的情况下 StripeCount == 8
 // 长度为 8 的 PaddedT 数组
 PaddedT array[StripeCount];
 ```
@@ -167,4 +169,9 @@ const T& operator[] (const void *p) const {
 
 分析完 `StripedMap` 就分析完了 `SideTables` 这个全局的大 `hash` 表，下面我们继续来分析 `SideTables` 中存储的数据: `SideTable`。
 
-
+**参考链接:🔗**
+[Object Runtime -- Weak](https://cloud.tencent.com/developer/article/1408976)
+[OC Runtime之Weak(2)---weak_entry_t](https://www.jianshu.com/p/045294e1f062)
+[iOS 关联对象 - DisguisedPtr](https://www.jianshu.com/p/cce56659791b)
+[Objective-C运行时-动态特性](https://zhuanlan.zhihu.com/p/59624358)
+[Objective-C runtime机制(7)——SideTables, SideTable, weak_table, weak_entry_t](https://blog.csdn.net/u013378438/article/details/82790332)
