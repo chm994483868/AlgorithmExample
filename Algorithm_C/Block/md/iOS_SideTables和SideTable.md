@@ -5,6 +5,7 @@
 
 `SideTables` 可以通过全局的静态函数获取:
 ```c++
+// Map: NSObject * (key) -- SideTable& (value)
 static StripedMap<SideTable>& SideTables() {
     return SideTablesMap.get();
 }
@@ -180,7 +181,8 @@ struct SideTable {
 1. `spinlock_t slock;`: 自旋锁，用于 `SideTable` 的加锁和解锁。
   此锁正是重点来解决弱引用机制的线程安全问题的，看前面的两大块 `weak_table_t` 和 `weak_entry_t` 的时候，看到所有操作中都不是线程安全的，它们的操作完全没有提及锁的事情，其实是把保证它们线程安全的任务交给了 `SideTable`。下面可以看到 `SideTable` 提供的方法都与锁有关。
 
-2. `RefcountMap refcnts;`: 以 `DisguisedPtr<objc_object>` 为 `key` 的 `hash` 表，用来存储 `OC` 对象的引用计数（仅在未开启 `isa` 优化或者 `isa` 优化情况下 `isa_t` 的引用计数溢出时才会用到，这里就牵涉到 `isa_t`里的 `uintptr_t has_sidetable_rc` 和 `uintptr_t extra_rc` 两个字段，以前看的 `isa` 的结构这里终于用到了，还有这时候终于知道 `rc` 其实是 `refcount`(引用计数) 的缩写。😄）
+2. `RefcountMap refcnts;`: 以 `DisguisedPtr<objc_object>` 为 `key`，以 `size_t` 为 `value` 的 `hash` 表，用来存储 `OC` 对象的引用计数（仅在未开启 `isa` 优化或者 `isa` 优化情况下 `isa_t` 的引用计数溢出时才会用到，这里就牵涉到 `isa_t`里的 `uintptr_t has_sidetable_rc` 和 `uintptr_t extra_rc` 两个字段，以前看的 `isa` 的结构这里终于用到了，还有这时候终于知道 `rc` 其实是 `refcount`(引用计数) 的缩写）。作为哈希表，它使用的是平方探测法生成哈希值（`key`），`weak_table_t` 则是线性探测（开放寻址法）。
+
 3. `weak_table_t weak_table;` 存储对象弱引用的指针的 `hash` 表，是 `OC` `weak` 功能实现的核心数据结构。
 
 下面是构造函数和析构函数：
@@ -245,3 +247,6 @@ class DenseMap : public DenseMapBase<DenseMap<KeyT, ValueT, ValueInfoT, KeyInfoT
 **参考链接:🔗**
 [【C++】C++11可变参数模板（函数模板、类模板）](https://blog.csdn.net/qq_38410730/article/details/105247065?utm_medium=distribute.pc_relevant.none-task-blog-BlogCommendFromMachineLearnPai2-2.channel_param&depth_1-utm_source=distribute.pc_relevant.none-task-blog-BlogCommendFromMachineLearnPai2-2.channel_param)
 [C++11新特性之 std::forward(完美转发)](https://blog.csdn.net/wangshubo1989/article/details/50485951?utm_medium=distribute.pc_relevant.none-task-blog-BlogCommendFromMachineLearnPai2-3.channel_param&depth_1-utm_source=distribute.pc_relevant.none-task-blog-BlogCommendFromMachineLearnPai2-3.channel_param)
+[llvm中的数据结构及内存分配策略 - DenseMap](https://blog.csdn.net/dashuniuniu/article/details/80043852)
+[RunTime中SideTables, SideTable, weak_table, weak_entry_t](https://www.jianshu.com/p/48a9a9ec8779)
+[Object Runtime -- Weak](https://cloud.tencent.com/developer/article/1408976)

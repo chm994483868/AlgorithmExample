@@ -7,7 +7,10 @@
 // StripedMap<T> 是一个 void * -> T 的 map，即 Key 为 void *，value 是 T 的 hash 表。
 
 // For example, this may be used as StripedMap<spinlock_t> or as StripedMap<SomeStruct> where SomeStruct stores a spin lock.
-// 例如，它可能用作 StripedMap<spinlock_t> 对应 StripedMap<SomeStruct>，此时 SomeStruct 保存了一个 spin lock.
+// 例如，它可能用作 StripedMap<spinlock_t> 或者 StripedMap<SomeStruct>，此时 SomeStruct 保存了一个 spin lock.
+
+/// 它的主要功能就是把自旋锁的锁操作从类中分离出来，而且类中必须要有一个自旋锁属性。（？）
+/// StripMap 内部的实质是一个开放寻址法生成哈希键值的散列表 (虽然是写着的 array ，但是是一个散列表)。
 
 enum { CacheLineSize = 64 };
 
@@ -32,9 +35,11 @@ class StripedMap {
     // 所有 PaddedT struct 类型数据被存储在 array 数组中
     // TARGET_OS_IPHONE 设备 StripeCount == 8
     // 长度为 8 的 PaddedT 数组
+    // hash 表数据 
     PaddedT array[StripeCount];
     
     // 该方法以 void * 作为 key 来获取 void * 对应在 StripedMap 中的位置
+    // hash 函数
     static unsigned int indexForPointer(const void *p) {
         // typedef unsigned long uintptr_t;
         uintptr_t addr = reinterpret_cast<uintptr_t>(p);
@@ -46,6 +51,8 @@ class StripedMap {
  public:
     // 根据指针 p 得出 index，返回 array 数组 index 
     // 处的 PaddedT 的 value 成员变量
+    // 操作符重载
+    // 即可以使用 StripMap<xxx>[objcPtr] 访问 
     T& operator[] (const void *p) { 
         return array[indexForPointer(p)].value; 
     }
