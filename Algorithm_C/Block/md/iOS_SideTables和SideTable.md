@@ -1,4 +1,4 @@
-# iOS_SideTables和SideTable
+# iOS_SideTables 和 SideTable
 
 ## SideTables
 `SideTables` 可以理解为一个 `key` 是对象指针(`void *`)，`value` 是`SideTable` 的静态全局的 `hash` 数组，里面存储了 `SideTable` 类型的数据，其长度在 `TARGET_OS_IPHONE && !TARGET_OS_SIMULATOR` 的情况下是 8，其他所有情况下是 64。
@@ -176,7 +176,71 @@ struct SideTable {
 };
 ```
 `struct SideTable` 定义很清晰，首先是 3 个成员变量:
-1. `spinlock_t slock;`: 自旋锁
+
+1. `spinlock_t slock;`: 自旋锁，用于 `SideTable` 的加锁和解锁。
+  此锁正是重点来解决弱引用机制的线程安全问题的，看前面的两大块 `weak_table_t` 和 `weak_entry_t` 的时候，看到所有操作中都不是线程安全的，它们的操作完全没有提及锁的事情，其实是把保证它们线程安全的任务交给了 `SideTable`。下面可以看到 `SideTable` 提供的方法都与锁有关。
+
+2. `RefcountMap refcnts;`: 以 `DisguisedPtr<objc_object>` 为 `key` 的 `hash` 表，用来存储 `OC` 对象的引用计数（仅在未开启 `isa` 优化或者 `isa` 优化情况下 `isa_t` 的引用计数溢出时才会用到，这里就牵涉到 `isa_t`里的 `uintptr_t has_sidetable_rc` 和 `uintptr_t extra_rc` 两个字段，以前看的 `isa` 的结构这里终于用到了，还有这时候终于知道 `rc` 其实是 `refcount`(引用计数) 的缩写。😄）
+3. `weak_table_t weak_table;` 存储对象弱引用的指针的 `hash` 表，是 `OC` `weak` 功能实现的核心数据结构。
+
+下面是构造函数和析构函数：
+构造函数只做了一件事，把 `weak_table` 的数据空间置为 `0`：
+```c++
+// 把从 &weak_table 位置开始的长度为 sizeof(weak_table) 的内存置为 0
+memset(&weak_table, 0, sizeof(weak_table));
+```
+析构函数也是只做了一件事，就是把你的程序直接给停止运行，明确指出 `SideTable` 是不能被析构的。`_objc_fatal` 会调用 `exit` 或者 `abort`。
+再下面是锁的操作，同时接口也符合上面提到的 `StripedMap` 中关于模版抽象类型 `T` 类型的 `value` 的接口要求。
+
+## `spinlock_t`
+`spinlock_t` 的最终定义是实际上是一个 `uint32_t` 类型 `非公平的自旋锁`，（目前底层实现已由互斥锁(`os_unfair_lock`)所替换）。所谓非公平是指，就是说获得锁的顺序和申请锁的顺序无关，也就是说，第一个申请锁的线程有可能会是最后一个获得该锁，或者是刚获得锁线程会再次立刻获得该锁，造成忙等（`busy-wait`）。
+同时，`os_unfair_lock` 在 `_os_unfair_lock_opaque` 也记录了获取它的线程信息，只有获得该锁的线程才能够解开这把锁。
+```c++
+OS_UNFAIR_LOCK_AVAILABILITY
+typedef struct os_unfair_lock_s {
+    uint32_t _os_unfair_lock_opaque;
+} os_unfair_lock, *os_unfair_lock_t;
+```
+`os_unfair_lock` 的实现，苹果并未公开，大体上应该是操作 `_os_unfair_lock_opaque` 这个 `uint32_t` 的值，当大于 0 时，锁可用，当等于或小于 0 时，表示锁已经被其他线程获取且还没有解锁，当前线程再获取这把锁，就要被等待（或者直接阻塞，知道能获取到锁）。
+
+## `RefcountMap`
+`RefcountMap refcnts;` 用来存储对象的引用计数。首先看一下它的类型定义:
+```c++
+// RefcountMap disguises its pointers because we don't want the table to act as a root for `leaks`.
+// 同样是使用 DisguisedPtr 把对象的地址隐藏起来，逃过 leaks 等工具的检测
+typedef objc::DenseMap<DisguisedPtr<objc_object>,size_t,RefcountMapValuePurgeable> RefcountMap;
+```
+它实质上是一个 `key` 是 `DisguisedPtr<objc_object>`，`value` 是 `size_t` 的 `hash` 表，而 `value` 就是对象的引用计数。（《Objective-C 高级编程xxx》那本书里面的苹果实现引用计数的逻辑可以在这里得到解答！⛽️）`RefcountMapValuePurgeable` 表示是否在 `value = 0` 的时候自动释放掉响应的 `hash` 节点，默认是 `true`。下面是它的定义:
+```c++
+struct RefcountMapValuePurgeable {
+    static inline bool isPurgeable(size_t x) {
+        return x == 0;
+    }
+};
+```
+`RefcountMap` 的实际代码实现是一个模版类。
+定义位于 `Project Headers/llvm-DenseMap.h` P750，代码如下：
+```c++
+template <typename KeyT, typename ValueT,
+          typename ValueInfoT = DenseMapValueInfo<ValueT>,
+          typename KeyInfoT = DenseMapInfo<KeyT>,
+          typename BucketT = detail::DenseMapPair<KeyT, ValueT>>
+class DenseMap : public DenseMapBase<DenseMap<KeyT, ValueT, ValueInfoT, KeyInfoT, BucketT>,
+                                     KeyT, ValueT, ValueInfoT, KeyInfoT, BucketT> {
+  friend class DenseMapBase<DenseMap, KeyT, ValueT, ValueInfoT, KeyInfoT, BucketT>;
+
+  // Lift some types from the dependent base class into this class for
+  // simplicity of referring to them.
+  using BaseT = DenseMapBase<DenseMap, KeyT, ValueT, ValueInfoT, KeyInfoT, BucketT>;
+
+  BucketT *Buckets;
+  unsigned NumEntries;
+  unsigned NumTombstones;
+  unsigned NumBuckets;
+  ...
+};
+```
+关于 `DenseMap` 和相关的模版定义，实在是太长啦，等后面再看。😭
 
 **参考链接:🔗**
 [【C++】C++11可变参数模板（函数模板、类模板）](https://blog.csdn.net/qq_38410730/article/details/105247065?utm_medium=distribute.pc_relevant.none-task-blog-BlogCommendFromMachineLearnPai2-2.channel_param&depth_1-utm_source=distribute.pc_relevant.none-task-blog-BlogCommendFromMachineLearnPai2-2.channel_param)
