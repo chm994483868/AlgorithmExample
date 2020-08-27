@@ -1,13 +1,12 @@
-#  iOS_DisguisedPtr
-
-> 为了全面透彻的理解 weak 等关键字，现在从最底层的数据结构开始挖掘，力求构建一个完整的认知体系。
+# iOS weak 底层实现原理(一)：DisguisedPtr
 
 ## DisguisedPtr
+为了全面透彻的理解 weak 关键字，现在从最底层的数据结构开始挖掘，力求构建一个完整的认知体系。
 定义位于: `Project Headers/objc-private.h` Line 904
 
 指针伪装模版类 `Disguised<T>`，与此对应的概念是**指针伪装**。
 
-DisguisedPtr<T> 通过运算使指针隐藏于系统工具（如 leaks 工具），同时保持指针的能力，其作用是通过计算把保存的 T 的指针隐藏起来，实现指针到整数的全射。 
+`DisguisedPtr<T>` 通过运算使指针隐藏于系统工具（如 `leaks` 工具），同时保持指针的能力，其作用是通过计算把保存的 T 的指针隐藏起来，实现指针到整数的映射。 
 
  根据 `Disguised` 这个英文单词我们或许能猜出一部分信息，`Ptr` 是 `Pointer` （指针）的缩写，硬翻译的话可以理解为：`掩藏指针`，`封装指针`，看它的定义再直白一点的话，大概就是指针本身的地址值与 `unsigned long` 来回相互转化。
 ```
@@ -15,8 +14,7 @@ Disguised /dɪs'ɡaɪz/
 vt. 假装；掩饰；隐瞒
 n. 伪装；假装；用作伪装的东西
 ```
-这个模版类用来封装 nil ptr，让  nil 指针像 non-nil 指针那样正常运行它的操作，而不会让程序崩溃。
-
+这个模版类用来封装 `nil ptr`，让  `nil` 指针像 `non-nil` 指针那样正常运行它的操作，而不会让程序崩溃。
 ```c++
 // DisguisedPtr<T> acts like pointer type T*, except the 
 // DisguisedPtr<T> 的作用类似指针类型 T*,
@@ -36,7 +34,8 @@ n. 伪装；假装；用作伪装的东西
 template <typename T>
 class DisguisedPtr {
     // typedef unsigned long uintptr_t;
-    uintptr_t value; // 无符号 long 类型的 value 成员变量
+    // 无符号 long 类型的 value 成员变量
+    uintptr_t value;
 
     static uintptr_t disguise(T* ptr) { // 指针隐藏
         // 相当于直接把 T 指针的地址转化为 unsigned long 并取负值
@@ -69,14 +68,16 @@ class DisguisedPtr {
 
     // 重载运算符
     operator T* () const {
-        return undisguise(value); // 转为指针
+        // 转为指针
+        return undisguise(value);
     }
-    
     T* operator -> () const { 
-        return undisguise(value); // 转为指针
+        // 转为指针
+        return undisguise(value);
     }
     T& operator * () const { 
-        return *undisguise(value); // 转化为指针并取出该指针指向的内容
+        // 转化为指针并取出该指针指向的内容
+        return *undisguise(value);
     }
     T& operator [] (size_t i) const {
         return undisguise(value)[i];
@@ -84,7 +85,6 @@ class DisguisedPtr {
 
     // pointer arithmetic operators omitted 
     // 省略的指针算术运算符
-    
     // because we don't currently use them anywhere
     // 因为目前我们不在任何地方使用它
 };
@@ -99,8 +99,9 @@ static inline bool operator != (DisguisedPtr<objc_object> lhs, id rhs) {
 ```
 
 **参考链接:🔗**
-[Object Runtime -- Weak](https://cloud.tencent.com/developer/article/1408976)
-[OC Runtime之Weak(2)---weak_entry_t](https://www.jianshu.com/p/045294e1f062)
-[iOS 关联对象 - DisguisedPtr](https://www.jianshu.com/p/cce56659791b)
-[Objective-C运行时-动态特性](https://zhuanlan.zhihu.com/p/59624358)
-[Objective-C runtime机制(7)——SideTables, SideTable, weak_table, weak_entry_t](https://blog.csdn.net/u013378438/article/details/82790332)
++ [使用intptr_t和uintptr_t](https://www.jianshu.com/p/03b7d56bf80f)
++ [Object Runtime -- Weak](https://cloud.tencent.com/developer/article/1408976)
++ [OC Runtime之Weak(2)---weak_entry_t](https://www.jianshu.com/p/045294e1f062)
++ [iOS 关联对象 - DisguisedPtr](https://www.jianshu.com/p/cce56659791b)
++ [Objective-C运行时-动态特性](https://zhuanlan.zhihu.com/p/59624358)
++ [Objective-C runtime机制(7)——SideTables, SideTable, weak_table, weak_entry_t](https://blog.csdn.net/u013378438/article/details/82790332)

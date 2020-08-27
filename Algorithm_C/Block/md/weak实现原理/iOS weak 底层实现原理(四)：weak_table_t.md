@@ -1,9 +1,9 @@
-#  iOS weak_table_t
+# iOS weak 底层实现原理(四)：weak_table_t
 
 > 定义位于 `Project Headers/objc-weak.h` Line 119。
 
 ## 简介
-`weak_table_t weak_table;` 是用来存储对象弱引用的相关信息。通过上节我们知道 `SideTables` 中 `PaddedT array[StripeCount];` 而 `StripeCount` 只能是 8 或者 64（针对不同平台），即我们的 `SideTable` 只能有 8 或 64 张。而在我们的程序中，绝对不止 8 或 64 个对象，因此多个对象一定会重用一个 `SideTable`，也就是说一个 `weak_table` 会存储多个对象的弱引用信息。因此在一个`SideTable` 中，又会通过 `weak_table` 作为 `hash` 表再次分散存储每个对象的弱引用信息。
+`weak_table_t weak_table` 是用来存储对象弱引用的相关信息。通过上节我们知道 `SideTables` 中 `PaddedT array[StripeCount];` 而 `StripeCount` 只能是 8 或者 64（针对不同平台），即我们的 `SideTable` 只能有 8 或 64 张。而在我们的程序中，绝对不止 8 或 64 个对象，因此多个对象一定会重用一个 `SideTable`，也就是说一个 `weak_table` 会存储多个对象的弱引用信息。因此在一个`SideTable` 中，又会通过 `weak_table` 作为 `hash` 表再次分散存储每个对象的弱引用信息。
 
 ## `weak_table_t` 定义
 `weak_table_t` 定义如下:

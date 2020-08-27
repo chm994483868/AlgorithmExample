@@ -213,11 +213,11 @@
 		D2164F1324F25E070000A6AA /* iOS_dispatch_semaphore.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = iOS_dispatch_semaphore.md; sourceTree = "<group>"; };
 		D2164F1424F2654F0000A6AA /* iOS_pthread_rwlock_t.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = iOS_pthread_rwlock_t.md; sourceTree = "<group>"; };
 		D2164F1524F33A9A0000A6AA /* iOS_Lock总结.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS_Lock总结.md"; sourceTree = "<group>"; };
-		D2164F1624F3B7C00000A6AA /* iOS_weak_entry_t.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = iOS_weak_entry_t.md; sourceTree = "<group>"; };
-		D2164F1724F3B9A20000A6AA /* iOS_DisguisedPtr.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = iOS_DisguisedPtr.md; sourceTree = "<group>"; };
-		D2164F1824F499680000A6AA /* iOS_weak_table_t.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = iOS_weak_table_t.md; sourceTree = "<group>"; };
+		D2164F1624F3B7C00000A6AA /* iOS weak 底层实现原理(三)：weak_entry_t.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS weak 底层实现原理(三)：weak_entry_t.md"; sourceTree = "<group>"; };
+		D2164F1724F3B9A20000A6AA /* iOS weak 底层实现原理(一)：DisguisedPtr.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS weak 底层实现原理(一)：DisguisedPtr.md"; sourceTree = "<group>"; };
+		D2164F1824F499680000A6AA /* iOS weak 底层实现原理(四)：weak_table_t.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS weak 底层实现原理(四)：weak_table_t.md"; sourceTree = "<group>"; };
 		D2164F1924F4A0930000A6AA /* iOS_SideTables和SideTable.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS_SideTables和SideTable.md"; sourceTree = "<group>"; };
-		D2164F1A24F4FC850000A6AA /* iOS_StripedMap.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = iOS_StripedMap.md; sourceTree = "<group>"; };
+		D2164F1A24F4FC850000A6AA /* iOS weak 底层实现原理(二)：StripedMap.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS weak 底层实现原理(二)：StripedMap.md"; sourceTree = "<group>"; };
 		D2164F1B24F505330000A6AA /* C++强制类型转换符reinterpret_cast.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "C++强制类型转换符reinterpret_cast.md"; sourceTree = "<group>"; };
 		D21B43A124CE83160078EEF9 /* FindDuplication.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = FindDuplication.cpp; sourceTree = "<group>"; };
 		D21B43A224CE83160078EEF9 /* FindDuplication.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = FindDuplication.hpp; sourceTree = "<group>"; };
@@ -849,6 +849,19 @@
 			path = 15_NumberOf1InBinary;
 			sourceTree = "<group>";
 		};
+		D2164F1C24F7AF070000A6AA /* weak实现原理 */ = {
+			isa = PBXGroup;
+			children = (
+				D20B5C8024EBCEFE0077EF6D /* iOS底层weak实现原理.md */,
+				D2164F1724F3B9A20000A6AA /* iOS weak 底层实现原理(一)：DisguisedPtr.md */,
+				D2164F1A24F4FC850000A6AA /* iOS weak 底层实现原理(二)：StripedMap.md */,
+				D2164F1624F3B7C00000A6AA /* iOS weak 底层实现原理(三)：weak_entry_t.md */,
+				D2164F1824F499680000A6AA /* iOS weak 底层实现原理(四)：weak_table_t.md */,
+				D2164F1924F4A0930000A6AA /* iOS_SideTables和SideTable.md */,
+			);
+			path = "weak实现原理";
+			sourceTree = "<group>";
+		};
 		D21B43A024CE82E40078EEF9 /* 03_01_DuplicationInArray */ = {
 			isa = PBXGroup;
 			children = (
@@ -1464,6 +1477,7 @@
 		D2E526C924E3CEEC00ACD06F /* md */ = {
 			isa = PBXGroup;
 			children = (
+				D2164F1C24F7AF070000A6AA /* weak实现原理 */,
 				D2164F0624EE113B0000A6AA /* 学习统计.md */,
 				D21333F324E6610E00A6175C /* 内存对齐原则.md */,
 				D21333F224E63B6C00A6175C /* 深入理解Objective-C中的alloc和init.md */,
@@ -1489,12 +1503,6 @@
 				D20B5C7A24EA63FF0077EF6D /* iOS底层Class结构之Cache_t.md */,
 				D20B5C7B24EB64500077EF6D /* iOS底层runtime应用之动态添加属性:成员变量.md */,
 				D20B5C7C24EBB92B0077EF6D /* iOS底层懒加载类:非懒加载类.md */,
-				D20B5C8024EBCEFE0077EF6D /* iOS底层weak实现原理.md */,
-				D2164F1A24F4FC850000A6AA /* iOS_StripedMap.md */,
-				D2164F1924F4A0930000A6AA /* iOS_SideTables和SideTable.md */,
-				D2164F1824F499680000A6AA /* iOS_weak_table_t.md */,
-				D2164F1624F3B7C00000A6AA /* iOS_weak_entry_t.md */,
-				D2164F1724F3B9A20000A6AA /* iOS_DisguisedPtr.md */,
 				D20B5C8124ECFF120077EF6D /* iOS_spinlock_t.md */,
 				D2164F0824EE45A60000A6AA /* iOS_os_unfair_lock.md */,
 				D2164F0D24EFD9710000A6AA /* iOS_pthread_mutex_t.md */,

@@ -1,6 +1,6 @@
 #  dispatch_async的block中是否该使用_weak self的思考
 
-> blcok 中捕获 self，一定会延长 self 的生命周期。如果 self 同时持有 block，则会导致循环引用。循环引用之外的延长 self 的生命周期是很容易忽略的一个点。
+> `blcok` 中捕获 `self`，一般会延长 `self` 的生命周期（至少到 `block` 释放后）。如果 `self` 同时持有 `block`，则会导致循环引用。循环引用之外的延长 `self` 的生命周期是很容易忽略的一个点。
 
 ## 延长 self 的生命周期
 ```objective-c
@@ -18,7 +18,8 @@ dispatch_async(globalQueue_DEFAULT, ^{
 // 下面在并行队列里面要执行的 block 没有 retain self
 __weak typeof(self) _self = self;
 dispatch_async(globalQueue_DEFAULT, ^{
-    __strong typeof(_self) self = _self; // 保证在下面的执行过程中 self 不会被释放，执行结束后 self 会被释放
+    // 保证在下面的执行过程中 self 不会被释放，执行结束后 self 会被释放
+    __strong typeof(_self) self = _self;
     if (!self) return;
     // do something
     // ...
@@ -44,9 +45,7 @@ dispatch_async(globalQueue_DEFAULT, ^{
     // self 假如在此处捕获的 self 是一个 UI 对象，且此 block 是该 UI 对象的最后一个持有者，一些操作使该 UI 对象被释放，由于此时在非主线程，且 此时 UI 对象的 dealloc 里面有一些 UI 操作，由于 UI 操作必须在主线程进行，但是此时是在非主线程，所以会导致 crash (怎么才能模拟出这种场景呢😖)
 };
 ```
-
 **参考链接:🔗**
-
-[dispatch_async的block中是否该使用_weak self](https://www.jianshu.com/p/c374b7727d79)
-[dispatch_async的block里面需要__weak self 吗？ #41](https://github.com/ibireme/YYKit/issues/41)
-[线程安全类的设计](https://objccn.io/issue-2-4/)
++ [dispatch_async的block中是否该使用_weak self](https://www.jianshu.com/p/c374b7727d79)
++ [dispatch_async的block里面需要__weak self 吗？ #41](https://github.com/ibireme/YYKit/issues/41)
++ [线程安全类的设计](https://objccn.io/issue-2-4/)

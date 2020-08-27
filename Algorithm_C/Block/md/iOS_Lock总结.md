@@ -216,11 +216,10 @@
   pthread_mutex_trylock 和 trylock 不同，trylock 返回的是 YES 和 NO，pthread_mutex_trylock 加锁成功返回的是 0，失败返回的是错误提示码。
   pthread_mutex_destroy 为释放资源。
   
-  **参考链接:🔗**
-  
-  [iOS 常见知识点（三）：Lock](https://www.jianshu.com/p/ddbe44064ca4)
-  [iOS中保证线程安全的几种方式与性能对比](https://www.jianshu.com/p/938d68ed832c)
-  [关于 @synchronized，这儿比你想知道的还要多](http://yulingtianxia.com/blog/2015/11/01/More-than-you-want-to-know-about-synchronized/)
+**参考链接:🔗**
++ [iOS 常见知识点（三）：Lock](https://www.jianshu.com/p/ddbe44064ca4)
++ [iOS中保证线程安全的几种方式与性能对比](https://www.jianshu.com/p/938d68ed832c)
++ [关于 @synchronized，这儿比你想知道的还要多](http://yulingtianxia.com/blog/2015/11/01/More-than-you-want-to-know-about-synchronized/)
     
   
   

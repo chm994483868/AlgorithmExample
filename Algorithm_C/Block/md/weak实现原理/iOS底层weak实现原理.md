@@ -3,6 +3,7 @@
 > 提起 `weak` 我们脑海中大概会浮现出如下印象：
   1. 当我们直接把对象赋值给 `__weak` 变量时，编译器会提示我们 `Assigning retained object to weak variable; object will be released after assignment`，即把对象直接赋值给 `weak` 修饰的变量，`weak` 变量不会持有所赋值的对象，不会增加对象的引用计数，对象会立即得到释放。
   2. 当 `__weak` 修饰的变量所引用的对象释放后，`__weak` 变量会被自动置为 `nil` 而不是野指针，避免访问野指针导致的 `crash`。
+  3. `weak` 修饰的属性，
   
   那么下面我们来一步一步分析 `weak` 的实现细节。
 
@@ -21,7 +22,7 @@
   }
 ```
 运行后会进入断点，并显示出这样的信息：
-```
+```c++
 ....
 ->  0x100000dcf <+63>:  movq   -0x10(%rbp), %rsi
 0x100000dd3 <+67>:  leaq   -0x18(%rbp), %rdi
@@ -216,6 +217,8 @@ storeWeak(id *location, objc_object *newObj)
         { // 如果 cls 还没有初始化，先初始化，再尝试设置 weak
             // 解锁
             SideTable::unlockTwo<haveOld, haveNew>(oldTable, newTable);
+            // 调用对象所在类的(不是元类)初始化方法，
+            // 即 调用的是 [newObjClass initialize]; 类方法
             class_initialize(cls, (id)newObj);
 
             // If this class is finished with +initialize then we're good.
@@ -229,6 +232,11 @@ storeWeak(id *location, objc_object *newObj)
             //（即在它自己的一个实例上，+initialize 调用 storeWeak），
             // 那么我们可以继续，但它将显示为正在初始化一个尚未初始化的检查。
             
+            // 如果这个类在这个线程中完成了 +initialize 的任务，那么这很好。
+            // 如果这个类还在这个线程中继续执行着 +initialize 任务，
+            // (比如，这个类的实例在调用 storeWeak 方法，而 storeWeak 方法调用了 +initialize .)
+            // 这样我们可以继续运行，但在上面它将进行初始化和尚未初始化的检查。
+            // 相反，在重试时设置 previouslyInitializedClass 为这个类来识别它。
             // Instead set previouslyInitializedClass to recognize it on retry.
             // 这里记录一下 previouslyInitializedClass，防止该 if 分支再次进入
             previouslyInitializedClass = cls;

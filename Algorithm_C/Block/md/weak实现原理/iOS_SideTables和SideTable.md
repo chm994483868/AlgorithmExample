@@ -1,21 +1,29 @@
 # iOS_SideTables 和 SideTable
 
 ## SideTables
-`SideTables` 可以理解为一个 `key` 是对象指针(`void *`)，`value` 是`SideTable` 的静态全局的 `hash` 数组，里面存储了 `SideTable` 类型的数据，其长度在 `TARGET_OS_IPHONE && !TARGET_OS_SIMULATOR` 的情况下是 8，其他所有情况下是 64。
+`SideTables` 是一个 `key` 是对象指针(`void *`)，`value` 是`SideTable` 的静态全局的 `hash` 数组，里面存储了 `SideTable` 类型的数据，其长度在 `(TARGET_OS_IPHONE && !TARGET_OS_SIMULATOR)` 的情况下是 8，其它情况下是 64，正是这 8/64 张 `SideTable` 完成了所有对象的引用计数控制和 `weak` 机制的实现。
 
-`SideTables` 可以通过全局的静态函数获取:
+`SideTables` 可以通过全局的静态函数获取，其代码实现是抽象类型为 `SideTable` 的 `StripedMap` 模版类。
 ```c++
 // Map: NSObject * (key) -- SideTable& (value)
 static StripedMap<SideTable>& SideTables() {
     return SideTablesMap.get();
 }
 ```
-看到 `SideTables()` 下面定义了多个与 `lock` 相关的函数，内部实现其实都是调用的 `class StripedMap` 的函数，而 `class StripedMap` 又恰是其模版抽象类型 `T` 所支持的函数接口，对应 `SideTables` 的 `T` 类型是 `SideTable`，下面分析 `SideTable` 时，再一并分析看 `SideTable` 是怎么实现的。
+`SideTablesMap` 是抽象类型为 `StripedMap<SideTable>` 的 `ExplicitInit` 模版类，`ExplicitInit` 代码实现很少，只有两个函数：`init` 和 `get` 函数，但是不影响接下来的分析，先略过，其实还没看懂啥意思，大概就是为 `SideTables` 中的 8/64 个 `SideTable` 分配空间。
 ```c++
+static objc::ExplicitInit<StripedMap<SideTable>> SideTablesMap;
+```
+
+`SideTables()` 下面定义了多个与锁相关的全局函数，内部实现是调用 `StripedMap` 的模版抽象类型 `T` 所支持的函数接口，对应 `SideTables` 的 `T` 类型是 `SideTable`，而 `SideTable` 执行对应的函数接口时正是调用了它的 `spinlock_t slock;` 成员变量。这里采用了分离锁的机制，即一张 `SideTable` 一把锁，减轻并行处理对象时的阻塞压力。
+
+```c++
+// 循环 8/64 次给 SideTable 加锁
 void SideTableLockAll() {
     SideTables().lockAll();
 }
 
+// 循环 8/64 次给 SideTable 解锁
 void SideTableUnlockAll() {
     SideTables().unlockAll();
 }
@@ -51,14 +59,15 @@ void SideTableLocksSucceedLocks(StripedMap<spinlock_t>& oldlocks) {
         SideTables().succeedLock(oldlock);
     }
 }
-
 ```
-根据函数返回值类型可以看到 `SideTabls` 类型为模版类型 `StripedMap`。
+根据函数返回值类型可以看到 `SideTabls` 类型为模版类型 `StripedMap`。`StripedMap` 分析在另外一篇文章。
+
 接着看下 `SideTablesMap.get()`，`SideTableMap` 是一个类型为 `objc::ExplicitInit<StripedMap<SideTable>>` 的静态全局变量，`SideTablesMap` 定义：
 ```c++
 static objc::ExplicitInit<StripedMap<SideTable>> SideTablesMap;
 ```
 那接下来我们详细分析一下 `ExplicitInit` 类型。
+
 ## `ExplicitInit`
 定义位于`Project Headers/DenseMapExtras.h` P37：
 
@@ -163,11 +172,11 @@ struct SideTable {
 
     // Address-ordered lock discipline for a pair of side tables.
     
-    // 按锁的顺序对两个 SideTable 参数里的 slock 上锁
     // HaveOld 和 HaveNew 分别表示 lock1 和 lock2 是否存在
     // 对应于 __weak 变量是否指向有旧值和目前要指向的新值
     // lock1 代表旧值对象所处的 SideTable 
     // lock2 代表新值对象所处的 SideTable
+    // lockTwo 是根据谁有值就调谁的锁，触发加锁 ( C++ 方法重载)，如果两个都有值，那么两个都加锁
     template<HaveOld, HaveNew>
     static void lockTwo(SideTable *lock1, SideTable *lock2);
     
@@ -245,6 +254,10 @@ class DenseMap : public DenseMapBase<DenseMap<KeyT, ValueT, ValueInfoT, KeyInfoT
 关于 `DenseMap` 和相关的模版定义，实在是太长啦，等后面再看。😭
 
 **参考链接:🔗**
+[一个有趣的现象（苹果的bug Or 坑?），关于区分真机和模拟器的预编译宏](https://blog.csdn.net/openglnewbee/article/details/25223633?utm_medium=distribute.pc_relevant.none-task-blog-BlogCommendFromMachineLearnPai2-2.add_param_isCf&depth_1-utm_source=distribute.pc_relevant.none-task-blog-BlogCommendFromMachineLearnPai2-2.add_param_isCf)
+[iOS管理对象内存的数据结构以及操作算法--SideTables、RefcountMap、weak_table_t-二](https://www.jianshu.com/p/8577286af88e)
+
+
 [【C++】C++11可变参数模板（函数模板、类模板）](https://blog.csdn.net/qq_38410730/article/details/105247065?utm_medium=distribute.pc_relevant.none-task-blog-BlogCommendFromMachineLearnPai2-2.channel_param&depth_1-utm_source=distribute.pc_relevant.none-task-blog-BlogCommendFromMachineLearnPai2-2.channel_param)
 [C++11新特性之 std::forward(完美转发)](https://blog.csdn.net/wangshubo1989/article/details/50485951?utm_medium=distribute.pc_relevant.none-task-blog-BlogCommendFromMachineLearnPai2-3.channel_param&depth_1-utm_source=distribute.pc_relevant.none-task-blog-BlogCommendFromMachineLearnPai2-3.channel_param)
 [llvm中的数据结构及内存分配策略 - DenseMap](https://blog.csdn.net/dashuniuniu/article/details/80043852)
