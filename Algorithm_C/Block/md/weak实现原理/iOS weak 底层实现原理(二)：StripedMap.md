@@ -195,7 +195,7 @@ const T& operator[] (const void *p) const {
 }
 ```
 ## `Lock` 操作
-接下来是一系列锁的操作，循环加锁、循环解锁、定义锁定顺序等等，由于 `SideTables` 是一个全局的 `hash` 表，因此必须要带锁访问。通过源码看到所有的 `StripedMap` 锁操作，最终调用的都是 `array[i].value` 的相关操作，而 `value` 是模版的抽象数据 `T` 类型，因此 `T` 必须具备相关的 `lock` 操作接口。
+接下来是一系列锁的操作，循环加锁、循环解锁、定义锁定顺序等等，由于 `SideTables` 是一个全局的 `hash` 表，因此必须要带锁访问。通过源码看到所有的 `StripedMap` 锁操作，最终调用的都是 `array[i].value` 的相关操作，而 `value` 是模版的抽象数据 `T` 类型，因此 `T` 必须具备相关的 `lock` 操作接口。在讲 《iOS weak 底层实现原理(四)：SideTables和SideTable》一节中我们都能看到对应的实现。
 
 因此，要用 `StripedMap` 作为模版 `hash` 表，对于 `T` 类型是有要求的，而在 `SideTables` 中 `T` 即为 `SideTable` 类型，等下我们会看 `SideTable` 是怎么符合 `StripedMap` 的数据类型要求的。
 

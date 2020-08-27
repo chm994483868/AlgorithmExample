@@ -215,8 +215,8 @@
 		D2164F1524F33A9A0000A6AA /* iOS_Lock总结.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS_Lock总结.md"; sourceTree = "<group>"; };
 		D2164F1624F3B7C00000A6AA /* iOS weak 底层实现原理(三)：weak_entry_t.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS weak 底层实现原理(三)：weak_entry_t.md"; sourceTree = "<group>"; };
 		D2164F1724F3B9A20000A6AA /* iOS weak 底层实现原理(一)：DisguisedPtr.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS weak 底层实现原理(一)：DisguisedPtr.md"; sourceTree = "<group>"; };
-		D2164F1824F499680000A6AA /* iOS weak 底层实现原理(四)：weak_table_t.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS weak 底层实现原理(四)：weak_table_t.md"; sourceTree = "<group>"; };
-		D2164F1924F4A0930000A6AA /* iOS_SideTables和SideTable.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS_SideTables和SideTable.md"; sourceTree = "<group>"; };
+		D2164F1824F499680000A6AA /* iOS weak 底层实现原理(五)：weak_table_t.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS weak 底层实现原理(五)：weak_table_t.md"; sourceTree = "<group>"; };
+		D2164F1924F4A0930000A6AA /* iOS weak 底层实现原理(四)：SideTables和SideTable.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS weak 底层实现原理(四)：SideTables和SideTable.md"; sourceTree = "<group>"; };
 		D2164F1A24F4FC850000A6AA /* iOS weak 底层实现原理(二)：StripedMap.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS weak 底层实现原理(二)：StripedMap.md"; sourceTree = "<group>"; };
 		D2164F1B24F505330000A6AA /* C++强制类型转换符reinterpret_cast.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "C++强制类型转换符reinterpret_cast.md"; sourceTree = "<group>"; };
 		D21B43A124CE83160078EEF9 /* FindDuplication.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = FindDuplication.cpp; sourceTree = "<group>"; };
@@ -856,8 +856,8 @@
 				D2164F1724F3B9A20000A6AA /* iOS weak 底层实现原理(一)：DisguisedPtr.md */,
 				D2164F1A24F4FC850000A6AA /* iOS weak 底层实现原理(二)：StripedMap.md */,
 				D2164F1624F3B7C00000A6AA /* iOS weak 底层实现原理(三)：weak_entry_t.md */,
-				D2164F1824F499680000A6AA /* iOS weak 底层实现原理(四)：weak_table_t.md */,
-				D2164F1924F4A0930000A6AA /* iOS_SideTables和SideTable.md */,
+				D2164F1924F4A0930000A6AA /* iOS weak 底层实现原理(四)：SideTables和SideTable.md */,
+				D2164F1824F499680000A6AA /* iOS weak 底层实现原理(五)：weak_table_t.md */,
 			);
 			path = "weak实现原理";
 			sourceTree = "<group>";

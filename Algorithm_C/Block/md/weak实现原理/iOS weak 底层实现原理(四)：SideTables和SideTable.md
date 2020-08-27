@@ -1,22 +1,27 @@
-# iOS_SideTables 和 SideTable
+# iOS weak 底层实现原理(四)：SideTables和SideTable
 
-## SideTables
-`SideTables` 是一个 `key` 是对象指针(`void *`)，`value` 是`SideTable` 的静态全局的 `hash` 数组，里面存储了 `SideTable` 类型的数据，其长度在 `(TARGET_OS_IPHONE && !TARGET_OS_SIMULATOR)` 的情况下是 8，其它情况下是 64，正是这 8/64 张 `SideTable` 完成了所有对象的引用计数控制和 `weak` 机制的实现。
+## `SideTables`
+`SideTables` 是一个 `key` 是对象指针(`void *`)，`value` 是`SideTable` 的静态全局的 `hash` 数组。
+`SideTables` 里面存储了 `SideTable` 类型的数据，其长度在 `(TARGET_OS_IPHONE && !TARGET_OS_SIMULATOR)` 的情况下是 8，其它情况下是 64，正是这 8/64 张 `SideTable` 完成了程序中所有对象的引用计数操作和 `weak` 机制的实现。
 
-`SideTables` 可以通过全局的静态函数获取，其代码实现是抽象类型为 `SideTable` 的 `StripedMap` 模版类。
+`SideTables` 可以通过全局的静态函数获取，其数据类型是抽象类型为 `SideTable` 的 `StripedMap` 模版类。
 ```c++
 // Map: NSObject * (key) -- SideTable& (value)
 static StripedMap<SideTable>& SideTables() {
     return SideTablesMap.get();
 }
 ```
+
+## `SideTablesMap`
+`SideTables` 是 `SideTablesMap` 的 `get` 函数返回值 。
 `SideTablesMap` 是抽象类型为 `StripedMap<SideTable>` 的 `ExplicitInit` 模版类，`ExplicitInit` 代码实现很少，只有两个函数：`init` 和 `get` 函数，但是不影响接下来的分析，先略过，其实还没看懂啥意思，大概就是为 `SideTables` 中的 8/64 个 `SideTable` 分配空间。
 ```c++
 static objc::ExplicitInit<StripedMap<SideTable>> SideTablesMap;
 ```
 
-`SideTables()` 下面定义了多个与锁相关的全局函数，内部实现是调用 `StripedMap` 的模版抽象类型 `T` 所支持的函数接口，对应 `SideTables` 的 `T` 类型是 `SideTable`，而 `SideTable` 执行对应的函数接口时正是调用了它的 `spinlock_t slock;` 成员变量。这里采用了分离锁的机制，即一张 `SideTable` 一把锁，减轻并行处理对象时的阻塞压力。
-
+## `SideTables()`  锁相关的全局函数
+`SideTables()` 下面定义了多个与锁相关的全局函数，内部实现是调用 `StripedMap` 的模版抽象类型 `T` 所支持的函数接口，对应 `SideTables` 的 `T` 类型是 `SideTable`，而 `SideTable` 执行对应的函数时正是调用了它的 `spinlock_t slock` 成员变量的函数。
+这里采用了分离锁的机制，即一张 `SideTable` 一把锁，减轻并行处理多个对象时的阻塞压力。
 ```c++
 // 循环 8/64 次给 SideTable 加锁
 void SideTableLockAll() {
@@ -60,9 +65,9 @@ void SideTableLocksSucceedLocks(StripedMap<spinlock_t>& oldlocks) {
     }
 }
 ```
-根据函数返回值类型可以看到 `SideTabls` 类型为模版类型 `StripedMap`。`StripedMap` 分析在另外一篇文章。
 
-接着看下 `SideTablesMap.get()`，`SideTableMap` 是一个类型为 `objc::ExplicitInit<StripedMap<SideTable>>` 的静态全局变量，`SideTablesMap` 定义：
+## `SideTablesMap`
+`SideTableMap` 是一个类型为 `objc::ExplicitInit<StripedMap<SideTable>>` 的静态全局变量。`SideTablesMap` 定义如下：
 ```c++
 static objc::ExplicitInit<StripedMap<SideTable>> SideTablesMap;
 ```
@@ -76,10 +81,13 @@ static objc::ExplicitInit<StripedMap<SideTable>> SideTablesMap;
 // 命名空间 objc
 namespace objc {
 
-// We cannot use a C++ static initializer to initialize certain globals because libc calls us before our C++ initializers run. 
-// 我们不能使用 C++ 静态初始化程序来初始化某些全局变量，因为 libc 在 C++ 初始化程序运行之前会调用我们。
+// We cannot use a C++ static initializer to initialize certain
+// globals because libc calls us before our C++ initializers run. 
+// 我们不能使用 C++ 静态初始化程序来初始化某些全局变量，
+// 因为 libc 在 C++ 初始化程序运行之前会调用我们。
 
-// We also don't want a global pointer to some globals because of the extra indirection.
+// We also don't want a global pointer to some 
+// globals because of the extra indirection.
 // 由于额外的间接性，我们也不需要全局指针指向某些全局变量。
 
 // ExplicitInit / LazyInit wrap doing it the hard way.
@@ -159,7 +167,7 @@ struct SideTable {
 
     ~SideTable() {
         // 析构函数
-        // 看到 SidetTable 是不能析构的，如果进行析构则会直接 creash
+        // 看到 SidetTable 是不能析构的，如果进行析构则会直接终止运行
         _objc_fatal("Do not delete SideTable.");
     }
     
@@ -176,7 +184,8 @@ struct SideTable {
     // 对应于 __weak 变量是否指向有旧值和目前要指向的新值
     // lock1 代表旧值对象所处的 SideTable 
     // lock2 代表新值对象所处的 SideTable
-    // lockTwo 是根据谁有值就调谁的锁，触发加锁 ( C++ 方法重载)，如果两个都有值，那么两个都加锁
+    // lockTwo 是根据谁有值就调谁的锁，触发加锁 ( C++ 方法重载)，
+    // 如果两个都有值，那么两个都加锁
     template<HaveOld, HaveNew>
     static void lockTwo(SideTable *lock1, SideTable *lock2);
     
@@ -188,19 +197,22 @@ struct SideTable {
 `struct SideTable` 定义很清晰，首先是 3 个成员变量:
 
 1. `spinlock_t slock;`: 自旋锁，用于 `SideTable` 的加锁和解锁。
-  此锁正是重点来解决弱引用机制的线程安全问题的，看前面的两大块 `weak_table_t` 和 `weak_entry_t` 的时候，看到所有操作中都不是线程安全的，它们的操作完全没有提及锁的事情，其实是把保证它们线程安全的任务交给了 `SideTable`。下面可以看到 `SideTable` 提供的方法都与锁有关。
+  此锁正是重点来解决弱引用机制的线程安全问题的。看前面的两大块 `weak_table_t` 和 `weak_entry_t` 的时候，看到所有操作中都不是线程安全的，如果你仔细观察的话会发现它们的函数名后面都有一个 `no_lock`的小尾巴，即它们的操作完全没有提及锁的事情。其实是把保证它们线程安全的任务交给了 `SideTable`，下面可以看到 `SideTable` 提供的方法都与锁有关，而这正是由`slock` 完成。
 
-2. `RefcountMap refcnts;`: 以 `DisguisedPtr<objc_object>` 为 `key`，以 `size_t` 为 `value` 的 `hash` 表，用来存储 `OC` 对象的引用计数（仅在未开启 `isa` 优化或者 `isa` 优化情况下 `isa_t` 的引用计数溢出时才会用到，这里就牵涉到 `isa_t`里的 `uintptr_t has_sidetable_rc` 和 `uintptr_t extra_rc` 两个字段，以前看的 `isa` 的结构这里终于用到了，还有这时候终于知道 `rc` 其实是 `refcount`(引用计数) 的缩写）。作为哈希表，它使用的是平方探测法生成哈希值（`key`），`weak_table_t` 则是线性探测（开放寻址法）。
+2. `RefcountMap refcnts`: 以 `DisguisedPtr<objc_object>` 为 `key`，以 `size_t` 为 `value` 的 `hash` 表，用来存储 `OC` 对象的引用计数（仅在未开启 `isa` 优化或者 `isa` 优化情况下 `isa_t` 的引用计数溢出时才会用到，这里就牵涉到 `isa_t`里的 `uintptr_t has_sidetable_rc` 和 `uintptr_t extra_rc` 两个字段，以前看的 `isa` 的结构这里终于用到了，还有这时候终于知道 `rc` 其实是 `refcount`(引用计数) 的缩写）。作为哈希表，它使用的是平方探测法生成哈希值（`key`），`weak_table_t` 则是线性探测（开放寻址法）。（`RefcountMap` 留在引用计数相关文章中来分析。）
 
-3. `weak_table_t weak_table;` 存储对象弱引用的指针的 `hash` 表，是 `OC` `weak` 功能实现的核心数据结构。
+3. `weak_table_t weak_table` 存储对象弱引用的指针的 `hash` 表，是 `OC` `weak` 功能实现的核心数据结构。
 
 下面是构造函数和析构函数：
-构造函数只做了一件事，把 `weak_table` 的数据空间置为 `0`：
+构造函数只做了一件事，调用 `memset` 函数，把 `weak_table` 的数据空间置为 `0`：
 ```c++
 // 把从 &weak_table 位置开始的长度为 sizeof(weak_table) 的内存置为 0
 memset(&weak_table, 0, sizeof(weak_table));
 ```
 析构函数也是只做了一件事，就是把你的程序直接给停止运行，明确指出 `SideTable` 是不能被析构的。`_objc_fatal` 会调用 `exit` 或者 `abort`。
+```
+_objc_fatal("Do not delete SideTable.");
+```
 再下面是锁的操作，同时接口也符合上面提到的 `StripedMap` 中关于模版抽象类型 `T` 类型的 `value` 的接口要求。
 
 ## `spinlock_t`
@@ -217,7 +229,8 @@ typedef struct os_unfair_lock_s {
 ## `RefcountMap`
 `RefcountMap refcnts;` 用来存储对象的引用计数。首先看一下它的类型定义:
 ```c++
-// RefcountMap disguises its pointers because we don't want the table to act as a root for `leaks`.
+// RefcountMap disguises its pointers because we
+// don't want the table to act as a root for `leaks`.
 // 同样是使用 DisguisedPtr 把对象的地址隐藏起来，逃过 leaks 等工具的检测
 typedef objc::DenseMap<DisguisedPtr<objc_object>,size_t,RefcountMapValuePurgeable> RefcountMap;
 ```
@@ -251,15 +264,16 @@ class DenseMap : public DenseMapBase<DenseMap<KeyT, ValueT, ValueInfoT, KeyInfoT
   ...
 };
 ```
-关于 `DenseMap` 和相关的模版定义，实在是太长啦，等后面再看。😭
+关于 `DenseMap` 和相关的模版定义，实在是太长啦，准备后面写引用计数相关内容时再讲。
 
+## 参考链接
 **参考链接:🔗**
-[一个有趣的现象（苹果的bug Or 坑?），关于区分真机和模拟器的预编译宏](https://blog.csdn.net/openglnewbee/article/details/25223633?utm_medium=distribute.pc_relevant.none-task-blog-BlogCommendFromMachineLearnPai2-2.add_param_isCf&depth_1-utm_source=distribute.pc_relevant.none-task-blog-BlogCommendFromMachineLearnPai2-2.add_param_isCf)
-[iOS管理对象内存的数据结构以及操作算法--SideTables、RefcountMap、weak_table_t-二](https://www.jianshu.com/p/8577286af88e)
++ [一个有趣的现象（苹果的bug Or 坑?），关于区分真机和模拟器的预编译宏](https://blog.csdn.net/openglnewbee/article/details/25223633?utm_medium=distribute.pc_relevant.none-task-blog-BlogCommendFromMachineLearnPai2-2.add_param_isCf&depth_1-utm_source=distribute.pc_relevant.none-task-blog-BlogCommendFromMachineLearnPai2-2.add_param_isCf)
++ [iOS管理对象内存的数据结构以及操作算法--SideTables、RefcountMap、weak_table_t-二](https://www.jianshu.com/p/8577286af88e)
 
 
-[【C++】C++11可变参数模板（函数模板、类模板）](https://blog.csdn.net/qq_38410730/article/details/105247065?utm_medium=distribute.pc_relevant.none-task-blog-BlogCommendFromMachineLearnPai2-2.channel_param&depth_1-utm_source=distribute.pc_relevant.none-task-blog-BlogCommendFromMachineLearnPai2-2.channel_param)
-[C++11新特性之 std::forward(完美转发)](https://blog.csdn.net/wangshubo1989/article/details/50485951?utm_medium=distribute.pc_relevant.none-task-blog-BlogCommendFromMachineLearnPai2-3.channel_param&depth_1-utm_source=distribute.pc_relevant.none-task-blog-BlogCommendFromMachineLearnPai2-3.channel_param)
-[llvm中的数据结构及内存分配策略 - DenseMap](https://blog.csdn.net/dashuniuniu/article/details/80043852)
-[RunTime中SideTables, SideTable, weak_table, weak_entry_t](https://www.jianshu.com/p/48a9a9ec8779)
-[Object Runtime -- Weak](https://cloud.tencent.com/developer/article/1408976)
++ [C++11可变参数模板（函数模板、类模板）](https://blog.csdn.net/qq_38410730/article/details/105247065?utm_medium=distribute.pc_relevant.none-task-blog-BlogCommendFromMachineLearnPai2-2.channel_param&depth_1-utm_source=distribute.pc_relevant.none-task-blog-BlogCommendFromMachineLearnPai2-2.channel_param)
++ [C++11新特性之 std::forward(完美转发)](https://blog.csdn.net/wangshubo1989/article/details/50485951?utm_medium=distribute.pc_relevant.none-task-blog-BlogCommendFromMachineLearnPai2-3.channel_param&depth_1-utm_source=distribute.pc_relevant.none-task-blog-BlogCommendFromMachineLearnPai2-3.channel_param)
++ [llvm中的数据结构及内存分配策略 - DenseMap](https://blog.csdn.net/dashuniuniu/article/details/80043852)
++ [RunTime中SideTables, SideTable, weak_table, weak_entry_t](https://www.jianshu.com/p/48a9a9ec8779)
++ [Object Runtime -- Weak](https://cloud.tencent.com/developer/article/1408976)
