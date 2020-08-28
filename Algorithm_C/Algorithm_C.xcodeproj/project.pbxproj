@@ -219,6 +219,8 @@
 		D2164F1924F4A0930000A6AA /* iOS weak 底层实现原理(四)：SideTables和SideTable.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS weak 底层实现原理(四)：SideTables和SideTable.md"; sourceTree = "<group>"; };
 		D2164F1A24F4FC850000A6AA /* iOS weak 底层实现原理(二)：StripedMap.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS weak 底层实现原理(二)：StripedMap.md"; sourceTree = "<group>"; };
 		D2164F1B24F505330000A6AA /* C++强制类型转换符reinterpret_cast.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "C++强制类型转换符reinterpret_cast.md"; sourceTree = "<group>"; };
+		D2164F1D24F8856E0000A6AA /* 野指针.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "野指针.md"; sourceTree = "<group>"; };
+		D2164F1E24F899FA0000A6AA /* iOS weak 底层实现原理(六)：objc-weak.mm函数分析.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS weak 底层实现原理(六)：objc-weak.mm函数分析.md"; sourceTree = "<group>"; };
 		D21B43A124CE83160078EEF9 /* FindDuplication.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = FindDuplication.cpp; sourceTree = "<group>"; };
 		D21B43A224CE83160078EEF9 /* FindDuplication.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = FindDuplication.hpp; sourceTree = "<group>"; };
 		D21B43A524CEA24B0078EEF9 /* FindDuplicationNoEdit.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = FindDuplicationNoEdit.cpp; sourceTree = "<group>"; };
@@ -852,12 +854,13 @@
 		D2164F1C24F7AF070000A6AA /* weak实现原理 */ = {
 			isa = PBXGroup;
 			children = (
-				D20B5C8024EBCEFE0077EF6D /* iOS底层weak实现原理.md */,
 				D2164F1724F3B9A20000A6AA /* iOS weak 底层实现原理(一)：DisguisedPtr.md */,
 				D2164F1A24F4FC850000A6AA /* iOS weak 底层实现原理(二)：StripedMap.md */,
 				D2164F1624F3B7C00000A6AA /* iOS weak 底层实现原理(三)：weak_entry_t.md */,
 				D2164F1924F4A0930000A6AA /* iOS weak 底层实现原理(四)：SideTables和SideTable.md */,
 				D2164F1824F499680000A6AA /* iOS weak 底层实现原理(五)：weak_table_t.md */,
+				D2164F1E24F899FA0000A6AA /* iOS weak 底层实现原理(六)：objc-weak.mm函数分析.md */,
+				D20B5C8024EBCEFE0077EF6D /* iOS底层weak实现原理.md */,
 			);
 			path = "weak实现原理";
 			sourceTree = "<group>";
@@ -1480,6 +1483,7 @@
 				D2164F1C24F7AF070000A6AA /* weak实现原理 */,
 				D2164F0624EE113B0000A6AA /* 学习统计.md */,
 				D21333F324E6610E00A6175C /* 内存对齐原则.md */,
+				D2164F1D24F8856E0000A6AA /* 野指针.md */,
 				D21333F224E63B6C00A6175C /* 深入理解Objective-C中的alloc和init.md */,
 				D2E526D124E4B2E200ACD06F /* 深入理解Objective-C中的Class.md */,
 				D21333F124E63A9D00A6175C /* 深入理解Objective-C中的isa.md */,

@@ -2,8 +2,8 @@
 
 > 提起 `weak` 我们脑海中大概会浮现出如下印象：
   1. 当我们直接把对象赋值给 `__weak` 变量时，编译器会提示我们 `Assigning retained object to weak variable; object will be released after assignment`，即把对象直接赋值给 `weak` 修饰的变量，`weak` 变量不会持有所赋值的对象，不会增加对象的引用计数，对象会立即得到释放。
-  2. 当 `__weak` 修饰的变量所引用的对象释放后，`__weak` 变量会被自动置为 `nil` 而不是野指针，避免访问野指针导致的 `crash`。
-  3. `weak` 修饰的属性，
+  2. 当 `__weak` 修饰的变量所引用的对象释放后，`__weak` 变量会被自动置为 `nil` 而不是成为野指针，这能避免访问野指针而导致的 `crash`。
+  3. `weak` 修饰的属性，机制同 `__weak` 变量。
   
   那么下面我们来一步一步分析 `weak` 的实现细节。
 
@@ -15,8 +15,14 @@
   int main(int argc, const char * argv[]) {
       @autoreleasepool {
           // insert code here...
-          NSObject *obj = [[NSObject alloc] init];
-          __weak id weakPtr = obj; // ⬅️ 在这一行打断点
+          printf("Start tag");
+          {
+              id obj = [NSObject new];
+              __weak id weakPtr = obj;
+              __weak id weakPtrTwo = weakPtr;
+              NSLog(@"🎉🎉🎉 weakPtr = %@, weakPtrTwo = %@", weakPtr, weakPtrTwo);
+          }
+          printf("End tag");
       }
       return 0;
   }

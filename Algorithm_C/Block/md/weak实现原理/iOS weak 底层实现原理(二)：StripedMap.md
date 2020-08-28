@@ -1,6 +1,7 @@
 #  iOS weak 底层实现原理(二)：StripedMap
 ## 摘要
-首先 `StripedMap` 是一个模版类 `template<typename T> class StripedMap`，从数据结构角度看的话，它是一个 `Key` 是 `void *`，`Value` 是 `T` 的 `hash` 表，而我们使用的 `SideTables` 对应类型是: `StripedMap<SideTable>`，即我们根据对象的指针找到它所对应的 `SideTable`，它的实现并不复杂，下面一起看下它的实现：
+首先 `StripedMap` 是一个模版类型：`template<typename T> class StripedMap`，阅读其内部实现然后从数据结构角度看的话，它其实是作为一个 `Key` 是 `void *`，`Value` 是 `T` 的 `hash` 表来用的。我们使用的 `SideTables` 对应类型是: `StripedMap<SideTable>`，阅读代码时我们能发现多处类似: `SideTable *table = &SideTables()[obj]` 这样的调用，它的作用正是根据对象的指针从 `SideTables` 这张 `hash` 表中找到 `obj` 所对应的 `SideTable`。
+`StripedMap` 代码的实现并不复杂，下面一起来看下吧：
 ## StripedMap 源码
 ```c++
 // StripedMap<T> is a map of void* -> T, 

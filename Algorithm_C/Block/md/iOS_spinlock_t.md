@@ -247,6 +247,7 @@ void _os_nospin_lock_unlock(_os_nospin_lock_t lock);
   最终的结论就是，除非开发者能保证访问锁的线程全部都处于同一优先级，否则 iOS 系统中所有类型的自旋锁都不能再使用了。
 
 **参考链接:🔗**
++ [自旋锁](https://baike.baidu.com/item/自旋锁/9137985?fr=aladdin)
 + [不再安全的 OSSpinLock](https://blog.ibireme.com/2016/01/16/spinlock_is_unsafe_in_ios/)
 + [iOS 锁 部分一](https://www.jianshu.com/p/8ce323dbc491)
 + [如何深入理解 iOS 开发中的锁？](https://zhuanlan.zhihu.com/p/148788634)
