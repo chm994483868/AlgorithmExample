@@ -3,6 +3,17 @@
 ## 前言
 &emsp;为了全面透彻的分析 `weak`，前面几篇已经连续分析了所有要用到的数据结构，偶有提及相关操作函数。本篇则直接把 `objc-weak.mm` 中的函数全部分析一遍，从开始往下把一行一行代码都嚼碎了。等把这些函数分析完毕，然后加上前面的几篇数据结构的理解，相信对 `weak` 的大致实现原理能立即浮现于脑中，最后再开新篇完整的对 `weak` 进行总结和验证。⛽️⛽️
 
+## 流程图
+&emsp;下面列出 `objc-weak.h` 中三个公开函数的流程图:
++ `weak_register_no_lock` 函数流程图:
+![weak_register_no_lock 流程图](https://p6-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/daadcd917f5349009d983832c77e7f5c~tplv-k3u1fbpfcp-zoom-1.image)
+
++ `weak_unregister_no_lock` 函数流程图:
+![weak_unregister_no_lock 流程图](https://p9-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/777fa131da9b4011a3bce30263813ce8~tplv-k3u1fbpfcp-zoom-1.image)
+
++ `weak_clear_no_lock` 函数流程图:
+![weak_clear_no_lock 流程图](https://p9-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/02bf8d94652c4c3893d4c326f6e81b58~tplv-k3u1fbpfcp-zoom-1.image)
+
 ## `TABLE_SIZE` 宏定义
 ```c++
 #define TABLE_SIZE(entry) (entry->mask ? entry->mask + 1 : 0)
