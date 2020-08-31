@@ -52,9 +52,9 @@ int main(int argc, const char * argv[]) {
     0x100000e69 <+57>:  movq   %rax, -0x10(%rbp)
     0x100000e6d <+61>:  movq   -0x10(%rbp), %rsi
     0x100000e71 <+65>:  leaq   -0x18(%rbp), %rdi
-    0x100000e75 <+69>:  callq  0x100000ef0               ; symbol stub for: objc_initWeak // 
+    0x100000e75 <+69>:  callq  0x100000ef0               ; symbol stub for: objc_initWeak // ❗️❗️
     0x100000e7a <+74>:  leaq   -0x18(%rbp), %rdi
-    0x100000e7e <+78>:  callq  0x100000eea               ; symbol stub for: objc_destroyWeak // 
+    0x100000e7e <+78>:  callq  0x100000eea               ; symbol stub for: objc_destroyWeak // ❗️❗️
 ->  0x100000e83 <+83>:  leaq   0xe8(%rip), %rdi          ; "End tag"
     0x100000e8a <+90>:  movb   $0x0, %al
     0x100000e8c <+92>:  callq  0x100000f02               ; symbol stub for: printf
@@ -327,281 +327,61 @@ storeWeak(id *location, objc_object *newObj)
     return (id)newObj;
 }
 ```
-分析 `storeWeak` 方法实现：
+`storeWeak` 方法实质上接受5个参数，其中 `HaveOld haveOld, HaveNew haveNew, CrashIfDeallocating crashIfDeallocating` 这三个参数是以模板枚举的方式传入的，其实这是三个 `bool` 参数，分别表示：
++ `HaveOld`: `weak ptr` 之前是否已经指向了一个弱引用，
++ `HaveNew`: `weak ptr` 是否需要指向一个新引用 
++ `CrashIfDeallocating`: 如果被弱引用的对象正在析构，此时再弱引用该对象，是否应该 `crash`。
+具体到 `objc_initWeak`，这三个参数的值分别为 `false，true，true`，因为是初始化 `weak` 变量必然要有新值，没有旧值。
 
-`storeWeak` 方法实质上接受5个参数，其中 `HaveOld haveOld, HaveNew haveNew, CrashIfDeallocating crashIfDeallocating` 这三个参数是以模板枚举的方式传入的，其实这是三个`bool`参数，分别表示：
-+ `weak ptr` 之前是否已经指向了一个弱引用，
-+ `weak ptr` 是否需要指向一个新引用 
-+ 如果被弱引用的对象正在析构，此时再弱引用该对象，是否应该 `crash`。
+那 `storeWeak` 大概分析到这里，下面我们来看另外一个函数。
 
-具体到 `objc_initWeak`，这三个参数的值分别为`false，true，true`。
+### `objc_destroyWeak`
+&emsp;示例代码中 `weak` 变量出来右边花括号必然要进行释放销毁，汇编代码中我们看到了 `objc_destroyWeak` 函数，它正是 `weak` 变量销毁时调用的函数。在分析销毁函数之前我们先看一个问题：
 
-`storeWeak` 另外两个参数是`id *location, objc_object *newObj`，这两个参数和`objc_initWeak`是一样的，分别代表`weak` 指针的地址，以及被`weak`引用的对象。
+> 如果 `weak` 变量比它所指向的对象提前销毁了，那 `weak_entry_t` 中存放弱引用的指针的哈希数组是怎么处理的 ？
+  对于这个问题，因为是关于弱引用的指针怎么处理的，那我们首先想到的应该是 `weak_register_no_lock` 和 `weak_unregister_no_lock` 函数，因为是跟销毁相关的，那我们盲猜应该是和 `weak_unregister_no_lock` 有关，那接下来我们进行验证这个盲猜。
 
-涉及到两个关键函数: 
-```c++
-void weak_unregister_no_lock(weak_table_t *weak_table, id referent_id, id *referrer_id); // 将 weak ptr 地址 从 obj 的 weak_entry_t 中移除
-id weak_register_no_lock(weak_table_t *weak_table, id referent_id, id *referrer_id, bool crashIfDeallocating); // 将 weak ptr 地址 注册到 obj 对应的 weak_entry_t 中
-```
-继续看下 `weak_unregister_no_lock`，将 `weak ptr` 地址 从 `obj` 的 `weak_entry_t` 中移除:
-如果 `weak ptr` 在指向 `obj` 之前，已经 `weak` 引用了其他的对象，则需要先将 `weak ptr` 从其他对象的 `weak_entry_t` 的 `hash` 数组中移除。在 `storeWeak` 方法中，会调用 `weak_unregister_no_lock` 来做移除操作。
+首先我们看下 `objc_destroyWeak` 函数的实现:
 ```c++
 /** 
- * Unregister an already-registered weak reference.
- * 注销以前注册的弱引用。
- * This is used when referrer's storage is about to go away, but referent
- * isn't dead yet. (Otherwise, zeroing referrer later would be a
- * bad memory access.)
- * 该方法用于 referrer 的存储即将消失，但是还没有 “死亡”时。（否则，referrer 置 0 后，可能会造成一个错误的内存访问）
- * Does nothing if referent/referrer is not a currently active weak reference.
- * 如果 referent/referrer 不是当前活动的弱引用，则什么也不做
- * Does not zero referrer.
- * 不能为 0 引用。
+ * Destroys the relationship between a weak pointer and the object
+ * it is referencing in the internal weak table. 
+ 
+ * 销毁 weak pointer 和它指向的对象在 weak_table_t 中的关系。
+ 
+ * If the weak pointer is not referencing anything, 
+ * there is no need to edit the weak table. 
+ 
+ * 如果 weak pointer 没有指向任何变量，那就不需要编辑 weak_table_t。
+ 
+ * This function IS NOT thread-safe with respect to concurrent
+ * modifications to the weak variable. (Concurrent weak clear is safe.)
+ 
+ * 此函数对 weak 变量的并发修改不是线程安全的。
  * 
- * FIXME currently requires old referent value to be passed in (lame)
- * // 当前需要传递旧的引用值
- * FIXME unregistration should be automatic if referrer is collected
- * // 如果 referrer 被收集了，注销应该是自动进行。
- *
- * @param weak_table The global weak table. // 弱引用表
- * @param referent The object. // 旧值
- * @param referrer The weak reference. // weak 变量的指针
+ * @param location The weak pointer address. 
  */
 void
-weak_unregister_no_lock(weak_table_t *weak_table, id referent_id, 
-                        id *referrer_id)
+objc_destroyWeak(id *location)
 {
-    // 旧对象的指针
-    objc_object *referent = (objc_object *)referent_id;
-    
-    // referrer_id 是指向 weak 指针的指针，
-    // 所以这里是 **
-    objc_object **referrer = (objc_object **)referrer_id;
-    
-    // weak_entry_t 自动变量
-    weak_entry_t *entry;
-
-    if (!referent) return;
-    // referent 是 weak 变量之前指向的旧值
-    // 在 weak_table 中去找到有 referent 的 entry
-    //（相当于在 weak_table 表中去找到包含 referent 元素的数组）
-    // 查找到 referent 所对应的 weak_entry_t
-    if ((entry = weak_entry_for_referent(weak_table, referent))) {
-        // 找到了这个 entry，就删除 entry 中的引用对象 - referrer
-        // entry 的结构大概是是 key 是对象的地址，value 是存储 __weak 变量的数组
-        // 这时从数组中把当前的 __weak 变量从数组中移除
-        // 在 referent 所对应的 weak_entry_t 的 hash 数组中，移除 referrer
-        remove_referrer(entry, referrer);
-        bool empty = true;
-        // 移除元素之后， 要检查一下 weak_entry_t 的 hash 数组是否已经空了
-        // 这里是检查哈希表
-        if (entry->out_of_line()  &&  entry->num_refs != 0) {
-            empty = false;
-        }
-        else {
-        // 这里是检查长度为 4 的内部小数组
-            for (size_t i = 0; i < WEAK_INLINE_COUNT; i++) {
-                if (entry->inline_referrers[i]) {
-                    empty = false; 
-                    break;
-                }
-            }
-        }
-        
-        // 如果 entry 中的引用对象没有了，删除这个 entry
-        // 即没有 __weak 变量指向这个对象了
-        // 如果 weak_entry_t 的 hash 数组已经空了，则需要将 weak_entry_t 从 weak_table 中移除
-        if (empty) {
-            weak_entry_remove(weak_table, entry);
-        }
-    }
-
-    // Do not set *referrer = nil. objc_storeWeak() requires that the 
-    // value not change.
+    (void)storeWeak<DoHaveOld, DontHaveNew, DontCrashIfDeallocating>
+        (location, nil);
 }
 ```
->  关键步骤:
-> 1. 在 weak_table 中去找到有 referent - 引用对象的 entry (相当于在 weak_table 表中去找到包含 referent 元素的数组)
-> 2. 如果找到了 entry 就删除 entry 中的 referent - 引用对象（删除的是 referrer 吧好像？）
-> 3. 判断 entry 里面还有没有其他对象，如果没有，就把 entry 也 remove 掉（相当于数组中元素为空，就把这个数据也删除）
-
-`weak_register_no_lock`，将 `weak ptr` 地址 注册到 `obj` 对应的 `weak_entry_t` 中:
+&emsp;我们看到函数内部只有一行对 `storeWeak` 函数的调用，且模版参数直接表明 `DoHaveOld` 有旧值、 `DontHaveNew` 没有新值、`DontCrashIfDeallocating` 不需要 crash，`newObj` 为 `nil`，参数只有 `location` 即要销毁的弱引用的指针，回忆我们上面详细分析的 `storeWeak` 函数：
 ```c++
-/** 
- * Registers a new (object, weak pointer) pair. Creates a new weak
- * object entry if it does not exist.
- * 注册一个新的 (对象，weak 指针) 对。
- * 创建一个新的 weak object entry，如果它不存在的话。
- *
- * @param weak_table The global weak table. // weak 表
- * @param referent The object pointed to by the weak reference. // weak 引用指向的对象
- * @param referrer The weak pointer address. // weak 指针地址
- */
-id 
-weak_register_no_lock(weak_table_t *weak_table, id referent_id, 
-                      id *referrer_id, bool crashIfDeallocating)
-{
-    objc_object *referent = (objc_object *)referent_id;
-    objc_object **referrer = (objc_object **)referrer_id;
-    
-    // 如果 referent为nil 或 referent 采用了 TaggedPointer 计数方式，直接返回，不做任何操作
-    if (!referent  ||  referent->isTaggedPointer()) return referent_id;
-
-    // ensure that the referenced object is viable
-    // 确保引用对象是可见的
-    
-    // 确保被引用的对象可用（没有在析构，同时应该支持 weak 引用）
-    // 1. 判断对象是否正在释放或者已经被释放了
-    bool deallocating;
-    if (!referent->ISA()->hasCustomRR()) {
-        deallocating = referent->rootIsDeallocating();
-    }
-    else {
-        // 2. 判断入参对象是否能进行 weak 引用
-        // 如果对象是继承自 NSObject 则默认是 YES
-        BOOL (*allowsWeakReference)(objc_object *, SEL) = 
-            (BOOL(*)(objc_object *, SEL))
-            object_getMethodImplementation((id)referent, 
-                                           @selector(allowsWeakReference));
-        if ((IMP)allowsWeakReference == _objc_msgForward) {
-            return nil;
-        }
-        deallocating =
-            ! (*allowsWeakReference)(referent, @selector(allowsWeakReference)); // 通过函数指针执行函数
-    }
-
-    // 如果对象释放了且 crashIfDeallocating 为 true，则抛出 crash
-    // 正在析构的对象，不能够被弱引用
-    if (deallocating) {
-        if (crashIfDeallocating) {
-            _objc_fatal("Cannot form weak reference to instance (%p) of "
-                        "class %s. It is possible that this object was "
-                        "over-released, or is in the process of deallocation.",
-                        (void*)referent, object_getClassName((id)referent));
-        } else {
-            return nil;
-        }
-    }
-
-    // now remember it and where it is being stored
-    // 在 weak_table 中找到 referent 对应的 weak_entry,并将 referrer 加入到 weak_entry 中
-    weak_entry_t *entry;
-    // 在 weak_table 中去找到有 referent 的 entry
-    //（相当于在 weak_table 表中去找到包含 referent 元素的数组）
-    // 即自弱引用表里面包含 key 是新对象地址键
-    // 如果能找到 weak_entry，则将 referrer 插入到 weak_entry 中
-    if ((entry = weak_entry_for_referent(weak_table, referent))) {
-        // 如果找到了，直接 append
-        // 类似把 __weak 变量放进数组
-        // 这里其实很复杂，有点类似与 cache_t 的机制，初始化为 4,并根据 3/4 进行扩容
-        // 将 referrer 插入到 weak_entry_t 的引用数组中
-        append_referrer(entry, referrer);
-    } 
-    else {
-        // 创建一个新的 weak_entry_t，并将 referrer 插入到 weak_entry_t 的引用数组中
-        weak_entry_t new_entry(referent, referrer);
-        // weak_table 的 weak_entry_t 数组是否需要动态增长，若需要，则会扩容一倍
-        weak_grow_maybe(weak_table);
-        // 将 weak_entry_t 插入到 weak_table 中
-        weak_entry_insert(weak_table, &new_entry);
-    }
-
-    // Do not set *referrer. objc_storeWeak() requires that the 
-    // value not change.
-    // 不要设置 *referrer。objc_storeWeak() 要求值不能改变。
-
-    return referent_id;
+...
+// Clean up old value, if any.
+// 如果有旧值，则进行 weak_unregister_no_lock 操作
+if (haveOld) {
+    // 把 location 从 oldObj 对应的 weak_entry_t 的 hash 数组中移除
+    weak_unregister_no_lock(&oldTable->weak_table, oldObj, location);
 }
+...
 ```
-> 关键步骤：
-> 1. 在 weak_table 中去找有 referent 的 entry （相当于在 weak_table 表中去找到包含 referent 元素的数组）
-> 2. 如果找到 entry，进行添加操作：append_referrer，如果有空位，直接插进去，这里有一个疑问：为什么会有一个空位呢？这里可以看 new_entry 的实现：初始容量为 4，并默认 4 个空值。如果数量超过容量的 3/4，进行扩容，再添加。（这里想到，方法缓存机制，方法缓存也是超过 3/4 进行扩容，方法的扩容是：扩容之后，以前的方法删掉了，再把需要缓存的方法插进去）
-> 3. 如果没有找到 entry，创建一个 entry，再进行插入。
+正验证了我们上面的盲猜，直接调用 `weak_unregister_no_lock` 函数。
 
-关于 `referrer` 是如何插入到 `weak_entry_t` 中的，其 `hash` 算法是怎么样的，利用函数 `append_referrer`:
-```c++
-/** 
- * Add the given referrer to set of weak pointers in this entry.
- * 添加给定的 referrer 到这个 entry 的 weak 数组或者链表中。
- *
- * Does not perform duplicate checking (b/c weak pointers are never added to a set twice). 
- * 不执行重复检查，weak 指针永远不会添加到 set 中两次。
- * @param entry The entry holding the set of weak pointers.
- * @param new_referrer The new weak pointer to be added.
- */
-static void append_referrer(weak_entry_t *entry, objc_object **new_referrer)
-{
-    if (! entry->out_of_line()) {
-        // Try to insert inline.
-        // 如果 weak_entry 尚未使用动态数组，走这里
-        for (size_t i = 0; i < WEAK_INLINE_COUNT; i++) {
-            if (entry->inline_referrers[i] == nil) {
-                entry->inline_referrers[i] = new_referrer;
-                return;
-            }
-        }
 
-        // Couldn't insert inline. Allocate out of line.
-        
-        // 如果 inline_referrers 的位置已经存满了，则要转型为 referrers，做动态数组
-        weak_referrer_t *new_referrers = (weak_referrer_t *)
-            calloc(WEAK_INLINE_COUNT, sizeof(weak_referrer_t));
-            
-        // This constructed table is invalid, but grow_refs_and_insert will fix it and rehash it.
-        // 此构造的 table 无效，grow_refs_and_insert 将修复它并重新哈希。
-        for (size_t i = 0; i < WEAK_INLINE_COUNT; i++) {
-            new_referrers[i] = entry->inline_referrers[i];
-        }
-        entry->referrers = new_referrers;
-        entry->num_refs = WEAK_INLINE_COUNT;
-        
-        // 看到 out_of_line_ness 置为 REFERRERS_OUT_OF_LINE，标记是使用 长度为 4 的内部数组，还是哈希表
-        entry->out_of_line_ness = REFERRERS_OUT_OF_LINE;
-        
-        // 看到这里有一个减 1 的操作
-        entry->mask = WEAK_INLINE_COUNT-1;
-        entry->max_hash_displacement = 0;
-    }
-    
-    // 对于动态数组的附加处理：
-    // 断言： 此时一定使用的动态数组
-    ASSERT(entry->out_of_line());
-
-    //#define TABLE_SIZE(entry) (entry->mask ? entry->mask + 1 : 0) // mask 又加了 1
-    // 如果动态数组中元素个数大于或等于数组位置总空间的 3/4，则扩展数组空间为当前长度的一倍
-    if (entry->num_refs >= TABLE_SIZE(entry) * 3/4) {
-        // 扩容，并插入
-        return grow_refs_and_insert(entry, new_referrer);
-    }
-    
-    // 如果不需要扩容，直接插入到 weak_entry 中
-    // 注意，weak_entry 是一个哈希表，key：w_hash_pointer(new_referrer) value: new_referrer
-    
-    // 细心的人可能注意到了，这里 weak_entry_t 的 hash 算法和 weak_table_t 的 hash 算法是一样的，同时扩容/减容的算法也是一样的
-    // '& (entry->mask)' 确保了 begin 的位置只能大于或等于数组的长度
-    size_t begin = w_hash_pointer(new_referrer) & (entry->mask);
-    size_t index = begin; // 初始的 hash index
-    size_t hash_displacement = 0; // 用于记录 hash 冲突的次数，也就是 hash 再位移的次数
-    while (entry->referrers[index] != nil) {
-        hash_displacement++;
-        // index + 1, 移到下一个位置，再试一次能否插入。
-        //（这里要考虑到entry->mask取值，一定是：0x111, 0x1111, 0x11111, ... ，
-        // 因为数组每次都是*2增长，即8， 16， 32，对应动态数组空间长度-1的mask，也就是前面的取值。）
-        index = (index+1) & entry->mask;
-        // index == begin 意味着数组绕了一圈都没有找到合适位置，这时候一定是出了什么问题。
-        if (index == begin) bad_weak_table(entry);
-    }
-    // 记录最大的 hash 冲突次数, max_hash_displacement 意味着: 
-    // 我们尝试至多 max_hash_displacement 次，肯定能够找到 object 对应的 hash 位置
-    if (hash_displacement > entry->max_hash_displacement) {
-        entry->max_hash_displacement = hash_displacement;
-    }
-    // 将ref存入hash数组，同时，更新元素个数num_refs
-    weak_referrer_t &ref = entry->referrers[index];
-    ref = new_referrer;
-    entry->num_refs++;
-}
-```
 
 对象 dealloc 时针对 `weak ptr` 所做的操作：
 当对象引用计数为 0 的时候会执行 `dealloc` 函数，可以在 dealloc 中去看看具体的销毁过程：
