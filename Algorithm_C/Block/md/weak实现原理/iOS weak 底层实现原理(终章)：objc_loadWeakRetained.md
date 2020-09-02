@@ -439,3 +439,4 @@ objc_moveWeak(id *dst, id *src)
 **参考链接:🔗**
 + [详解获取weak对象的过程](https://www.jianshu.com/p/b22a446f8a8d)
 + [ObjC Runtime 中 Weak 属性的实现 (上)](https://www.jianshu.com/p/fb6b15e8acfd)
++ [weak指针的线程安全和自动置nil的深度探讨](https://www.jianshu.com/p/edbd1ec314aa)
