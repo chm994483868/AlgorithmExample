@@ -526,7 +526,7 @@ AssociationsManager::Storage AssociationsManager::_mapStorage;
 4. `ObjcAssociation` 的两个成员变量，保存我们的关联策略 `_policy` 和关联值 `_value`。
 
 示例图:
-![]()
+![associated object相关数据结构](https://p9-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/cc5e47b5525c4739994bd95bcc78fc43~tplv-k3u1fbpfcp-zoom-1.image)
 
 ### `objc_setAssociatedObject`
 ```c++
@@ -698,7 +698,8 @@ _object_set_associative_reference(id object, const void *key, id value, uintptr_
 + `value != nil` 新增/更新关联对象的值
 + `value == nil` 删除一个关联对象
 
-流程图:
+函数流程图：
+![_object_set_associative_reference流程图](https://p6-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/1c4350153140465b86d3ad44d1f917f2~tplv-k3u1fbpfcp-zoom-1.image)
 
 如果看通了上面的 `_object_set_associative_reference` 则看  `_object_get_associative_reference` 是很容易看懂的。
 

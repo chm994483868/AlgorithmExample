@@ -1,3 +1,5 @@
+# iOS 从 libclosure-74 研究 Block 实现原理
+
 # + (void)initialize
 临时插入一个 initialize 函数的话题：
 `+(void)initialize;` 类方法，在该类收到第一条消息前初始化该类。

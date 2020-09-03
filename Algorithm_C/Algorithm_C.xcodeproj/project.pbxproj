@@ -223,6 +223,7 @@
 		D2164F1F24FDFDC30000A6AA /* iOS weak 底层实现原理(终章)：objc_loadWeakRetained.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS weak 底层实现原理(终章)：objc_loadWeakRetained.md"; sourceTree = "<group>"; };
 		D2164F2024FE22C10000A6AA /* bzero函数.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "bzero函数.md"; sourceTree = "<group>"; };
 		D2164F2124FF10F10000A6AA /* iOS AssociatedObject 底层实现原理.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS AssociatedObject 底层实现原理.md"; sourceTree = "<group>"; };
+		D2164F2E2500F32A0000A6AA /* iOS Tagged Pointer.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS Tagged Pointer.md"; sourceTree = "<group>"; };
 		D21B43A124CE83160078EEF9 /* FindDuplication.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = FindDuplication.cpp; sourceTree = "<group>"; };
 		D21B43A224CE83160078EEF9 /* FindDuplication.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = FindDuplication.hpp; sourceTree = "<group>"; };
 		D21B43A524CEA24B0078EEF9 /* FindDuplicationNoEdit.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = FindDuplicationNoEdit.cpp; sourceTree = "<group>"; };
@@ -350,7 +351,7 @@
 		D2EB013A24DA2DC8009EAFD6 /* TwoSum.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = TwoSum.hpp; sourceTree = "<group>"; };
 		D2EB014024DB7A5C009EAFD6 /* Block */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = Block; sourceTree = BUILT_PRODUCTS_DIR; };
 		D2EB014224DB7A5C009EAFD6 /* main.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = main.m; sourceTree = "<group>"; };
-		D2EB014724DB7B3A009EAFD6 /* BlockNotes.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = BlockNotes.md; sourceTree = "<group>"; };
+		D2EB014724DB7B3A009EAFD6 /* iOS 从 libclosure-74 研究 Block 实现原理.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 从 libclosure-74 研究 Block 实现原理.md"; sourceTree = "<group>"; };
 		D2EB014D24DC0002009EAFD6 /* Father.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Father.h; sourceTree = "<group>"; };
 		D2EB014E24DC0002009EAFD6 /* Father.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = Father.m; sourceTree = "<group>"; };
 		D2EB015324DC00CE009EAFD6 /* Son.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Son.h; sourceTree = "<group>"; };
@@ -1486,11 +1487,12 @@
 				D2164F1C24F7AF070000A6AA /* weak实现原理 */,
 				D2164F0624EE113B0000A6AA /* 学习统计.md */,
 				D2164F2124FF10F10000A6AA /* iOS AssociatedObject 底层实现原理.md */,
+				D2164F2E2500F32A0000A6AA /* iOS Tagged Pointer.md */,
 				D21333F324E6610E00A6175C /* 内存对齐原则.md */,
 				D2164F1D24F8856E0000A6AA /* 野指针.md */,
 				D21333F224E63B6C00A6175C /* 深入理解Objective-C中的alloc和init.md */,
 				D2E526D124E4B2E200ACD06F /* 深入理解Objective-C中的Class.md */,
-				D2EB014724DB7B3A009EAFD6 /* BlockNotes.md */,
+				D2EB014724DB7B3A009EAFD6 /* iOS 从 libclosure-74 研究 Block 实现原理.md */,
 				D20B350224E7EFAE00092DE5 /* iOS底层isa结构(isa_t).md */,
 				D20B34FF24E6791600092DE5 /* iOS底层class_getInstanceSize和malloc_size.md */,
 				D20B350624E8D6A700092DE5 /* iOS底层Class探索和方法执行过程.md */,
