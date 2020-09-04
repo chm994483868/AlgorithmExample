@@ -156,7 +156,7 @@ NSLog(@"🧚‍♂️🧚‍♂️🧚‍♂️ %zu", class_getInstanceSize([sta
 NSLog(@"🧚‍♂️🧚‍♂️🧚‍♂️ %lu", sizeof(staff));
 // 打印:
 🧚‍♂️🧚‍♂️🧚‍♂️ 24
-🧚‍♂️🧚‍♂️🧚‍♂️ 8 // 这里是 pinter 在 64 位机器中长度是 8，（32位是4）
+🧚‍♂️🧚‍♂️🧚‍♂️ 8 // 这里是 pointer 在 64 位机器中长度是 8，（32位是4）
 // 示例 2:
 struct TEMPSTRUCT {
     Class isa; // 补0 偏0 长8 //在 继承的 NSObject 中还有一个 Class isa; 成员变量
