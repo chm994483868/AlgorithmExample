@@ -878,12 +878,523 @@ category_t::propertiesForMeta(bool isMeta, struct header_info *hi)
 ```
 `header_info` 涉及到 `runtime` 初始化加载数据，这里暂且不表。 
 
-到这里 `category_t` 相关的数据结构基本看完了，并不复杂。
+到这里 `category_t` 相关的数据结构基本看完了，并不复杂。在之前我们用 `clang` 编译我们的类文件和分类文件的时候，已经看到生成的 `_category_t` 结构体，下面我们再解读一下 `clang` 以后的 `.cpp` 文件内容：
+
+### `_OBJC_$_CATEGORY_INSTANCE_METHODS_NSObject_$_customCategory`
+编译器生成实例方法列表保存在 **DATA段的** `objc_const` `section` 里（`struct /*_method_list_t*/`）。 
+```c++
+static struct /*_method_list_t*/ {
+    unsigned int entsize;  // sizeof(struct _objc_method)
+    unsigned int method_count;
+    struct _objc_method method_list[2];
+} _OBJC_$_CATEGORY_INSTANCE_METHODS_NSObject_$_customCategory __attribute__ ((used, section ("__DATA,__objc_const"))) = {
+    sizeof(_objc_method),
+    2,
+    {{(struct objc_selector *)"customInstanceMethod_one", "v16@0:8", (void *)_I_NSObject_customCategory_customInstanceMethod_one},
+    {(struct objc_selector *)"customInstanceMethod_two", "v16@0:8", (void *)_I_NSObject_customCategory_customInstanceMethod_two}}
+};
+```
+
+### `_OBJC_$_CATEGORY_CLASS_METHODS_NSObject_$_customCategory`
+编译器生成类方法列表保存在 **DATA段的** `objc_const` `section` 里（`struct /*_method_list_t*/`）。
+```c++
+static struct /*_method_list_t*/ {
+    unsigned int entsize;  // sizeof(struct _objc_method)
+    unsigned int method_count;
+    struct _objc_method method_list[2];
+} _OBJC_$_CATEGORY_CLASS_METHODS_NSObject_$_customCategory __attribute__ ((used, section ("__DATA,__objc_const"))) = {
+    sizeof(_objc_method),
+    2,
+    {{(struct objc_selector *)"customClassMethod_one", "v16@0:8", (void *)_C_NSObject_customCategory_customClassMethod_one},
+    {(struct objc_selector *)"customClassMethod_two", "v16@0:8", (void *)_C_NSObject_customCategory_customClassMethod_two}}
+};
+```
+
+### `_OBJC_$_PROP_LIST_NSObject_$_customCategory`
+编译器生成属性列表保存在 **DATA段的** `objc_const` `section` 里（`struct /*_prop_list_t*/`）。
+```c++
+static struct /*_prop_list_t*/ {
+    unsigned int entsize;  // sizeof(struct _prop_t)
+    unsigned int count_of_properties;
+    struct _prop_t prop_list[2];
+} _OBJC_$_PROP_LIST_NSObject_$_customCategory __attribute__ ((used, section ("__DATA,__objc_const"))) = {
+    sizeof(_prop_t),
+    2,
+    {{"categoryProperty_one","T@\"NSString\",C,N"},
+    {"categoryProperty_two","T@\"NSMutableArray\",&,N"}}
+};
+```
+
+还有一个需要注意到的事实就是 `category` 的名字用来给各种列表以及后面的 `category` 结构体本身命名，而且有 `static` 来修饰，所以在同一个编译单元里我们的 `category` 名不能重复，否则会出现编译错误。
+
+### `_OBJC_$_CATEGORY_NSObject_$_customCategory`
+编译器生成 `_category_t` 本身 `_OBJC_$_CATEGORY_NSObject_$_customCategory` 并用前面生成的实例方法、类方法、属性列表来初始化。
+还用 `OBJC_CLASS_$_NSObject` 来动态指定 `_OBJC_$_CATEGORY_NSObject_$_customCategory` 所属的类。
+```c++
+extern "C" __declspec(dllimport) struct _class_t OBJC_CLASS_$_NSObject;
+
+static struct _category_t _OBJC_$_CATEGORY_NSObject_$_customCategory __attribute__ ((used, section ("__DATA,__objc_const"))) = 
+{
+    "NSObject",
+    0, // &OBJC_CLASS_$_NSObject,
+    (const struct _method_list_t *)&_OBJC_$_CATEGORY_INSTANCE_METHODS_NSObject_$_customCategory,
+    (const struct _method_list_t *)&_OBJC_$_CATEGORY_CLASS_METHODS_NSObject_$_customCategory,
+    0,
+    (const struct _prop_list_t *)&_OBJC_$_PROP_LIST_NSObject_$_customCategory,
+};
+
+// 设置 cls
+static void OBJC_CATEGORY_SETUP_$_NSObject_$_customCategory(void ) {
+    _OBJC_$_CATEGORY_NSObject_$_customCategory.cls = &OBJC_CLASS_$_NSObject;
+}
+
+#pragma section(".objc_inithooks$B", long, read, write)
+__declspec(allocate(".objc_inithooks$B")) static void *OBJC_CATEGORY_SETUP[] = {
+    (void *)&OBJC_CATEGORY_SETUP_$_NSObject_$_customCategory,
+};
+```
+### `L_OBJC_LABEL_CATEGORY_$`
+最后，编译器在 **DATA段下的** `objc_catlist` `section` 里保存了一个长度为 1 的 `struct _category_t *` 数组 `L_OBJC_LABEL_CATEGORY_$`，如果有多个 `category`，会生成对应长度的数组，用于运行期 `category` 的加载，到这里编译器的工作就接近尾声了。
+```c++
+static struct _category_t *L_OBJC_LABEL_CATEGORY_$ [1] __attribute__((used, section ("__DATA, __objc_catlist,regular,no_dead_strip")))= {
+    &_OBJC_$_CATEGORY_NSObject_$_customCategory,
+};
+```
+这时我们大概会有一个疑问，这些准备好的的 `_category_t` 数据什么时候附加到类上去呢？或者是存放在内存哪里等着我们去调用它里面的实例函数或类函数呢？**已知分类数据是会全部追加到类本身上去的。** 不是类似 `weak` 机制或者 `associated object` 机制等，再另外准备哈希表存放数据，然后根据对象地址去查询处理数据等这样的模式。
+下面我们就开始研究分类的数据是如何追加到本类上去的。
 
 ## `category` 相关函数
+&emsp;`category` 的加载涉及到 `runtime` 的初始化及加载流程，因为 `runtime` 相关的内容比较多，这里只一笔带过，详细内容准备开新篇来讲。本篇只研究`runtime` 初始化加载过程中连带到 `category` 的加载。
+`Objective-C` 的运行是依赖 `runtime` 来做的，而 `runtime` 和其他系统库一样，是由 `OS X` 和 `iOS` 通过 `dyld(the dynamic link editor)` 来动态加载的。
 
+### `_objc_init`
+在 `Source/objc-os.mm` P907 可看到其入口方法 `_objc_init`：
+```c++
+/***********************************************************************
+* _objc_init
+* Bootstrap initialization. 引导程序初始化。
 
+* Registers our image notifier with dyld.
+* 通过 dyld 来注册我们的 image.
 
+* Called by libSystem BEFORE library initialization time
+* library 初始化之前由 libSystem 调用
+**********************************************************************/
+
+void _objc_init(void)
+{
+    // 用一个静态变量标记，保证只进行一次初始化
+    static bool initialized = false;
+    if (initialized) return;
+    initialized = true;
+    
+    // fixme defer initialization until an objc-using image is found?
+    // fixme 推迟初始化，直到找到一个 objc-using image？
+    
+    // 读取会影响 runtime 的环境变量，
+    // 如果需要，还可以打印一些环境变量。
+    environ_init();
+    
+    tls_init();
+    
+    // 运行 C++ 静态构造函数，
+    // 在 dyld 调用我们的静态构造函数之前，libc 调用 _objc_init（），因此我们必须自己做。
+    static_init();
+    
+    runtime_init();
+    
+    // 初始化 libobjc 的异常处理系统，
+    // 由 map_images（）调用。
+    exception_init();
+    
+    
+    cache_init();
+    _imp_implementationWithBlock_init();
+
+    _dyld_objc_notify_register(&map_images, load_images, unmap_image);
+
+#if __OBJC2__
+    // 标记 _dyld_objc_notify_register 的调用是否已完成。
+    didCallDyldNotifyRegister = true;
+#endif
+}
+```
+***看到 `_dyld_objc_notify_register` 函数的第一个参数是 `map_imags` 的函数地址。`_objc_init` 里面调用 `map_images` 最终会调用 `objc-runtime-new.mm` 里面的 `_read_images` 函数，而 `category` 加载到类上面正是从 `_read_images` 函数里面开始的。***
+可能这里已经发生修改，在 `load_images` 函数里面调用 `loadAllCategories()` 函数，且它的前面有一句 `didInitialAttachCategories = true;` 这个全局静态变量默认为 `false`，在这里被设置为 `true`，且整个 `objc4` 唯一的一次赋值操作，那么可以断定: 在 `load_images` 函数里面调用 `loadAllCategories()` 一定是早于 `_read_images` 里面的 `for` 循环里面调用 `load_categories_nolock` 函数。
+
+### `map_images`
+```c++
+/***********************************************************************
+* map_images
+* Process the given images which are being mapped in by dyld.
+* 处理由 dyld 映射的给定 images。
+
+* Calls ABI-agnostic code after taking ABI-specific locks.
+* 取得 ABI-specific 锁后调用 ABI-agnostic.
+
+* Locking: write-locks runtimeLock
+* rutimeLock 是一个全局的互斥锁（mutex_t runtimeLock;）
+**********************************************************************/
+void
+map_images(unsigned count, const char * const paths[],
+           const struct mach_header * const mhdrs[])
+{
+    // 加锁
+    mutex_locker_t lock(runtimeLock);
+    // 调用 map_images_nolock 函数
+    return map_images_nolock(count, paths, mhdrs);
+}
+```
+### `map_images_nolock`
+```c++
+void 
+map_images_nolock(unsigned mhCount, const char * const mhPaths[],
+                  const struct mach_header * const mhdrs[])
+{
+...
+if (hCount > 0) {
+    _read_images(hList, hCount, totalClasses, unoptimizedTotalClasses);
+}
+...
+}
+```
+### `_read_images`
+```c++
+/***********************************************************************
+* _read_images
+* Perform initial processing of the headers in the linked
+* list beginning with headerList. 
+* 从 headerList 开始对链接列表中的标头执行初始处理。
+*
+* Called by: map_images_nolock
+* 由 map_images_nolock 调用
+*
+* Locking: runtimeLock acquired by map_images
+* 由 map_images 函数获取 runtimeLock 
+**********************************************************************/
+void _read_images(header_info **hList, uint32_t hCount, int totalClasses, int unoptimizedTotalClasses)
+{
+...
+// Discover categories. Only do this after the initial category
+// attachment has been done.
+// 发现 categories。仅在完成初始类别附件（category_t 结构体列表，包含该类所有的类别）
+// 后才执行此操作。
+//（大概是指编译器生成并保存在 DATA段下的 `objc_catlist` `section` 的 `struct _category_t *` 数组吗？）
+
+// For categories present at startup,
+// discovery is deferred until the first load_images call after the
+// call to _dyld_objc_notify_register completes. rdar://problem/53119145
+// 对于启动时出现的类别，
+// discovery 被推迟，直到 _dyld_objc_notify_register 的调用完成后第一次调用 load_images。
+
+if (didInitialAttachCategories) {
+    for (EACH_HEADER) {
+        load_categories_nolock(hi);
+    }
+}
+...
+}
+
+/***********************************************************************
+* didInitialAttachCategories
+* Whether the initial attachment of categories present at startup has been done.
+* 启动时出现的类别的初始附件是否已完成，
+**********************************************************************/
+static bool didInitialAttachCategories = false;
+```
+### `EACH_HEADER`
+```c++
+// header_info **hList 
+// hList 是一个元素是 header_info * 的数组
+
+#define EACH_HEADER \
+hIndex = 0;         \
+hIndex < hCount && (hi = hList[hIndex]); \
+hIndex++
+```
+
+### `load_images`
+```c++
+void
+load_images(const char *path __unused, const struct mach_header *mh)
+{
+    if (!didInitialAttachCategories && didCallDyldNotifyRegister) {
+        // 全局的唯一一次把 didInitialAttachCategories 置为 true
+        didInitialAttachCategories = true;
+        loadAllCategories();
+    }
+    ...
+}
+```
+
+### `loadAllCategories`
+循环调用 `load_categories_nolock` 函数，由于目前对 `runtime` 初始化加载流程不熟悉，暂时无法定论加载 `category` 是从哪开始的，但是目前可以确定的是加载 `category` 是调用 `load_categories_nolock` 函数来做的，下面我们就详细分析 `load_categories_nolock` 函数。
+```c++
+static void loadAllCategories() {
+    mutex_locker_t lock(runtimeLock);
+
+    for (auto *hi = FirstHeader; hi != NULL; hi = hi->getNext()) {
+        load_categories_nolock(hi);
+    }
+}
+```
+
+### `load_categories_nolock` 
+在 `for` 循环里面执行 `load_categories_nolock` 函数，这里 `header_info` 涉及到 `Apple` 的二进制格式和 `load` 机制，这里暂且不表，等到 `runtime` 初始化加载相关篇章时再讲。
+这里不影响我们解读 `load_categories_nolock` 函数。
+
+**这里会涉及懒加载的类和非懒加载的类的，此处先不表，不影响我们阅读原始代码，我们先硬着头把函数实现一行一行读完。**
+
+```c++
+static void load_categories_nolock(header_info *hi) {
+    // 是否有类属性？（目前我们还没有见过给类添加属性的操作）
+    bool hasClassProperties = hi->info()->hasCategoryClassProperties();
+
+    size_t count;
+    auto processCatlist = [&](category_t * const *catlist) {
+        // catlist 是保存一个 category_t * 的指针，
+        // 且有一个 const 修饰，表示该指针的指向是固定的，但是指向的内存里面的内容是可以修改的
+        
+        // 这个数据大概是指编译器生成并保存在 DATA段下的
+        // `objc_catlist` `section` 的 `struct _category_t *` 数组吗？
+        
+        // 遍历数组
+        for (unsigned i = 0; i < count; i++) {
+            // 取得 category_t 指针
+            category_t *cat = catlist[i];
+            // 取得 category_t 所属的类
+            Class cls = remapClass(cat->cls);
+            
+            // struct locstamped_category_t {
+            //    category_t *cat;
+            //    struct header_info *hi;
+            // };
+            // 构建一个 locstamped_category_t 的局部变量
+            locstamped_category_t lc{cat, hi};
+
+            if (!cls) {
+                // 如类不存在，执行 log
+                // Category's target class is missing (probably weak-linked).
+                // Ignore the category.
+                if (PrintConnecting) {
+                    _objc_inform("CLASS: IGNORING category \?\?\?(%s) %p with "
+                                 "missing weak-linked target class",
+                                 cat->name, cat);
+                }
+                continue;
+            }
+            
+            // Process this category.
+            // 处理此 category。
+            // 判断 cls 是否是 Stub Class
+            if (cls->isStubClass()) {
+                // Stub classes are never realized. 
+                // Stub classes don't know their metaclass until they're initialized,
+                // so we have to add categories with class methods or properties to the stub itself.
+                // methodizeClass() will find them and add them to the metaclass as appropriate.
+                
+                // 大概意思是说 Stub classes 开始时不确定是元类还是类吗？
+                if (cat->instanceMethods ||
+                    cat->protocols ||
+                    cat->instanceProperties ||
+                    cat->classMethods ||
+                    cat->protocols ||
+                    (hasClassProperties && cat->_classProperties))
+                {
+                    // 该类还没有实现，把 lc 添加到类的原始数据上吗？（这里还不知道怎么形容没有实现的类）
+                    objc::unattachedCategories.addForClass(lc, cls);
+                }
+            } else {
+                // First, register the category with its target class.
+                // Then, rebuild the class's method lists (etc) if the class is realized.
+                // 首先，将 category 注册给其目标类。然后，如果该类已实现了，则重建该类的方法列表（等）。
+                
+                // 把实例方法、协议、属性添加到类
+                if (cat->instanceMethods ||  cat->protocols
+                    ||  cat->instanceProperties)
+                {
+                    if (cls->isRealized()) {
+                        // 该类已实现，则重建类的方法列表等
+                        attachCategories(cls, &lc, 1, ATTACH_EXISTING);
+                    } else {
+                        // 该类还没有实现，把 lc 添加到类的原始数据上吗？（这里不知道怎么形容没有实现的类）
+                        objc::unattachedCategories.addForClass(lc, cls);
+                    }
+                }
+
+                // 看到 cat->protocols 也会被添加到元类中
+                // 把类方法、协议添加到元类
+                if (cat->classMethods  ||  cat->protocols
+                    ||  (hasClassProperties && cat->_classProperties))
+                {
+                    if (cls->ISA()->isRealized()) {
+                        attachCategories(cls->ISA(), &lc, 1, ATTACH_EXISTING | ATTACH_METACLASS);
+                    } else {
+                        objc::unattachedCategories.addForClass(lc, cls->ISA());
+                    }
+                }
+            }
+        }
+    };
+    
+    // _getObjc2CategoryList 取得原始 category 数据
+    processCatlist(_getObjc2CategoryList(hi, &count));
+    // _getObjc2CategoryList2 取得原始 category 数据
+    processCatlist(_getObjc2CategoryList2(hi, &count));
+}
+```
+看到 `category` 中的协议会同时添加到类和元类。
+
+### `unattachedCategories`
+```c++
+static UnattachedCategories unattachedCategories;
+```
+
+### `addForClass`
+`class UnattachedCategories` 继承自 `ExplicitInitDenseMap`，模版抽象类型是: `<Class, category_list>`
+```c++
+class UnattachedCategories : public ExplicitInitDenseMap<Class, category_list>
+{
+public:
+    void addForClass(locstamped_category_t lc, Class cls)
+    {
+        // 加锁
+        runtimeLock.assertLocked();
+        
+        // log 语句
+        if (slowpath(PrintConnecting)) {
+            _objc_inform("CLASS: found category %c%s(%s)",
+                         cls->isMetaClass() ? '+' : '-',
+                         cls->nameForLogging(), lc.cat->name);
+        }
+
+        // 这里有又看到了 try_emplace 函数，在关联对象一篇中我们有用到。
+        // 关联对象用到的是在全局 AssociationsHashMap 中尝试插入
+        // <DisguisedPtr<objc_object>, ObjectAssociationMap> 
+        // 返回值类型是 std::pair<iterator, bool>
+        
+        // 尝试插入 <Class, category_list>
+        auto result = get().try_emplace(cls, lc);
+        
+        // 插入失败时，会执行 append 函数，这里是保证 category 的数据内容
+        // 必须拼到所属类中去吗 ？
+        
+        if (!result.second) {
+            result.first->second.append(lc);
+        }
+    }
+    ...
+}
+```
+
+### `attachCategories`
+最最最重要的一个函数。
+```c++
+// Attach method lists and properties and protocols from categories to a class.
+// 将 方法列表 以及 属性 和 协议 从 categories 附加到类。
+
+// Assumes the categories in cats are all loaded and sorted by load order, oldest categories first.
+// 假定 cats 中的所有类别均按加载顺序进行加载和排序，最早的类别在前。
+// oldest categories first 是指后编译的分类在前面吗 ？
+static void
+attachCategories(Class cls, const locstamped_category_t *cats_list, uint32_t cats_count,
+                 int flags)
+{
+    // log
+    if (slowpath(PrintReplacedMethods)) {
+        printReplacements(cls, cats_list, cats_count);
+    }
+    // log
+    if (slowpath(PrintConnecting)) {
+        _objc_inform("CLASS: attaching %d categories to%s class '%s'%s",
+                     cats_count, (flags & ATTACH_EXISTING) ? " existing" : "",
+                     cls->nameForLogging(), (flags & ATTACH_METACLASS) ? " (meta)" : "");
+    }
+
+    /*
+     * Only a few classes have more than 64 categories during launch.
+     * 在启动期间，只有少数几个类具有超过 64 个 categories。
+     * This uses a little stack, and avoids malloc.
+     * 这将使用一个较小的栈，并避免使用 malloc。
+     *
+     * Categories must be added in the proper order, which is back to front.
+     * 必须按正确的顺序添加类别，这是从前到后的。
+     *
+     * To do that with the chunking, we iterate cats_list from front to back,
+     * build up the local buffers backwards, and call attachLists on the chunks. 
+     * attachLists prepends the lists, so the final result is in the expected order.
+     * 为此，我们从前到后迭代 cats_list，向后建立本地缓冲区，然后在块上调用 attachLists。attachLists 
+     * 在列表的前面，因此最终结果按预期顺序排列。
+     */
+    
+    // 在编译时即可得出常量值
+    constexpr uint32_t ATTACH_BUFSIZ = 64;
+    // 方法列表 数组元素是 method_list_t *
+    method_list_t   *mlists[ATTACH_BUFSIZ];
+    // 属性列表 数组元素是 property_list_t *
+    property_list_t *proplists[ATTACH_BUFSIZ];
+    // 协议列表 数组元素是 protocol_list_t *
+    protocol_list_t *protolists[ATTACH_BUFSIZ];
+
+    uint32_t mcount = 0;
+    uint32_t propcount = 0;
+    uint32_t protocount = 0;
+    bool fromBundle = NO;
+    
+    // 根据入参 flags 判断是否是元类
+    bool isMeta = (flags & ATTACH_METACLASS);
+    // 外部扩展
+    auto rwe = cls->data()->extAllocIfNeeded();
+
+    for (uint32_t i = 0; i < cats_count; i++) {
+        // locstamped_category_t 
+        auto& entry = cats_list[i];
+        
+        // 根据 isMeta 取出 category_t 中的实例方法列表或者类方法列表
+        method_list_t *mlist = entry.cat->methodsForMeta(isMeta);
+        if (mlist) {
+            // 判断方法个数
+            if (mcount == ATTACH_BUFSIZ) {
+                // 
+                prepareMethodLists(cls, mlists, mcount, NO, fromBundle);
+                rwe->methods.attachLists(mlists, mcount);
+                mcount = 0;
+            }
+            mlists[ATTACH_BUFSIZ - ++mcount] = mlist;
+            fromBundle |= entry.hi->isBundle();
+        }
+
+        property_list_t *proplist =
+            entry.cat->propertiesForMeta(isMeta, entry.hi);
+        if (proplist) {
+            if (propcount == ATTACH_BUFSIZ) {
+                rwe->properties.attachLists(proplists, propcount);
+                propcount = 0;
+            }
+            proplists[ATTACH_BUFSIZ - ++propcount] = proplist;
+        }
+
+        protocol_list_t *protolist = entry.cat->protocolsForMeta(isMeta);
+        if (protolist) {
+            if (protocount == ATTACH_BUFSIZ) {
+                rwe->protocols.attachLists(protolists, protocount);
+                protocount = 0;
+            }
+            protolists[ATTACH_BUFSIZ - ++protocount] = protolist;
+        }
+    }
+
+    if (mcount > 0) {
+        prepareMethodLists(cls, mlists + ATTACH_BUFSIZ - mcount, mcount, NO, fromBundle);
+        rwe->methods.attachLists(mlists + ATTACH_BUFSIZ - mcount, mcount);
+        if (flags & ATTACH_EXISTING) flushCaches(cls);
+    }
+
+    rwe->properties.attachLists(proplists + ATTACH_BUFSIZ - propcount, propcount);
+
+    rwe->protocols.attachLists(protolists + ATTACH_BUFSIZ - protocount, protocount);
+}
+```
 
 ## 参考链接
 **参考链接:🔗**
@@ -891,10 +1402,12 @@ category_t::propertiesForMeta(bool isMeta, struct header_info *hi)
 + [iOS Extension详解，及与Category的区别](https://www.jianshu.com/p/b45e1dd24e32)
 + [iOS Category详解](https://www.jianshu.com/p/c92b17a36b9e)
 + [iOS-分类（Category）](https://www.jianshu.com/p/01911be8ce83)
-
 + [iOS Category的使用及原理](https://www.jianshu.com/p/4ce54f78290a)
 + [iOS-Category原理](https://www.jianshu.com/p/9966940fcd9e)
 + [category工作原理](https://www.jianshu.com/p/7de5f06af5c7)
 + [iOS开发笔记之六十七——Category使用过程中的一些注意事项](https://blog.csdn.net/lizitao/article/details/77196620)
 + [结合 category 工作原理分析 OC2.0 中的 runtime](https://blog.csdn.net/qq_26341621/article/details/54140140)
 + [深入理解Objective-C：Category](https://tech.meituan.com/2015/03/03/diveintocategory.html)
++ [iOS 捋一捋Category加载流程及+load](https://www.jianshu.com/p/fd176e806cf3)
++ [十：底层探索 - 分类的加载](https://juejin.im/post/6844904115814793224)
++ [Category的实现原理](https://www.jianshu.com/p/7aaac3e70637)
