@@ -161,7 +161,7 @@ if (hCount > 0) {
 * Perform initial processing of the headers in the linked
 * list beginning with headerList. 
 * 从 headerList 起点开始对其中的 header 执行初始化
-*
+* 
 * Called by: map_images_nolock
 * 由 map_images_nolock 调用
 *
@@ -399,6 +399,7 @@ attachCategories(Class cls, const locstamped_category_t *cats_list, uint32_t cat
      *
      * 在启动期时，很少能有类添加超过 64 个分类，这里使用一个长度为 64 的数组来存放 categories 的内容，
      * 并能避免使用 malloc。
+     * （这个 64 表示一个类很少会有超过 64 个分类）
      *
      * Categories must be added in the proper order, which is back to front.
      * 必须按正确的顺序添加 categories，这里是从前到后的。
@@ -449,15 +450,21 @@ attachCategories(Class cls, const locstamped_category_t *cats_list, uint32_t cat
         
         // 取得 entry 的 cat（category_t *）成员变量的函数列表
         method_list_t *mlist = entry.cat->methodsForMeta(isMeta);
+        
         if (mlist) {
             if (mcount == ATTACH_BUFSIZ) {
+            
                 prepareMethodLists(cls, mlists, mcount, NO, fromBundle);
                 rwe->methods.attachLists(mlists, mcount);
+                
+                // 处理完以后把 mcount 置为 0
                 mcount = 0;
             }
             
-            // 从 category 中的函数列表从后向前放在 mlists 数组里面的
+            // 把 mlist 从后向前放在 mlists 数组里面
+            // mcount 做自增操作
             mlists[ATTACH_BUFSIZ - ++mcount] = mlist;
+            
             // 取得 hi 的 isBundle 是 true 或 false  
             fromBundle |= entry.hi->isBundle();
         }
@@ -491,6 +498,50 @@ attachCategories(Class cls, const locstamped_category_t *cats_list, uint32_t cat
     rwe->properties.attachLists(proplists + ATTACH_BUFSIZ - propcount, propcount);
 
     rwe->protocols.attachLists(protolists + ATTACH_BUFSIZ - protocount, protocount);
+}
+```
+
+### `prepareMethodLists`
+```c++
+static void 
+prepareMethodLists(Class cls, method_list_t **addedLists, int addedCount,
+                   bool baseMethods, bool methodsFromBundle)
+{
+    // 加锁
+    runtimeLock.assertLocked();
+
+    if (addedCount == 0) return;
+
+    // There exist RR/AWZ/Core special cases for some class's base methods.
+    // But this code should never need to scan base methods for RR/AWZ/Core:
+    // default RR/AWZ/Core cannot be set before setInitialized().
+    // Therefore we need not handle any special cases here.
+    
+    if (baseMethods) { // 此值直接传递的是 NO
+        ASSERT(cls->hasCustomAWZ() && cls->hasCustomRR() && cls->hasCustomCore());
+    }
+
+    // Add method lists to array.
+    // Reallocate un-fixed method lists.
+    // The new methods are PREPENDED to the method list array.
+    for (int i = 0; i < addedCount; i++) {
+        method_list_t *mlist = addedLists[i];
+        ASSERT(mlist);
+
+        // Fixup selectors if necessary
+        if (!mlist->isFixedUp()) {
+            fixupMethodList(mlist, methodsFromBundle, true/*sort*/);
+        }
+    }
+
+    // If the class is initialized, then scan for method implementations
+    // tracked by the class's flags. If it's not initialized yet,
+    // then objc_class::setInitialized() will take care of it.
+    if (cls->isInitialized()) {
+        objc::AWZScanner::scanAddedMethodLists(cls, addedLists, addedCount);
+        objc::RRScanner::scanAddedMethodLists(cls, addedLists, addedCount);
+        objc::CoreScanner::scanAddedMethodLists(cls, addedLists, addedCount);
+    }
 }
 ```
 
