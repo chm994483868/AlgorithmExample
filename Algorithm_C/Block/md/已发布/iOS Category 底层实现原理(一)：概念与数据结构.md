@@ -830,7 +830,7 @@ void method_list_t::setFixedUp() {
 static uint32_t fixed_up_method_list = 3;
 static uint32_t uniqued_method_list = 1;
 ```
-`method_list_t` 的 `FlagMask` 是 `0x3`，即二进制: `0b11`。这里还没有看懂这个逻辑，先向下，等下再回过头来看...
+`method_list_t` 的 `FlagMask` 是 `0x3`，即二进制: `0b11`，`FlagMask` 会在把 `category` 的方法追加到类前调用 `prepareMethodLists` 函数里面用到，用于判断是否需要把方法列表调整为 `uniqued and sorted`。
 
 ### `protocol_list_t`
 ```c++
@@ -1207,18 +1207,8 @@ static struct _category_t *L_OBJC_LABEL_CATEGORY_$ [1] __attribute__((used, sect
 
 ## 参考链接
 **参考链接:🔗**
-+ [iOS开发之runtime（17）：_dyld_objc_notify_register方法介绍](https://xiaozhuanlan.com/topic/6453890217)
-+ [iOS开发之runtime(27): _read_images 浅析](https://xiaozhuanlan.com/topic/1452730698)
-+ [Objective-C运行时-类别category](https://zhuanlan.zhihu.com/p/161100311)
-+ [iOS Extension详解，及与Category的区别](https://www.jianshu.com/p/b45e1dd24e32)
-+ [iOS Category详解](https://www.jianshu.com/p/c92b17a36b9e)
-+ [iOS-分类（Category）](https://www.jianshu.com/p/01911be8ce83)
-+ [iOS Category的使用及原理](https://www.jianshu.com/p/4ce54f78290a)
-+ [iOS-Category原理](https://www.jianshu.com/p/9966940fcd9e)
-+ [category工作原理](https://www.jianshu.com/p/7de5f06af5c7)
-+ [iOS开发笔记之六十七——Category使用过程中的一些注意事项](https://blog.csdn.net/lizitao/article/details/77196620)
-+ [结合 category 工作原理分析 OC2.0 中的 runtime](https://blog.csdn.net/qq_26341621/article/details/54140140)
++ [结合 category 工作原理分析 OC2.0 中的 runtime](http://www.cocoachina.com/articles/17293)
 + [深入理解Objective-C：Category](https://tech.meituan.com/2015/03/03/diveintocategory.html)
 + [iOS 捋一捋Category加载流程及+load](https://www.jianshu.com/p/fd176e806cf3)
-+ [十：底层探索 - 分类的加载](https://juejin.im/post/6844904115814793224)
-+ [Category的实现原理](https://www.jianshu.com/p/7aaac3e70637)
++ [iOS开发之runtime（17）：_dyld_objc_notify_register方法介绍](https://xiaozhuanlan.com/topic/6453890217)
++ [iOS开发之runtime(27): _read_images 浅析](https://xiaozhuanlan.com/topic/1452730698)

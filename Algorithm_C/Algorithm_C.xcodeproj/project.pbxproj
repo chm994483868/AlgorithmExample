@@ -320,7 +320,7 @@
 		D2A32AE424E153EF00ECE821 /* OtherSon+Test.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = "OtherSon+Test.m"; sourceTree = "<group>"; };
 		D2A32AE624E1541B00ECE821 /* OtherGrandSon+Test.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "OtherGrandSon+Test.h"; sourceTree = "<group>"; };
 		D2A32AE724E1541B00ECE821 /* OtherGrandSon+Test.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = "OtherGrandSon+Test.m"; sourceTree = "<group>"; };
-		D2E0674D2506118F008BF0E9 /* iOS Category 底层实现原理(二)：相关函数与调用流程.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS Category 底层实现原理(二)：相关函数与调用流程.md"; sourceTree = "<group>"; };
+		D2E0674D2506118F008BF0E9 /* iOS Category 底层实现原理(二)：相关函数与加载流程.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS Category 底层实现原理(二)：相关函数与加载流程.md"; sourceTree = "<group>"; };
 		D2E526C724E3CEA600ACD06F /* using关键字使用.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "using关键字使用.md"; sourceTree = "<group>"; };
 		D2E526C824E3CECA00ACD06F /* memmove函数使用.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "memmove函数使用.md"; sourceTree = "<group>"; };
 		D2E526CA24E3E5E300ACD06F /* LP64等数据模型.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "LP64等数据模型.md"; sourceTree = "<group>"; };
@@ -869,7 +869,7 @@
 				D2164F1F24FDFDC30000A6AA /* iOS weak 底层实现原理(终章)：objc_loadWeakRetained.md */,
 				D2164F2124FF10F10000A6AA /* iOS AssociatedObject 底层实现原理.md */,
 				D2164F442501E8880000A6AA /* iOS Category 底层实现原理(一)：概念与数据结构.md */,
-				D2E0674D2506118F008BF0E9 /* iOS Category 底层实现原理(二)：相关函数与调用流程.md */,
+				D2E0674D2506118F008BF0E9 /* iOS Category 底层实现原理(二)：相关函数与加载流程.md */,
 			);
 			path = "已发布";
 			sourceTree = "<group>";
