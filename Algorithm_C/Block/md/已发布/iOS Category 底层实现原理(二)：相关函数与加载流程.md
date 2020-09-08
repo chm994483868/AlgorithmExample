@@ -127,7 +127,30 @@ map_images(unsigned count, const char * const paths[],
 ```
 
 ### `map_images_nolock`
+&emsp;`map_images_nolock` 参数:
++ `mhCount`: `mach-o header count`，即 `mach-o header` 个数
++ `mhPaths`: `mach-o header Paths`，即 `header` 的路径数组
++ `mhdrs`: `mach-o headers`，即 `headers`
+
 ```c++
+/*
+* map_images_nolock
+*
+* Process the given images which are being mapped in by dyld.
+* 处理由 dyld 映射的给定镜像。
+
+* All class registration and fixups are performed 
+* (or deferred pending discovery of missing superclasses etc), and +load methods are called.
+* 所有类的 注册 和 fixups 都将执行（或推迟进行以发现丢失的超类 等），并调用 +load 方法。
+*
+* info[] is in bottom-up order i.e. libobjc will be earlier
+* in the array than any library that links to libobjc.
+* info[] 按自下而上的顺序进行操作，即 libobjc 在数组中的时间比链接到 libobjc 的任何 library 都早
+* 
+* Locking: loadMethodLock(old) or runtimeLock(new) acquired by map_images.
+* loadMethodLock(old) 或者 runtimeLock(new) 由 map_images 获取。
+* 
+*/
 void 
 map_images_nolock(unsigned mhCount, const char * const mhPaths[],
                   const struct mach_header * const mhdrs[])
@@ -142,17 +165,20 @@ if (hCount > 0) {
 `map_images_nolock` 主要做了 4 件事:
 1. 拿到 `dlyd` 传过来的 `header`，进行封装 
 2. 初始化 `selector` 
-3. 初始化 `autorelease pool page`
-4. 读取 `images`
 
-`map_images_nolock` 参数:
-+ `mhCount`: `mach-o header count`，即 `mach-o header` 个数
-+ `mhPaths`: `mach-o header Paths`，即 `header` 的路径数组
-+ `mhdrs`: `mach-o headers`，即 `headers`
+3. `arr_init();` 初始化 `autorelease pool page` 初始化 `SideTablesMap` `associations` 初始化
+  ```c++
+  void arr_init(void) {
+      AutoreleasePoolPage::init();
+      SideTablesMap.init(); // SideTablesMap 初始化
+      _objc_associations_init(); // AssociationsManager::init(); 初始化
+  }
+  ```
+4. 读取 `images`
 
 ### `_read_images`
 &emsp;读取各个 `section` 中的数据并放到缓存中，这里的缓存大部分都是全局静态变量。
-`GETSECT(_getObjc2CategoryList,        category_t *,    "__objc_catlist");`
+`GETSECT(_getObjc2CategoryList, category_t *, "__objc_catlist");`
 之前用 `clang` 编译 `category` 文件时，看到 `DATA段下的` `__objc_catlist` 区，保存 `category` 数据。
 
 ```c++
@@ -160,13 +186,14 @@ if (hCount > 0) {
 * _read_images
 * Perform initial processing of the headers in the linked
 * list beginning with headerList. 
-* 从 headerList 起点开始对其中的 header 执行初始化
+* 从 headerList 的起点开始对其中的 header（数据类型是 header_info 结构体） 执行初始化
 * 
 * Called by: map_images_nolock
-* 由 map_images_nolock 调用
+* 是被 map_images_nolock 调用的
 *
 * Locking: runtimeLock acquired by map_images
-* 由 map_images 函数获取 runtimeLock 
+* 由 map_images 函数获取 runtimeLock，调用 _read_images 之前已经加锁
+* totalClasses 所有类的数量 unoptimizedTotalClasses 未优化的类的数量
 */
 void _read_images(header_info **hList, uint32_t hCount, int totalClasses, int unoptimizedTotalClasses)
 {
