@@ -162,6 +162,7 @@
 		8E2572D624D304DE0080F598 /* Array.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Array.cpp; sourceTree = "<group>"; };
 		8E2572D724D304DE0080F598 /* Array.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = Array.hpp; sourceTree = "<group>"; };
 		8E5CCE0624B9FF3D0081B5FF /* Review_1.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Review_1.cpp; sourceTree = "<group>"; };
+		8E62E18D25092A410012C934 /* iOS Autorelease pool 底层实现原理.md  */ = {isa = PBXFileReference; lastKnownFileType = text; path = "iOS Autorelease pool 底层实现原理.md "; sourceTree = "<group>"; };
 		8EA593D624CDB969002785EF /* OfferReview */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = OfferReview; sourceTree = BUILT_PRODUCTS_DIR; };
 		8EA593D824CDB969002785EF /* main.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
 		8EA593DE24CDBD0B002785EF /* AssignmentOperator.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = AssignmentOperator.cpp; sourceTree = "<group>"; };
@@ -872,6 +873,7 @@
 				D2164F442501E8880000A6AA /* iOS Category 底层实现原理(一)：概念与数据结构.md */,
 				D2E0674D2506118F008BF0E9 /* iOS Category 底层实现原理(二)：函数分析与加载流程.md */,
 				D2E067692508E82E008BF0E9 /* iOS Category 底层实现原理(三)：附加+load函数超详细解析.md */,
+				8E62E18D25092A410012C934 /* iOS Autorelease pool 底层实现原理.md  */,
 			);
 			path = "已发布";
 			sourceTree = "<group>";
