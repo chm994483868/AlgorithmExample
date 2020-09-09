@@ -1,14 +1,13 @@
-# iOS Category 底层实现原理(二)：相关函数与加载流程
-
-## `category` 相关函数
-&emsp;`category` 的加载涉及到 `runtime` 的初始化及加载流程，因为 `runtime` 相关的内容比较多，这里只一笔带过，详细内容准备开新篇来讲。
-本篇只研究`runtime` 初始化加载过程中涉及的 `category` 加载。
+# iOS Category 底层实现原理(二)：函数分析与加载流程
+## `category` 相关函数分析
+&emsp;`category` 的加载涉及到 `runtime` 的初始化及加载流程且内容实在过于多，这里只是粗略的介绍下，详细内容准备开新篇来讲。
+本篇只研究 `runtime` 初始化加载过程中涉及的 `category` 的加载。
 `Objective-C` 的运行是依赖 `runtime` 来做的，而 `runtime` 和其他系统库一样，是由 `OS X` 和 `iOS` 通过 `dyld(the dynamic link editor)` 来动态加载的。
 
 ### `_objc_init`
-&emsp;在 `Source/objc-os.mm` P907 可看到其入口方法 `_objc_init`，`_objc_init` 是 `runtime` 的入口函数。
+&emsp;`_objc_init` 是 `runtime` 的入口函数，在 `Source/objc-os.mm` P907 可找到其实现。下面我们来一起看看吧：
 ```c++
-/***********************************************************************
+/*
 * _objc_init
 * Bootstrap initialization. 引导程序初始化。
 
@@ -17,7 +16,7 @@
 
 * Called by libSystem BEFORE library initialization time
 * library 初始化之前由 libSystem 调用
-**********************************************************************/
+*/
 void _objc_init(void)
 {
     // 用一个静态变量标记，保证只进行一次初始化
@@ -79,8 +78,7 @@ typedef void (*_dyld_objc_notify_mapped)(unsigned count, const char* const paths
 typedef void (*_dyld_objc_notify_init)(const char* path, const struct mach_header* mh);
 typedef void (*_dyld_objc_notify_unmapped)(const char* path, const struct mach_header* mh);
 ```
-大概的意思是：
-> 该方法是 `runtime` 特有的方法，该方法的调用时机是，当 `oc` 对象、镜像（ `images` ）被映射（ `mapped` ），未被映射（ `unmapped` ）以及被初始化了（ `initialized` ）。这个方法是 `dlyd` 中声明的，一旦调用该方法，调用结果会作为该函数的参数回传回来。比如，当所有的 `images` 以及 `section` 为 `“objc-image-info”` 被加载之后会回调 `mapped` 方法，在 `_objc_init` 中正是 `&map_images` 函数。`load` 方法也将在这个方法中被调用。
+> 该方法是 `runtime` 特有的方法，该方法的调用时机是，当 `oc` 对象、镜像（ `images` ）被映射（ `mapped` ），未被映射（ `unmapped` ）以及被初始化了（ `initialized` ）。这个方法是 `dlyd` 中声明的，一旦调用该方法，调用结果会作为该函数的参数回传回来。比如，当所有的 `images` 以及 `section` 为 `objc-image-info` 被加载之后会回调 `mapped` 方法，在 `_objc_init` 中正是 `&map_images` 函数。`load` 方法也将在这个方法中被调用。
 
 `map_images` 对应函数指针:
 ```c++
@@ -100,7 +98,9 @@ typedef void (*_dyld_objc_notify_unmapped)(const char* path, const struct mach_h
 
 `map_images` 方法只会调用一次，`load_images` 会调用多次，也很好理解，`map_images` 会把文件数以及文件的 `path`、`header` 等信息给到 `runtime`，`load_images` 则负责每个文件的加载等过程。
 
-> ***看到 `_dyld_objc_notify_register` 函数的第一个参数是 `map_imags` 的函数地址。`_objc_init` 里面调用 `map_images`    最终会调用`objc-runtime-new.mm` 里面的 `_read_images` 函数，而 `category` 加载到类上面正是从 `_read_images` 函数里面开始的。***   可能这里已经发生修改，在 `load_images` 函数里面调用 `loadAllCategories()` 函数，且它的前面有一句 `didInitialAttachCategories =  true;` 这个全局静态变量默认为 `false`，在这里被设置为 `true`，且整个 `objc4` 唯一的一次赋值操作，那么可以断定: 在 `load_images`  函数里面调用 `loadAllCategories()` 一定是早于 `_read_images` 里面的 `for` 循环里面调用 `load_categories_nolock` 函数。
+> ~~看到 `_dyld_objc_notify_register` 函数的第一个参数是 `map_imags` 的函数地址。`_objc_init` 里面调用 `map_images` 最终会调用 `objc-runtime-new.mm` 里面的 `_read_images` 函数，而 `category` 加载到类上面正是从 `_read_images` 函数里面开始的。~~
+
+`objc4-781` 发生了一些修改，在 `load_images` 函数里面调用 `loadAllCategories()` 函数，且它的前面有一句 `didInitialAttachCategories =  true` 这个全局静态变量表示 `category` 数据是否已经完成初始化，且默认为 `false`。在 `load_images` 被设置为 `true`，且是整个 `objc4-781` 唯一的一次赋值操作，那么可以断定: 在 `load_images`  函数里面调用 `loadAllCategories()` 一定是早于 `_read_images` 里面的 `for` 循环里面调用 `load_categories_nolock` 函数的。因为 `_read_images` 里面 `for` 循环开始之前要先判断 `didInitialAttachCategories` 为 `true`, 之前是没有这个逻辑的。
 
 ### `map_images`
 ```c++
@@ -132,6 +132,23 @@ map_images(unsigned count, const char * const paths[],
 + `mhPaths`: `mach-o header Paths`，即 `header` 的路径数组
 + `mhdrs`: `mach-o headers`，即 `headers`
 
+`map_images_nolock` 主要做了 4 件事:
+1. 拿到 `dlyd` 传过来的 `mach_header`，封装为 `header_info` 
+2. 初始化 `selector` 
+
+3. `arr_init();` 初始化 `autorelease pool page` 初始化 `SideTablesMap` 和 `associations` 初始化
+  ```c++
+  void arr_init(void) {
+      AutoreleasePoolPage::init();
+      SideTablesMap.init(); // SideTablesMap 初始化
+      _objc_associations_init(); // AssociationsManager::init(); 初始化
+  }
+  ```
+4. 读取 `images`
+
+在 `objc4-781` 下:
++ 把 `OBJC_PRINT_IMAGES` 添加到 `Environment Variables` 中，看到打印: `processing 256 newly-mapped images...`。
+
 ```c++
 /*
 * map_images_nolock
@@ -157,29 +174,23 @@ map_images_nolock(unsigned mhCount, const char * const mhPaths[],
 {
 ...
 if (hCount > 0) {
+    // hList 是 header_info * 数组
+    // hCount 是其长度
+    // totalClasses 表示启动时的所有类的数量
+    // unoptimizedTotalClasses 看名字大概是未优化的
     _read_images(hList, hCount, totalClasses, unoptimizedTotalClasses);
 }
 ...
 }
 ```
-`map_images_nolock` 主要做了 4 件事:
-1. 拿到 `dlyd` 传过来的 `header`，进行封装 
-2. 初始化 `selector` 
-
-3. `arr_init();` 初始化 `autorelease pool page` 初始化 `SideTablesMap` `associations` 初始化
-  ```c++
-  void arr_init(void) {
-      AutoreleasePoolPage::init();
-      SideTablesMap.init(); // SideTablesMap 初始化
-      _objc_associations_init(); // AssociationsManager::init(); 初始化
-  }
-  ```
-4. 读取 `images`
 
 ### `_read_images`
 &emsp;读取各个 `section` 中的数据并放到缓存中，这里的缓存大部分都是全局静态变量。
+
 `GETSECT(_getObjc2CategoryList, category_t *, "__objc_catlist");`
 之前用 `clang` 编译 `category` 文件时，看到 `DATA段下的` `__objc_catlist` 区，保存 `category` 数据。
+
++ 把 `OBJC_PRINT_CLASS_SETUP` 添加到 `Environment Variables` 中，看到打印: `found 21690 classes during launch`。
 
 ```c++
 /*
@@ -198,24 +209,67 @@ if (hCount > 0) {
 void _read_images(header_info **hList, uint32_t hCount, int totalClasses, int unoptimizedTotalClasses)
 {
 ...
+// IMAGE TIMES: discover categories
 // Discover categories. Only do this after the initial category
 // attachment has been done.
-// 发现 categories。仅在完成初始类别附件（category_t 结构体列表，包含该类所有的类别）
-// 后才执行此操作。
-//（大概是指编译器生成并保存在 DATA段下的 `objc_catlist` `section` 的 `struct _category_t *` 数组吗？）
+// 仅在完成初始类别附件（category_t 结构体列表，包含该类所有的类别）
+// 后才执行 Discover categories.
 
 // For categories present at startup,
 // discovery is deferred until the first load_images call after the
 // call to _dyld_objc_notify_register completes. rdar://problem/53119145
-// 对于启动时出现的类别，
-// discovery 被推迟，直到 _dyld_objc_notify_register 的调用完成后第一次调用 load_images。
+// 对于启动时出现的类别，discovery 被推迟到 _dyld_objc_notify_register 完成后第一次调用 load_images 时。
 
 // 遍历加载每个 header_info 中的 category 数据
+// 由于 didInitialAttachCategories 默认为 false，所以第一次调用 _read_images 时，是不会执行 if 里面的 for 循环的。
 if (didInitialAttachCategories) {
     for (EACH_HEADER) {
         load_categories_nolock(hi);
     }
 }
+
+ts.log("IMAGE TIMES: discover categories");
+
+// 紧接着是 "IMAGE TIMES: realize non-lazy classes" 实现非懒加载类
+// Category discovery MUST BE Late to avoid potential races
+// when other threads call the new category code before this thread finishes its fixups.
+
+// +load handled by prepare_load_methods()
+
+// Realize non-lazy classes (for +load methods and static instances)
+// 实现非懒加载类（为了 +load 函数和静态实例）
+for (EACH_HEADER) {
+    // GETSECT(_getObjc2NonlazyClassList, classref_t const, "__objc_nlclslist");
+    // 读出 __objc_nlclslist 内的类数据
+    classref_t const *classlist = 
+        _getObjc2NonlazyClassList(hi, &count);
+    for (i = 0; i < count; i++) {
+        Class cls = remapClass(classlist[i]);
+        
+        printf("non-lazy classes: %s\n", cls->mangledName());
+        
+        if (!cls) continue;
+        
+        // 添加到一个全局类表中
+        addClassTableEntry(cls);
+
+        if (cls->isSwiftStable()) {
+            if (cls->swiftMetadataInitializer()) {
+                _objc_fatal("Swift class %s with a metadata initializer "
+                            "is not allowed to be non-lazy",
+                            cls->nameForLogging());
+            }
+            // fixme also disallow relocatable classes
+            // We can't disallow all Swift classes because of
+            // classes like Swift.__EmptyArrayStorage
+        }
+        
+        // 实现类
+        realizeClassWithoutSwift(cls, nil);
+    }
+}
+
+ts.log("IMAGE TIMES: realize non-lazy classes");
 ...
 }
 
@@ -226,6 +280,7 @@ if (didInitialAttachCategories) {
  */
 static bool didInitialAttachCategories = false;
 ```
+&emsp;这里 `discover categories` 的内容 `objc4-781` 和 `objc4-779.1` 已经完全不一样，这里多了全局静态变量  `didInitialAttachCategories` 的控制，它默认是 `false` 表示启动时是否已经将 `category` 的数据初始化完成，全局搜索只发现在 `load_images` 函数中有把它置为 `true`。
 
 ### `EACH_HEADER`
 ```c++
@@ -238,8 +293,263 @@ hIndex < hCount && (hi = hList[hIndex]); \
 hIndex++
 ```
 
+### `realizeClassWithoutSwift`
+```c++
+/*
+* realizeClassWithoutSwift
+* Performs first-time initialization on class cls, 
+* including allocating its read-write data.
+* 在 calss cls 上执行首次初始化，为其分配 read-write data.
+* 
+* Does not perform any Swift-side initialization.
+* Returns the real class structure for the class. 
+* 返回该类的真实类结构。
+*
+* Locking: runtimeLock must be write-locked by the caller
+*/
+static Class realizeClassWithoutSwift(Class cls, Class previously)
+{
+    // 加锁
+    runtimeLock.assertLocked();
+    // rw 数据
+    class_rw_t *rw;
+    // 父类
+    Class supercls;
+    // 元类
+    Class metacls;
+
+    // 判空
+    if (!cls) return nil;
+    // 如果已经初始化了，return cls.
+    if (cls->isRealized()) return cls;
+    ASSERT(cls == remapClass(cls));
+
+    // fixme verify class is not in an un-dlopened part of the shared cache?
+
+    auto ro = (const class_ro_t *)cls->data();
+    auto isMeta = ro->flags & RO_META;
+    
+    if (ro->flags & RO_FUTURE) {
+        // 已经初始化过的类才会进入这里
+        // This was a future class. rw data is already allocated.
+        rw = cls->data();
+        ro = cls->data()->ro();
+        ASSERT(!isMeta);
+        cls->changeInfo(RW_REALIZED|RW_REALIZING, RW_FUTURE);
+    } else {
+        // 我们主要看这里
+        // Normal class. Allocate writeable class data.
+        // 通常的 class, 为其 rw 分配空间
+        
+        // 第一次初始化类，创建一个新的 rw 并对 rw 的 ro 赋值
+        rw = objc::zalloc<class_rw_t>();
+        rw->set_ro(ro);
+        // 同时设置三个标志位（它们分别处于不同的二进制位）
+        rw->flags = RW_REALIZED|RW_REALIZING|isMeta;
+        cls->setData(rw);
+    }
+
+#if FAST_CACHE_META
+    if (isMeta) cls->cache.setBit(FAST_CACHE_META);
+#endif
+
+    // Choose an index for this class.
+    // Sets cls->instancesRequireRawIsa if indexes no more indexes are available
+    // SUPPORT_INDEXED_ISA 才会用到
+    cls->chooseClassArrayIndex();
+
+    if (PrintConnecting) {
+        _objc_inform("CLASS: realizing class '%s'%s %p %p #%u %s%s",
+                     cls->nameForLogging(), isMeta ? " (meta)" : "", 
+                     (void*)cls, ro, cls->classArrayIndex(),
+                     cls->isSwiftStable() ? "(swift)" : "",
+                     cls->isSwiftLegacy() ? "(pre-stable swift)" : "");
+    }
+
+    // Realize superclass and metaclass, if they aren't already.
+    // 如果尚未实现，实现超类和元类。
+    
+    // This needs to be done after RW_REALIZED is set above, for root classes.
+    // 对于根类，需要在上面设置了 RW_REALIZED 之后执行此操作。
+    
+    // This needs to be done after class index is chosen, for root metaclasses.
+    // 对于根元类，需要在选择类索引之后执行此操作
+    
+    // This assumes that none of those classes have Swift contents,
+    //   or that Swift's initializers have already been called.
+    //   fixme that assumption will be wrong if we add support
+    //   for ObjC subclasses of Swift classes.
+    // 假设这些类都不包含 Swift 内容，或已经调用了 Swift 的初始化。
+    // 如果我们添加对 Swift 类的 ObjC 子类的支持，则该假设将是错误的
+    
+    // 递归初始化父类和元类
+    supercls = realizeClassWithoutSwift(remapClass(cls->superclass), nil);
+    metacls = realizeClassWithoutSwift(remapClass(cls->ISA()), nil);
+    
+    // 修改 flags 标记、关联父类、元类 等一系列操作
+#if SUPPORT_NONPOINTER_ISA
+    if (isMeta) {
+        // Metaclasses do not need any features from non pointer ISA
+        // 元类不需要非指针 ISA 的任何功能
+        // This allows for a faspath for classes in objc_retain/objc_release.
+        // 这为 objc_retain/objc_release 中的类提供了方便。
+        // 意为在 objc_retain/objc_release 函数中如果 class 是元类的话能快速执行。
+        // 元类都是全局唯一的，不需要 retain 和 release。
+        cls->setInstancesRequireRawIsa();
+    } else {
+        // Disable non-pointer isa for some classes and/or platforms.
+        // 在某些类 和/或 平台上禁用非指针isa。
+        // Set instancesRequireRawIsa.
+        bool instancesRequireRawIsa = cls->instancesRequireRawIsa();
+        bool rawIsaIsInherited = false;
+        static bool hackedDispatch = false;
+
+        if (DisableNonpointerIsa) {
+            // Non-pointer isa disabled by environment or app SDK version
+            // 非指针 isa 被环境或应用程序SDK版本禁用
+            // 可在 Environment Variables 中添加 OBJC_DISABLE_NONPOINTER_ISA
+            instancesRequireRawIsa = true;
+        }
+        else if (!hackedDispatch  &&  0 == strcmp(ro->name, "OS_object"))
+        {
+            // hack for libdispatch et al - isa also acts as vtable pointer
+            // hack libdispatch 等 - ISA 也可充当 vtable 指针
+            hackedDispatch = true;
+            instancesRequireRawIsa = true;
+        }
+        else if (supercls  &&  supercls->superclass  &&
+                 supercls->instancesRequireRawIsa())
+        {
+            // This is also propagated by addSubclass()
+            // but nonpointer isa setup needs it earlier.
+            // Special case: instancesRequireRawIsa does not propagate
+            // from root class to root metaclass
+            // 这也可以通过 addSubclass（）传播，但是非指针 isa 设置需要更早的使用它。
+            // instanceRequireRawIsa 不会从 根类 传播到 根元类
+            instancesRequireRawIsa = true;
+            rawIsaIsInherited = true;
+        }
+
+        if (instancesRequireRawIsa) {
+            // 将此类及其所有子类标记为需要原始 isa 指针
+            cls->setInstancesRequireRawIsaRecursively(rawIsaIsInherited);
+        }
+    }
+// SUPPORT_NONPOINTER_ISA
+#endif
+
+    // Update superclass and metaclass in case of remapping
+    // 在重新映射的情况下更新超类和元类
+    
+    cls->superclass = supercls;
+    cls->initClassIsa(metacls);
+
+    // Reconcile instance variable offsets / layout.
+    // This may reallocate class_ro_t, updating our ro variable.
+    // 协调实例变量的偏移量/布局。
+    // 这可能会重新分配 class_ro_t，从而更新我们的 ro 变量。
+    if (supercls  &&  !isMeta) reconcileInstanceVariables(cls, supercls, ro);
+
+    // Set fastInstanceSize if it wasn't set already.
+    // 设置 fastInstanceSize 如果之前没有设置。
+    // 类大小
+    cls->setInstanceSize(ro->instanceSize);
+
+    // Copy some flags from ro to rw
+    // 将一些标志从 ro 复制到 rw
+    if (ro->flags & RO_HAS_CXX_STRUCTORS) {
+        // 是否有 C++ 析构函数 
+        cls->setHasCxxDtor();
+        if (! (ro->flags & RO_HAS_CXX_DTOR_ONLY)) {
+            // 是否有 C++ 构造函数
+            cls->setHasCxxCtor();
+        }
+    }
+    
+    // Propagate the associated objects forbidden flag from ro or from
+    // the superclass.
+    // 从 ro 或超类传播关联的对象禁止标志
+    
+    
+    // 如果该类不允许在其实例上关联对象或者父类存在且父类也不允许在其实例上关联对象
+    // 则禁止该类进行关联对象
+    if ((ro->flags & RO_FORBIDS_ASSOCIATED_OBJECTS) ||
+        (supercls && supercls->forbidsAssociatedObjects()))
+    {
+        rw->flags |= RW_FORBIDS_ASSOCIATED_OBJECTS;
+    }
+
+    // Connect this class to its superclass's subclass lists
+    // 将此类连接到其超类的子类列表
+    if (supercls) {
+        // 这个方法包含的信息还挺多的，作为延展学习，一定要看一下
+        // 终于看到了一直迷惑的 firstSubclass 和 nextSiblingClass 
+        // 什么时候会用到
+        addSubclass(supercls, cls);
+    } else {
+        // 如果没有 supercls 则添加到根类
+        addRootClass(cls);
+    }
+
+    // Attach categories
+    // 现在 cls 已经实现了，开始为它追加 category 数据
+    // 到这里引出最重要的函数 methodizeClass
+    methodizeClass(cls, previously);
+
+    return cls;
+}
+```
+
+### `addSubclass`
+为 `class_rw_t` 的两个成员变量 `nextSiblingClass` `firstSubclass` 解谜，它们是在 `realizeClassWithoutSwift` 函数中被设置。
+```c++
+/***********************************************************************
+* addSubclass
+* Adds subcls as a subclass of supercls.
+* Locking: runtimeLock must be held by the caller.
+**********************************************************************/
+static void addSubclass(Class supercls, Class subcls)
+{
+    runtimeLock.assertLocked();
+
+    if (supercls  &&  subcls) {
+        ASSERT(supercls->isRealized());
+        ASSERT(subcls->isRealized());
+
+        objc_debug_realized_class_generation_count++;
+        
+        subcls->data()->nextSiblingClass = supercls->data()->firstSubclass;
+        supercls->data()->firstSubclass = subcls;
+
+        if (supercls->hasCxxCtor()) {
+            subcls->setHasCxxCtor();
+        }
+
+        if (supercls->hasCxxDtor()) {
+            subcls->setHasCxxDtor();
+        }
+
+        objc::AWZScanner::scanAddedSubClass(subcls, supercls);
+        objc::RRScanner::scanAddedSubClass(subcls, supercls);
+        objc::CoreScanner::scanAddedSubClass(subcls, supercls);
+
+        // Special case: instancesRequireRawIsa does not propagate
+        // from root class to root metaclass
+        if (supercls->instancesRequireRawIsa()  &&  supercls->superclass) {
+            subcls->setInstancesRequireRawIsaRecursively(true);
+        }
+    }
+}
+```
+
 ### `load_images`
 ```c++
+/*
+* load_images
+* Process +load in the given images which are being mapped in by dyld.
+* 处理由 dyld 映射的给定的镜像的 +load 函数
+* Locking: write-locks runtimeLock and loadMethodLock
+*/
 void
 load_images(const char *path __unused, const struct mach_header *mh)
 {
@@ -251,6 +561,7 @@ load_images(const char *path __unused, const struct mach_header *mh)
     ...
 }
 ```
+执行 `if` 这里有两个条件 `!didInitialAttachCategories` 和 `didCallDyldNotifyRegister`，`didCallDyldNotifyRegister` 会在 `_dyld_objc_notify_register` 函数的末尾置为 `true`，`didInitialAttachCategories` 则默认是 `false`，然后进入该 `if` 后，被置为 `true`，且全局搜索只有这一次赋值操作，自此该 `if` 就再也不会进入第二次了。
 
 ### `loadAllCategories`
 &emsp;循环调用 `load_categories_nolock` 函数，由于目前对 `runtime` 初始化加载流程不熟悉，暂时无法定论加载 `category` 是从哪开始的，但是目前可以确定的是加载 `category` 是调用 `load_categories_nolock` 函数来做的，下面我们就详细分析 `load_categories_nolock` 函数。
@@ -325,10 +636,11 @@ static void load_categories_nolock(header_info *hi) {
                 // Stub classes are never realized. 
                 // Stub classes don't know their metaclass until they're initialized,
                 // so we have to add categories with class methods or properties to the stub itself.
+                // 这里是没有区分类和元类，下面的不管是实例方法还是类方法都跟 cls 做了映射
                 
                 // methodizeClass() will find them and add them to the metaclass as appropriate.
                 // 下面这些 key 是 cls value 是 category_list 的哈希表中的数据，
-                // methodizeClass（）将找到它们并将它们添加到适当的元类中。
+                // methodizeClass() 将找到它们并将它们添加到适当的元类中。
                 
                 if (cat->instanceMethods ||
                     cat->protocols ||
@@ -787,6 +1099,8 @@ static void flushCaches(Class cls)
 * methodizeClass
 * Fixes up cls's method list, protocol list, and property list.
 * Attaches any outstanding categories.
+* 把 category 的数据追加到类上，"修改" 类的方法列表、协议列表和属性列表。
+*
 * Locking: runtimeLock must be held by the caller
 */
 static void methodizeClass(Class cls, Class previously)
@@ -797,7 +1111,6 @@ static void methodizeClass(Class cls, Class previously)
     // 是否是元类
     bool isMeta = cls->isMetaClass();
     
-    // 下节详细分析这些数据结构
     auto rw = cls->data();
     auto ro = rw->ro();
     auto rwe = rw->ext();
@@ -810,13 +1123,13 @@ static void methodizeClass(Class cls, Class previously)
     }
 
     // Install methods and properties that the class implements itself.
-    // 从 ro 读取 baseMethods，它里面保存到都是类定义和延展中函数
+    // 从 ro 读取 baseMethods，它里面保存的都是 类定义和延展中的 函数
     method_list_t *list = ro->baseMethods();
     
     if (list) {
-        // 准备（排序和唯一，这个逻辑还没有看懂）
+        // 排序
         prepareMethodLists(cls, &list, 1, YES, isBundleClass(cls));
-        // 这里比较重要，可以理解为 ro 中的函数数据都附加到 rw 中
+        // 这里比较重要，可以理解为把 ro 中的函数数据都附加到 rw 中
         if (rwe) rwe->methods.attachLists(&list, 1);
     }
 
@@ -831,9 +1144,12 @@ static void methodizeClass(Class cls, Class previously)
     if (rwe && protolist) {
         rwe->protocols.attachLists(&protolist, 1);
     }
-
+    
+    // 都是把 ro 中的内容转移到 rw 中。
+    
     // Root classes get bonus method implementations if they don't have them already. 
     // These apply before category replacements.
+    // category 中重写 initialize 函数会 "覆盖" 父类的 initialize 函数
     if (cls->isRootMetaclass()) {
         // root metaclass
         // 给 cls 添加 initialize 方法
@@ -841,7 +1157,8 @@ static void methodizeClass(Class cls, Class previously)
     }
 
     // Attach categories.
-    // 附加 categories
+    // 追加 categories 的内容到类中。
+    
     if (previously) {
         if (isMeta) {
         
@@ -871,8 +1188,9 @@ static void methodizeClass(Class cls, Class previously)
     }
 #endif
 }
-
 ```
+大致可以绘制这样一个流程图:
+![category加载流程](https://p1-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/16f91b0b066a41319d7216c7664236ac~tplv-k3u1fbpfcp-zoom-1.image)
 
 ## 参考链接
 **参考链接:🔗**
