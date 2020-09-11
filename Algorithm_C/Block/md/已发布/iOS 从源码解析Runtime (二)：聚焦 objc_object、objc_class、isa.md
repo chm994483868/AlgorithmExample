@@ -1,5 +1,8 @@
-# iOS 内存管理实现(一)：聚焦 objc_object、objc_class、isa
-> 2006 年，苹果发布了全新的 `Objective-C 2.0`，目前我们可以在苹果官网下载最新的 `objc4-781` 源码来阅读和调试。**在 `Obejective-C 2.0` 中类和对象等的实现进行了完全重写。** 虽然 `Objective-C 1.0` 已经被废弃了，但是相关代码并没有被完全剔除，源码内通过一些宏定义来为我们做出区分，在阅读过程中我们可以进行比较理解。
+# iOS 内存管理实现(二)：聚焦 objc_object、objc_class、isa
+> 拓展：`runtime` 是什么？
+在 `C` 语言中，将代码转换为可执行程序，一般要经历三个步骤，即编译、链接、运行。在链接的时候，方法的实现就已经确定好了。而在 `Objective-C` 中，却将一些在编译和链接过程中的工作，放到了运行阶段。也就是说，就算是一个编译好的 `.ipa` 包，在程序没有运行的时候，也不知道调用一个方法会发生什么。因此我们称 `Objective-C` 为一门动态语言。这样的设计使 `Objective-C` 变得灵活，甚至可以让我们在程序运行的时候，去动态修改一个方法的实现，而实现这一切的基础就是 `runtime`。简单来说，`runtime` 是一个库，这个库使我们可以在程序运行时创建对象、检查对象、修改类和对象的方法等。
+  
+> 2006 年，苹果发布了全新的 `Objective-C 2.0`，目前我们可以在苹果官网下载最新的 `objc4-781` 源码来阅读和调试。**在 `Obejective-C 2.0` 中类和对象等的实现进行了完全重写。** 虽然对当下而言 `Objective-C 1.0` 已经过时很久了，但是其相关代码对我们学习 `2.0` 还是具有极大的参考价值。（在源码内部 `1.0` 与 `2.0` 主要通过一些宏来作出区分。）
 
 &emsp;`struct objc_object` 和 `struct objc_class` 是 `iOS(OC)` 编写面向对象代码的基石。那今天我们就来超详细的解析这两个结构体吧。
 
@@ -11,7 +14,7 @@
 
 &emsp;这样做是为了避免与其它地方定义的 `id` 和 `Class` 产生冲突。在 `Objective-C 1.0` 和 `2.0` 中，类和对象的结构体定义是不同的，在源码中我们能看到两处不同的 `objc_class` 和 `objc_object` 定义。
 
-&emsp;我们可在 `runtime.h` 文件中看到 `/* Types */` 处的 `objc_class` 定义的那一部分代码都被 `#if !OBJC_TYPES_DEFINED ... #endif` 所包裹，然后还有 `objc.h` 文件开头处的 `objc_object` 定义的代码也被 `#if !OBJC_TYPES_DEFINED ... #endif` 所包裹，表示两者只在 `Objective-C 1.0` 中使用。`Objective-C 2.0` 下正在使用的  `objc_object` 和 `objc_class` 定义分别位于 `objc-private.h` 和 `objc-runtime-new.h` 文件下。（2.0 下 `OBJC_TYPES_DEFINED` 宏值为 1）
+&emsp;我们可在 `runtime.h` 文件中看到 `/* Types */` 处的 `objc_class` 定义的那一部分代码都被 `#if !OBJC_TYPES_DEFINED ... #endif` 所包裹，然后还有 `objc.h` 文件开头处的 `objc_object` 定义的代码也被 `#if !OBJC_TYPES_DEFINED ... #endif` 所包裹，表示两者只在 `Objective-C 1.0` 中使用。`Objective-C 2.0` 下正在使用的  `objc_object` 和 `objc_class` 定义分别位于 `objc-private.h` 和 `objc-runtime-new.h` 文件下。（2.0 下 `OBJC_TYPES_DEFINED` 的值为 1）
 ```c++
 /* 
  * Isolate ourselves from the definitions of id and Class in the compiler and public headers.
@@ -28,7 +31,7 @@
 #undef OBJC_OLD_DISPATCH_PROTOTYPES
 #define OBJC_OLD_DISPATCH_PROTOTYPES 0
 ```
-&emsp;在 `Public Headers/objc-api.h` 文件可看到如下代码：
+&emsp;在 `Public Headers/objc-api.h` 文件可看到如下代码，在 `__swift__` 为真的情况下，`OBJC_OLD_DISPATCH_PROTOTYPES` 会定为 1，其它情况下都是 0，在 `objc-privete.h` 文件中 `OBJC_OLD_DISPATCH_PROTOTYPES` 被定为 0。
 ```c++
 /* OBJC_OLD_DISPATCH_PROTOTYPES == 0 
  * enforces the rule that the dispatch functions must be cast to an appropriate function pointer type. 
@@ -47,7 +50,7 @@
 #   endif
 #endif
 ```
-在 `objc-privete.h` 中 `OBJC_OLD_DISPATCH_PROTOTYPES` 被定为 0。
+
 示例代码一：
 ```c++
 /// A pointer to the function of a method implementation. 
@@ -66,6 +69,7 @@ extern id _objc_msgForward_impcache(id, SEL, ...);
 #endif
 ```
 看到同名函数，返回值 `void` 和 `id _Nullable (id 可空)` 做了替换，参数 `void` 和 `id, SEL` 做了替换，全局搜索可发现此行为只针对调度函数。
+
 + `Public Header/runtime.h` 中的 `Objective-C 1.0` 下的 `objc_class` 定义
 ```c++
 /* Types */
@@ -112,6 +116,7 @@ struct objc_class {
 } OBJC2_UNAVAILABLE;
 /* Use `Class` instead of `struct objc_class *` */
 ```
+
 + `Public Headers/objc.h` 中的 `Objective-C 1.0` 下的 `objc_object` 定义
 ```c++
 #if !OBJC_TYPES_DEFINED
@@ -127,6 +132,47 @@ struct objc_object {
 typedef struct objc_object *id;
 #endif
 ```
+&emsp;在面向对象（`oop`）的编程语言中，每一个对象都是某个类的实例。在 `Objective-C` 中，所有对象的本质都是一个 `objc_object` 结构体，且每个实例对象的第一个成员变量都是 `Class isa`，指向该对象对应的类，每一个类描述了一系列它的实例对象的信息，包括对象占用内存大小、成员变量列表、该对象能执行的函数列表...等。
+
+**在一个类的实例对象的内存布局中，第一个成员变量是 `isa`，然后根据该对象所属类的继承体系依次对成员变量排序，排列顺序是: 根类的成员变量、父类的成员变量、最后才是自己的成员变量，且每个类定义中的成员变量（仅包含使用 `@property` 声明属性后由编译器生成的同名的 _成员变量）相互之间的顺序可能会与定义时的顺序不同，编译器会在内存对齐的原则下对类定义时的成员变量的顺序做出优化，保证内存占用最少。（还会涉及到 `.h` 中的成员变量和属性 `.m` 中 `extension` 中添加的成员变量和属性，它们之间的排序顺序）**
+验证代码:
+```objective-c
+// SubObject 类定义
+@interface SubObject : BaseObject {
+    NSArray *cus_array;
+}
+
+@property (nonatomic, assign) int cus_int;
+@property (nonatomic, assign) double cus_dou;
+@property (nonatomic, assign) int cus_int2;
+@property (nonatomic, copy) NSString *cus_string;
+
+@end
+
+// 添加断点，控制台打印
+(lldb) p *sub
+(SubObject) $2 = {
+  BaseObject = {
+    NSObject = {
+      isa = SubObject
+    }
+    baseString = nil
+    _baseArray = nil
+  }
+  cus_array = nil
+  _cus_int = 0
+  _cus_int2 = 0
+  _cus_dou = 0
+  _cus_string = nil
+}
+```
+&emsp;可看到你 `NSObject` 的 `isa` 在最前面，然后是 `BaseObject` 的成员变量，最后才是 `SubObject` 的成员变量，然后注意 `_cus_int2` 跑到了 `_cus_dou` 前面，而在类定义时 `cus_dou` 属性是在 `cus_int2` 属性前面的。（这样至少减少了 4 个字节的内存）
+
+这里大概又可以引出为什么不能动态的给类添加成员变量却可以添加方法？
+
+&emsp;类的成员变量布局以及其实例对象大小在编译时就已确定，设想一下，如果 `Objective-C` 中允许给一个类动态添加成员变量，会带来一个问题：为基类动态增加成员变量会导致所有已创建出的子类实例都无法使用。
+我们所说的 “类的实例”（对象），指的是一块内存区域，里面存储了 `isa` 指针和所有的成员变量。所以假如允许动态修改类已固定的成员变量的布局，那么那些已经创建出的对象就不符合类的定义了，就变成无效对象了。而方法的定义都是在类对象或元类对象中的，不管如何增删方法，都不会影响对象的内存布局，已经创建出的对象仍然可以正常使用。
+
 + `OBJC_ISA_AVAILABILITY` 
 &emsp;在 `Public Headers/objc-api.h` 中的宏定义。
 ```c++
@@ -142,6 +188,7 @@ typedef struct objc_object *id;
 #endif
 ```
 表明在 `Objective-C 1.0` 中类型为 `Class` 的 `isa` 将在 `2.0` 中被弃用。在 `2.0` 中 `isa` 转变为 `union isa_t isa`，下面会详细分析。
+
 + `OBJC2_UNAVAILABLE`
 &emsp;在 `Public Headers/objc-api.h` 中的宏定义。
 ```c++
@@ -159,13 +206,16 @@ typedef struct objc_object *id;
 #endif
 ```
 表明在 `Objective-C 2.0` 中不可用，在 `macOS 10.5 iOS 2.0` 以及 `TVOS/WATCHOS/BRIDGEOS` 不可用。
+
 + `SEL`
-&emsp;在 `Public Headers/objc.h` 文件中定义的一个指向 `struct objc_selector` 的指针。在 `objc4-781` 中查找不到 `objc_selector` 的具体定义，那这个 `objc_selector` 结构体具体是什么取决与使用 `GNU` 还是苹果的运行时， 在 `macOS` 中 `SEL` 其实被映射为一个 `C` 字符串，一个保存方法名字的字符串，它并不指向一个具体的方法实现（`IMP` 类型才是）。
+&emsp;在 `Public Headers/objc.h` 文件中定义的一个指向 `struct objc_selector` 的指针。
+在 `objc4-781` 中查找不到 `objc_selector` 的具体定义，那这个 `objc_selector` 结构体具体是什么取决与使用 `GNU` 还是苹果的运行时， 在 `macOS` 中 `SEL` 其实被映射为一个 `C` 字符串，一个保存方法名字的字符串，它并不指向一个具体的方法实现（`IMP` 类型才是）。
 `@selector(abc)` 返回的类型是 `SEL`，它作用是找到名字为 `abc` 的方法，对于所有的类，只要方法名是相同的，产生的 `selector` 都是一样的。简而言之，你可以理解 `@selector()` 就是取指定名字的函数在类中的编号，它的行为基本可以等同 `C` 语言的中函数指针，只不过 `C` 语言中，可以把函数名直接赋给一个函数指针，而 `Objective-C` 的类不能直接应用函数指针，这样只能做一个 `@selector` 语法来取。
 ```c++
 /// An opaque type that represents a method selector.
 typedef struct objc_selector *SEL;
 ```
+
 + `IMP`
 &emsp;在 `Public Headers/objc.h` 文件中定义的一个函数指针，指向方法调用时对应的函数实现。
 ```c++
@@ -178,20 +228,210 @@ typedef id _Nullable (*IMP)(id _Nonnull, SEL _Nonnull, ...);
 #endif
 ```
 `OBJC_OLD_DISPATCH_PROTOTYPES` 默认为 0，在 `__swift__` 为真时是 1，则会进行严格的参数匹配。
+`IMP` 指向的函数的前两个参数是默认参数 `id` 和 `SEL`，这对应了函数内部两个隐含参数 `self` 和 `_cmd`，这里的 `SEL` 和 `_cmd` 好理解，就是函数名。而 `id` 和 `self` ，对于实例方法来说， `self` 保存了当前对象的地址，对于类方法来说， `self` 保存了当前对应类对象的地址，后面的省略号即是参数列表。如下代码测试 `_cmd`: 
+```objective-c
+- (void)testCmd:(NSNumber *)num {
+    NSLog(@"%ld", (long)num.integerValue);
+    num = [NSNumber numberWithInteger:num.integerValue-1];
+    if (num.integerValue > 0) {
+        // 此处调用 _cmd
+        [self performSelector:_cmd withObject:num];
+    }
+}
+```
+控制台依次打印 5 4 3 2 1，即我们可以在方法内部用 `_cmd` 来调用方法自身。
+
 + `Method`
-&emsp;在 `Objective-C 1.0` 下：
+&emsp;位置在`Public Headers/objc.h` 文件。在 `Objective-C 1.0` 下，`Method` 被定义为一个指向 `struct objc_method` 的指针：
 ```c++
 #if !OBJC_TYPES_DEFINED
-
 // An opaque type that represents a method in a class definition.
 // 表示类定义中的方法
 typedef struct objc_method *Method;
+#endif
+```
+`struct objc_method` 在 `Objective-C 1.0` 定义如下:
+```c++
+struct objc_method {
+    // 方法名称
+    SEL _Nonnull method_name                                 OBJC2_UNAVAILABLE;
+    // 方法类型是一个 char 指针，存储着方法的参数类型和返回值类型
+    // 可通过 method_getTypeEncoding(method) 获取
+    // 类似这样: @28@0:8i16@20、v16@0:8
+    char * _Nullable method_types                            OBJC2_UNAVAILABLE;
+    // 方法实现
+    IMP _Nonnull method_imp                                  OBJC2_UNAVAILABLE;
+}                                                            OBJC2_UNAVAILABLE;
+```
+`Method` 的作用，相当于在 `SEL` 和 `IMP` 之间做了一个映射，当对一个对象发送消息时，通过 `SEL` 方法名找到其对应的函数实现 `IMP`，然后执行。
 
+注意:
+&emsp;由于在类中查找方法时只是根据方法名来查找的，因此在 `OC` 中同一块定义区域内，不能同时定义两个同名方法。（在分类中可以添加与类已有的方法同名的方法，会造成 "覆盖"）
+如下代码则不能同时定义:
+```objective-c
+- (void)setWidth:(int)width;
+- (void)setWidth:(double)width; // ❗️Duplicate declaration of method 'setWidth:'
+```
+
++ `objc_method_list`
+`objc_method_list` 在 `Objective-C 1.0` 下的定义：
+```c++
+struct objc_method_list {
+    struct objc_method_list * _Nullable obsolete             OBJC2_UNAVAILABLE;
+
+    int method_count                                         OBJC2_UNAVAILABLE;
+#ifdef __LP64__
+    int space                                                OBJC2_UNAVAILABLE;
+#endif
+    /* variable length structure */
+    struct objc_method method_list[1]                        OBJC2_UNAVAILABLE;
+}                                                            OBJC2_UNAVAILABLE;
+```
+`__LP64__` 表示当前平台（或者说运行环境）下 `long` 和 `poniter` 都是 64，表示当前操作系统是 64 位。在 `Mac` 终端直接执行 `cpp -dM /dev/null` 会打印出一大组当前设备的一些宏定义的值，我看到在我的机器下: `#define __LP64__ 1`、`#define __POINTER_WIDTH__ 64`、等等，列表很长，大家可以在终端执行一下试试。
+
+在上面 `Objective-C 1.0` 下 `objc_class` 定义中 `methodLists` 是一个 `struct objc_method_list` 类型的二级指针，其中每一个元素是一个数组，数组中的每一个元素是 `struct objc_method`。
+
++ `Ivar`
+&emsp;在 `Objective-C 1.0` 下，`Ivar` 被定义为一个指向 `struct objc_ivar` 的指针：
+```c++
+#if !OBJC_TYPES_DEFINED
+/// An opaque type that represents an instance variable.
+typedef struct objc_ivar *Ivar;
 #endif
 ```
 
++ `objc_ivar`
+`objc_ivar` 在 `Objective-C 1.0` 下的定义：
+```c++
+struct objc_ivar {
+    char * _Nullable ivar_name                               OBJC2_UNAVAILABLE;
+    char * _Nullable ivar_type                               OBJC2_UNAVAILABLE;
+    // 这个 ivar_offset 很重要，等后面我们看 2.0 时再进行展开
+    int ivar_offset                                          OBJC2_UNAVAILABLE;
+#ifdef __LP64__
+    int space                                                OBJC2_UNAVAILABLE;
+#endif
+}                                                            OBJC2_UNAVAILABLE;
+```
+
++ `objc_ivar_list`
+`objc_ivar_list` 在 `Objective-C 1.0` 下的定义：
+```c++
+struct objc_ivar_list {
+    int ivar_count                                           OBJC2_UNAVAILABLE;
+#ifdef __LP64__
+    int space                                                OBJC2_UNAVAILABLE;
+#endif
+    /* variable length structure */
+    struct objc_ivar ivar_list[1]                            OBJC2_UNAVAILABLE;
+}                                                            OBJC2_UNAVAILABLE;
+```
+在上面 `Objective-C 1.0` 下 `objc_class` 定义中 `ivars` 是一个 `struct objc_ivar_list` 类型的指针。
+`ivars` 中有一个数组，数组中每个元素是一个 `struct objc_ivar`。
+
++ `objc_property_t`
+&emsp;在 `Objective-C 1.0` 下，`objc_property_t` 被定义为一个指向 `struct objc_property` 的指针：
+```c++
+#if !OBJC_TYPES_DEFINED
+/// An opaque type that represents an Objective-C declared property.
+typedef struct objc_property *objc_property_t;
+#endif
+```
+在 `objc4-781` 中未找到 `struct objc_property` 定义。倒是可以找一个与 `property` 相关的。
+
++ `objc_property_attribute_t`
+```c++
+/// Defines a property attribute
+typedef struct {
+    // 属性的名字
+    const char * _Nonnull name;           /**< The name of the attribute */
+    // 属性的值（通常是空的）
+    const char * _Nonnull value;          /**< The value of the attribute (usually empty) */
+} objc_property_attribute_t;
+```
+`objc_property_attribute_t` 定义了属性的特性。
+
++ `Category`
+&emsp;在 `Objective-C 1.0` 下，`Category` 被定义为一个指向 `struct objc_category` 的指针：
+```c++
+#if !OBJC_TYPES_DEFINED
+/// An opaque type that represents a category.
+typedef struct objc_category *Category;
+#endif
+```
+
++ `objc_category`
+`objc_category` 在 `Objective-C 1.0` 下的定义：
+```c++
+struct objc_category {
+    char * _Nonnull category_name                            OBJC2_UNAVAILABLE;
+    char * _Nonnull class_name                               OBJC2_UNAVAILABLE;
+    struct objc_method_list * _Nullable instance_methods     OBJC2_UNAVAILABLE;
+    struct objc_method_list * _Nullable class_methods        OBJC2_UNAVAILABLE;
+    struct objc_protocol_list * _Nullable protocols          OBJC2_UNAVAILABLE;
+}                                                            OBJC2_UNAVAILABLE;
+```
+`objc_category` 包含分类中定义的实例方法和类方法，在程序启动时会由 `dyld` 动态追加到对应的类和元类中。
+在 `objc_category` 中包含对象方法列表、类方法列表、协议列表。从这里我们也可以看出， `Category` 支持添加对象方法、类方法、协议，但不能保存成员变量。
+
+注意:
+在 `Category` 中是可以添加属性的，但不会生成对应的成员变量、 `getter` 和 `setter` 。因此，调用 `Category` 中声明的属性时会报错。
+
+`Category` 在 `2.0` 和 `1.0` 中的差别还挺大的，后面我们会详细分析 `2.0` 下的 `Category`。
+
++ `Cache`
+&emsp;在 `Objective-C 1.0` 下，`Cache` 被定义为一个指向 `struct objc_cache` 的指针：
+```c++
+typedef struct objc_cache *Cache                             OBJC2_UNAVAILABLE;
+```
++ `objc_cache`
+`objc_cache` 在 `Objective-C 1.0` 下的定义：
+```c++
+#define CACHE_BUCKET_NAME(B)  ((B)->method_name)
+#define CACHE_BUCKET_IMP(B)   ((B)->method_imp)
+#define CACHE_BUCKET_VALID(B) (B)
+
+// 哈希函数的宏定义
+#ifndef __LP64__
+#define CACHE_HASH(sel, mask) (((uintptr_t)(sel)>>2) & (mask))
+#else
+#define CACHE_HASH(sel, mask) (((unsigned int)((uintptr_t)(sel)>>3)) & (mask))
+#endif
+
+struct objc_cache {
+    // 总容量 - 1
+    unsigned int mask /* total = mask + 1 */                 OBJC2_UNAVAILABLE;
+    // 当前的占用的总数
+    unsigned int occupied                                    OBJC2_UNAVAILABLE;
+    // struct objc_method 指针数组
+    Method _Nullable buckets[1]                              OBJC2_UNAVAILABLE;
+};
+```
++ `Protocol`
+```c++
+#ifdef __OBJC__
+@class Protocol;
+#else
+typedef struct objc_object Protocol;
+#endif
+
+@interface Protocol : NSObject
+@end
+```
+
++ `objc_protocol_list`
+```c++
+struct objc_protocol_list {
+    struct objc_protocol_list * _Nullable next;
+    long count;
+    __unsafe_unretained Protocol * _Nullable list[1];
+};
+```
+
+**到这里 `OBJC_TYPES_DEFINED` 涉及的 `Objective-C 1.0` 下的一些类型定义已经基本看了一遍，大致在脑中也有了一个脉络，下面继续看 `objc-private.h` 文件和接下的来 `Objective-C 2.0` 下类和对象的结构所做出的改变。**
+
 + `ASSERT(x)`
-&emsp;在 `release` 模式下不会执行断言，但是保证 `ASSERT(x)` 可编译。
+&emsp;在 `release` 模式下不会执行断言，同时也保证 `ASSERT(x)` 可正常编译。
 ```c++
 // An assert that's disabled for release builds but still ensures the expression compiles.
 #ifdef NDEBUG
@@ -200,11 +440,25 @@ typedef struct objc_method *Method;
 #define ASSERT(x) assert(x)
 #endif
 ```
+
++ `Class`
+`Class` 是指向 `struct objc_class` 的指针。
+```c++
+typedef struct objc_class *Class;
+```
+
++ `id`
+`id` 是指向 `struct objc_object` 的指针。
+```c++
+typedef struct objc_object *id;
+```
+
 + `__OBJC__`
 > `__OBJC__`
-  This macro is defined, with value 1, when the Objective-C compiler is in use. You can use `__OBJC__` to test whether a header is compiled by a C compiler or a Objective-C compiler. 
+  This macro is defined, with value 1, when the Objective-C compiler is in use. You can use `__OBJC__` to test whether a header is compiled by a C compiler or a Objective-C compiler. [Common Predefined Macros](https://gcc.gnu.org/onlinedocs/gcc-3.3/cpp/Common-Predefined-Macros.html)
 
 `__OBJC__` 在 `Objective-C` 编译器中被预定义为 1，我们可以使用该宏来判断头文件是通过 `C` 编译器还是 `Objective-C` 编译器进行编译。
+
 + `__OBJC2__`
 &emsp;定义在 `Project Headers/objc-config.h` 中：
 ```c++
@@ -228,6 +482,7 @@ public:
 ```
 
 ## `isa`
+**`isa` 是在 `arm64` 架构推出以后修改为 `union isa_t` 吗，并不是 `Objective-C 2.0` 后推出的，`union isa_t` 是随着 `iPhone 5s arm64` 64 位处理器的推出开始的。**
 ```c++
 #include "isa.h"
 union isa_t {
@@ -248,10 +503,10 @@ union isa_t {
 #endif
 };
 ```
-&emsp;`isa` 的类型是 `union isa_t`，它有两个成员变量 `Class cls` 和 `uintptr_t bits`，其中 `bits` 采用位域的机制来保存更多信息。`ISA_BITFIELD` 宏定义位于 `isa.h` 文件，一起来看下。
+&emsp;`isa` 的类型是 `union isa_t`，它有两个成员变量 `Class cls` 和 `uintptr_t bits` 共用同一块内存空间，其中 `bits` 采用位域的机制来保存更多信息。`ISA_BITFIELD` 宏定义位于 `isa.h` 文件，一起来看下。
 
 ### 苹果设备架构梳理
-&emsp;在进行 `isa.h` 之前我们首先对苹果设备的架构做一下梳理。
+&emsp;在进行 `isa.h` 之前我们首先对苹果现有的设备架构做一下梳理。
 + `armv6/armv7/armv7s/arm64(armv8)/arm64e(armv8)` 是 `iPhone` 的 `ARM` 处理器的指令集。（`A` 系列 `CPU` 芯片）
 + `i386/x86_64` 是 `Mac` 的 `intel` 处理器的指令集。（同时也是我们在 `Xcode` 中使用的手机模拟器的指令集）
 
@@ -394,6 +649,8 @@ the isa field as a maskable pointer with other data around it.
 #   define RC_ONE   (1ULL<<25)
 #   define RC_HALF  (1ULL<<6)
 ```
+
+
 
 ## 参考链接
 **参考链接:🔗**

@@ -7,7 +7,7 @@
 &emsp;`category` 拥有 `.h` 和 `.m` 文件，`extension` 则不然，`extension` 只存在一个 `.h` 文件，或者只能寄生于一个类的 `.m` 中（寄生在 `.m` 中是我们最常见的存在形式）。
 
 + "寄生" 形式 
-比如，在 `BaseViewController.m` 文件中，我们通常会写一个 `extension`:
+比如，在 `BaseViewController.m` 文件中，我们通常会写直接写一个 `extension`:
 ```objective-c
 @interface BaseViewController () {
 // 此处可定义私有成员变量
@@ -64,7 +64,9 @@ NS_ASSUME_NONNULL_END
 @end
 ```
 
-**如果把 `#import "CusObject+extension.h"` 引入放在 `CusObject.m` 中，表示`extension` 中的成员变量、属性和方法都是私有的。**
+~~如果把 `#import "CusObject+extension.h"` 引入放在 `CusObject.m` 中，表示`extension` 中的成员变量、属性和方法都是私有的。~~
+
+如果把 `#import "CusObject+extension.h"` 引入放在 `CusObject.m` 中，则`extension` 中的成员变量、属性和方法只能在类内部使用。
 
 注意：如果把 `#import "CusObject+extension.h"` 放在 `CusObject.h` 最上面引入，会直接报错，这里有一个定义先后的问题，此时 `CusObject+extension.h` 处于 `CusObject` 类定义前面, `CusObject` 定义还没有完成，`extension` 必然无法找到 `CusObject`。
 
@@ -83,11 +85,15 @@ NS_ASSUME_NONNULL_END
 #import "CusObject+extension.h"
 ```
 注意：⚠️⚠️ 
-+ 无论在 `.m` 还是 `.h` 中引入 `extension`，`extension` 中定义的成员变量都是私有的。
-+ 在 `.m` 中引入 `extension`，其中定义的成员变量、属性和方法都是私有的。
-+ 在 `.h` 中引入 `extension`，属性和方法是公开的。
++ ~~无论在 `.m` 还是 `.h` 中引入 `extension`，`extension` 中定义的成员变量都是私有的。~~
++ ~~在 `.m` 中引入 `extension`，其中定义的成员变量、属性和方法都是私有的。~~
+
++ 在 `.m` 中引入 `extension`，其中定义的成员变量、属性和方法只能在类内部使用。
++ 在 `.h` 中引入 `extension`，属性和方法是公开的，成员变量默认是私有的，我们可以在前面添加 `@public` 可以变为公开，访问时要用 `->`。（`.` 和 `->` 的使用在 `C/C++` 和 `Objective-C` 中有一些区别，`OC` 是 `C` 的超集，但是这里它并没有和 `C` 完全相同）
++ 在 `.m` 中给类定义直接添加成员变量，在外部访问时会报错提示成员变量是 `protected` 的。同样也可加 `@public` 公开
 
 ```objective-c
+object->array = @[@(1), @(2)]; ❌❌ // Instance variable 'array' is protected
 objc->name = @"chm"; ❌❌ // Instance variable 'name' is private
 ```
 ### `extension` 和 `cateogry` 区别
