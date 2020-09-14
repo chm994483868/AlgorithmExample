@@ -141,7 +141,7 @@ _objc_isTaggedPointer(const void * _Nullable ptr)
 &emsp;接着上面 `OBJC_HAVE_TAGGED_POINTERS` 宏定义继续往下看的话，看到枚举 `objc_tag_index_t`，
 
 
-
+// tagged pointer
 
 
 
