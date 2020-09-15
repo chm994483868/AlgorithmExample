@@ -61,7 +61,7 @@ size_t instanceSize(size_t extraBytes) const {
 &emsp;如果没有 `Tagged Pointer`，在 `32` 位环境中存储一个 `NSInteger` 类型的 `NSNumber` 对象的时候，需要系统在堆区为其分配 `8` 个字节（对象的 `isa` 指针 `4` 字节 + 存储的值 `4` 字节）空间，而到了 `64` 位环境，就会变成 `16` 个字节（（理想状态）对象的 `isa` 指针 `8` 字节 + 存储的值 `8` 字节），然后再加上必要的指针变量在栈区的空间（`32` 位占 `4` 字节/ `64` 位占 `8` 字节），而如果此时 `NSNumber` 对象中仅存储了一个较小的数字，从 `32` 位切到  `64` 位环境即使在逻辑上没有任何改变的情况下，`NSNumber` 这类对象的内存占用也会直接翻一倍。
 （在 `64` 位 `iOS` 真机环境下，`NSNumber` 对象中存放 `NSIntegerMax` 时，使用 `malloc_size` 函数，返回 `32`，即系统会为其开辟 `32` 字节的空间，一个 `NSObject` 对象系统会为其开辟 `16` 字节的空间。）
 
-+ 在 `64` 位环境下，非 `Tagged Pointer` 时，`NSNumber` 对象在堆区占用 `16` 字节（`NSObject` 对象是 `16` 字节，`NSNumber` 对象实际占用 `32` 字节） + 指针变量在栈区占用 `8` 字节空间，一共 `24` 字节空间。
++ 在 `64` 位环境下，非 `Tagged Pointer` 时，`NSNumber` 对象在堆区占用 `16` 字节（ `NSObject` 对象是 `16` 字节，`NSNumber` 对象实际占用 `32` 字节） + 指针变量在栈区占用 `8` 字节空间，一共 `24` 字节空间。
 + 在 `64` 位环境下，使用 `Tagged Pointer` 时，`NSNumber` 对象在堆区占用 `0` 字节 + 指针变量在栈区占用 `8` 字节空间，一共 `8` 字节空间。
 
 **`Tagged Pointer` 减少了至少一半的内存占用。**
@@ -107,6 +107,16 @@ _objc_isTaggedPointer(const void * _Nullable ptr)
     return ((uintptr_t)ptr & _OBJC_TAG_MASK) == _OBJC_TAG_MASK;
 }
 ```
+### `SUPPORT_TAGGED_POINTERS`
+&emsp;定义在 `Project Headers/objc-config.h Line 74`的 `SUPPORT_TAGGED_POINTERS` 表示在 `Objective-C 2.0` 和 `64` 位系统中可用 `Tagged Pointer`。
+```c++
+// Define SUPPORT_TAGGED_POINTERS=1 to enable tagged pointer objects Be sure to edit tagged pointer SPI in objc-internal.h as well.
+#if !(__OBJC2__  &&  __LP64__)
+#   define SUPPORT_TAGGED_POINTERS 0
+#else
+#   define SUPPORT_TAGGED_POINTERS 1
+#endif
+```
 ### `OBJC_MSB_TAGGED_POINTERS`
 &emsp;`OBJC_MSB_TAGGED_POINTERS` 表示不同平台下字符串是低位优先排序（`LSD`）还是高位优先排序（`MSD`）。具体细节可参考:[《字符串低位优先排序(LSD)和高位优先排序(MSD)原理及C++实现》](https://blog.csdn.net/weixin_41427400/article/details/79851043)
 ```c++
@@ -121,7 +131,8 @@ _objc_isTaggedPointer(const void * _Nullable ptr)
 #endif
 ```
 ### `_OBJC_TAG_MASK`
-&emsp;`_OBJC_TAG_MASK` 表示在 `字符串高位优先排序的平台下` 指针变量的第 `64` 位标记该指针为 `Tagged Pointer`，在 `字符串低位优先排序的平台下` 指针变量的第 `1` 位标记该指针为 `Tagged Pointer`。 
+&emsp;`_OBJC_TAG_MASK` 表示在 `字符串高位优先排序的平台下` 指针变量的第 `64` 位标记该指针为 `Tagged Pointer`，在 `字符串低位优先排序的平台下` 指针变量的第 `1` 位标记该指针为 `Tagged Pointer`。
+在 `iOS` 真机上判断是否是 `Tagged Pointer` 直接看指针的第 `64` 个比特位是否是 `1`，在 `x86_64` 架构的 `Mac` 下看指针的第 `1` 个比特位是否是 `1`。
 ```c++
 #if OBJC_MSB_TAGGED_POINTERS
 #   define _OBJC_TAG_MASK (1UL<<63)
@@ -131,36 +142,428 @@ _objc_isTaggedPointer(const void * _Nullable ptr)
 ...
 #endif
 ```
-&emsp;在 `iOS` 真机上判断是否是 `Tagged Pointer` 直接看指针的第 `64` 个比特位是否是 `1`，在 `x86_64` 架构的 `Mac` 下看指针的第 `1` 个比特位是否是 `1`。
+示例代码:
+```
+// 在 iPhone 上运行
+// Tagged Pointer
+NSNumber *number1 = @1;
+NSLog(@"number1 %p %@ %zu", number1, [number1 class], malloc_size(CFBridgingRetain(number1)));
+NSNumber *number2 = @2;
+NSLog(@"number2 %p %@ %zu", number2, [number2 class], malloc_size(CFBridgingRetain(number2)));
+NSString *a = [[@"a" mutableCopy] copy];
+NSLog(@"a %p %@ %zu", a, [a class], malloc_size(CFBridgingRetain(a)));
+NSString *ab = [[@"ab" mutableCopy] copy];
+NSLog(@"ab %p %@ %zu", ab, [ab class], malloc_size(CFBridgingRetain(ab)));
+NSString *b = [NSString stringWithFormat:@"b"];
+NSLog(@"b %p %@ %zu", b, [b class], malloc_size(CFBridgingRetain(b)));
+NSString *c = [NSString stringWithFormat:@"c"];
+NSLog(@"c %p %@ %zu", c, [c class], malloc_size(CFBridgingRetain(c)));
+
+// 非 Tagged Pointer
+NSNumber *number3 = [[NSNumber alloc] initWithInteger:NSIntegerMax];
+NSLog(@"number3 %p %@ %zu", number3, [number3 class], malloc_size(CFBridgingRetain(number3)));
+NSString *abcd__ = [NSString stringWithFormat:@"abcdefghijklmnopqrstuvwxyz"];
+NSLog(@"abcd__ %p %@ %zu", abcd__, [abcd__ class], malloc_size(CFBridgingRetain(abcd__)));
+
+// 控制台打印
+number1 0xd3bc9b2fde3f08b4 __NSCFNumber 0
+number2 0xd3bc9b2fde3f0884 __NSCFNumber 0
+a 0xc3bc9b2fde3f0eb7 NSTaggedPointerString 0
+ab 0xc3bc9b2fde392eb4 NSTaggedPointerString 0
+b 0xc3bc9b2fde3f0e87 NSTaggedPointerString 0
+c 0xc3bc9b2fde3f0e97 NSTaggedPointerString 0
+number3 0x282bcc540 __NSCFNumber 32
+abcd__ 0x2805e3150 __NSCFString 48
+```
+&emsp;分析打印结果，可看到所有 `Tagged Pointer` 的最高位都是 `1`，`malloc_size` 返回的都是 `0`，对比最后一个非 `Tagged Pointer`  系统没有为对象开辟空间。正常的 `Objective-C` 实例对象的第一个成员变量都是指向类对象内存地址的 `isa` 指针，通过打断点，可看到所有 `Tagged Pointer` 的 `isa` 都是 `0x0`，且当 `Tagged Pointer` 是 `NSNumber` 类型时，`class` 函数的打印依然是 `__NSCFNumber`，苹果并没有设计一个单独的 `Class` 来表示 `Tagged Pointer`，`NSString` 则打印的是 `NSTaggedPointerString`，那这里引出了另外一个问题，`Tagged Pointer` 又是怎么获取类对象的地址的呢？
 
 ## 为何可通过设定最高位或最低位来标识 `Tagged Pointer`
+&emsp;这是因为在分配内存的时候，都是按 `2` 的整数倍来分配的，这样分配出来的正常内存地址末位不可能为 `1` ，这样通过将最低标识为 `1` ，就可以和其他正常指针做出区分。
+那么为什么最高位为 `1` ，也可以标识呢 ？这是因为 `64` 位操作系统，设备一般没有那么大的内存，所以内存地址一般只有 `48` 个左右有效位（`64` 位 `iOS` 堆区地址只使用了 `36` 位有效位），也就是说高位的 `16` 位左右都为 `0`，所以可以通过最高位标识为 `1` 来表示 `Tagged Pointer`。那么既然 `1` 位就可以标识 `Tagged Pointer` 了，其他的信息是干嘛的呢？我们可以想象，要有一些 `bit` 位来表示这个指针对应的类型，不然拿到一个 `Tagged Pointer` 的时候我们不知道类型，就无法解析成对应的值。
 
-&emsp;这是因为在分配内存的时候，都是按 `2` 的整数倍来分配的，这样分配出来的正常内存地址末位不可能为 `1` ，这样通过将最低标识为 `1` ，就可以和其他正常指针做出区分。那么为什么最高位为 `1` ，也可以标识呢 `？` 这是因为 `64` 位操作系统，设备一般没有那么大的内存，所以内存地址一般只有 `48` 个左右有效位（`64` 位 `iOS` 堆区地址使用了 `36` 位有效位），也就是说高位的 `16` 位左右都为 `0`，所以可以通过最高位标识为 `1` 来表示 `Tagged Pointer`。那么既然 `1` 位就可以标识 `Tagged Pointer` 了其他的信息是干嘛的呢？我们可以想象，要有一些 `bit` 位来表示这个指针对应的类型，不然拿到一个 `Tagged Pointer` 的时候我们不知道类型，就无法解析成对应的值。
+## 如何从 `Tagged Pointer` 获取类对象
+&emsp;正常的 `Objective-C` 对象是通过 `isa` 指针和掩码 `ISA_MASK` 进行 `&` 运算得到类对象的内存地址的，那么 `Tagged Pointer` 又是怎样获取类对象的内存地址的呢？接着上面 `OBJC_HAVE_TAGGED_POINTERS` 宏定义继续往下看的话，看到枚举 `objc_tag_index_t`，表示可能成为 `Tagged Pointer` 的类有哪些。
+### `objc_tag_index_t`
+```c++
+// Tagged pointer layout and usage is subject to change on different OS versions.
+// Tagged pointer 的 layout 和用法可能会因不同的 OS 版本而异。
 
-## 如何从 `Tagged Pointer` 获取变量类型 `objc_tag_index_t`
-&emsp;接着上面 `OBJC_HAVE_TAGGED_POINTERS` 宏定义继续往下看的话，看到枚举 `objc_tag_index_t`，
+// Tag indexes 0..<7 have a 60-bit payload.
+// 0..<7 的类型有 60 位的负载内容。
+// Tag index 7 is reserved.
+// 7 是保留位。
+// Tag indexes 8..<264 have a 52-bit payload.
+// 8..<264 的类型有 52 位负载内容。
+// Tag index 264 is reserved.
+// 264 是保留位。
+#if __has_feature(objc_fixed_enum)  ||  __cplusplus >= 201103L
+enum objc_tag_index_t : uint16_t
+#else
+typedef uint16_t objc_tag_index_t;
+enum
+#endif
+{
+    // 60-bit payloads
+    OBJC_TAG_NSAtom            = 0, 
+    OBJC_TAG_1                 = 1, 
+    OBJC_TAG_NSString          = 2, 
+    OBJC_TAG_NSNumber          = 3, 
+    OBJC_TAG_NSIndexPath       = 4, 
+    OBJC_TAG_NSManagedObjectID = 5, 
+    OBJC_TAG_NSDate            = 6,
 
+    // 60-bit reserved
+    // 保留位
+    OBJC_TAG_RESERVED_7        = 7, 
 
-// tagged pointer
+    // 52-bit payloads
+    OBJC_TAG_Photos_1          = 8,
+    OBJC_TAG_Photos_2          = 9,
+    OBJC_TAG_Photos_3          = 10,
+    OBJC_TAG_Photos_4          = 11,
+    OBJC_TAG_XPC_1             = 12,
+    OBJC_TAG_XPC_2             = 13,
+    OBJC_TAG_XPC_3             = 14,
+    OBJC_TAG_XPC_4             = 15,
+    OBJC_TAG_NSColor           = 16,
+    OBJC_TAG_UIColor           = 17,
+    OBJC_TAG_CGColor           = 18,
+    OBJC_TAG_NSIndexSet        = 19,
+    
+    // 前 60 位负载内容
+    OBJC_TAG_First60BitPayload = 0,
+    // 后 60 位负载内容
+    OBJC_TAG_Last60BitPayload  = 6, 
+    // 前 52 位负载内容
+    OBJC_TAG_First52BitPayload = 8, 
+    // 后 52 位负载内容
+    OBJC_TAG_Last52BitPayload  = 263, 
+    
+    // 保留位
+    OBJC_TAG_RESERVED_264      = 264
+};
+#if __has_feature(objc_fixed_enum)  &&  !defined(__cplusplus)
+typedef enum objc_tag_index_t objc_tag_index_t;
+#endif
+```
+### `_objc_taggedPointersEnabled`
+```c++
+// Returns true if tagged pointers are enabled.
+// 如果启用了 Tagged Pointer，则返回 true。
+// The other functions below must not be called if tagged pointers are disabled.
+// 如果禁用了 Tagged Pointer，则不得调用以下其他函数。
+static inline bool 
+_objc_taggedPointersEnabled(void)
+{
+    // 外联值 objc_debug_taggedpointer_mask
+    // 在 SUPPORT_TAGGED_POINTERS 下， 
+    // uintptr_t objc_debug_taggedpointer_mask = _OBJC_TAG_MASK;
+    
+    extern uintptr_t objc_debug_taggedpointer_mask;
+    return (objc_debug_taggedpointer_mask != 0);
+}
+```
+在 `Source/objc-runtime-new.mm` 有一段 `Tagged pointer objects` 的注释如下:
+```c++
+/*
+* Tagged pointer objects.
+*
+* Tagged pointer objects store the class and the object value in the object pointer; 
+* Tagged pointer 指针对象将 class 和对象数据存储在对象指针中；
+* the "pointer" does not actually point to anything.
+* 指针实际上不指向任何东西。
+* Tagged pointer objects currently use this representation:
+* Tagged pointer 当前使用此表示形式:
+* (LSB)(字符串低位优先排序，64 位的 mac 下)
+*  1 bit   set if tagged, clear if ordinary object pointer 标记是 Tagged Pointer
+*  3 bits  tag index // 标记类型
+* 60 bits  payload // 负载数据容量，（存储对象数据）
+* (MSB)(64 位 iPhone 下)
+* The tag index defines the object's class. 
+* tag index 表示对象所属的 class。
+* The payload format is defined by the object's class.
+* 负载格式由对象的 class 定义。
+*
+* If the tag index is 0b111, the tagged pointer object uses an "extended" representation, 
+* 如果 tag index 是 0b111(7), tagged pointer 对象使用 “扩展” 表示形式,
+* allowing more classes but with smaller payloads:
+* 允许更多类，但 有效载荷 更小: 
+* (LSB)(字符串低位优先排序，64 位的 mac 下)
+*  1 bit   set if tagged, clear if ordinary object pointer
+*  3 bits  0b111
+*  8 bits  extended tag index // 扩展的 tag index
+* 52 bits  payload // 负载数据容量，此时只有 52 位
+* (MSB)
+*
+* Some architectures reverse the MSB and LSB in these representations.
+* 在这些表示中，某些体系结构反转了 MSB 和 LSB。
+*
+* This representation is subject to change. Representation-agnostic SPI is:
+* objc-internal.h for class implementers.
+* objc-gdb.h for debuggers.
+*/
+```
+### `_objc_decodeTaggedPointer`
+```c++
+static inline uintptr_t
+_objc_decodeTaggedPointer(const void * _Nullable ptr)
+{
+    return (uintptr_t)ptr ^ objc_debug_taggedpointer_obfuscator;
+}
+```
+&emsp;解码 `Tagged Pointer`，就是与混淆器 `objc_debug_taggedpointer_obfuscator` 进行异或操作。
+### `_objc_getTaggedPointerTag`
+```c++
+// Extract the tag value from the given tagged pointer object.
+// 从给定的标记指针对象中提取标记值.
+// Assumes ptr is a valid tagged pointer object.
+// 假定 ptr 是有效的带标记的指针对象。
+// Does not check the validity of ptr's tag.
+// 不检查 ptr 标签的有效性。
+static inline objc_tag_index_t 
+_objc_getTaggedPointerTag(const void * _Nullable ptr);
 
+static inline objc_tag_index_t 
+_objc_getTaggedPointerTag(const void * _Nullable ptr) 
+{
+    // ASSERT(_objc_isTaggedPointer(ptr));
+    uintptr_t value = _objc_decodeTaggedPointer(ptr);
+    uintptr_t basicTag = (value >> _OBJC_TAG_INDEX_SHIFT) & _OBJC_TAG_INDEX_MASK;
+    uintptr_t extTag =   (value >> _OBJC_TAG_EXT_INDEX_SHIFT) & _OBJC_TAG_EXT_INDEX_MASK;
+    if (basicTag == _OBJC_TAG_INDEX_MASK) {
+        return (objc_tag_index_t)(extTag + OBJC_TAG_First52BitPayload);
+    } else {
+        return (objc_tag_index_t)basicTag;
+    }
+}
+```
+&emsp;都是移位以及与操作。
+### `classSlotForBasicTagIndex`
+&emsp;在 `Source/objc-runtime-new.mm` 定义，根据 `objc_tag_index_t` 返回 `Class` 指针。
+```c++
+// Returns a pointer to the class's storage in the tagged class arrays.
+// 从存储 tagged class 的数组中返回一个指向 class 的指针。
+// Assumes the tag is a valid basic tag.
+// 假设 tag 是有效的 tag.
+static Class *
+classSlotForBasicTagIndex(objc_tag_index_t tag)
+{
+    // 
+    uintptr_t tagObfuscator = ((objc_debug_taggedpointer_obfuscator
+                                >> _OBJC_TAG_INDEX_SHIFT)
+                               & _OBJC_TAG_INDEX_MASK);
+    uintptr_t obfuscatedTag = tag ^ tagObfuscator;
+    
+    // Array index in objc_tag_classes includes the tagged bit itself
+    // objc_tag_classes 中的数组索引包括标记位本身
+    
+#if SUPPORT_MSB_TAGGED_POINTERS
+    return &objc_tag_classes[0x8 | obfuscatedTag];
+#else
+    return &objc_tag_classes[(obfuscatedTag << 1) | 1];
+#endif
+}
+```
+### `classSlotForTagIndex`
+```c++
+// Returns a pointer to the class's storage in the tagged class arrays, 
+// 从存储 tagged class 的数组中返回一个指向 class 的指针。
+// or nil if the tag is out of range.
+// 如果 tag 在区间之外返回 nil.
+static Class *  
+classSlotForTagIndex(objc_tag_index_t tag)
+{
+    if (tag >= OBJC_TAG_First60BitPayload && tag <= OBJC_TAG_Last60BitPayload) {
+        return classSlotForBasicTagIndex(tag);
+    }
 
+    if (tag >= OBJC_TAG_First52BitPayload && tag <= OBJC_TAG_Last52BitPayload) {
+        int index = tag - OBJC_TAG_First52BitPayload;
+        uintptr_t tagObfuscator = ((objc_debug_taggedpointer_obfuscator
+                                    >> _OBJC_TAG_EXT_INDEX_SHIFT)
+                                   & _OBJC_TAG_EXT_INDEX_MASK);
+        return &objc_tag_ext_classes[index ^ tagObfuscator];
+    }
+    
+    // 返回 nil
+    return nil;
+}
+```
+### `objc_tag_classes`
+```c++
+extern "C" { 
+    extern Class objc_debug_taggedpointer_classes[_OBJC_TAG_SLOT_COUNT];
+    ...
+}
+#define objc_tag_classes objc_debug_taggedpointer_classes
+```
+&emsp;全局搜索 `objc_tag_classes` 只能看到是一个外联 `Class` 数组。
+### `objc_debug_taggedpointer_obfuscator` 和 `initializeTaggedPointerObfuscator` 函数
+```c++
+// 在 Private Header/objc-gdb.h 中的定义
+// tagged pointers 通过与 objc_debug_taggedpointer_obfuscator 进行异或来混淆
+// tagged pointers are obfuscated by XORing with a random value
+// decoded_obj = (obj ^ obfuscator)
+OBJC_EXPORT uintptr_t objc_debug_taggedpointer_obfuscator
+    OBJC_AVAILABLE(10.14, 12.0, 12.0, 5.0, 3.0);
+/*
+* initializeTaggedPointerObfuscator
+* Initialize objc_debug_taggedpointer_obfuscator with randomness.
+* 用随机值初始化 objc_debug_taggedpointer_obfuscator.
+*
+* The tagged pointer obfuscator is intended to make it more difficult for an attacker to construct a particular object as a tagged pointer,
+* tagged pointer 混淆器旨在使攻击者更难将一个特定对象构造为 tagged pointer,
+* in the presence of a buffer overflow or other write control over some memory.
+* 在缓冲区溢出或对某些内存进行其他写控制的情况下。
+* The obfuscator is XORed with the tagged pointers when setting or retrieving payload values.
+* 设置或检索有效载荷值时，混淆器会与 tagged pointers 进行异或。
+* They are filled with randomness on first use.
+* 首次使用时充满随机性。
+*/
+static void
+initializeTaggedPointerObfuscator(void)
+{
+    // objc_debug_taggedpointer_obfuscator 是一个 unsigned long 类型的全局变量
+    
+    // 环境变量，禁用 tagged pointers 混淆 
+    // OPTION( DisableTaggedPointerObfuscation, OBJC_DISABLE_TAG_OBFUSCATION, "disable obfuscation of tagged pointers")
+    
+    if (sdkIsOlderThan(10_14, 12_0, 12_0, 5_0, 3_0) ||
+        // Set the obfuscator to zero for apps linked against older SDKs,
+        // 对于与旧版SDK链接的应用，将 混淆器 设置为零，
+        // in case they're relying on the tagged pointer representation.
+        // 以防他们依赖 tagged pointer 表示。
+        DisableTaggedPointerObfuscation) {
+        objc_debug_taggedpointer_obfuscator = 0;
+    } else {
+        // Pull random data into the variable, then shift away all non-payload bits.
+        // 将随机数据放入变量中，然后移走所有非有效位。
+        arc4random_buf(&objc_debug_taggedpointer_obfuscator,
+                       sizeof(objc_debug_taggedpointer_obfuscator));
+                       
+        // 然后和 ~_OBJC_TAG_MASK 作一次与操作 
+        objc_debug_taggedpointer_obfuscator &= ~_OBJC_TAG_MASK;
+    }
+}
+```
+&emsp;主要看 `classSlotForBasicTagIndex` 函数，`objc_debug_taggedpointer_obfuscator` 是系统动态运行时创建的盐，每次运行都不一样，然后其他的操作就是根据不同的平台宏定义的值进行移位和进行位操作。
 
+验证示例:
+```c++
+// 引入 #import "objc-internal.h"
+NSString *str1 = [NSString stringWithFormat:@"a"];
+NSNumber *num1 = [NSNumber numberWithInteger:1];
 
+NSLog(@"str1 class: %@", _objc_getClassForTag(_objc_getTaggedPointerTag((__bridge void *)str1)));
+NSLog(@"num1 class: %@", _objc_getClassForTag(_objc_getTaggedPointerTag((__bridge void *)num1)));
 
+// 打印结果:
+str1 class: NSTaggedPointerString
+num1 class: __NSCFNumber
+```
+## 获取 `Tagged Pointer` 的值
+### `_objc_getTaggedPointerValue` 和 `_objc_getTaggedPointerSignedValue`
+```c++
+// Extract the payload from the given tagged pointer object.
+// 从给定的 tagged pointer 对象中提取有效负载。
+// Assumes ptr is a valid tagged pointer object.
+// 假定 ptr 是有效的 tagged pointer 对象。
+// The payload value is zero-extended.
+// 有效负载值是零扩展的
+static inline uintptr_t
+_objc_getTaggedPointerValue(const void * _Nullable ptr);
 
+static inline uintptr_t
+_objc_getTaggedPointerValue(const void * _Nullable ptr) 
+{
+    // ASSERT(_objc_isTaggedPointer(ptr));
+    uintptr_t value = _objc_decodeTaggedPointer(ptr);
+    uintptr_t basicTag = (value >> _OBJC_TAG_INDEX_SHIFT) & _OBJC_TAG_INDEX_MASK;
+    if (basicTag == _OBJC_TAG_INDEX_MASK) {
+        return (value << _OBJC_TAG_EXT_PAYLOAD_LSHIFT) >> _OBJC_TAG_EXT_PAYLOAD_RSHIFT;
+    } else {
+        return (value << _OBJC_TAG_PAYLOAD_LSHIFT) >> _OBJC_TAG_PAYLOAD_RSHIFT;
+    }
+}
 
+static inline intptr_t
+_objc_getTaggedPointerSignedValue(const void * _Nullable ptr) 
+{
+    // ASSERT(_objc_isTaggedPointer(ptr));
+    uintptr_t value = _objc_decodeTaggedPointer(ptr);
+    uintptr_t basicTag = (value >> _OBJC_TAG_INDEX_SHIFT) & _OBJC_TAG_INDEX_MASK;
+    if (basicTag == _OBJC_TAG_INDEX_MASK) {
+        return ((intptr_t)value << _OBJC_TAG_EXT_PAYLOAD_LSHIFT) >> _OBJC_TAG_EXT_PAYLOAD_RSHIFT;
+    } else {
+        return ((intptr_t)value << _OBJC_TAG_PAYLOAD_LSHIFT) >> _OBJC_TAG_PAYLOAD_RSHIFT;
+    }
+}
+```
+&emsp;函数实现都很简单，首先 `Tagged Pointer` 解码，与 `objc_debug_taggedpointer_obfuscator` 进行异或操作，然后根据不同平台的宏定义进行移位操作。
 
+示例代码:
+```c++
+// 引入 #import "objc-internal.h"
+NSString *str1 = [NSString stringWithFormat:@"a"];
+NSString *str2 = [NSString stringWithFormat:@"ab"];
+NSString *str3 = [NSString stringWithFormat:@"abc"];
 
-// 再加上对其堆区的读写、引用计数维护、销毁的清理工作等，这些都给程序增加了额外的逻辑，造成效率上的损失。
-// 所以苹果采取了一种方式将一些比较小的数据直接存储在指针变量中，这些指针变量就称为 `Tagged Pointer`。
-// 题纲
-// 1. 减少一半的内存占用的证明：与 32 位时比较/与普通对象比较
-// 2. 3 倍的访问速度提升的证明：与普通对象比较
-// 3. 100 倍的创建和销毁速度提升的证明：与普通对象比较
+uintptr_t value1 = _objc_getTaggedPointerValue((__bridge void *)str1);
+uintptr_t value2 = _objc_getTaggedPointerValue((__bridge void *)str2);
+uintptr_t value3 = _objc_getTaggedPointerValue((__bridge void *)str3);
 
-// 如何识别 Tagged Pointer
-// Tagged Pointer 中读出类型
-// 
+NSLog(@"value1: %lx", value1);
+NSLog(@"value2: %lx", value2);
+NSLog(@"value3: %lx", value3);
+
+// 打印：
+value1: 611
+value2: 62612
+value3: 6362613
+
+NSNumber *num1 = [NSNumber numberWithInteger:11];
+NSNumber *num2 = [NSNumber numberWithInteger:12];
+NSNumber *num3 = [NSNumber numberWithInteger:13];
+
+uintptr_t value1 = _objc_getTaggedPointerValue((__bridge void *)num1);
+uintptr_t value2 = _objc_getTaggedPointerValue((__bridge void *)num2);
+uintptr_t value3 = _objc_getTaggedPointerValue((__bridge void *)num3);
+
+NSLog(@"value1: %lx", value1);
+NSLog(@"value2: %lx", value2);
+NSLog(@"value3: %lx", value3);
+
+// 打印：
+value1: b3
+value2: c3
+value3: d3
+```
+&emsp;第一组 `NSString` 的打印中：`0x61`、`0x62`、`0x63` 分别对应 `a`、`b`、`c` 的 `ASCII` 码，最后一位数字表示字符串长度。第二组 `NSNumber` 的打印中：`0xb`、`0xc`、`0xd` 分别对应 `11`、`12`、`13` 的 `ASCII` 码，后面的 `3` 大概对应 `enum objc_tag_index_t` 的 `OBJC_TAG_NSNumber          = 3` 表示类型是 `OBJC_TAG_NSNumber`。
+
+## `Tagged Pointer` 可存储的最大值
+&emsp;根据前面的分析以及当 `Tagged Pointer` 是 `NSNumber` 类型时，在 `x86_64 Mac` 平台下:
+```c++
+NSNumber *number = [[NSNumber alloc] initWithInteger: pow(2, 55) - 2];;
+NSLog(@"number %p %@ %zu", number, [number class], malloc_size(CFBridgingRetain(number)));
+// 打印:
+number 0x10063e330 __NSCFNumber 32
+
+NSNumber *number = [[NSNumber alloc] initWithInteger: pow(2, 55) - 3];;
+NSLog(@"number %p %@ %zu", number, [number class], malloc_size(CFBridgingRetain(number)));
+// 打印:
+number 0x21a60cf72f053d4b __NSCFNumber 0
+```
+&emsp;在 `x86_64 Mac` 平台下存储 `NSString` 类型的 `Tagged Pointer`，一个指针 `8` 个字节，`64` 个比特位，第 `1` 个比特位用于标记是否是 `Tagged Pointer`，第 `2~4` 比特位用于标记 `Tagged Pointer` 的指针类型，解码后的最后 `4` 个比特位用于标记 `value` 的长度，那么用于存储 `value` 的比特位只有 `56` 个了，此时如果每个字符用 `ASCII` 编码的话 `8` 个字符应该就不是 `Tagged Pointer` 了，但其实 `NSTaggedPointerString` 采用不同的编码方式：
+1. 如果长度介于 `0` 到 `7`，直接用八位编码存储字符串。
+2. 如果长度是 `8` 或 `9`，用六位编码存储字符串，使用编码表 `eilotrm.apdnsIc ufkMShjTRxgC4013bDNvwyUL2O856P-B79AFKEWV_zGJ/HYX`。
+3. 如果长度是 `10` 或 `11`，用五位编码存储字符串,使用编码表 `eilotrm.apdnsIc ufkMShjTRxgC4013`。
+
+`@"aaaaaaaa"` 解码后的 `TaggedPointer` 值为 `0x2082082082088`，扣除最后 `4` 个比特位代表的长度，则为 `0x20820820820`，只有 `6` 个字节，但是因为长度为 `8`，需要进行分组解码，`6` 个比特位为一组，分组后为 `0x0808080808080808`，刚好 `8` 个字节，长度符合了。采用编码表 `eilotrm.apdnsIc ufkMShjTRxgC4013bDNvwyUL2O856P-B79AFKEWV_zGJ/HYX`，下标为`8` 的刚好是 `a`。
+
+`@"aaaaaaaaaa"` 解码后的 `TaggedPointer` 值为 `1084210842108a`，扣除最后 `4` 个比特位代表的长度，则为 `1084210842108`，只有 `6.5` 字节，但是因为长度为 `10`，需要进行分组解码，`5` 个比特位为一组，分组后为 `0x08080808080808080808`，刚好 `10` 个字节，长度符合了。采用编码表 `eilotrm.apdnsIc ufkMShjTRxgC4013`，下标为 `8` 的刚好是 `a`。
+
+在编码表中并没有看到 `+` 字符，使用 `+` 字符做个测试，`7` 个 `+` 应为 `NSTaggedPointerString`，而 `8` 个 `+` 则为普通的 `__NSCFString` 对象。
+关于字符串的存储可以参考: [《译】采用Tagged Pointer的字符串》](http://www.cocoachina.com/articles/13449)。
 
 ## 参考链接
 **参考链接:🔗**
