@@ -732,26 +732,76 @@ void moveFromOldBuckets(BucketT *OldBucketsBegin, BucketT *OldBucketsEnd) {
   
   for (BucketT *B = OldBucketsBegin, *E = OldBucketsEnd; B != E; ++B) {
     if (ValueInfoT::isPurgeable(B->getSecond())) {
+      // 如果 size_t 是 0，释放 value
       // Free the value.
       B->getSecond().~ValueT();
     } else if (!KeyInfoT::isEqual(B->getFirst(), EmptyKey) &&
         !KeyInfoT::isEqual(B->getFirst(), TombstoneKey)) {
+        
       // Insert the key/value into the new table.
+      // 插入 key/value 到新表中
+      
       BucketT *DestBucket;
       bool FoundVal = LookupBucketFor(B->getFirst(), DestBucket);
       (void)FoundVal; // silence warning.
       ASSERT(!FoundVal && "Key already in new map?");
+      
+      // 更新 KeyT
       DestBucket->getFirst() = std::move(B->getFirst());
+      // 更新 ValueT
       ::new (&DestBucket->getSecond()) ValueT(std::move(B->getSecond()));
+      // 增加 NumEntries
       incrementNumEntries();
 
       // Free the value.
+      // 释放 value.
       B->getSecond().~ValueT();
     }
+    
+    // 释放 KeyT
     B->getFirst().~KeyT();
   }
 }
 ```
+### `copyFrom`
+```c++
+template <typename OtherBaseT>
+void copyFrom(
+    const DenseMapBase<OtherBaseT, KeyT, ValueT, ValueInfoT, KeyInfoT, BucketT> &other) {
+  // 断言 1：other 与 this 不能相同
+  ASSERT(&other != this);
+  // 断言 2：other 和 this 的 NumBuckets 必须相等
+  ASSERT(getNumBuckets() == other.getNumBuckets());
+  
+  // 设置 this 的 NumEntries 和 NumTombstones 与 other 相等
+  setNumEntries(other.getNumEntries());
+  setNumTombstones(other.getNumTombstones());
+
+  if (is_trivially_copyable<KeyT>::value &&
+      is_trivially_copyable<ValueT>::value)
+      
+    // 如果 KeyT 和 ValueT 有完全复制能力，
+    // 则直接把 other 的 Buckets 内容按字节复制到 this 的 Buckets 中
+    memcpy(reinterpret_cast<void *>(getBuckets()), other.getBuckets(),
+           getNumBuckets() * sizeof(BucketT));
+  else
+    // 循环遍历进行赋值
+    for (size_t i = 0; i < getNumBuckets(); ++i) {
+      // KeyT 赋值
+      ::new (&getBuckets()[i].getFirst())
+          KeyT(other.getBuckets()[i].getFirst());
+          
+      if (!KeyInfoT::isEqual(getBuckets()[i].getFirst(), getEmptyKey()) &&
+          !KeyInfoT::isEqual(getBuckets()[i].getFirst(), getTombstoneKey()))
+        // ValueT 赋值
+        ::new (&getBuckets()[i].getSecond())
+            ValueT(other.getBuckets()[i].getSecond());
+    }
+}
+```
+
+
+
 
 ### `InsertIntoBucket、InsertIntoBucketWithLookup、InsertIntoBucketImpl`
 ```c++
