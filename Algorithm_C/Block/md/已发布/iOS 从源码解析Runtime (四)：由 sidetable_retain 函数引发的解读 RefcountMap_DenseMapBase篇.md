@@ -545,6 +545,8 @@ bool erase(const KeyT &Val) {
   TheBucket->getSecond().~ValueT();
   
   // 把 BucketT 的 first 置为 TombstoneKey
+  // 删除操作
+  // 把 BucketT 的 first 设置为 TombstoneKey
   TheBucket->getFirst() = getTombstoneKey();
   
   // NumEntries 减 1
@@ -799,11 +801,35 @@ void copyFrom(
     }
 }
 ```
+### `getHashValue、getEmptyKey、getTombstoneKey`
+&emsp;下面 3 个函数超级眼熟，在我们的 `DenseMapInfo<KeyT>` 中的 3 个函数，且包含的不同类型的 `KeyT` 的特化实现。
+```c++
+static unsigned getHashValue(const KeyT &Val) {
+  return KeyInfoT::getHashValue(Val);
+}
 
+template<typename LookupKeyT>
+static unsigned getHashValue(const LookupKeyT &Val) {
+  return KeyInfoT::getHashValue(Val);
+}
 
+static const KeyT getEmptyKey() {
+  // 断言也印证了 DerivedT 的传入类型是 DenseMap，是 DenseMapBase 的子类
+  static_assert(std::is_base_of<DenseMapBase, DerivedT>::value,
+                "Must pass the derived type to this template!");
+                
+  return KeyInfoT::getEmptyKey();
+}
 
+static const KeyT getTombstoneKey() {
+  return KeyInfoT::getTombstoneKey();
+}
+```
 
 ### `InsertIntoBucket、InsertIntoBucketWithLookup、InsertIntoBucketImpl`
+&emsp; `InsertIntoBucket` 的定义如下，该函数分为如下两步：
++ 调用 `InsertIntoBucketImpl`，根据装载因子（`load factor`），来判断是否需要增加桶的数量，然后返回插入位置。
++ 根据插入位置，使用 `placement new` 在指定的内存位置上创建对象。
 ```c++
 template <typename KeyArg, typename... ValueArgs>
 BucketT *InsertIntoBucket(BucketT *TheBucket, KeyArg &&Key,
@@ -869,7 +895,11 @@ BucketT *InsertIntoBucketImpl(const KeyT &Key, const LookupKeyT &Lookup,
     NumBuckets = getNumBuckets();
   } else if (LLVM_UNLIKELY(NumBuckets-(NewNumEntries+getNumTombstones()) <=
                            NumBuckets/8)) {
-    // // 
+                           
+    // 如果 NumEntries / NumBuckets < 3 / 4 为 true，但是 EmptyEntries / NumBuckets <= 1 / 8，
+    // 则说明 DenseMap 中的 Tombstone 数量太多，如果 DenseMap 中全部为 Tombstone 的话，有可能会造成死循环，
+    // 此时并不会增加桶的数量，而是重新哈希，然后重新计算插入位置。
+    
     this->grow(NumBuckets);
     LookupBucketFor(Lookup, TheBucket);
   }
@@ -902,8 +932,112 @@ BucketT *InsertIntoBucketImpl(const KeyT &Key, const LookupKeyT &Lookup,
 
   return TheBucket;
 }
-
 ```
+### `LookupBucketFor`
+```c++
+/// LookupBucketFor - Lookup the appropriate bucket for Val, returning it in FoundBucket.
+/// If the bucket contains the key and a value, this returns true, 
+/// otherwise it returns a bucket with an empty marker or tombstone and returns false.
+/// 查找适合 Val 的存储桶，并在 FoundBucket 中将其返回。
+/// 如果存储桶包含键和值，则返回 true，否则返回带有空标记或逻辑删除的存储桶并返回 false。
+template<typename LookupKeyT>
+bool LookupBucketFor(const LookupKeyT &Val,
+                     const BucketT *&FoundBucket) const {
+  // Buckets 数组起点
+  const BucketT *BucketsPtr = getBuckets();
+  // NumBuckets 
+  const unsigned NumBuckets = getNumBuckets();
+  
+  // 如果数量为 0，则 FoundBucket 为 nullptr，并返回 false
+  if (NumBuckets == 0) {
+    FoundBucket = nullptr;
+    return false;
+  }
+
+  // FoundTombstone - Keep track of whether we find a tombstone while probing.
+  // 跟踪在探测时是否找到 tombstone。
+  // 临时变量记录 FoundTombstone
+  const BucketT *FoundTombstone = nullptr;
+  
+  // EmptyKey
+  const KeyT EmptyKey = getEmptyKey();
+  // Tombstone
+  const KeyT TombstoneKey = getTombstoneKey();
+  
+  assert(!KeyInfoT::isEqual(Val, EmptyKey) &&
+         !KeyInfoT::isEqual(Val, TombstoneKey) &&
+         "Empty/Tombstone value shouldn't be inserted into map!");
+  
+  // Val 的哈希值，后面与操作，防止越界
+  unsigned BucketNo = getHashValue(Val) & (NumBuckets-1);
+  unsigned ProbeAmt = 1;
+  
+  while (true) {
+    // BucketsPtr 加上 BucketNo，指针偏移，找 Bucket
+    const BucketT *ThisBucket = BucketsPtr + BucketNo;
+    // Found Val's bucket?  If so, return it.
+    // 如果找到的 Bucket 的 first 刚好和 Val 相同的话，就可以返回 true 并赋值给 FoundBucket。
+    if (LLVM_LIKELY(KeyInfoT::isEqual(Val, ThisBucket->getFirst()))) {
+      FoundBucket = ThisBucket;
+      return true;
+    }
+
+    // If we found an empty bucket, the key doesn't exist in the set.
+    // Insert it and return the default value.
+    // 如果我们发现一个 empty bucket，则表明该 val 在 set 中不存在。
+    // 插入并返回默认值。
+    if (LLVM_LIKELY(KeyInfoT::isEqual(ThisBucket->getFirst(), EmptyKey))) {
+      // If we've already seen a tombstone while probing,
+      // fill it in instead of the empty bucket we eventually probed to.
+      // 如果我们在探测时已经看到了 tombstone，填充它而不是我们最终探究的空桶。
+      FoundBucket = FoundTombstone ? FoundTombstone : ThisBucket;
+      return false;
+    }
+
+    // If this is a tombstone, remember it. If Val ends up not in the map, 
+    // we prefer to return it than something that would require more probing.
+    // Ditto for zero values.
+    // 如果这是一个 tombstone，记住它。如果 Val 最终不在 map 中，我们宁愿返回它，而不是需要进行更多的探测。
+    
+    // 记住找到的第一个 TombstoneKey。
+    if (KeyInfoT::isEqual(ThisBucket->getFirst(), TombstoneKey) &&
+        !FoundTombstone)
+      FoundTombstone = ThisBucket;  // Remember the first tombstone found.
+    
+    // 如果 ThisBucket 的 second 等于 0，并且 FoundTombstone 是 nullptr，则记录
+    if (ValueInfoT::isPurgeable(ThisBucket->getSecond())  &&  !FoundTombstone)
+      FoundTombstone = ThisBucket;
+
+    // Otherwise, it's a hash collision or a tombstone, continue quadratic probing.
+    // 否则，是哈希冲突或 tombstone，请继续进行二次探测
+    if (ProbeAmt > NumBuckets) {
+      FatalCorruptHashTables(BucketsPtr, NumBuckets);
+    }
+    // ProbeAmt 从 1 开始，下次是 2 3 4
+    // BucketNo 第一次前进 1
+    // BucketNo 第二次前进 2
+    // BucketNO 第三次前进 3
+    // 基于开放寻址法（open-addressing）实现，探查采用二次探查（quadratic probing），
+    // 初始探查位置决定了整个序列，每一个关键字都有其相应的唯一固定的探查序列。
+    
+    // 二次探查的关键在于ID = ID + ProbeAmt++，如果ProbeAmt没有自增运算，那么就是线性探查，存在自增运算就是二次探查。
+    
+    BucketNo += ProbeAmt++;
+    // 与操作防止越界
+    BucketNo &= (NumBuckets-1);
+  }
+}
+
+template <typename LookupKeyT>
+bool LookupBucketFor(const LookupKeyT &Val, BucketT *&FoundBucket) {
+  const BucketT *ConstFoundBucket;
+  bool Result = const_cast<const DenseMapBase *>(this)
+    ->LookupBucketFor(Val, ConstFoundBucket);
+  FoundBucket = const_cast<BucketT *>(ConstFoundBucket);
+  return Result;
+}
+```
+&emsp;到这里我们的 `DenseMapBase` 的代码就全部看完啦。这里特别要注意的是哈希数组申请完空间以后会做 `initEmpty` 的操作，把数组内装满 “空状态” 的 `BucketT`（把它们的 `first` 置为 `EmptyKey`）。
 
 ## 参考链接
 **参考链接:🔗**
@@ -911,4 +1045,5 @@ BucketT *InsertIntoBucketImpl(const KeyT &Key, const LookupKeyT &Lookup,
 + [C++小心得之7： C++11新特性之利用std::conditional实现变量的多类型](https://blog.csdn.net/asbhunan129/article/details/86609897)
 + [STL源码学习系列四： 迭代器(Iterator)](https://blog.csdn.net/qq_34777600/article/details/80427463)
 + [《STL源码剖析》学习之迭代器](https://blog.csdn.net/shudou/article/details/11099931?utm_medium=distribute.pc_relevant_t0.none-task-blog-BlogCommendFromMachineLearnPai2-1.add_param_isCf&depth_1-utm_source=distribute.pc_relevant_t0.none-task-blog-BlogCommendFromMachineLearnPai2-1.add_param_isCf)
++ [C++主动调用析构函数分析](https://blog.csdn.net/m0_37185283/article/details/78723981)
 

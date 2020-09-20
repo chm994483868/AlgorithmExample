@@ -42,7 +42,7 @@ class DenseMap : public DenseMapBase<DenseMap<KeyT, ValueT, ValueInfoT, KeyInfoT
 &emsp;一张粗略的简介图：
 ![RefcountMap_DenseMap结构图](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/58c662552b47414287564f06d01825cb~tplv-k3u1fbpfcp-zoom-1.image)
 
-&emsp;只看 `RefcountMap` 的 `typedef` 语句的话，我们可以直白的把 `RefcountMap` 理解为一个 `key` 是我们的对象指针 `value` 是该对象的引用计数的哈希表。（深入下去 `DenseMap` 涉及的数据结构真的超多，为了秉持完成 `runtime` 每行代码都要看的通透，那我们硬着头看下去。）`DenseMap` 是在 `llvm` 中用的非常广泛的数据结构，它本身的实现是一个基于`Quadratic probing`（二次探查）的散列表，键值对本身是 `std::pair<KeyT, ValueT>`。`DenseMap` 有四个成员变量: `Buckets`、`NumEntries`、`NumTombstones`、`NumBuckets` 分别用于表示散列桶的起始地址（一块连续的内存）、已存储的数据的个数、`Tombstone` 个数（二次探查法删除数据时需要设置 `deleted` 标识）、桶的总个数。
+&emsp;只看 `RefcountMap` 的 `typedef` 语句的话，我们可以直白的把 `RefcountMap` 理解为一个 `key` 是我们的对象指针 `value` 是该对象的引用计数的哈希表。（深入下去 `DenseMap` 涉及的数据结构真的超多，为了秉持完成 `runtime` 每行代码都要看的通透，那我们硬着头看下去。）`DenseMap` 是在 `llvm` 中用的非常广泛的数据结构，它本身的实现是一个基于`Quadratic probing`（二次探查）的散列表，键值对本身是 `std::pair<KeyT, ValueT>`。`DenseMap` 有四个成员变量: `Buckets`、`NumEntries`、`NumTombstones`、`NumBuckets` 分别用于表示散列桶的起始地址（一块连续的内存）、已存储的数据的个数、`Tombstone` 个数（表示之前存储的有值，现在被 `erase` 了的个数，初始化是置为 `EmptyKey`，当 `erase` 后被置为 `TombstoneKey`。二次探查法删除数据时需要设置 `deleted` 标识）、桶的总个数。
 
 &emsp;`DenseMap<>` 继承自 `DenseMapBase<>`，`DenseMapBase` 是 `2012` 年 `Chandler Carruth` 添加的，为了实现 `SmallDenseMap<>`，将 `DenseMap` 的哈希逻辑抽象到了 `DenseMapBase` 中，而内存管理的逻辑留在了 `DenseMap` 和 `SmallDenseMap` 实现。
 
