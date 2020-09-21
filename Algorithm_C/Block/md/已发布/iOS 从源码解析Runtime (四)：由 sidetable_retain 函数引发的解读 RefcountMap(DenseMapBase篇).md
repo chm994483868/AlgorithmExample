@@ -1,4 +1,4 @@
-# iOS 从源码解析Runtime (四)：由 sidetable_retain 函数引发的解读 RefcountMap_DenseMapBase篇
+# iOS 从源码解析Runtime (四)：由 sidetable_retain 函数引发的解读 RefcountMap(DenseMapBase篇)
 ## 前言
 &emsp;上一节我们从上到下分析了 `DenseMap` 的内容，中间已经涉及到多处 `DenseMapBase` 的使用。`DenseMap` 是 `DenseMapBase` 的子类，而 `DenseMapBase` 是 `DenseMap` 的友元类，所以两者存在多处交织调用。那下面我们就详细分析下 `DenseMapBase` 的实现吧。（这个类实在是太长了，消耗了太多时间，一度想只看下核心实现就不看细枝末节了，但是一想到它涉及到的引用计数以及修饰符相关的内容，再加上强迫症，那就认真看下去吧！⛽️⛽️）
 

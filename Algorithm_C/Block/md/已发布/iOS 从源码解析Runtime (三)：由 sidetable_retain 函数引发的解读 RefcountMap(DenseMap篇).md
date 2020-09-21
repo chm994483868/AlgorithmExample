@@ -1,4 +1,4 @@
-# iOS 从源码解析Runtime (三)：由 sidetable_retain 函数引发的解读 RefcountMap_DenseMap篇 
+# iOS 从源码解析Runtime (三)：由 sidetable_retain 函数引发的解读 RefcountMap(DenseMap篇)
 
 > 在 [iOS weak 底层实现原理(四)：SideTables和SideTable](https://juejin.im/post/6865670937841238023) 已经解读过 `struct SideTable`，但是当时重点放在了 `weak` 相关内容上，由于较少涉及对象的引用计数相关内容，所以没有详细解读其中的 `RefcountMap refcnts`，那么就由本篇来解读。
 

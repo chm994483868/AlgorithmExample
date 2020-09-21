@@ -1,4 +1,4 @@
-#  iOS 从源码解析Runtime (五)：聚焦 isa、objc_object(2)
+# iOS 从源码解析Runtime (五)：聚焦 isa、objc_object(retain、release相关内容篇)
 
 > 经过上面两篇 `DenseMap` 和 `DenseMapBase` 的分析，相信对存储 `objc_object` 的引用计数所用的数据结构已经极其清楚了，那么接下来继续分析 `objc_object` 剩下的函数吧。
 
