@@ -96,7 +96,7 @@ objc_object::rootRetain()
 ALWAYS_INLINE id 
 objc_object::rootRetain(bool tryRetain, bool handleOverflow)
 {
-    // 如果是 Tagged Pointer 则直接返回 this (Tagged Pointer 不参与引用计数系统，它的内存在栈区，由系统自己处理)
+    // 如果是 Tagged Pointer 则直接返回 this (Tagged Pointer 不参与引用计数管理，它的内存在栈区，由系统处理)
     if (isTaggedPointer()) return (id)this;
     
     // 临时变量，标记 SideTable 是否加锁
@@ -114,7 +114,6 @@ objc_object::rootRetain(bool tryRetain, bool handleOverflow)
     // 即 do-while 的循环条件是指，&isa.bits 与 oldisa.bits 内容不同，如果它们内容不同，则一直进行循环。
     
     // 如果 &isa.bits 与 oldisa.bits 的内容不相同，则把 newisa.bits 的内容复制给 &isa.bits。
-    // 
     // return __c11_atomic_compare_exchange_weak((_Atomic(uintptr_t) *)dst, &oldvalue, value, __ATOMIC_RELAXED, __ATOMIC_RELAXED)
     
     // _Bool atomic_compare_exchange_weak( volatile A *obj, C* expected, C desired );
@@ -126,15 +125,16 @@ objc_object::rootRetain(bool tryRetain, bool handleOverflow)
         // 默认不需要转移引用计数到 SideTable
         transcribeToSideTable = false;
         
+        // x86_64 平台下
         // C atomic_load( const volatile A* obj );
         // 定义于头文件 <stdatomic.h>
-        // 以原子方式加载并返回obj指向的原子变量的当前值。该操作是原子读取操作。
-        
+        // 以原子方式加载并返回 obj 指向的原子变量的当前值。该操作是原子读取操作。
         //return  __c11_atomic_load((_Atomic(uintptr_t) *)src, __ATOMIC_RELAXED);
-        // 以原子方式读取 isa.bits。（&为取地址） 
+        
+        // 以原子方式读取 &isa.bits。（&为取地址） 
         oldisa = LoadExclusive(&isa.bits);
         
-        // 赋值给 newisa
+        // 赋值给 newisa（第一次进来时 &isa.bits, oldisa.bits, newisa.bits 三者是完全相同的）
         newisa = oldisa;
         
         // 如果 newisa 不是优化的 isa (元类的 isa 是原始的 isa (Class cls))
@@ -151,8 +151,14 @@ objc_object::rootRetain(bool tryRetain, bool handleOverflow)
             if (!tryRetain && sideTableLocked) sidetable_unlock();
             
             if (tryRetain) {
-              // 如果需要 tryRetain 则调用 sidetable_tryRetain 函数
+            
+              // 如果需要 tryRetain 则调用 sidetable_tryRetain 函数，并根据结果返回 this 或者 nil
+              // 执行此行之前是不需要在当前函数对 SideTable 加锁的
+              
+              // sidetable_tryRetain 返回 false 表示对象已被标记为正在释放，
+              // 所以此时再执行 retain 操作是没有意义的，所以返回 nil
               return sidetable_tryRetain() ? (id)this : nil;
+              
             } else { 
               // 如果不需要 tryRetain 则调用 sidetable_retain()
               return sidetable_retain();
@@ -162,8 +168,8 @@ objc_object::rootRetain(bool tryRetain, bool handleOverflow)
         // don't check newisa.fast_rr; we already called any RR overrides
         // 不要检查 newisa.fast_rr; 我们已经调用所有 RR 的重载。
         
+        // 如果 tryRetain 为真并且 objc_object 被标记为正在释放 (newisa.deallocating)
         if (slowpath(tryRetain && newisa.deallocating)) {
-            // 如果 tryRetain 为真并且 objc_object 被标记为正在释放 (newisa.deallocating)
             
             // 在 mac、arm64e 下不执行任何操作，只在 arm64 下执行 __builtin_arm_clrex();
             // 在 arm64 平台下，清除对 &isa.bits 的独占访问标记。
@@ -176,7 +182,7 @@ objc_object::rootRetain(bool tryRetain, bool handleOverflow)
             return nil;
         }
         
-        // 下面就是 isa 为 nonpointer， 并且没有被标记为正在释放的对象
+        // 下面就是 isa 为 nonpointer，并且没有被标记为正在释放的对象
         uintptr_t carry;
         // bits extra_rc 自增
         
@@ -186,9 +192,12 @@ objc_object::rootRetain(bool tryRetain, bool handleOverflow)
         // extra_rc 位于 56~64 位
         
         newisa.bits = addc(newisa.bits, RC_ONE, 0, &carry);  // extra_rc++
-
+        
+        // 如果 carry 为 true，表示要处理引用计数溢出的情况
         if (slowpath(carry)) {
             // newisa.extra_rc++ overflowed
+            
+            // 如果 handleOverflow 为 false，则调用 rootRetain_overflow(tryRetain)
             if (!handleOverflow) {
                 
                 // 在 mac、arm64e 下不执行任何操作，只在 arm64 下执行 __builtin_arm_clrex();
@@ -198,33 +207,39 @@ objc_object::rootRetain(bool tryRetain, bool handleOverflow)
                 return rootRetain_overflow(tryRetain);
             }
             
-            // Leave half of the retain counts inline and prepare to copy the other half to the side table.
+            // Leave half of the retain counts inline and prepare to
+            // copy the other half to the side table.
             // 将 retain count 的一半留在 inline，并准备将另一半复制到 SideTable.
             
             // SideTable 加锁，接下来需要操作 refcnts 
+            // 如果 tryRetain 为 false 并且 sideTableLocked 为 false，则 SideTable 加锁
             if (!tryRetain && !sideTableLocked) sidetable_lock();
             
             // 标记 SideTable 已经加锁
+            // 整个函数只有这里把 sideTableLocked 置为 true
             sideTableLocked = true;
             // 标记需要把引用计数转移到 SideTable 中
             transcribeToSideTable = true;
             
-            // uintptr_t extra_rc        : 8
-            // #   define RC_HALF  (1ULL<<7)
-            // 把 extra_rc 置为一半 
+            // x86_64 平台下：
+            // uintptr_t extra_rc : 8
+            // # define RC_HALF  (1ULL<<7) 二进制表示为: 0b 1000,0000
+            // 把 extra_rc 总共 8 位，现在把它置为 RC_HALF，表示 extra_rc 溢出
             newisa.extra_rc = RC_HALF;
-            // 把 has_sidetable_rc 标记为 true，表示 extra_rc 已经存不下该对象的引用计数，需要扩张到 SideTable 中
+            
+            // 把 has_sidetable_rc 标记为 true，表示 extra_rc 已经存不下该对象的引用计数，
+            // 需要扩张到 SideTable 中
             newisa.has_sidetable_rc = true;
         }
     } while (slowpath(!StoreExclusive(&isa.bits, oldisa.bits, newisa.bits)));
 
     if (slowpath(transcribeToSideTable)) {
         // Copy the other half of the retain counts to the side table.
-        // 复制 retain count 的一半到 SideTable 中。
+        // 复制 retain count 的另一半到 SideTable 中。
         sidetable_addExtraRC_nolock(RC_HALF);
     }
 
-    // 解锁
+    // 如果 tryRetain 为 false 并且 sideTableLocked 为 true，则 SideTable 解锁
     if (slowpath(!tryRetain && sideTableLocked)) sidetable_unlock();
     
     // 返回 this 
@@ -330,11 +345,11 @@ objc_object::sidetable_tryRetain()
 
 // 如果当前平台支付 isa 优化
 #if SUPPORT_NONPOINTER_ISA
-    // 如果 isa 是优化的 isa 则直接执行断言.
-    
-    // 此函数只针对原始 isa 调用（Class cls）
+    // 如果 isa 是优化的 isa 则直接执行断言，
+    // 表明 sidetable_tryRetain 函数只针对原始 isa 调用（Class cls）
     ASSERT(!isa.nonpointer);
 #endif
+
     // 从全局的 SideTalbes 中找到 this 所处的 SideTable
     SideTable& table = SideTables()[this];
 
@@ -343,7 +358,7 @@ objc_object::sidetable_tryRetain()
     
     // _objc_rootTryRetain() is called exclusively by _objc_loadWeak(), 
     // which already acquired the lock on our behalf.
-    // _objc_rootTryRetain() 仅由 _objc_loadWeak() 调用，已经代表我们获得了锁。
+    // _objc_rootTryRetain() 仅由 _objc_loadWeak() 独占调用，已经代表我们获得了锁。
 
     // fixme can't do this efficiently with os_lock_handoff_s
     // fixme os_lock_handoff_s 无法有效地做到这一点
@@ -353,23 +368,45 @@ objc_object::sidetable_tryRetain()
 
     bool result = true;
     
-    // std::pari<DenseMapIterator<BucketT>, bool>
-    // std::pair<DenseMapIterator<std::pair<Disguised<objc_object>, size_t>>, bool>
-    
+    // std::pair<DenseMapIterator<BucketT>, bool>
+    // it 类型是: std::pair<DenseMapIterator<std::pair<Disguised<objc_object>, size_t>>, bool>
     auto it = table.refcnts.try_emplace(this, SIDE_TABLE_RC_ONE);
+    // refcnt 是引用计数值，it.first 是迭代器，迭代器其实是 BucketT 指针，然后再 ->second 就正是 size_t 了。
     auto &refcnt = it.first->second;
+    
+    // it.second 为 true，表示 objc_object 的引用计数第一次放进 SideTable
     if (it.second) {
         // there was no entry
-    } else if (refcnt & SIDE_TABLE_DEALLOCATING) {
+    } else if (refcnt & SIDE_TABLE_DEALLOCATING) { // 表示对象正在释放，result 置为 false
         result = false;
-    } else if (! (refcnt & SIDE_TABLE_RC_PINNED)) {
+    } else if (! (refcnt & SIDE_TABLE_RC_PINNED)) { // refcnt 加 SIDE_TABLE_RC_ONE
         refcnt += SIDE_TABLE_RC_ONE;
     }
     
+    // 返回 result
     return result;
 }
 ```
+### `sidetable_retain`
+```c++
+id
+objc_object::sidetable_retain()
+{
+#if SUPPORT_NONPOINTER_ISA
+    ASSERT(!isa.nonpointer);
+#endif
+    SideTable& table = SideTables()[this];
+    
+    table.lock();
+    size_t& refcntStorage = table.refcnts[this];
+    if (! (refcntStorage & SIDE_TABLE_RC_PINNED)) {
+        refcntStorage += SIDE_TABLE_RC_ONE;
+    }
+    table.unlock();
 
+    return (id)this;
+}
+```
 
 ## 参考链接
 **参考链接:🔗**
