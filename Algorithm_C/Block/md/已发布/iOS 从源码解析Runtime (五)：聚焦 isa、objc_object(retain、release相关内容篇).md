@@ -261,6 +261,11 @@ objc_object::rootRetain(bool tryRetain, bool handleOverflow)
     return (id)this;
 }
 ```
+&emsp;这里增加引用计数的情况中，前两种比较普通。
+1. 当对象的 `isa` 是非优化的 `isa` 时，对象的引用计数全部保存在 `SideTable` 中，当要增加引用计数时就调用 `sidetable_tryRetain/sidetable_retain` 增加 `SideTable` 中的引用计数。
+2. 当对象的 `isa` 是优化的 `isa` 且对象的引用计数保存在 `extra_rc` 字段中且加 1 后未溢出时，此时也是比较清晰的，执行完加 1 后，函数也直接 `return (id)this` 结束了。
+3. 只有第三种情况比较特殊，当对象的 `isa` 是优化的 `isa` 且对象的引用计数保存在 `extra_rc` 中，此时 `extra_rc++` 后发生溢出，此时会把 `extra_rc` 赋值为 `RC_HALF`，把 `has_sidetable_rc` 赋值为 `true`，然后调用 `sidetable_addExtraRC_nolock(RC_HALF)`。其实疑问就发生在这里，如果对象的 `extra_rc` 中的引用计数已经溢出过了，并转移到了 `SideTable` 中一部分，此时 `extra_rc` 是被置为了 `RC_HALF`，那下次增加对象的引用计数时，并不是直接去 `SideTable` 中增加引用计数，其实是增加 `extra_rc` 中的值，直到增加到再次溢出时才会跑到 `SideTable` 中增加引用计数。这里还挺迷惑的，觉的最好的解释就是尽量在 `extra_rc` 字段中增加引用计数，少去操作 `SideTable`，毕竟操作 `SideTable` 还要加锁解锁，还要哈希查值，整体消耗肯定是大于操作 `extra_rc` 字段的。
+
 #### `LoadExclusive、ClearExclusive、StoreExclusive、StoreReleaseExclusive`
 &emsp;这四个函数主要用来进行原子读写(修改)操作。在 `Project Headers/objc-os.h` 的定义可看到在不同平台下它们的实现是不同的。首先是 `__arm64__ && !__arm64e__`，它针对的平台是从 `iPhone 5s` 开始到 `A12` 之前，已知 `A12` 开始是属于 `__arm64e__` 架构。
 
@@ -372,7 +377,6 @@ ClearExclusive(uintptr_t *dst __unused)
 #define SIDE_TABLE_FLAG_MASK (SIDE_TABLE_RC_ONE-1) // 0b011 后两位是 1，其它位都是 0，做掩码使用
 ```
 ### `sidetable_tryRetain`
-
 &emsp;**此函数只针对在 `SUPPORT_NONPOINTER_ISA` 平台下使用非优化 `isa` 的 `objc_object`。**
 它有个 `bool` 类型的返回值，只有在对象被标记为 `SIDE_TABLE_DEALLOCATING` 正在进行释放时才会返回 `false`，其它情况下都是正常进行 `retain` 并返回 `true`。
 
@@ -429,7 +433,6 @@ objc_object::sidetable_tryRetain()
 }
 ```
 ### `sidetable_retain`
-
 &emsp;**此函数只针对在 `SUPPORT_NONPOINTER_ISA` 平台下使用非优化 `isa` 的 `objc_object`。**
 ```c++
 id
@@ -482,13 +485,15 @@ objc_object::rootRetain_overflow(bool tryRetain)
 bool 
 objc_object::sidetable_addExtraRC_nolock(size_t delta_rc)
 {
-    // 如果 isa.nonpointer 不为真，即 objc_object 的 isa 不是优化的 isa，则会执行断言
+    // 如果 isa.nonpointer 为真，即 objc_object 的 isa 是优化的 isa，则正常往下执行
     ASSERT(isa.nonpointer);
     
     // 从全局的 SideTalbes 中找到 this 所处的 SideTable
     SideTable& table = SideTables()[this];
 
-    // 返回值为 size_t 的引用
+    // 返回值为 size_t 的引用，此时如果 SideTable.refcnts 中没有保存对象引用计数的话
+    // 会直接构建一份 BucketT，保存该对象的引用计数
+    
     // ValueT &operator[](const KeyT &Key) {
     //   return FindAndConstruct(Key).second;
     // }
@@ -497,12 +502,13 @@ objc_object::sidetable_addExtraRC_nolock(size_t delta_rc)
     
     // isa-side bits should not be set here
     // isa-side bits 不应在此处设置
-    // ❗️这里表明从 SideTable 中取出的 size_t 的后两位是不能包含  SIDE_TABLE_DEALLOCATING 和 SIDE_TABLE_WEAKLY_REFERENCED 的
-    // 它们两位必须是 0
+    // 这里表明从 SideTable 中取出的 size_t 的后两位是
+    // 不能包含 SIDE_TABLE_DEALLOCATING 和 SIDE_TABLE_WEAKLY_REFERENCED 的
+    // 它们两位必须都是 0，不然会执行如下断言
     ASSERT((oldRefcnt & SIDE_TABLE_DEALLOCATING) == 0);
     ASSERT((oldRefcnt & SIDE_TABLE_WEAKLY_REFERENCED) == 0);
 
-    // 如果已经被标记为溢出了则直接 return
+    // 如果已经被标记为溢出，则直接 return true
     if (oldRefcnt & SIDE_TABLE_RC_PINNED) return true;
 
     // 加 1
@@ -513,12 +519,14 @@ objc_object::sidetable_addExtraRC_nolock(size_t delta_rc)
     // oldRefcnt & SIDE_TABLE_FLAG_MASK => oldRefcnt & 0b011
     
     if (carry) {
-        refcntStorage =
-            SIDE_TABLE_RC_PINNED | (oldRefcnt & SIDE_TABLE_FLAG_MASK);
         // refcntStorage 最高位为 1，然后最后两位保持原值，其它位都是 0
+        
+        // 这里不是说 SideTable 中取出的 refcnt 的后两位不都一定要是 0 吗，不然上面的断言会执行。
+        
+        refcntStorage = SIDE_TABLE_RC_PINNED | (oldRefcnt & SIDE_TABLE_FLAG_MASK);
         return true;
     } else {
-        // refcnts 中引用计数正常加 1
+        // refcnts 中的引用计数正常加 1
         refcntStorage = newRefcnt;
         return false;
     }
