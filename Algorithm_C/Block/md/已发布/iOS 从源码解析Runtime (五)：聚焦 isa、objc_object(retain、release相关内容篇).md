@@ -96,8 +96,7 @@ objc_object::rootRetain()
     return rootRetain(false, false);
 }
 ```
-### `id rootRetain(bool tryRetain, bool handleOverflow)`
-
+#### `id rootRetain(bool tryRetain, bool handleOverflow)`
 &emsp;`tryRetain` 参数如其名，尝试持有，它涉及到的只有一个 `return sidetable_tryRetain() ? (id)this : nil;` 操作，只有当对象处于正在销毁状态时，才会返回  `false`。当对象的 `isa` 是原始指针时，对象的引用计数都是保存在 `SideTable` 里面的。`sidetable_tryRetain` 函数只会在对象的 `isa` 是原始指针时才会被调用。
 
 &emsp;`handleOverflow` 参数是处理 `newisa.extra_rc++ overflowed` 情况的，当溢出情况发生后，如果 `handleOverflow` 传入的是 `false` 时，则会调用 `return rootRetain_overflow(tryRetain)`，它只有一件事情，就是把 `handleOverflow` 传递为 `true` 再次调用 `rootRetain` 函数。
@@ -361,7 +360,7 @@ ClearExclusive(uintptr_t *dst __unused)
 [atomic_load](https://zh.cppreference.com/w/cpp/atomic/atomic_load)
 [atomic_compare_exchange](https://zh.cppreference.com/w/cpp/atomic/atomic_compare_exchange)
 
-### `SIDE_TABLE_WEAKLY_REFERENCED 等等标志位`
+#### `SIDE_TABLE_WEAKLY_REFERENCED 等等标志位`
 &emsp;我们首先要清楚一件很重要的事情，在 `SideTable` 的 `RefcountMap refcnts` 中取出 `objc_object` 对应的 `size_t` 的值并不是单纯的对象的引用计数这一个数字，它是明确有一些标志位存在的，且有些标志位所代表的含义与 `objc_object` 的 `isa_t isa` 中的一些位是相同的。所以这里我们不能形成定式思维，决定这些标志位只存在于 `isa_t isa` 中。
 
 + `SIDE_TABLE_WEAKLY_REFERENCED` 是 `size_t` 的第一位，表示该对象是否有弱引用。（`x86_64` 下 `isa_t isa` 的 `uintptr_t weakly_referenced : 1;`  ）   
@@ -381,10 +380,9 @@ ClearExclusive(uintptr_t *dst __unused)
 #define SIDE_TABLE_RC_SHIFT 2 // 表示 SIDE_TABLE_RC_ONE 左移的距离
 #define SIDE_TABLE_FLAG_MASK (SIDE_TABLE_RC_ONE-1) // 0b011 后两位是 1，其它位都是 0，做掩码使用
 ```
-### `sidetable_tryRetain`
+#### `sidetable_tryRetain`
 &emsp;**此函数只能在 `objc_object` 使用非优化 `isa` 的情况下调用。**
 它有个 `bool` 类型的返回值，当对象被标记为 `SIDE_TABLE_DEALLOCATING` （正在进行释放）时才会返回 `false`，其它情况下都是正常进行 `retain` 并返回 `true`。
-
 ```c++
 bool
 objc_object::sidetable_tryRetain()
@@ -446,7 +444,7 @@ objc_object::sidetable_tryRetain()
     return result;
 }
 ```
-### `sidetable_retain`
+#### `sidetable_retain`
 &emsp;**此函数只能在 `objc_object` 使用非优化 `isa` 的情况下调用。**
 ```c++
 id
@@ -471,6 +469,7 @@ objc_object::sidetable_retain()
     // 这里有一个迷惑点， 如果在 refcnts 中未找到 this 对应的 BucketT 的话，会调用 InsertIntoBucket 函数为 this 构建一个 BucketT，
     // 只是这里没有传递 size_t 那 BucketT 的 size_t 的初始值是什么呢？
     // 当对象的 isa 是原始指针时，对象的引用计数全部都存放在 refcnts 中，那么在对象刚创建好时就会把对象放到 refcnts 中吗？
+    // 还有对象是什么时候放进 SideTable 的？都还没有遇到，等一点一点的深入 objc4-781 应该都能看到的吧...
     size_t& refcntStorage = table.refcnts[this];
     
     if (! (refcntStorage & SIDE_TABLE_RC_PINNED)) {
@@ -486,7 +485,7 @@ objc_object::sidetable_retain()
     return (id)this;
 }
 ```
-### `rootRetain_overflow`
+#### `rootRetain_overflow`
 &emsp;`rootRetain_overflow` 函数内部是调用了 `rootRetain(tryRetain, true)`，`handleOverflow` 函数传递的是 `true`，即当溢出发生时递归调用 `rootRetain`，去执行 `sidetable_addExtraRC_nolock` 函数，去处理溢出，把引用计数转移到 `SideTable` 中去。
 
 ```c++
@@ -496,7 +495,7 @@ objc_object::rootRetain_overflow(bool tryRetain)
     return rootRetain(tryRetain, true);
 }
 ```
-### `sidetable_addExtraRC_nolock`
+#### `sidetable_addExtraRC_nolock`
 &emsp;`refcnts` 中引用计数溢出则返回 `true`，正常情况下加 `1`，返回 `false`。
 ```c++
 // Move some retain counts to the side table from the isa field.
@@ -512,12 +511,9 @@ objc_object::sidetable_addExtraRC_nolock(size_t delta_rc)
     // 从全局的 SideTalbes 中找到 this 所处的 SideTable
     SideTable& table = SideTables()[this];
 
-    // 返回值为 size_t 的引用，此时如果 SideTable.refcnts 中没有保存对象引用计数的话
-    // 会直接构建一份 BucketT，保存该对象的引用计数
-    
-    // ValueT &operator[](const KeyT &Key) {
-    //   return FindAndConstruct(Key).second;
-    // }
+    // 从 refcnts 中取出对象的引用计数，如果此时对象还没有插入哈希桶的话，
+    // 会直接构建一个为 this 在哈希桶中找一个位置插入，那么在函数 InsertIntoBucket 中不传递 Value
+    // 的时候，对象的 this 的所在的 BucketT 的 second 的初始值是多少呢？（size_t 的初始值是 0 吗？） 
     size_t& refcntStorage = table.refcnts[this];
     size_t oldRefcnt = refcntStorage;
     
@@ -529,7 +525,7 @@ objc_object::sidetable_addExtraRC_nolock(size_t delta_rc)
     ASSERT((oldRefcnt & SIDE_TABLE_DEALLOCATING) == 0);
     ASSERT((oldRefcnt & SIDE_TABLE_WEAKLY_REFERENCED) == 0);
 
-    // 如果已经被标记为溢出，则直接 return true
+    // 如果已经被标记为溢出，则直接 return true;
     if (oldRefcnt & SIDE_TABLE_RC_PINNED) return true;
 
     // 加 1
@@ -543,17 +539,57 @@ objc_object::sidetable_addExtraRC_nolock(size_t delta_rc)
         // refcntStorage 最高位为 1，然后最后两位保持原值，其它位都是 0
         
         // 这里不是说 SideTable 中取出的 refcnt 的后两位不都一定要是 0 吗，不然上面的断言会执行。
-        
+        // SIDE_TABLE_RC_PINNED 只有最高位是 1，然后 oldRefcnt 的最低两位是 0 与 0b011 做与操作
+        // 最后两位还是 0
+        // 所以 refcntStorage 的值就是 最高位是 1， 然后剩余位都是 oldRefcnt 的值
+        // 且刚刚 oldRefcnt 加 1 后溢出了则，refcntStorage 的值就是除了最后两位是 0 以外，其他位都是 1
         refcntStorage = SIDE_TABLE_RC_PINNED | (oldRefcnt & SIDE_TABLE_FLAG_MASK);
+        
+        // 溢出了,此时要返回 true
         return true;
     } else {
-        // refcnts 中的引用计数正常加 1
+        // refcnts 中的引用计数正常加 1，没有溢出，此时返回 false
         refcntStorage = newRefcnt;
         return false;
     }
 }
 ```
 
+&emsp;下面开始是 `release` 函数：
+
+### `bool rootRelease();`
+```c++
+// Base release implementation, ignoring overrides.
+// 基本的 release 函数实现，忽略重载。
+
+// Does not call -dealloc.
+// 不调用 -dealloc 函数。
+
+// Returns true if the object should now be deallocated.
+// 如果现在应该释放对象，那么返回 true。
+
+// This does not check isa.fast_rr; if there is an RR override then 
+// it was already called and it chose to call [super release].
+// 这不检查isa.fast_rr; 如果有 RR 函数被重载了，则它已经被调用了，
+// 并且选择调用[super release]。
+// 
+// 对应不同的执行逻辑，和上面的 rootRetain 函数有类似之处。
+// 
+// handleUnderflow=false is the frameless fast path. // 处理下溢出
+// handleUnderflow=true is the framed slow path including side table borrow
+
+// The code is structured this way to prevent duplication.
+
+ALWAYS_INLINE bool 
+objc_object::rootRelease()
+{
+    return rootRelease(true, false);
+}
+```
+#### `bool rootRelease(bool performDealloc, bool handleUnderflow)`
+```c++
+
+```
 
 ## 参考链接
 **参考链接:🔗**
