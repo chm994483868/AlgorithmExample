@@ -97,8 +97,13 @@ objc_object::rootRetain()
 }
 ```
 ### `id rootRetain(bool tryRetain, bool handleOverflow)`
-&emsp;`tryRetain` 参数如其名，尝试持有，它涉及到的只有一个 `return sidetable_tryRetain() ? (id)this : nil;` 操作，只有当对象处于正在销毁状态时，才会返回  `false`。这里其实还有一个点，当对象的 `isa` 是非优化的 `isa_t` 时，对象的引用计数都是保存在 `SideTable` 里面的。`sidetable_tryRetain` 函数只会在对象的 `isa` 是非优化的 `isa` 时才会被调用。
+
+&emsp;`tryRetain` 参数如其名，尝试持有，它涉及到的只有一个 `return sidetable_tryRetain() ? (id)this : nil;` 操作，只有当对象处于正在销毁状态时，才会返回  `false`。当对象的 `isa` 是原始指针时，对象的引用计数都是保存在 `SideTable` 里面的。`sidetable_tryRetain` 函数只会在对象的 `isa` 是原始指针时才会被调用。
+
 &emsp;`handleOverflow` 参数是处理 `newisa.extra_rc++ overflowed` 情况的，当溢出情况发生后，如果 `handleOverflow` 传入的是 `false` 时，则会调用 `return rootRetain_overflow(tryRetain)`，它只有一件事情，就是把 `handleOverflow` 传递为 `true` 再次调用 `rootRetain` 函数。
+
+&emsp;当对象的 `isa` 是优化的 `isa` 且 `extra_rc` 溢出时，会把一部分引用计数转移到 `RefcountMap` 中，只是转移一部分，并不是 `extra_rc` 溢出以后，对象的引用计数全部交给 `RefcountMap` 管理了，每次溢出后会把 `extra_rc` 置为 `RC_HALF`，然后下次增加引用计数增加的还是 `extra_rc`，直到再次溢出再转移到 `RefcountMap` 中。大概是因为操作 `extra_rc` 的消耗要远低于操作 `RefcountMap`。
+
 &emsp;循环结束的条件是: `!StoreExclusive(&isa.bits, oldisa.bits, newisa.bits)`，这句代码意思是，`&isa.bits` 和 `oldisa.bits` 进行原子比较字节逐位相等的话，则把 `newisa.bits` 复制(同 `std::memcpy` 函数)到 `&isa.bits` 中，并且返回 `true`。如果 `&isa.bits` 和 `oldisa.bits` 不相等的话，则把 `&isa.bits`  中的内容加载到 `oldisa.bits` 中。`StoreExclusive` 函数内部是封装 `__c11_atomic_compare_exchange_weak((_Atomic(uintptr_t) *)dst, &oldvalue, value, __ATOMIC_RELAXED, __ATOMIC_RELAXED)` 函数，可参考：[`atomic_compare_exchange_weak`](https://zh.cppreference.com/w/cpp/atomic/atomic_compare_exchange)。
 所以这里的循环的真实目的就是为了把: `newisa.bits` 复制到 `&isa.bits` 中。
 
@@ -264,7 +269,7 @@ objc_object::rootRetain(bool tryRetain, bool handleOverflow)
 &emsp;这里增加引用计数的情况中，前两种比较普通。
 1. 当对象的 `isa` 是非优化的 `isa` 时，对象的引用计数全部保存在 `SideTable` 中，当要增加引用计数时就调用 `sidetable_tryRetain/sidetable_retain` 增加 `SideTable` 中的引用计数。
 2. 当对象的 `isa` 是优化的 `isa` 且对象的引用计数保存在 `extra_rc` 字段中且加 1 后未溢出时，此时也是比较清晰的，执行完加 1 后，函数也直接 `return (id)this` 结束了。
-3. 只有第三种情况比较特殊，当对象的 `isa` 是优化的 `isa` 且对象的引用计数保存在 `extra_rc` 中，此时 `extra_rc++` 后发生溢出，此时会把 `extra_rc` 赋值为 `RC_HALF`，把 `has_sidetable_rc` 赋值为 `true`，然后调用 `sidetable_addExtraRC_nolock(RC_HALF)`。其实疑问就发生在这里，如果对象的 `extra_rc` 中的引用计数已经溢出过了，并转移到了 `SideTable` 中一部分，此时 `extra_rc` 是被置为了 `RC_HALF`，那下次增加对象的引用计数时，并不是直接去 `SideTable` 中增加引用计数，其实是增加 `extra_rc` 中的值，直到增加到再次溢出时才会跑到 `SideTable` 中增加引用计数。这里还挺迷惑的，觉的最好的解释就是尽量在 `extra_rc` 字段中增加引用计数，少去操作 `SideTable`，毕竟操作 `SideTable` 还要加锁解锁，还要哈希查值，整体消耗肯定是大于操作 `extra_rc` 字段的。
+3. 只有第三种情况比较特殊，当对象的 `isa` 是优化的 `isa` 且对象的引用计数保存在 `extra_rc` 中，此时 `extra_rc++` 后发生溢出，此时会把 `extra_rc` 赋值为 `RC_HALF`，把 `has_sidetable_rc` 赋值为 `true`，然后调用 `sidetable_addExtraRC_nolock(RC_HALF)`。其实疑问就发生在这里，如果对象的 `extra_rc` 中的引用计数已经溢出过了，并转移到了 `SideTable` 中一部分，此时 `extra_rc` 是被置为了 `RC_HALF`，那下次增加对象的引用计数时，并不是直接去 `SideTable` 中增加引用计数，其实是增加 `extra_rc` 中的值，直到增加到再次溢出时才会跑到 `SideTable` 中增加引用计数。这里还挺迷惑的，觉的最好的解释应该是尽量在 `extra_rc` 字段中增加引用计数，少去操作 `SideTable`，毕竟操作 `SideTable` 还要加锁解锁，还要哈希查找等，整体消耗肯定是大于直接操作 `extra_rc` 字段的。
 
 #### `LoadExclusive、ClearExclusive、StoreExclusive、StoreReleaseExclusive`
 &emsp;这四个函数主要用来进行原子读写(修改)操作。在 `Project Headers/objc-os.h` 的定义可看到在不同平台下它们的实现是不同的。首先是 `__arm64__ && !__arm64e__`，它针对的平台是从 `iPhone 5s` 开始到 `A12` 之前，已知 `A12` 开始是属于 `__arm64e__` 架构。

@@ -471,7 +471,6 @@ public:
 ```
 
 ## `isa`
-&emsp;**`isa` 是在 `arm64` 架构推出以后由 `Class` 修改为 `union isa_t` 类型的吗 ？好像并不是随 `Objective-C 2.0` 推出的，`isa` 类型的修改是随着 `iPhone 5s` `arm64` 架构 `64` 位处理器的推出开始的。**
 ```c++
 #include "isa.h"
 union isa_t {
@@ -514,17 +513,17 @@ union isa_t {
 // Define SUPPORT_PACKED_ISA=1 on platforms that store the class in
 the isa field as a maskable pointer with other data around it.
 // SUPPORT_PACKED_ISA = 1 的平台将类信息与其他数据一起存储在 isa 的字段中，
-// 把 isa 作为一个 maskable pointer。（能进行掩码的指针？）
+// 把 isa 作为一个 maskable pointer。（并通过掩码的方式读取 isa 保存的不同的内容）
 #if (!__LP64__  ||  TARGET_OS_WIN32  || (TARGET_OS_SIMULATOR && !TARGET_OS_IOSMAC))
 #   define SUPPORT_PACKED_ISA 0
 #else
 #   define SUPPORT_PACKED_ISA 1
 #endif
 ```
-&emsp;表示平台是否支持在 `isa` 指针中插入 `Class` 之外的信息。如果支持就会将 `Class` 信息放入 `isa_t` 中定义的 `bits` 位域的 `shiftcls` 中，并在其它位中放一些其它信息。如果不支持的话，那么不会使用 `isa_t` 内定义的 `bits`，这时只使用 `cls`（`Class` 指针） 成员变量。
+&emsp;表示平台是否支持在 `isa` 指针中插入 `Class` 之外的信息，可以理解为把类信息和其它的一些信息打包放在 `isa` 中。如果支持会将 `Class` 信息放入 `isa_t` 中定义的 `bits` 位域的 `shiftcls` 中，读取 `Class` 信息的话则是以掩码的方式。其它位中则放一些其它信息。如果不支持的话，那么 `union isa_t` 中的 `bits/cls` 两个成员变量共用的内存空间就保存一个 `Class` 指针。
 
 下列平台下不支持：
-1. 非 64 位处理器，即 32 位处理器。
+1. 32 位处理器。（它使用的是 `SUPPORT_INDEXED_ISA`）
 2. `os` 是 `win32`。
 3. 在模拟器中且 `!TARGET_OS_IOSMAC`。（ `TARGET_OS_IOSMAC` 不知道是什么平台）
 
@@ -534,7 +533,10 @@ the isa field as a maskable pointer with other data around it.
 // class in the isa field as an index into a class table.
 // Note, keep this in sync with any .s files which also define it.
 // Be sure to edit objc-abi.h as well.
-// SUPPORT_INDEXED_ISA = 1 的平台将类信息保存在 isa 中并把 isa 作为一个在 class table 中的索引。
+
+// SUPPORT_INDEXED_ISA = 1 的平台将类在全局 class table 中的 index 和其他数据一起存储在 isa 的字段中，
+// 把 isa 作为一个 maskable pointer。（并通过掩码的方式读取 isa 保存的不同的内容）
+
 // 注意，与任何定义它的 .s 文件保持同步。确保同时编辑 objc-abi.h 文件。
 #if __ARM_ARCH_7K__ >= 2  ||  (__arm64__ && !__LP64__)
 #   define SUPPORT_INDEXED_ISA 1
@@ -542,7 +544,7 @@ the isa field as a maskable pointer with other data around it.
 #   define SUPPORT_INDEXED_ISA 0
 #endif
 ```
-&emsp;表示在 `isa` 中存放的 `Class` 信息是 `Class` 的地址，并把 `isa` 作为一个在 `class table` 中的索引。仅限于 `armv7k` 或 `arm64_32`。已知自 `iPhone 5s` 以后苹果手机全部转向 `64` 位处理器 `arm64` 架构。
+&emsp;和上面的 `SUPPORT_PACKED_IA` 基本完全相同，不同的是它保存的是 `Class` 在全局 `class table` 中的索引，它位域名是 `indexcls`。它支持的平台仅限于 `armv7k` 或 `arm64_32`。已知自 `iPhone 5s` 以后苹果手机全部转向 `64` 位处理器 `arm64` 架构。（也就是说我们再也不会再遇到它了，然后全部转向了 `SUPPORT_PACKED_ISA` 阵营）
 
 #### `SUPPORT_NONPOINTER_ISA`
 ```c++
@@ -557,12 +559,12 @@ the isa field as a maskable pointer with other data around it.
 #endif
 ```
 &emsp;标记是否支持优化的 `isa` 指针（`isa` 中除 `Class` 指针外，可以保存更多信息）。那如何判断是否支持优化的 `isa` 指针呢？
-1. 首先只要支持 `SUPPORT_PACKED_ISA` 或 `SUPPORT_INDEXED_ISA` 任何一个的情况下都是支持 `SUPPORT_NONPOINTER_ISA` 的。 
-2. 已知在自 `iPhone 5s` `arm64` 架构以后的 `iPhone` 中 `SUPPORT_PACKED_ISA` 都为 1，`SUPPORT_INDEXED_ISA` 为 0，则其 `SUPPORT_NONPOINTER_ISA` 也为 1。
-3. 在 `Edit Scheme... -> Run -> Environment Variables` 中添加 `OBJC_DISABLE_NONPOINTER_ISA`，(在 `objc-env.h` 文件我们可以看到 `OPTION( DisableNonpointerIsa, OBJC_DISABLE_NONPOINTER_ISA, "disable non-pointer isa fields")` ) 关闭指针优化。
+1. 首先只要支持 `SUPPORT_PACKED_ISA` 或 `SUPPORT_INDEXED_ISA` 任何一个的情况下都是支持 `SUPPORT_NONPOINTER_ISA` 的。
+2. 已知在自 `iPhone 5s` `arm64` 架构以后的 `iPhone` 中 `SUPPORT_PACKED_ISA` 都为 1，`SUPPORT_INDEXED_ISA` 为 0，则其 `SUPPORT_NONPOINTER_ISA` 为 1。
+3. 在 `Edit Scheme... -> Run -> Environment Variables` 中添加 `OBJC_DISABLE_NONPOINTER_ISA`，(在 `objc-env.h` 文件我们可以看到 `OPTION( DisableNonpointerIsa, OBJC_DISABLE_NONPOINTER_ISA, "disable non-pointer isa fields")` ) 可关闭指针优化。
 
-**注意：**
-&emsp;即使在 `64` 位环境下，优化的 `isa` 指针并不是就一定会存储引用计数，毕竟用 19 位（在 `iOS` 系统中）保存引用计数并不一定够，且这 19 位保存的是引用计数减 1。
+&emsp;那怎么判断一个 `isa` 是优化的 `isa`（也就是 `nonpointer`）呢？
+也是极其简单的，在 `SUPPORT_PACKED_ISA` 或 `SUPPORT_INDEXED_ISA` 平台下，只需要判断 `isa` 的第一位就可以了，如果是 `1` 则表示是优化的 `isa` 否则就不是。
 
 那么看完以上 3 个宏定义，`isa.h` 文件中的宏定义我们就自然理解分为 3 大块了（由于我们的 `objc4-781` 是在 `Mac` 下运行的，那自然我们会更关注 `x84_64` 一些）。
 
@@ -1201,4 +1203,3 @@ objc_object::hasCxxDtor()
 + [C语言中文开发手册:atomic_load/atomic_compare_exchange_weak](https://www.php.cn/manual/view/34155.html)
 + [操作系统内存管理(思维导图详解)](https://blog.csdn.net/hguisu/article/details/5713164)
 + [内存管理](https://www.jianshu.com/p/8d742a44f0da)
-
