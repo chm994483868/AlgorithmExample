@@ -382,18 +382,18 @@ ClearExclusive(uintptr_t *dst __unused)
 #define SIDE_TABLE_FLAG_MASK (SIDE_TABLE_RC_ONE-1) // 0b011 后两位是 1，其它位都是 0，做掩码使用
 ```
 ### `sidetable_tryRetain`
-&emsp;**此函数只针对在 `SUPPORT_NONPOINTER_ISA` 平台下使用非优化 `isa` 的 `objc_object`。**
-它有个 `bool` 类型的返回值，只有在对象被标记为 `SIDE_TABLE_DEALLOCATING` 正在进行释放时才会返回 `false`，其它情况下都是正常进行 `retain` 并返回 `true`。
+&emsp;**此函数只能在 `objc_object` 使用非优化 `isa` 的情况下调用。**
+它有个 `bool` 类型的返回值，当对象被标记为 `SIDE_TABLE_DEALLOCATING` （正在进行释放）时才会返回 `false`，其它情况下都是正常进行 `retain` 并返回 `true`。
 
 ```c++
 bool
 objc_object::sidetable_tryRetain()
 {
 
-// 如果当前平台支付 isa 优化
+// 如果当前平台支持 isa 优化
 #if SUPPORT_NONPOINTER_ISA
     // 如果 isa 是优化的 isa 则直接执行断言，
-    // 表明 sidetable_tryRetain 函数只针对原始 isa 调用（Class cls）
+    // sidetable_tryRetain 函数只能在对象的 isa 是原始 isa 时调用（Class cls）
     ASSERT(!isa.nonpointer);
 #endif
 
@@ -417,37 +417,46 @@ objc_object::sidetable_tryRetain()
     bool result = true;
     
     // it 的类型是: std::pair<DenseMapIterator<std::pair<Disguised<objc_object>, size_t>>, bool>
-    // try_emplace 函数做的事情很多，如果 this 在 SideTable.refcnt 中还不存在，则会把 this 插入到散列桶中，size_t 是 SIDE_TABLE_RC_ONE
+   // try_emplace 处理两种情况：
+   // 1. 如果 this 在 refcnts 中还不存在，则给 this 在 buckets 中找一个 BucketT，
+   //    KeyT 放 this， ValueT 放 SIDE_TABLE_RC_ONE，然后使用这个 BucketT 构建一个 iterator，
+   //    然后用这个 iterator 和 true 构造一个 std::pair<iterator, true> 返回。
+   // 2. 如果 this 在 refcnts 中已经存在了，则用 this 对应的 BucketT 构建一个 iterator,
+   //    然后用这个 iterator 和 false 构造一个 std::pair<iterator, false> 返回。
     auto it = table.refcnts.try_emplace(this, SIDE_TABLE_RC_ONE);
     
-    // refcnt 是引用计数值的引用，it.first 是迭代器，迭代器其实是 BucketT 指针，然后再 ->second 就是 size_t。
+    // refcnt 是引用计数值的引用。
+    // it.first 是 DenseMapIterator，它的操作符 -> 被重写了返回的是 DenseMpaIterator 的 Ptr 成员变量，
+    // 然后 Ptr 的类型是 BucketT 指针, 然后这里的  ->second 其实就是 BucketT->second，其实就是 size_t，正是保存的对象的引用计数数据。
     auto &refcnt = it.first->second;
     
-    // it.second 为 true，表示 objc_object 第一次放进 SideTable.refcnts 中
     if (it.second) {
+        // 如果 it.second 为 true，表示 this 第一次放进 refcnts 中，且 BucketT.second 已经被置为 SIDE_TABLE_RC_ONE，其它也不需要任何操作了。
         // there was no entry
-    } else if (refcnt & SIDE_TABLE_DEALLOCATING) { // 表示对象正在释放，result 置为 false
+    } else if (refcnt & SIDE_TABLE_DEALLOCATING) { 
+        // 表示对象正在进行释放，result 置为 false 就好了
         result = false;
-    } else if (! (refcnt & SIDE_TABLE_RC_PINNED)) { // refcnt 加 SIDE_TABLE_RC_ONE
-        // 如果 SideTable.refcnts 没有溢出的话，把 objc_object 的引用计数加 1
+    } else if (! (refcnt & SIDE_TABLE_RC_PINNED)) { 
+        // refcnt & SIDE_TABLE_RC_PINNED 值为 false 的话表示，
+        // rcfcnts 中 保存 this 的 BucketT 的 size_t 还没有溢出，还可正常进行自增操作保存 this 的引用计数
+        // refcnt 加 SIDE_TABLE_RC_ONE
         refcnt += SIDE_TABLE_RC_ONE;
     }
-    
-    // 返回 result
+
     return result;
 }
 ```
 ### `sidetable_retain`
-&emsp;**此函数只针对在 `SUPPORT_NONPOINTER_ISA` 平台下使用非优化 `isa` 的 `objc_object`。**
+&emsp;**此函数只能在 `objc_object` 使用非优化 `isa` 的情况下调用。**
 ```c++
 id
 objc_object::sidetable_retain()
 {
 
-// 如果当前平台支付 isa 优化
+// 如果当前平台支持 isa 优化
 #if SUPPORT_NONPOINTER_ISA
-// 如果 isa 是优化的 isa 则直接执行断言，
-// 表明 sidetable_tryRetain 函数只针对原始 isa 调用（Class cls）
+    // 如果 isa 是优化的 isa 则直接执行断言，
+    // sidetable_retain 函数只能在对象的 isa 是原始 isa 时调用（Class cls）
     ASSERT(!isa.nonpointer);
 #endif
 
@@ -457,10 +466,17 @@ objc_object::sidetable_retain()
     // SideTable 加锁
     table.lock();
     
+    // 这里是调用 DenseMapBase 的 operator[]，找到 this 所对应的 BucketT 然后返回 Bucket.second 即 this 的引用计数数据
     
+    // 这里有一个迷惑点， 如果在 refcnts 中未找到 this 对应的 BucketT 的话，会调用 InsertIntoBucket 函数为 this 构建一个 BucketT，
+    // 只是这里没有传递 size_t 那 BucketT 的 size_t 的初始值是什么呢？
+    // 当对象的 isa 是原始指针时，对象的引用计数全部都存放在 refcnts 中，那么在对象刚创建好时就会把对象放到 refcnts 中吗？
     size_t& refcntStorage = table.refcnts[this];
+    
     if (! (refcntStorage & SIDE_TABLE_RC_PINNED)) {
-        // 如果在 refcnts 中找到了 this，并且 size_t 没有溢出，则加 1
+        // refcnt & SIDE_TABLE_RC_PINNED 值为 false 的话表示，
+        // rcfcnts 中 保存 this 的 BucketT 的 size_t 还没有溢出，还可正常进行自增操作保存 this 的引用计数
+        // refcnt 加 SIDE_TABLE_RC_ONE
         refcntStorage += SIDE_TABLE_RC_ONE;
     }
     

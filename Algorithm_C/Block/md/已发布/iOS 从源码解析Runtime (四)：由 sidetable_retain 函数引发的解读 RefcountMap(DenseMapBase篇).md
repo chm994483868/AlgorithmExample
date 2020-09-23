@@ -2,6 +2,20 @@
 ## 前言
 &emsp;上一节我们从上到下分析了 `DenseMap` 的内容，中间已经涉及到多处 `DenseMapBase` 的使用。`DenseMap` 是 `DenseMapBase` 的子类，而 `DenseMapBase` 是 `DenseMap` 的友元类，所以两者存在多处交织调用。那下面我们就详细分析下 `DenseMapBase` 的实现吧。（这个类实在是太长了，消耗了太多时间，一度想只看下核心实现就不看细枝末节了，但是一想到它涉及到的引用计数以及修饰符相关的内容，再加上强迫症，那就认真看下去吧！⛽️⛽️）
 
+先看下大致内容图吧:
+DenseMap init
+![DenseMap init](https://p9-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/eb5be821270243a8803512903f83fd4e~tplv-k3u1fbpfcp-zoom-1.image)
+DenseMap grow (扩容，参数 AtLeast 是需要扩充到的容量)
+![DenseMap grow](https://p1-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/7840a295e9084203a61a86432ebe3f33~tplv-k3u1fbpfcp-zoom-1.image)
+DenseMap copyFrom (KeyT 和 ValueT 的复制是调用 DenseMapBaes 的 copyFrom 完成的)
+![DenseMap copyFrom](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/2183dfdc4f9545c7b35fcd3c95743060~tplv-k3u1fbpfcp-zoom-1.image)
+DenseMap shrink_and_clear（收缩散列桶容量并清理数据（会直接放弃旧桶中的数据））
+![DenseMap shrink_and_clear](https://p6-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/190b1270db764c4ba88d8b614184ca95~tplv-k3u1fbpfcp-zoom-1.image)
+DenseMap 整体图
+![DenseMap 整体图](https://p1-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/8e5186a449f646cfa496ee9b9280a174~tplv-k3u1fbpfcp-zoom-1.image)
+DenseMapBase 整体图
+![DenseMapBase 整体图](https://p6-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/5e66cf9cdb43460fa20fc7dd9ec7c6ef~tplv-k3u1fbpfcp-zoom-1.image)
+
 ## `DenseMapBase`
 &emsp;一个拥有 `6` 个抽象参数的模版类。在 `DenseMap` 定义中，`DenseMapBase` 的第一个抽象参数 `DerivedT`（派生类型、衍生类型） 传的是 `DenseMap<KeyT, ValueT, ValueInfoT, KeyInfoT, BucketT>` 本身， 从它的名字里面我们大概可猜到一些信息，需要的是一个它的子类，那接下来的分析中我们潜意识里面就把 `DerivedT`  默认当作 `DenseMap` 来用。
 先看一下 `DenseMapBase` 的定义:
