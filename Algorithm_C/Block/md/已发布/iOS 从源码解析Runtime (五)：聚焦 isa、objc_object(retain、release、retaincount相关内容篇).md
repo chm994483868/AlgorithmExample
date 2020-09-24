@@ -1,4 +1,4 @@
-# iOS 从源码解析Runtime (五)：聚焦 isa、objc_object(retain、release相关内容篇)
+# iOS 从源码解析Runtime (五)：聚焦 isa、objc_object(retain、release、retaincount相关内容篇)
 
 > 经过上面两篇 `DenseMap` 和 `DenseMapBase` 的分析，相信对存储 `objc_object` 的引用计数所用的数据结构已经极其清楚了，那么接下来继续分析 `objc_object` 剩下的函数吧。
 
@@ -107,6 +107,11 @@ objc_object::rootRetain()
 所以这里的循环的真实目的就是为了把: `newisa.bits` 复制到 `&isa.bits` 中。
 
 ```c++
+// handleOverflow 参数看似是一个 bool 类型的表示是否处理上溢出，
+// 当溢出发生了的话是必须要处理的，如果 handleOverflow 为 false，
+// 那么它会借一个 rootRetain_overflow 函数，并再次调用 rootRetain 函数，
+// 并把 handleOverflow 参数传递 true。 
+
 ALWAYS_INLINE id 
 objc_object::rootRetain(bool tryRetain, bool handleOverflow)
 {
@@ -130,7 +135,8 @@ objc_object::rootRetain(bool tryRetain, bool handleOverflow)
     // 循环的最终目的就是把 newisa.bits 复制到 &isa.bits 中。
     
     // 如果 &isa.bits 与 oldisa.bits 的内容不相同，则把 newisa.bits 的内容复制给 &isa.bits。
-    // return __c11_atomic_compare_exchange_weak((_Atomic(uintptr_t) *)dst, &oldvalue, value, __ATOMIC_RELAXED, __ATOMIC_RELAXED)
+    // return __c11_atomic_compare_exchange_weak((_Atomic(uintptr_t) *)dst,
+    //                                          &oldvalue, value, __ATOMIC_RELAXED, __ATOMIC_RELAXED)
     
     // _Bool atomic_compare_exchange_weak( volatile A *obj, C* expected, C desired );
     // 定义于头文件 <stdatomic.h>
@@ -213,7 +219,8 @@ objc_object::rootRetain(bool tryRetain, bool handleOverflow)
         if (slowpath(carry)) {
             // newisa.extra_rc++ overflowed
             
-            // 如果 handleOverflow 为 false，则调用 rootRetain_overflow(tryRetain) 它的作用就是把 handleOverflow 传为 true
+            // 如果 handleOverflow 为 false，
+            // 则调用 rootRetain_overflow(tryRetain) 它的作用就是把 handleOverflow 传为 true
             // 再次调用 rootRetain 函数，目的就是 extra_rc 发生溢出时，我们一定要处理
             if (!handleOverflow) {
                 
@@ -334,14 +341,16 @@ static ALWAYS_INLINE
 bool
 StoreExclusive(uintptr_t *dst, uintptr_t oldvalue, uintptr_t value)
 {
-    return __c11_atomic_compare_exchange_weak((_Atomic(uintptr_t) *)dst, &oldvalue, value, __ATOMIC_RELAXED, __ATOMIC_RELAXED);
+    return __c11_atomic_compare_exchange_weak((_Atomic(uintptr_t) *)dst,
+                                                &oldvalue, value, __ATOMIC_RELAXED, __ATOMIC_RELAXED);
 }
 
 static ALWAYS_INLINE
 bool
 StoreReleaseExclusive(uintptr_t *dst, uintptr_t oldvalue, uintptr_t value)
 {
-    return __c11_atomic_compare_exchange_weak((_Atomic(uintptr_t) *)dst, &oldvalue, value, __ATOMIC_RELEASE, __ATOMIC_RELAXED);
+    return __c11_atomic_compare_exchange_weak((_Atomic(uintptr_t) *)dst,
+                                                &oldvalue, value, __ATOMIC_RELEASE, __ATOMIC_RELAXED);
 }
 
 static ALWAYS_INLINE
@@ -363,7 +372,7 @@ ClearExclusive(uintptr_t *dst __unused)
 #### `SIDE_TABLE_WEAKLY_REFERENCED 等等标志位`
 &emsp;我们首先要清楚一件很重要的事情，在 `SideTable` 的 `RefcountMap refcnts` 中取出 `objc_object` 对应的 `size_t` 的值并不是单纯的对象的引用计数这一个数字，它是明确有一些标志位存在的，且有些标志位所代表的含义与 `objc_object` 的 `isa_t isa` 中的一些位是相同的。所以这里我们不能形成定式思维，决定这些标志位只存在于 `isa_t isa` 中。
 
-+ `SIDE_TABLE_WEAKLY_REFERENCED` 是 `size_t` 的第一位，表示该对象是否有弱引用。（`x86_64` 下 `isa_t isa` 的 `uintptr_t weakly_referenced : 1;`  ）   
++ `SIDE_TABLE_WEAKLY_REFERENCED` 是 `size_t` 的第一位，表示该对象是否有弱引用。（针对 `isa` 是原始指针的对象）（`x86_64` 下 `isa_t isa` 的 `uintptr_t weakly_referenced : 1;`  ）   
 + `SIDE_TABLE_DEALLOCATING` 是 `size_t` 的第二位，表示对象是否正在进行释放。（`x86_64` 下 `isa_t isa` 的 `uintptr_t deallocating      : 1;` ）
 + `SIDE_TABLE_RC_ONE` 是 `size_t` 的第三位，才正式开始表示该对象的引用计数。
 + `SIDE_TABLE_RC_PINNED` 在 `__LP64__` 下是 `size_t` 的第 `64` 位，`32` 位系统架构下是第 `32` 位，也就是 `size_t` 的最后一位，表示在 `SideTable` 中的引用计数溢出。（大概是不会存在一个对象的引用计数大到连 `SideTable` 都存不下的吧）
@@ -414,7 +423,7 @@ objc_object::sidetable_tryRetain()
     // 默认值为 true，如果该对象正在进行释放，会被置为 false
     bool result = true;
     
-    // it 的类型是: std::pair<DenseMapIterator<std::pair<Disguised<objc_object>, size_t>>, bool>
+   // it 的类型是: std::pair<DenseMapIterator<std::pair<Disguised<objc_object>, size_t>>, bool>
    // try_emplace 处理两种情况：
    // 1. 如果 this 在 refcnts 中还不存在，则给 this 在 buckets 中找一个 BucketT，
    //    KeyT 放 this， ValueT 放 SIDE_TABLE_RC_ONE，然后使用这个 BucketT 构建一个 iterator，
@@ -429,7 +438,8 @@ objc_object::sidetable_tryRetain()
     auto &refcnt = it.first->second;
     
     if (it.second) {
-        // 如果 it.second 为 true，表示 this 第一次放进 refcnts 中，且 BucketT.second 已经被置为 SIDE_TABLE_RC_ONE，其它也不需要任何操作了。
+        // 如果 it.second 为 true，表示 this 第一次放进 refcnts 中，
+        // 且 BucketT.second 已经被置为 SIDE_TABLE_RC_ONE，其它也不需要任何操作了。
         // there was no entry
     } else if (refcnt & SIDE_TABLE_DEALLOCATING) { 
         // 表示对象正在进行释放，result 置为 false 就好了
@@ -570,26 +580,634 @@ objc_object::sidetable_addExtraRC_nolock(size_t delta_rc)
 
 // This does not check isa.fast_rr; if there is an RR override then 
 // it was already called and it chose to call [super release].
-// 这不检查isa.fast_rr; 如果有 RR 函数被重载了，则它已经被调用了，
-// 并且选择调用[super release]。
+// 这不检查 isa.fast_rr; 如果有 retain/release 函数被重载了，则它已经被调用了，
+// 并且它选择调用 [super release]。
 // 
 // 对应不同的执行逻辑，和上面的 rootRetain 函数有类似之处。
 // 
-// handleUnderflow=false is the frameless fast path. // 处理下溢出
+// handleUnderflow=false is the frameless fast path. // 不处理下溢出
+// 处理下溢出，涉及 SideTable 引用计数的数据的借用处理
 // handleUnderflow=true is the framed slow path including side table borrow
 
 // The code is structured this way to prevent duplication.
+// 以这种方式构造代码防止重复。
 
 ALWAYS_INLINE bool 
 objc_object::rootRelease()
 {
+    // 调用下面有两个参数的 rootRelease，
+    // 两个参数分别代表是否执行销毁/是否处理溢出
     return rootRelease(true, false);
 }
 ```
 #### `bool rootRelease(bool performDealloc, bool handleUnderflow)`
 ```c++
+// handleUnderflow 参数看似是一个 bool 类型的表示是否处理下溢出，
+// 当溢出发生了的话是必须要处理的，如果 handleUnderflow 为 false，
+// 那么它会借一个 rootRelease_underflow 函数，并再次调用 rootRelease 函数，
+// 并把 handleUnderflow 参数传递 true。
 
+ALWAYS_INLINE bool 
+objc_object::rootRelease(bool performDealloc, bool handleUnderflow)
+{   
+    // 如果是 Tagged Pointer 直接返回 false，Tagged Pointer 不参与引用计数处理，它内存位于栈区，由系统处理
+    if (isTaggedPointer()) return false;
+
+    // 标记 SideTable 是否加锁了
+    bool sideTableLocked = false;
+
+    // 临时变量存放旧的 isa
+    isa_t oldisa;
+    // 临时变量存放字段修改后的 isa
+    isa_t newisa;
+
+ retry:
+    do {
+        // 以原子方式读到 &isa.bits 的数据
+        oldisa = LoadExclusive(&isa.bits);
+        // 把 oldisa 赋值给 newisa，此时 isa.bits/oldisa/newisa 三者是相同的
+        newisa = oldisa;
+        
+        if (slowpath(!newisa.nonpointer)) {
+            // 如果对象的 isa 只是原始指针 （Class isa/Class cls）
+            
+            // __arm64__ && !__arm642__ 平台下，取消 &isa.bits 的独占访问标记
+            // x86_64 下什么都不需要做，对它而言上面的 LoadExclusive 也只是一个原子读取 (atomic_load)
+            ClearExclusive(&isa.bits);
+            
+            // 如果当前对象是元类对象，则直接返回 false 
+            if (rawISA()->isMetaClass()) return false;
+            
+            // 如果当前 SideTable 加锁了则进行解锁
+            if (sideTableLocked) sidetable_unlock();
+            
+            // 只针对 isa 是原始 Class cls 的对象调用的 sidetable_release 函数
+            return sidetable_release(performDealloc);
+        }
+        
+        // don't check newisa.fast_rr; we already called any RR overrides
+        // 不要检查 newisa.fast_rr; 我们之前已经调用过所有 RR 的重载
+        
+        // extra_rc-- 
+        uintptr_t carry;
+        newisa.bits = subc(newisa.bits, RC_ONE, 0, &carry);  // extra_rc--
+        
+        // 如果发生了下溢出的话，要进行处理，如果没有发生的话就是结束循环，解锁并执行 return false;
+        if (slowpath(carry)) {
+            // don't ClearExclusive()
+            // 不执行 ClearExclusive()
+            // 这里直接 goto 到 underflow 中去处理溢出
+            goto underflow;
+        }
+        
+    // 这里结束循环的方式同 rootRetain 函数，都是为了保证 isa.bits 能正确修改
+    // StoreExclusive 和 StoreReleaseExclusive 的区别在于 memory_order_relaxed 和 memory_order_release
+    // 可参考 https://en.cppreference.com/w/cpp/atomic/memory_order
+    
+    // 当 &isa.bits 与 oldisa.bits 相同时，把 newisa.bits 复制给 &isa.bits，并返回 true
+    // 当 &isa.bits 与 oldisa.bits 不同时，
+    // 把 oldisa.bits 复制给 &isa.bits, 并返回 false （此时会继续进行 do wehile 循环）
+    } while (slowpath(!StoreReleaseExclusive(&isa.bits, oldisa.bits, newisa.bits)));
+    
+    // 如果未下溢出的话，不需要 goto underflow，如果 Sidetable 加锁了，
+    // 则进行解锁，然后返回 false，函数执行结束
+    if (slowpath(sideTableLocked)) sidetable_unlock();
+    return false;
+
+ underflow:
+    // newisa.extra_rc-- underflowed: borrow from side table or deallocate
+    // newisa.extra_rc-- 发生溢出时，有两种方式进行处理：
+    // 1. 如果 SideTable 中有保存对象的引用计数的话可以从 SideTable 中借用
+    // 2. 如果 SideTable 中没有保存对象的引用计数的话，表示对象需要执行销毁了
+
+    // abandon newisa to undo the decrement
+    newisa = oldisa;
+
+    if (slowpath(newisa.has_sidetable_rc)) {
+        // 如果 newisa.has_sidetable_rc 为 true，表示在 SideTable 中有保存对象的引用计数
+        if (!handleUnderflow) {
+            ClearExclusive(&isa.bits);
+            
+            // 如果 handleUnderflow 为 false，则调用 rootRelease_underflow，“递归” 调用 rootRelease 处理溢出
+            return rootRelease_underflow(performDealloc);
+        }
+
+        // Transfer retain count from side table to inline storage.
+        // 将 retain count 从 SideTable 中转移到 isa.extra_rc 中保存。
+
+        if (!sideTableLocked) {
+            // 如果 SideTable 未加锁
+            
+            // 同上，清除独占标记
+            ClearExclusive(&isa.bits);
+            
+            // 给 SideTable 加锁
+            sidetable_lock();
+            // 并把加锁标记置为 true
+            sideTableLocked = true;
+            
+            // Need to start over to avoid a race against the nonpointer -> raw pointer transition.
+            
+            // 回到 retry
+            goto retry;
+        }
+
+        // Try to remove some retain counts from the side table.
+        // 尝试从 SideTable 中移除一些引用计数。
+        
+        // 是从 SideTable 借一些引用计数出来，borrowed 是借到的值，可能是 0，也可能是 RC_HALF
+        // refcnts 中保存的引用计数是 RC_HALF 的整数倍，
+        // 每次 retain 溢出时都是往 refcnts 中转移 RC_HALF，
+        // 剩下的 RC_HALF 放在 extra_rc 字段中
+        size_t borrowed = sidetable_subExtraRC_nolock(RC_HALF);
+
+        // To avoid races, has_sidetable_rc must remain set even if the side table count is now zero.
+        // 为了避免竞态，即使 SideTable 计数现在为零，也必须保持 has_sidetable_rc 之前的设置。
+        
+        if (borrowed > 0) {
+            // borrowed 表示从 SideTable 借到引用计数了
+            
+            // Side table retain count decreased.
+            // SideTable 引用计数 减少。
+            // Try to add them to the inline count.
+            // 尝试将借来的引用计数增加到 extra_rc 中。
+            
+            // 赋值。（包含减 1 的操作）
+            newisa.extra_rc = borrowed - 1;  // redo the original decrement too
+            
+            // 原子保存修改后的 isa.bits
+            bool stored = StoreReleaseExclusive(&isa.bits, 
+                                                oldisa.bits, newisa.bits);
+            if (!stored) {
+                // 如果失败的话
+                
+                // Inline update failed. 
+                // extra_rc 更新失败。
+                
+                // Try it again right now. 
+                // This prevents livelock on LL/SC architectures where the side
+                // table access itself may have dropped the reservation.
+                // 立即进行重试。
+                // 这样可以防止在 LL/SC体系结构上发生 livelock(活锁)，在这种情况下 SideTable 访问本身可能已取消预留。
+                // 活锁可参考: https://www.zhihu.com/question/20566246
+                
+                isa_t oldisa2 = LoadExclusive(&isa.bits);
+                isa_t newisa2 = oldisa2;
+                
+                if (newisa2.nonpointer) {
+                    uintptr_t overflow;
+                    // 把借来的引用计数增加到 extra_rc 中
+                    newisa2.bits = 
+                        addc(newisa2.bits, RC_ONE * (borrowed-1), 0, &overflow);
+                    if (!overflow) {
+                        // 如果还是失败的话，下面 goto retry 再重来
+                        stored = StoreReleaseExclusive(&isa.bits, oldisa2.bits, 
+                                                       newisa2.bits);
+                    }
+                }
+            }
+
+            if (!stored) {
+                // 如果还是失败了。
+                // Inline update failed.
+                // Put the retains back in the side table.
+                // 把从 SideTable 借来的引用计数还放回到 SideTable 中去。
+                
+                sidetable_addExtraRC_nolock(borrowed);
+                
+                // 然后直接 goto retry; 进行全盘重试
+                goto retry;
+            }
+
+            // Decrement successful after borrowing from side table.
+            // 减去从 SideTable 借来的引用计数成功。
+            
+            // This decrement cannot be the deallocating decrement
+            // - the side table lock and has_sidetable_rc bit
+            // ensure that if everyone else tried to -release while we worked, 
+            // the last one would block.
+            
+            // 解锁
+            sidetable_unlock();
+            // 返回 false 
+            return false;
+        }
+        else {
+            // SideTable 是空的，执行 dealloc 分支
+            // Side table is empty after all. Fall-through to the dealloc path.
+        }
+    }
+
+    // Really deallocate.
+    // 执行销毁。
+
+    if (slowpath(newisa.deallocating)) {
+        // 如果对象已经被标记了正在执行释放...
+        // 这里又进行释放，明显是发生了过度释放...
+        
+        // 清除独占标记
+        ClearExclusive(&isa.bits);
+        
+        // 如果 SideTable 加锁了则进行解锁
+        if (sideTableLocked) sidetable_unlock();
+        // 调用 overrelease_error，crash 报错...
+        // 对象在销毁的过程中过度释放；中断 objc_overrelease_during_dealloc_error 进行调试
+        return overrelease_error();
+        // does not actually return
+    }
+    
+    // 把对象的 isa 的 deallocating 置为 true。isa 的又一个字段被设置了，越来的越多的字段被发现设置位置了。 
+    newisa.deallocating = true;
+    
+    // 设置 &isa.bits，如果失败，则 goto retry;
+    if (!StoreExclusive(&isa.bits, oldisa.bits, newisa.bits)) goto retry;
+
+    // 如果加锁了，则进行解锁。
+    if (slowpath(sideTableLocked)) sidetable_unlock();
+
+    // 这个函数以当前的水平实在是看不懂呀...
+    __c11_atomic_thread_fence(__ATOMIC_ACQUIRE);
+
+    if (performDealloc) {
+        // 如果 performDealloc 为 true，则以消息发送的方式调用 dealloc 
+        ((void(*)(objc_object *, SEL))objc_msgSend)(this, @selector(dealloc));
+    }
+    
+    return true;
+}
 ```
+#### `sidetable_release`
+```c++
+// return uintptr_t instead of bool so that the various raw-isa -release paths all return zero in eax
+// 返回 uintptr_t 而不是 bool，以便各种 raw-isa -release路径在 eax 中都返回零
+
+uintptr_t
+objc_object::sidetable_release(bool performDealloc)
+{
+// 如果当前平台支持 isa 优化
+#if SUPPORT_NONPOINTER_ISA
+    // 如果 isa 是优化的 isa 则直接执行断言，
+    // sidetable_release 函数只能在对象的 isa 是原始 isa 时调用（Class cls）
+    ASSERT(!isa.nonpointer);
+#endif
+    
+    // 从全局的 SideTalbes 中找到 this 所处的 SideTable
+    SideTable& table = SideTables()[this];
+    
+    // 临时变量，标记是否需要执行 dealloc
+    bool do_dealloc = false;
+    
+    // 加锁
+    table.lock();
+    
+    // it 的类型是: std::pair<DenseMapIterator<std::pair<Disguised<objc_object>, size_t>>, bool>
+    // try_emplace 处理两种情况：
+    // 1. 如果 this 在 refcnts 中还不存在，则给 this 在 buckets 中找一个 BucketT，
+    //    KeyT 放 this， ValueT 放 SIDE_TABLE_DEALLOCATING，然后使用这个 BucketT 构建一个 iterator，
+    //    然后用这个 iterator 和 true 构造一个 std::pair<iterator, true> 返回。
+    // 2. 如果 this 在 refcnts 中已经存在了，则用 this 对应的 BucketT 构建一个 iterator,
+    //    然后用这个 iterator 和 false 构造一个 std::pair<iterator, false> 返回。
+    auto it = table.refcnts.try_emplace(this, SIDE_TABLE_DEALLOCATING);
+    
+    // refcnt 是引用计数值的引用。
+    // it.first 是 DenseMapIterator，它的操作符 -> 被重写了返回的是 DenseMpaIterator 的 Ptr 成员变量，
+    // 然后 Ptr 的类型是 BucketT 指针,
+    // 然后这里的 ->second 其实就是 BucketT->second，其实就是 size_t，正是保存的对象的引用计数数据。
+    auto &refcnt = it.first->second;
+    
+    if (it.second) {
+        // 如果 it.second 为 true，表示 this 第一次放进 refcnts 中，且 BucketT.second 已经被置为 SIDE_TABLE_DEALLOCATING，
+        // 标记为需要执行 dealloc
+        do_dealloc = true;
+    } else if (refcnt < SIDE_TABLE_DEALLOCATING) {
+        // SIDE_TABLE_WEAKLY_REFERENCED may be set. Don't change it.
+        // 如果 refcnt < SIDE_TABLE_DEALLOCATING，那可能的情况就是 SIDE_TABLE_WEAKLY_REFERENCED 或者为 0
+        // 标记为需要执行 dealloc
+        do_dealloc = true;
+        
+        // 与 SIDE_TABLE_DEALLOCATING 执行或操作，表示把 refcnt 标记为 DEALLOCATING
+        refcnt |= SIDE_TABLE_DEALLOCATING;
+    } else if (! (refcnt & SIDE_TABLE_RC_PINNED)) {
+        // refcnt & SIDE_TABLE_RC_PINNED 值为 false 的话表示，
+        // rcfcnts 中保存的 this 对应的 BucketT 的 size_t 还没有溢出，还可正常进行操作存储 this 的引用计数
+        // refcnt 减去 SIDE_TABLE_RC_ONE
+        refcnt -= SIDE_TABLE_RC_ONE;
+    }
+    
+    // 解锁
+    table.unlock();
+    
+    if (do_dealloc  &&  performDealloc) {
+        // 如果 do_dealloc 被标记为需要 dealloc 并且入参 performDealloc 为 true，
+        // 则以 objc_msgSend 消息发送的方式调用对象的 dealloc 方法
+        ((void(*)(objc_object *, SEL))objc_msgSend)(this, @selector(dealloc));
+    }
+    
+    return do_dealloc;
+}
+```
+#### `rootRelease_underflow`
+```c++
+NEVER_INLINE uintptr_t
+objc_object::rootRelease_underflow(bool performDealloc)
+{
+    // handleUnderflow 为 true，来处理溢出情况
+    return rootRelease(performDealloc, true);
+}
+```
+#### `sidetable_subExtraRC_nolock`
+```c++
+// Move some retain counts from the side table to the isa field.
+// 将一些引用计数从 SideTable 移动到 isa 的 extra_rc 中。
+// Returns the actual count subtracted, which may be less than the request.
+// 返回减去的实际计数，可能少于要求。
+
+size_t 
+objc_object::sidetable_subExtraRC_nolock(size_t delta_rc)
+{
+    // 对象的 isa 必须是非指针
+    ASSERT(isa.nonpointer);
+    // 取得 SideTable 
+    SideTable& table = SideTables()[this];
+
+    // it 的类型是: DenseMapIterator<  std::pair<Disguised<objc_object>, size_t>  >
+    // 找到 this 对应的 BucketT，并构建一个 DenseMapItertor
+    RefcountMap::iterator it = table.refcnts.find(this);
+    
+    // DenseMapIterator 的 operator== 重写了，内部比较的是两个迭代器的 Ptr 成员变量
+    // 如果 it == table.refcnts.end() 表示未找到 this 对应的 BucketT
+    // it->second == 0，表示 BucketT 的 size_t 是 0
+    if (it == table.refcnts.end()  ||  it->second == 0) {
+        // Side table retain count is zero. Can't borrow.
+        // SideTable 的引用计数是 0。不能借
+        return 0;
+    }
+    
+    // 取得 refcnts 中对象的引用计数
+    size_t oldRefcnt = it->second;
+
+    // 又见到在 retain 中已经见过的断言判断
+    // 从 SideTable 中取出的引用计数的数据，第一位和第二位必须是 0
+    
+    // isa-side bits should not be set here
+    ASSERT((oldRefcnt & SIDE_TABLE_DEALLOCATING) == 0);
+    ASSERT((oldRefcnt & SIDE_TABLE_WEAKLY_REFERENCED) == 0);
+    
+    // 从 oldRefcnt 中减去入参要借用的引用计数的数值
+    // 这里的减操作是不会有负数的，因为 BucketT 最小值 VlaueT 是 RC_HALF
+    size_t newRefcnt = oldRefcnt - (delta_rc << SIDE_TABLE_RC_SHIFT);
+    
+    // 断言：减操作以后，oldRefcnt 大于 newRefcnt，那如果 delta_rc 为 0 呢？oldRefcnt 会等于 newRefcnt
+    // 还有减完 newRefcnt 可能是 0，也就是意味着 SideTable 不再保存对象的引用计数了，此时 has_sidetable_rc 应该还是 true
+    ASSERT(oldRefcnt > newRefcnt);  // shouldn't underflow
+    
+    // 更新 SideTable 中的引用计数数据
+    it->second = newRefcnt;
+    // 返回借的值
+    return delta_rc;
+}
+```
+
+&emsp;**与aotorelease 相关的内容留到下篇再写。**
+
+### `rootTryRetain`
+```c++
+ALWAYS_INLINE bool 
+objc_object::rootTryRetain()
+{
+    return rootRetain(true, false) ? true : false;
+}
+```
+### `rootReleaseShouldDealloc`
+```c++
+ALWAYS_INLINE bool 
+objc_object::rootReleaseShouldDealloc()
+{
+    return rootRelease(false, false);
+}
+```
+### `rootRetainCount`
+&emsp;如果对象的 `isa` 是非指针的话，引用计数同时在 `extra_rc` 字段和 `SideTable` 中保存，要求它们的和。如果对象的 `isa` 是原始 `isa` 的话，对象的引用计数数据只保存在 `SideTable` 中。
+```c++
+inline uintptr_t 
+objc_object::rootRetainCount()
+{
+    // 如果是 Tagged Pointer 的话，获取它的引用计数则直接返回 (uintptr_t)this
+    if (isTaggedPointer()) return (uintptr_t)this;
+    
+    // 加锁
+    sidetable_lock();
+    
+    // 以原子方式加载 &isa.bits 数据
+    isa_t bits = LoadExclusive(&isa.bits);
+    // 如果是 __arm64__ && !__arm64e__ 平台下，要清除独占标记
+    ClearExclusive(&isa.bits);
+    
+    if (bits.nonpointer) {
+        // 如果对象的 isa 是非指针的话，引用计数同时在 extra_rc 字段和 SideTable 中保存，要求它们的和
+        // 这里加 1， 是因为 extra_rc 存储的是对象本身之外的引用计数的数量
+        uintptr_t rc = 1 + bits.extra_rc;
+        
+        // 如果 has_sidetable_rc 位为 1，则表示在 SideTable 中也保存有对象的引用计数数据
+        if (bits.has_sidetable_rc) {
+            // 找到对象的在 SideTable 中的引用计数并增加到 rc 中
+            rc += sidetable_getExtraRC_nolock();
+        }
+        // 解锁
+        sidetable_unlock();
+        // 返回 rc
+        return rc;
+    }
+
+    sidetable_unlock();
+    // 如果对象的 isa 是原始 isa 的话，对象的引用计数数据只保存在 SideTable 中
+    return sidetable_retainCount();
+}
+```
+#### `sidetable_getExtraRC_nolock`
+```c++
+size_t 
+objc_object::sidetable_getExtraRC_nolock()
+{
+    // 此函数只限定 isa 是非指针的对象调用
+    ASSERT(isa.nonpointer);
+    
+    // 从全局的 SideTables 中找到 this 所处的 SideTable
+    SideTable& table = SideTables()[this];
+    // 查找对象的引用计数
+    RefcountMap::iterator it = table.refcnts.find(this);
+    // 如果未找到，返回 0
+    if (it == table.refcnts.end()) return 0;
+    // 如果找到了做一次右移操作，后两位是预留的标记位
+    else return it->second >> SIDE_TABLE_RC_SHIFT;
+}
+```
+#### `sidetable_retainCount`
+```c++
+uintptr_t
+objc_object::sidetable_retainCount()
+{
+    // 找到 this 所在的 SideTable
+    SideTable& table = SideTables()[this];
+
+    // refcnt_result 初始为 1，因为 SideTable 中存储的是对象本身之外的引用计数的数量
+    size_t refcnt_result = 1;
+    
+    // 加锁
+    table.lock();
+    
+    // 在 refcnts 中查找对象的引用计数
+    RefcountMap::iterator it = table.refcnts.find(this);
+    if (it != table.refcnts.end()) {
+        // this is valid for SIDE_TABLE_RC_PINNED too
+        // 这也对 SIDE_TABLE_RC_PINNED 有效
+        
+        // 移位并增加到 refcnt_result
+        refcnt_result += it->second >> SIDE_TABLE_RC_SHIFT;
+    }
+    
+    // 解锁
+    table.unlock();
+    return refcnt_result;
+}
+```
+### `rootIsDeallocating`
+```c++
+inline bool 
+objc_object::rootIsDeallocating()
+{
+    // 如果是 Tagged Pointer 直接返回 false
+    if (isTaggedPointer()) return false;
+    
+    // 如果 isa 是非指针的对象，则直接返回 isa 的 deallocating 字段
+    // 该字段保存的正是对象是否正在进行释放
+    if (isa.nonpointer) return isa.deallocating;
+    
+    // 如果 isa 是原始指针的对象，它的是否正在释放状态是保存在 refcnts 中的引用计数数据的第二位中
+    return sidetable_isDeallocating();
+}
+```
+#### `sidetable_isDeallocating`
+```c++
+bool 
+objc_object::sidetable_isDeallocating()
+{
+    // 在全局的 SideTables 中找到对象所处的 SideTable
+    SideTable& table = SideTables()[this];
+
+    // NO SPINLOCK HERE
+    // 此处没有 SPINLOCK 
+    
+    // _objc_rootIsDeallocating() is called exclusively by _objc_storeWeak(), 
+    // which already acquired the lock on our behalf.
+    // _objc_rootIsDeallocating() 函数仅由 _objc_storeWeak() 函数独占调用，在调用之前已经获得了锁。
+    
+    // fixme can't do this efficiently with os_lock_handoff_s
+    // fixme os_lock_handoff_s 无法有效地做到这一点
+    // if (table.slock == 0) {
+    //     _objc_fatal("Do not call -_isDeallocating.");
+    // }
+
+    // 在 refcnts 中查找 this 的引用计数数据
+    RefcountMap::iterator it = table.refcnts.find(this);
+    // 如果 it 不等于 end()，并且引用计数数据的第二位是 1， 则表明对象正在进行释放
+    return (it != table.refcnts.end()) && (it->second & SIDE_TABLE_DEALLOCATING);
+}
+```
+### `clearDeallocating`
+&emsp;对象释放时的清理操作，这里涉及到：
+1. 如果对象有弱引用的话，则对象释放了要把那些弱引用置为 `nil`。
+2. 要从 `refcnts` 中清除对象，把存放对象引用计数数据的 `BucketT` 的 `second` 执行析构操作，然后把 `first` 置为 `TombstoneKey`。
+
+涉及到的函数调用流程还挺长的，我们来一步一步看。
+```c++
+inline void 
+objc_object::clearDeallocating()
+{
+    if (slowpath(!isa.nonpointer)) {
+        // Slow path for raw pointer isa.
+        // isa 是原始指针的对象
+        sidetable_clearDeallocating();
+    }
+    else if (slowpath(isa.weakly_referenced  ||  isa.has_sidetable_rc)) {
+        // Slow path for non-pointer isa with weak refs and/or side table data.
+        // 针对 isa 是非指针的对象，isa.weakly_referenced 为真，或者 isa.has_sidetable_rc 为真
+        clearDeallocating_slow();
+    }
+
+    assert(!sidetable_present());
+}
+```
+#### `sidetable_clearDeallocating`
+```c++
+void 
+objc_object::sidetable_clearDeallocating()
+{
+    SideTable& table = SideTables()[this];
+
+    // clear any weak table items
+    // 清除所有的弱引用项
+    
+    // clear extra retain count and deallocating bit
+    // 清除 extra retain count 和 deallocating 标志位
+    // (fixme warn or abort if extra retain count == 0 ?)
+    
+    // 加锁
+    table.lock();
+    // 在 refcnts 中查找 BucketT
+    RefcountMap::iterator it = table.refcnts.find(this);
+    if (it != table.refcnts.end()) {
+        // 如果引用计数数据的第一位是 1，则表示该对象存在弱引用
+        if (it->second & SIDE_TABLE_WEAKLY_REFERENCED) {
+        // 调用 weak_clear_no_lock 函数首先根据 this 找到 this 在 table.weak_table 中对应的 weak_entry_t
+        // 然后查找 weak_entry_t 中的 referrers 的数量已经起始地址，然后循环遍历把每个 referrer 置为 nil
+        // 然后把 weak_entry_t 从 weak_table 中移除，并判断是否需要紧缩 weak_table 容量
+        weak_clear_no_lock(&table.weak_table, (id)this);
+        }
+        
+        // 把 it 指向的 BucketT second 执行析构，把 first 置为 TombstoneKey 即把对象的 BucketT 从 Buckets 中移除。
+        // NumEntries 减 1，NumTombstones 加 1，并判断是否需要紧缩 Buckets 容量。
+        table.refcnts.erase(it);
+    }
+    // 解锁
+    table.unlock();
+}
+```
+#### `clearDeallocating_slow`
+```c++
+NEVER_INLINE void
+objc_object::clearDeallocating_slow()
+{
+    // 断言条件：isa 是非指针的对象，
+    // isa.weakly_referenced（有弱引用） 或者 isa.has_sidetable_rc（SideTable 中保存有引用计数） 为真
+    ASSERT(isa.nonpointer  &&  (isa.weakly_referenced || isa.has_sidetable_rc));
+    
+    // 在全局 SideTables 中找到 this 所在的 SideTable 
+    SideTable& table = SideTables()[this];
+    // 加锁
+    table.lock();
+    if (isa.weakly_referenced) {
+        // 如果该对象有弱引用
+        
+        // 调用 weak_clear_no_lock 函数首先根据 this 找到 this 在 table.weak_table 中对应的 weak_entry_t
+        // 然后查找 weak_entry_t 中的 referrers 的数量已经起始地址，然后循环遍历把每个 referrer 置为 nil
+        // 然后把 weak_entry_t 从 weak_table 中移除，并判断是否需要紧缩 weak_table 容量
+        weak_clear_no_lock(&table.weak_table, (id)this);
+    }
+    
+    if (isa.has_sidetable_rc) {
+        // 如果该对象在 SideTable 中有保存引用计数，要把它从 Buckets 中移除
+        // 找到 this 对应的 BucketT，把 BucketT second 执行析构，
+        // 把 first 置为 TombstoneKey 即把对象的 BucketT 从 Buckets 中移除。
+        // NumEntries 减 1，NumTombstones 加 1，并判断是否需要紧缩 Buckets 容量。
+        table.refcnts.erase(this);
+    }
+    
+    // 解锁
+    table.unlock();
+}
+```
+&emsp;到这里 `objc_object` 的 `retain` `release` `retainCount` 的操作就完全通了一遍了，由于这里已经篇幅过长了，下面的内容下篇继续分析。
 
 ## 参考链接
 **参考链接:🔗**
