@@ -327,7 +327,6 @@
 		D2A32AE724E1541B00ECE821 /* OtherGrandSon+Test.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = "OtherGrandSon+Test.m"; sourceTree = "<group>"; };
 		D2E0674D2506118F008BF0E9 /* iOS Category 底层实现原理(二)：函数分析与加载流程.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS Category 底层实现原理(二)：函数分析与加载流程.md"; sourceTree = "<group>"; };
 		D2E067692508E82E008BF0E9 /* iOS Category 底层实现原理(三)：附加+load函数超详细解析.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS Category 底层实现原理(三)：附加+load函数超详细解析.md"; sourceTree = "<group>"; };
-		D2E0676A2509A594008BF0E9 /* iOS Autorelease 底层实现原理.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS Autorelease 底层实现原理.md"; sourceTree = "<group>"; };
 		D2E0676B2509A649008BF0E9 /* iOS 引用计数机制的工作原理.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 引用计数机制的工作原理.md"; sourceTree = "<group>"; };
 		D2E0676C2509A8A2008BF0E9 /* iOS 从源码解析Runtime (二)：聚焦 isa、objc_object(ISA_BITFIELD相关内容篇).md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 从源码解析Runtime (二)：聚焦 isa、objc_object(ISA_BITFIELD相关内容篇).md"; sourceTree = "<group>"; };
 		D2E0676E250B5BCA008BF0E9 /* iOS 从源码解析Runtime (一)：由 isTaggedPointer 函数引发的解读 Tagged Pointer.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 从源码解析Runtime (一)：由 isTaggedPointer 函数引发的解读 Tagged Pointer.md"; sourceTree = "<group>"; };
@@ -888,7 +887,6 @@
 				D24C822225120D1400E3BF5E /* iOS 从源码解析Runtime (五)：聚焦 isa、objc_object(retain、release、retaincount相关内容篇).md */,
 				D237305A251C888D00274FBA /* iOS 从源码解析Runtime (六)：由 rootAutorelease 函数引发的解读 Autorelease.md */,
 				D2373059251C880C00274FBA /* iOS 从源码解析Runtime (七)：聚焦 isa、objc_object(dealloc、autorelease等相关内容篇).md */,
-				D2E0676A2509A594008BF0E9 /* iOS Autorelease 底层实现原理.md */,
 				D2E0676B2509A649008BF0E9 /* iOS 引用计数机制的工作原理.md */,
 			);
 			path = "已发布";

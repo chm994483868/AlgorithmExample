@@ -88,6 +88,7 @@ struct magic_t {
         // 程序在 DEBUG 模式下执行完整比较
         return check();
 #else
+        // 程序在 RELEASE 模式下是只比较 m[0] 的值是 0xA1A1A1A1
         return (m[0] == M0);
 #endif
     }
@@ -98,30 +99,85 @@ struct magic_t {
 ```
 ### `struct AutoreleasePoolPageData`
 ```c++
+// 前向声明，AutoreleasePoolPage 是私有继承自 AutoreleasePoolPageData 的类
 class AutoreleasePoolPage;
+
 struct AutoreleasePoolPageData
 {
+    // struct magic_t
     magic_t const magic;
+    
+    // __unsafe_unretained 修饰的 next，还是第一次见使用修饰符
+    // next 指针作为游标指向栈顶最新 add 进来的 autorelease 对象的下一个位置
     __unsafe_unretained id *next;
+    
+    // typedef __darwin_pthread_t pthread_t;
+    // typedef struct _opaque_pthread_t *__darwin_pthread_t;
+    // 原始是 struct _opaque_pthread_t 指针
+    // AutoreleasePool 是按线程一一对应的，thread 正是自动释放池所处的当前线程
     pthread_t const thread;
+    
+    // AutoreleasePool 没有单独的结构，而是由若干个 AutoreleasePoolPage 以双向链表的形式组合而成
+    // parent 和 child 这两个 AutoreleasePoolPage指针这是构成链表用的值指针
     AutoreleasePoolPage * const parent;
     AutoreleasePoolPage *child;
+    
+    // 这两个属性还不知道是干嘛用的
     uint32_t const depth;
     uint32_t hiwat;
 
-    AutoreleasePoolPageData(__unsafe_unretained id* _next, pthread_t _thread, AutoreleasePoolPage* _parent, uint32_t _depth, uint32_t _hiwat)
-        : magic(), next(_next), thread(_thread),
-          parent(_parent), child(nil),
-          depth(_depth), hiwat(_hiwat)
-    {
+    // 构造函数（初始化列表默认对所有成员变量都执行了默认初始化）
+    AutoreleasePoolPageData(__unsafe_unretained id* _next,
+                            pthread_t _thread,
+                            AutoreleasePoolPage* _parent,
+                            uint32_t _depth,
+                            uint32_t _hiwat) : magic(),
+                                               next(_next),
+                                               thread(_thread),
+                                               parent(_parent),
+                                               child(nil),
+                                               depth(_depth),
+                                               hiwat(_hiwat){
     }
 };
 ```
-
-
-
+### `struct thread_data_t`
+```c++
+struct thread_data_t
+{
+#ifdef __LP64__
+    // struct _opaque_pthread_t 指针 8 字节
+    pthread_t const thread;
+    uint32_t const hiwat; // 4 字节
+    uint32_t const depth; // 4 字节
+#else
+    pthread_t const thread;
+    uint32_t const hiwat;
+    uint32_t const depth;
+    uint32_t padding;
+#endif
+};
+// 一个断言，如果 thread_data_t 的 size 不是 16 的话就会执行该断言
+C_ASSERT(sizeof(thread_data_t) == 16);
+```
 
 ## `AutoreleasePoolPage`
+
+### `BREAKPOINT_FUNCTION`
+```c++
+/* Use this for functions that are intended to be breakpoint hooks.
+   If you do not, the compiler may optimize them away.
+   BREAKPOINT_FUNCTION( void stop_on_error(void) ); */
+#   define BREAKPOINT_FUNCTION(prototype)                             \
+    OBJC_EXTERN __attribute__((noinline, used, visibility("hidden"))) \
+    prototype { asm(""); }
+```
+
+```c++
+BREAKPOINT_FUNCTION(void objc_autoreleaseNoPool(id obj));
+BREAKPOINT_FUNCTION(void objc_autoreleasePoolInvalid(const void *token));
+```
+
 
 ## `Autorelease` 对象什么时候释放？
 
