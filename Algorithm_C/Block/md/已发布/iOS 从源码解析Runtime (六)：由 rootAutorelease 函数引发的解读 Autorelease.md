@@ -974,13 +974,15 @@ static void badPop(void *token)
 ```
 ### `popPage/popPageDebug`
 ```c++
+// 这里有一个模版参数 (bool 类型的 allowDebug)，直接传值，有点类似 sotreWeak 里的新值和旧值的模版参数
+// 这个 void *token 的参数没有用到....
 template<bool allowDebug>
 static void
 popPage(void *token, AutoreleasePoolPage *page, id *stop)
 {
     // OPTION( PrintPoolHiwat, OBJC_PRINT_POOL_HIGHWATER, "log high-water marks for autorelease pools")
     // 打印自动释放池的 high-water 标记
-    // 如果允许 debug 并且打开了 OBJC_PRINT_POOL_HIGHWATER，则打印自动释放池的 hiwat
+    // 如果允许 debug 并且打开了 OBJC_PRINT_POOL_HIGHWATER，则打印自动释放池的 hiwat（high-water “最高水位”）
     if (allowDebug && PrintPoolHiwat) printHiwat();
 
     // 把 stop 后面添加进自动释放池的对象全部执行一次 objc_release 操作
@@ -988,23 +990,31 @@ popPage(void *token, AutoreleasePoolPage *page, id *stop)
 
     // memory: delete empty children
     // 删除空的 page
+    // OPTION( DebugPoolAllocation, OBJC_DEBUG_POOL_ALLOCATION, "halt when autorelease pools are popped out of order, 
+    // and allow heap debuggers to track autorelease pools")
+    // 当自动释放池弹出顺序时停止，并允许堆调试器跟踪自动释放池
+
     if (allowDebug && DebugPoolAllocation  &&  page->empty()) {
-        // 如果允许 Debug，如果开启了 DebugPoolAllocation 并且 page 是空的 
+        // 如果允许 Debug 且开启了 DebugPoolAllocation 并且 page 是空的 
         
         // special case: delete everything during page-per-pool debugging
-        // 特殊情况：删除每个池页面调试期间的所有内容
+        // 特殊情况：删除每个 page 调试期间的所有内容
 
         AutoreleasePoolPage *parent = page->parent;
-        // 把 page 以及 page 之前的 page 都执行 delete
+        // 把 page 以及 page 之后增加的 page 都执行 delete
         page->kill();
         
         // 把 page 的 parent 设置为 hotPage
         setHotPage(parent);
     } else if (allowDebug && DebugMissingPools  &&  page->empty()  &&  !page->parent) {
+        //OPTION( DebugMissingPools, OBJC_DEBUG_MISSING_POOLS, 
+        // "warn about autorelease with no pool in place, which may be a leak")
+        // 警告自动释放没有池占位， 这可能是一个泄漏
+
         // special case: delete everything for pop(top) when debugging missing autorelease pools
         // 在调试缺少自动释放池时，删除 pop（顶部）的所有内容
 
-        // 把 page 以及 page 之前的 page 都执行 delete
+        // 把 page 以及 page 之后增加的 page 都执行 delete
         page->kill();
         
         // 设置 hotPage 为 nil 
@@ -1013,31 +1023,36 @@ popPage(void *token, AutoreleasePoolPage *page, id *stop)
         // 如果 page 的 child 存在
         
         // hysteresis: keep one empty child if page is more than half full
-        // 如果 page 存储的自动释放对象超过了一般，则保留该 page
+        // 如果 page 存储的自动释放对象超过了一半，则保留一个 empty child
         
         if (page->lessThanHalfFull()) {
             // 如果 page 内部保存的自动释放对象的数量少于一半
             
-            // 把 page 以及 page 之前的 page 都执行 delete
+            // 把 page 以及 page 之后增加的 page 都执行 delete
             page->child->kill();
         }
         else if (page->child->child) {
-            // 如果 page 的 前面的 前面的 page 存在
-            // 执行 kill
+            // 如果 page 的 child 的 child 存在
+            // 则把 page->child->child 以及它之后增加的 page 全部执行 delete
             page->child->child->kill();
         }
     }
 }
 ```
 ```c++
+// __attribute__((cold)) 表示函数不经常调用
 __attribute__((noinline, cold))
 static void
 popPageDebug(void *token, AutoreleasePoolPage *page, id *stop)
 {
+    // 模版参数 allowDebug 传递的是 true
     popPage<true>(token, page, stop);
 }
 ```
 ### `pop`
+
+// 🔫🔫 这个函数有点晕，等下再回来看
+
 ```c++
 static inline void
 pop(void *token)
@@ -1079,8 +1094,149 @@ pop(void *token)
     return popPage<false>(token, page, stop);
 }
 ```
+### `init`
+```c++
+static void init()
+{
+    int r __unused = pthread_key_init_np(AutoreleasePoolPage::key, 
+                                         AutoreleasePoolPage::tls_dealloc);
+    ASSERT(r == 0);
+}
+```
+### `print`
+&emsp;打印当前 `page` 里面的 `autorelease` 对象。
+```c++
+__attribute__((noinline, cold))
+void print()
+{
+    // 打印 hotPage 和 coldPage
+    _objc_inform("[%p]  ................  PAGE %s %s %s", this, 
+                 full() ? "(full)" : "", 
+                 this == hotPage() ? "(hot)" : "", 
+                 this == coldPage() ? "(cold)" : "");
+    check(false);
+    
+    // 打印当前池里的 autorelease 对象
+    for (id *p = begin(); p < next; p++) {
+        if (*p == POOL_BOUNDARY) {
+            _objc_inform("[%p]  ################  POOL %p", p, p);
+        } else {
+            _objc_inform("[%p]  %#16lx  %s", 
+                         p, (unsigned long)*p, object_getClassName(*p));
+        }
+    }
+}
+```
+### `printAll`
+&emsp;打印自动释放池里面的所有 `autorelease` 对象。
+```c++
+__attribute__((noinline, cold))
+static void printAll() // 这是一个静态非内联并较少被调用的函数
+{
+    _objc_inform("##############");
+    // 打印自动释放池所处的线程
+    _objc_inform("AUTORELEASE POOLS for thread %p", objc_thread_self());
 
+    AutoreleasePoolPage *page;
+    ptrdiff_t objects = 0;
+    // coldePage 是第一个 page
+    // 沿着 child 指针一直向前，遍历所有的 page
+    for (page = coldPage(); page; page = page->child) {
+        // 这里是把每个 page 里的 autorelease 对象的数量全部加起来
+        objects += page->next - page->begin();
+    }
+    
+    // 打印自动释放池里面等待 objc_release 的所有 autorelease 对象的数量 
+    _objc_inform("%llu releases pending.", (unsigned long long)objects);
 
+    if (haveEmptyPoolPlaceholder()) {
+        // 如果目前只是空占位池的话，打印空池
+        _objc_inform("[%p]  ................  PAGE (placeholder)", 
+                     EMPTY_POOL_PLACEHOLDER);
+        _objc_inform("[%p]  ################  POOL (placeholder)", 
+                     EMPTY_POOL_PLACEHOLDER);
+    }
+    else {
+        // 循环打印每个 page 里面的 autorelease 对象
+        for (page = coldPage(); page; page = page->child) {
+            page->print();
+        }
+    }
+
+    // 打印分割线
+    _objc_inform("##############");
+}
+```
+### `printHiwat`
+&emsp;打印 `high-water`。
+```c++
+__attribute__((noinline, cold))
+static void printHiwat()
+{
+    // Check and propagate high water mark
+    // Ignore high water marks under 256 to suppress noise.
+    
+    // hotPage
+    AutoreleasePoolPage *p = hotPage();
+    // COUNT 固定情况下是 4096 / 8 = 512
+    // p->depth 是 hotPage 的深度，第一个 page 的 depth 是 0，然后每次增加一个 page 该 page 的 depth 加 1
+    // p->next - p->begin() 是该 page 内存储的 autorelease 对象的个数
+    // 那么 mark 大概就是从第一个 page 到 hotpage 的 page 的数量乘以 512 然后加上 hotPage 里面保存的 autorelease 对象的数量
+    
+    uint32_t mark = p->depth*COUNT + (uint32_t)(p->next - p->begin());
+    
+    if (mark > p->hiwat  &&  mark > 256) {
+        // 沿着 parent 链遍历每个 page，把每个 page 的 hiwat 置为 mark
+        for( ; p; p = p->parent) {
+            // 当前什么也不做
+            p->unprotect();
+            
+            p->hiwat = mark;
+            
+            // 当前什么也不做
+            p->protect();
+        }
+
+        // 
+        _objc_inform("POOL HIGHWATER: new high water mark of %u "
+                     "pending releases for thread %p:",
+                     mark, objc_thread_self());
+
+        void *stack[128];
+        
+        // int backtrace(void**,int) __OSX_AVAILABLE_STARTING(__MAC_10_5, __IPHONE_2_0);
+        // 函数原型
+        // #include <execinfo.h> 
+        // int backtrace(void **buffer, int size);
+        // 该函数获取当前线程的调用堆栈，获取的信息将会被存放在 buffer 中，它是一个指针数组，参数 size 用来指定 buffer
+        // 中可以保存多少个 void * 元素。函数的返回值是实际返回的 void * 元素个数。buffer 中的 void * 元素实际是从堆栈中获取的返回地址。 
+        
+        int count = backtrace(stack, sizeof(stack)/sizeof(stack[0]));
+        
+        // char** backtrace_symbols(void* const*,int) __OSX_AVAILABLE_STARTING(__MAC_10_5, __IPHONE_2_0);
+        // 函数原型
+        // char **backtrace_symbols(void *const *buffer, int size);
+        // 该函数将 backtrace 函数获取的信息转化为一个字符串数组，
+        // 参数 buffer 是 backtrace 获取的堆栈指针，
+        // size 是 backtrace 返回值。
+        // 函数返回值是一个指向字符串数组的指针，它包含 char* 元素个数为 size。
+        // 每个字符串包含了一个相对于 buffer 中对应元素的可打印信息，包括函数名、函数偏移地址和实际返回地址。
+        // backtrace_symbols 生成的字符串占用的内存是 malloc 出来的，但是是一次性 malloc 出来的，释放是只需要一次性释放返回的二级指针即可
+        
+        char **sym = backtrace_symbols(stack, count);
+        
+        for (int i = 0; i < count; i++) {
+            _objc_inform("POOL HIGHWATER:     %s", sym[i]);
+        }
+        free(sym);
+    }
+}
+```
+### `#undef POOL_BOUNDARY`
+```c++
+#undef POOL_BOUNDARY
+```
+&emsp;至此 `AuroreleasePoolPage` 代码就全部看一遍了，所有的实现点都很清晰。
 
 ## `Autorelease` 对象什么时候释放？
 
@@ -1093,5 +1249,6 @@ pop(void *token)
 + [黑幕背后的Autorelease](http://blog.sunnyxx.com/2014/10/15/behind-autorelease/)
 + [GCC扩展 __attribute__ ((visibility("hidden")))](https://www.cnblogs.com/lixiaofei1987/p/3198665.html)
 + [Linux下__attribute__((visibility ("default")))的使用](https://blog.csdn.net/fengbingchun/article/details/78898623)
++ [backtrace函数](https://www.cnblogs.com/fangyan5218/p/10686488.html)
 + [操作系统内存管理(思维导图详解)](https://blog.csdn.net/hguisu/article/details/5713164)
 
