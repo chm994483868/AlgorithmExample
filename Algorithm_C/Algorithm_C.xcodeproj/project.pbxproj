@@ -263,7 +263,7 @@
 		D2330A2724AF0FD500C6480D /* main.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
 		D23730582514A96E00274FBA /* iOS 从源码解析Runtime (四)：由 sidetable_retain 函数引发的解读 RefcountMap(DenseMapBase篇).md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 从源码解析Runtime (四)：由 sidetable_retain 函数引发的解读 RefcountMap(DenseMapBase篇).md"; sourceTree = "<group>"; };
 		D2373059251C880C00274FBA /* iOS 从源码解析Runtime (七)：聚焦 isa、objc_object(dealloc、autorelease等相关内容篇).md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 从源码解析Runtime (七)：聚焦 isa、objc_object(dealloc、autorelease等相关内容篇).md"; sourceTree = "<group>"; };
-		D237305A251C888D00274FBA /* iOS 从源码解析Runtime (六)：由 rootAutorelease 函数引发的解读 Autorelease.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 从源码解析Runtime (六)：由 rootAutorelease 函数引发的解读 Autorelease.md"; sourceTree = "<group>"; };
+		D237305A251C888D00274FBA /* iOS 从源码解析Runtime (六)：由 rootAutorelease 函数引发的解读 AutoreleasePool.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 从源码解析Runtime (六)：由 rootAutorelease 函数引发的解读 AutoreleasePool.md"; sourceTree = "<group>"; };
 		D237C63D24D24648001E0B21 /* StackWithMin.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = StackWithMin.cpp; sourceTree = "<group>"; };
 		D237C63E24D24648001E0B21 /* StackWithMin.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = StackWithMin.hpp; sourceTree = "<group>"; };
 		D237C64124D25B20001E0B21 /* StackPushPopOrder.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = StackPushPopOrder.cpp; sourceTree = "<group>"; };
@@ -885,7 +885,7 @@
 				D24C82232512140800E3BF5E /* iOS 从源码解析Runtime (三)：由 sidetable_retain 函数引发的解读 RefcountMap(DenseMap篇).md */,
 				D23730582514A96E00274FBA /* iOS 从源码解析Runtime (四)：由 sidetable_retain 函数引发的解读 RefcountMap(DenseMapBase篇).md */,
 				D24C822225120D1400E3BF5E /* iOS 从源码解析Runtime (五)：聚焦 isa、objc_object(retain、release、retaincount相关内容篇).md */,
-				D237305A251C888D00274FBA /* iOS 从源码解析Runtime (六)：由 rootAutorelease 函数引发的解读 Autorelease.md */,
+				D237305A251C888D00274FBA /* iOS 从源码解析Runtime (六)：由 rootAutorelease 函数引发的解读 AutoreleasePool.md */,
 				D2373059251C880C00274FBA /* iOS 从源码解析Runtime (七)：聚焦 isa、objc_object(dealloc、autorelease等相关内容篇).md */,
 				D2E0676B2509A649008BF0E9 /* iOS 引用计数机制的工作原理.md */,
 			);
