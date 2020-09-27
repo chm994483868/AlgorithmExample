@@ -1,14 +1,14 @@
 # iOS 从源码解析Runtime (六)：由 rootAutorelease 函数引发的解读 Autorelease
 
-> 上一篇文章分析了 `objc_object` 的 `retain` 和 `releasae` 等函数相关的内容，当看到 `rootAutorelease` 函数里面的 `AutoreleasePoolPage` 的时候，觉的是时候深入学习自动释放池了，那么就由本篇开始吧。
+> 上一篇文章分析了 `objc_object` 的 `retain` 和 `releasae` 等函数相关的内容，当看到 `rootAutorelease` 函数里面的 `AutoreleasePoolPage` 的时候，觉的是时候再深入学习自动释放池了，那么就由本篇开始吧。
 
 ## `AutoreleasePoolPageData`
-&emsp;老样子我们还是首先分析其所使用的数据结构，发现这是一个很好的切入角度。每次要详细进入一个知识点时可采取如下步骤：
+&emsp;老样子我们还是首先分析其所使用的数据结构（相关的类或者结构体实现），发现这是一个很好的切入角度。每次要深入学习一个知识点时都可采取如下步骤：
 1. 第一步首先找相关内容的文章，对大概的知识脉络有一个认知，尽管一些地方看不懂也没事，尽管看的模模糊糊也没事。
-2. 第二步直接进入源码，源码部分一般都是简单的 `C++` 代码，然后 `Apple` 的封装也做的特别好，每个函数每个功能都特别清晰明了，看源码是最轻松也是最明了的，这时第一步看的相关原理就会在脑子里慢慢浮现慢慢被串联起来了。
+2. 第二步直接进入源码，源码部分一般都是简单的 `C++` 代码，然后 `Apple` 的封装也做的特别好，每个函数每个功能都特别清晰明了，看源码是最轻松也是最明了的，这时第一步看的相关原理就会在脑子里慢慢浮现慢慢被串联起来。
 3. 第三步源码看完了熟络了，然后再回到第一步，然后结合着源码可看一些更高深的文章，最终可做到融会贯通。⛽️⛽️
 
-&emsp;从 `rootAutorelease` 函数开始，按住 `command` 我们一层一层进入到 `Private Headers/NSObject-internal.h` 文件，它里面定义了三个结构体 `magic_t`、`AutoreleasePoolPageData`、`thread_data_t` 以及 `AutoreleasePoolPage` 的前向声明，正式它们构成了自动释放池的完整结构。
+&emsp;从 `rootAutorelease` 函数开始，按住 `command` 我们一层一层进入到 `Private Headers/NSObject-internal.h` 文件，它里面定义了三个结构体 `magic_t`、`AutoreleasePoolPageData`、`thread_data_t` 以及 `AutoreleasePoolPage` 的前向声明（在 `AutoreleasePoolPageData` 定义中有使用 `AutoreleasePoolPageData` 的成员变量），正是它们构成了自动释放池的完整结构。
 
 首先我们先看下 `NSObject-internal.h` 文件开头的注释和几个宏定义。
 >    Autorelease pool implementation
@@ -21,18 +21,22 @@
   and deleted as necessary.
   Thread-local storage points to the hot page, where newly autoreleased objects are stored.
 
-+ 一个线程的自动释放池就是一个存放指针的栈。
-+ 每个指针要么是要释放的对象，要么是 `POOL_BOUNDARY` 自动释放池边界。
-+ `pool token` 是指向该池的 `POOL_BOUNDARY` 的指针。
++ 一个线程的自动释放池就是一个存放指针的栈（这里指 `AutoreleasePoolPage`，自动释放池整体结构则是由 `AutoreleasePoolPage` 组成的双向链表）。
++ 栈里面的每个指针要么是等待 `autorelease` 的对象，要么是 `POOL_BOUNDARY` 自动释放池边界（实际为 `#define POOL_BOUNDARY nil`，同时也是 `next` 的指向）。
+
++ 一个 `pool token` 是指向 `POOL_BOUNDARY` 的指针。`When 
+the pool is popped, every object hotter than the sentinel is released.`
 + 当自动释放池执行 `popped`，`every object hotter than the sentinel is released.`。（这句没有看懂）
-+ 这些栈分离在 `AutoreleasePoolPage` 构成的双向链表中。`AutoreleasePoolPage` 已添加或者根据需要删除。
-+ `Thread-local storage points to the hot page, where newly autoreleased objects are stored.`
+
++ 这些栈分散位于由 `AutoreleasePoolPage` 构成的双向链表中。`AutoreleasePoolPage` 会根据需要进行添加和删除。
++ `hotPage` 保存在当前线程中，当有新的 `autorelease` 对象添加进自动释放池时会被添加到 `hotPage`。
 
 `#define AUTORELEASEPOOL_VERSION 1` 自动释放池的版本号，仅当 `ABI` 的兼容性被打破时才会改变。
-`#define PROTECT_AUTORELEASEPOOL 0` 将此设置为 1 即可 `mprotect()` 自动释放池的内容。（即设置自动释放池的内存的保护属性，限制该内存区域只可读或者可读可写）
-`#define CHECK_AUTORELEASEPOOL (DEBUG)` 将此设置为 1 可以在所有时间验证整个自动释放池的 `header`。（例如，在任何地方使用 `check()` 代替 `fastcheck()`）
+`#define PROTECT_AUTORELEASEPOOL 0` 将此设置为 1 即可进行 `mprotect()` 自动释放池的内容。（`mprotect()` 可设置自动释放池的内存区域的保护属性，限制该内存区域只可读或者可读可写）
+`#define CHECK_AUTORELEASEPOOL (DEBUG)` 将此设置为 1 要在所有时刻都完整验证自动释放池的 `header`。（也就是 `magic_t` 的 `check()` 和 `fastcheck()`，完整验证数组的 4 个元素全部相等，还是只要验证第一个元素相等，当设置为 1 在任何地方使用 `check()` 代替 `fastcheck()`，可看出在 `Debug` 状态下是进行的完整验证，其它情况都是快速验证）
 
 以及开头的一段警告：`WARNING  DANGER  HAZARD  BEWARE  EEK` 告诉我们此文件的任何内容都是 `Apple` 内部使用的，它们可能在任何的版本更新中以不可预测的方式修改文件里面的内容。
+`NSObject-internal.h`: 供其他系统框架使用的专用 `SPI`。
 
 ### `magic_t`
 &emsp;`M0` 和 `M1` 的硬编码...，
@@ -77,7 +81,7 @@ struct magic_t {
         
         // 把 m 转化为一个 uint64_t 的数组， uint64_t 类型占 8 个字节
         volatile uint64_t *p = (volatile uint64_t *)m;
-        // 置 0
+        // 16 个字节置 0
         p[0] = 0; p[1] = 0;
     }
 
@@ -104,33 +108,41 @@ struct magic_t {
 ### `struct AutoreleasePoolPageData`
 ```c++
 // 前向声明，AutoreleasePoolPage 是私有继承自 AutoreleasePoolPageData 的类
+// 在 AutoreleasePoolPageData 中要声明 AutoreleasePoolPage 类型的成员变量
+// 即双向链表中使用的两个指针 parent 和 child
 class AutoreleasePoolPage;
-
 struct AutoreleasePoolPageData
 {
-    // struct magic_t
+    // struct magic_t 作为 AutoreleasePoolPage 的 header 来验证 AutoreleasePoolPage
+    // 0xA1A1A1A1AUTORELEASE!
     magic_t const magic;
     
-    // __unsafe_unretained 修饰的 next，还是第一次见使用修饰符
+    // __unsafe_unretained 修饰的 next，看源码还是第一次见使用修饰符
     // next 指针作为游标指向栈顶最新 add 进来的 autorelease 对象的下一个位置
     __unsafe_unretained id *next;
     
     // typedef __darwin_pthread_t pthread_t;
     // typedef struct _opaque_pthread_t *__darwin_pthread_t;
     // 原始是 struct _opaque_pthread_t 指针
-    // AutoreleasePool 是按线程一一对应的，thread 正是自动释放池所处的当前线程
+    // AutoreleasePool 是按线程一一对应的，thread 是自动释放池所处的线程
     pthread_t const thread;
     
     // AutoreleasePool 没有单独的结构，而是由若干个 AutoreleasePoolPage 以双向链表的形式组合而成
-    // parent 和 child 这两个 AutoreleasePoolPage指针这是构成链表用的值指针
+    // parent 和 child 这两个 AutoreleasePoolPage 指针正是构成链表用的值指针
     AutoreleasePoolPage * const parent;
     AutoreleasePoolPage *child;
     
-    // 这两个属性还不知道是干嘛用的
+    // 标记每个指针的深度，例如第一个 page 的 depth 是 0，后续新增的 page 的 depth 依次递增
     uint32_t const depth;
+    // high-water
     uint32_t hiwat;
 
-    // 构造函数（初始化列表默认对所有成员变量都执行了默认初始化）
+    // 构造函数
+    // 初始化列表中 parent 根据 _parent 初始化，child 初始化为 nil
+    // 这里可以看出，第一个 page 的 parent 和 child 都是 nil
+    // 然后第二个 page 初始化时第一个 page 作为它的 parent 传入
+    // 然后第一个 page 的 child 指向 第二个 page，parent 指向 nil
+    // 第二个 page 的 parent 指向第一个 page，child 此时指向 nil
     AutoreleasePoolPageData(__unsafe_unretained id* _next,
                             pthread_t _thread,
                             AutoreleasePoolPage* _parent,
@@ -162,7 +174,7 @@ struct thread_data_t
 };
 
 // 一个断言，如果 thread_data_t 的 size 不是 16 的话就会执行该断言
-// 可以看到在 __LP64__ 下，同时在内存对齐原则下 thread_data_t size 也是 16
+// 可以看到在 __LP64__ 平台同时遵循内存对齐原则下 thread_data_t size 也正是 8 + 4 + 4 = 16
 C_ASSERT(sizeof(thread_data_t) == 16);
 ```
 
@@ -199,13 +211,13 @@ C_ASSERT(sizeof(thread_data_t) == 16);
 #define __attribute_used__ __attribute__((__used__))
 ```
 #### `__attribute__((visibility("hidden")))`
-> 在 `Linux` 下动态库`(.so)`中，通过`GCC`的`C++ visibility`属性可以控制共享文件导出符号。在`GCC 4.0`及以上版本中，有个`visibility`属性，可见属性可以应用到函数、变量、模板以及C++类。
+> 在 `Linux` 下动态库`(.so)`中，通过`GCC`的`C++ visibility`属性可以控制共享文件导出符号。在`GCC 4.0`及以上版本中，有个 `visibility` 属性，可以应用到函数、变量、模板以及C++类。
   限制符号可见性的原因：从动态库中尽可能少地输出符号是一个好的实践经验。输出一个受限制的符号会提高程序的模块性，并隐藏实现的细节。动态库装载和识别的符号越少，程序启动和运行的速度就越快。导出所有符号会减慢程序速度，并耗用大量内存。
   `default`：用它定义的符号将被导出，动态库中的函数默认是可见的。
   `hidden`：用它定义的符号将不被导出，并且不能从其它对象进行使用，动态库中的函数是被隐藏的。
   `default`意味着该方法对其它模块是可见的。而`hidden`表示该方法符号不会被放到动态符号表里，所以其它模块(可执行文件或者动态库)不可以通过符号表访问该方法。
-  要定义`GNU`属性，需要包含`__attribute__`和用括号括住的内容。可以将符号的可见性指定为`visibility(“hidden”)`，这将不允许它们在库中被导出，但是可以在源文件之间共享。实际上，隐藏的符号将不会出现在动态符号表中，但是还被留在符号表中用于静态链接。
-  导出列表由编译器在创建共享库的时候自动生成，也可以由开发人员手工编写。导出列表的原理是显式地告诉编译器可以通过外部文件从对象文件导出的符号是哪些。GNU用户将此类外部文件称作为”导出映射”。[Linux下__attribute__((visibility ("default")))的使用](https://blog.csdn.net/fengbingchun/article/details/78898623)
+  要定义 `GNU` 属性，需要包含 `__attribute__` 和用括号括住的内容。可以将符号的可见性指定为 `visibility(“hidden”)`，这将不允许它们在库中被导出，但是可以在源文件之间共享。实际上，隐藏的符号将不会出现在动态符号表中，但是还被留在符号表中用于静态链接。
+  导出列表由编译器在创建共享库的时候自动生成，也可以由开发人员手工编写。导出列表的原理是显式地告诉编译器可以通过外部文件从对象文件导出的符号是哪些。`GNU` 用户将此类外部文件称作为 `导出映射`。[Linux下__attribute__((visibility ("default")))的使用](https://blog.csdn.net/fengbingchun/article/details/78898623)
 
 在 `TARGET_OS_WIN32` 环境下定义如下: 
 ```c++
@@ -217,14 +229,12 @@ C_ASSERT(sizeof(thread_data_t) == 16);
 #   define BREAKPOINT_FUNCTION(prototype) \
     __declspec(noinline) prototype { __asm { } }
 ```
-
-未找到下面两个函数的实现:
+用 `BREAKPOINT_FUNCTION` 修饰如下两个函数：
 ```c++
 BREAKPOINT_FUNCTION(void objc_autoreleaseNoPool(id obj));
-// token 莫不是开始的注释: a pool token 是指向该池的 POOL_BOUNDARY 的指针。
 BREAKPOINT_FUNCTION(void objc_autoreleasePoolInvalid(const void *token));
 ```
-&emsp;`AutoreleasePoolPage` 是一个私有继承自 `AutoreleasePoolPageData` 的类。并且 `thread_data_t` 是它 友元结构体。
+&emsp;`AutoreleasePoolPage` 是一个私有继承自 `AutoreleasePoolPageData` 的类。 `thread_data_t` 是 `AutoreleasePoolPage` 的友元结构体，可直接访问 `AutoreleasePoolPage` 的私有成员变量。
 ```c++
 class AutoreleasePoolPage : private AutoreleasePoolPageData
 {
@@ -233,7 +243,7 @@ class AutoreleasePoolPage : private AutoreleasePoolPageData
 };
 ```
 ### `SIZE`
-&emsp;表示 `AutoreleasePoolPage` 的容量。已知在 `Private Headers/NSObject-internal.h` 中 `PROTECT_AUTORELEASEPOOL` 值为 `0`。
+&emsp;表示 `AutoreleasePoolPage` 的容量。已知在 `Private Headers/NSObject-internal.h` 中 `PROTECT_AUTORELEASEPOOL` 值为 `0`，那么 `SIZE` 的值是 `PAGE_MIN_SIZE`。（在 `vm_param.h` 中 `PAGE_MAX_SIZE` 和 `PAGE_MIN_SIZE` 都是 `4096`...）
 ```c++
     static size_t const SIZE =
 #if PROTECT_AUTORELEASEPOOL
@@ -247,25 +257,30 @@ class AutoreleasePoolPage : private AutoreleasePoolPageData
 #define I386_PGBYTES            4096            /* bytes per 80386 page */
 ```
 可看到 `SIZE` 的值是 `4096`。
+
 ```c++
 private:
     // typedef __darwin_pthread_key_t pthread_key_t;
     // typedef unsigned long __darwin_pthread_key_t;
     // 所以 pthread_key_t 实际是一个 unsigned long 类型
     
-    // #define AUTORELEASE_POOL_KEY    ((tls_key_t)__PTK_FRAMEWORK_OBJC_KEY3)
+    // #define AUTORELEASE_POOL_KEY ((tls_key_t)__PTK_FRAMEWORK_OBJC_KEY3)
     // typedef pthread_key_t tls_key_t;
     // #define __PTK_FRAMEWORK_OBJC_KEY3    43
+    
     // AUTORELEASE_POOL_KEY 
-    // tls 全拼是 Thread Local Storage 表示在当前线程存储一些数据用，
+    // tls 全拼是 Thread Local Storage 表示在当前线程存储一些数据用，（已知线程都有自己的存储空间）
     // 而这些数据的存储与读取是通过这些固定的 Key 来做的。
     
+    // 通过此 key 从当前线程的存储中取出 hotPage
     static pthread_key_t const key = AUTORELEASE_POOL_KEY;
     
-    // SCRIBBLE 
+    // SCRIBBLE
+    // 在 releaseUntil 函数中，page 中的 objc_object ** 指向的对象执行 objc_release，然后它们留空的位置会放 SCRIBBLE 
+    // 也就是说通过 objc_objcect ** 把指向的对象执行 release 后，把之前存放 objc_object ** 的位置放 SCRIBBLE 
     static uint8_t const SCRIBBLE = 0xA3;  // 0xA3A3A3A3 after releasing
     
-    // 可保存的 id 的数量 4096 / 8 = 512
+    // 可保存的 id 的数量 4096 / 8 = 512 (实际可用容量是 4096 减去成员变量占用的 56 字节 )
     static size_t const COUNT = SIZE / sizeof(id);
 
     // EMPTY_POOL_PLACEHOLDER is stored in TLS when exactly one pool is pushed and it has never contained any objects. 
@@ -274,9 +289,10 @@ private:
     // This saves memory when the top level (i.e. libdispatch) pushes and pops pools but never uses them.
     // 当 top level(例如 libdispatch) pushes 和 pools 却从不使用它们的时候可以节省内存。
     
-    // objc_object **
+    // 把 1 转为 objc_object **
 #   define EMPTY_POOL_PLACEHOLDER ((id*)1)
-    // pool 的边界是 nil
+
+    // pool 的边界是指一个 nil
 #   define POOL_BOUNDARY nil
 
 // SIZE-sizeof(*this) bytes of contents follow
@@ -332,37 +348,38 @@ int mprotect(const void *start, size_t len, int prot);
 ### `AutoreleasePoolPage(AutoreleasePoolPage *newParent)/~AutoreleasePoolPage() `
 &emsp;`AutoreleasePoolPage` 的构造函数，看到这里用了一个 `AutoreleasePoolPage *newParent` 作为参数，我们已知自动释放池的完整结构 是一个由 `AutoreleasePoolPage` 构成的双向链表，它的成员变量 `AutoreleasePoolPage * const parent` 和 `AutoreleasePoolPage *child` 作为前后两个链接节点的链接指针，那么 `parent` 和 `child` 谁在前谁在后呢？
 
-根据 `AutoreleasePoolPageData` 的构造函数可知，第一个节点的 `parent`  和 `child` 都是 `nil`，当第一个 `AutoreleasePoolPage` 满了，会再创建一个 `AutoreleasePoolPage`，此时会拿第一个节点作为 `newParent` 参数来构建这第二个节点。即第一个节点的 `child` 指向第二个节点，第二个节点的 `parent` 指向第一个节点。
+根据 `AutoreleasePoolPageData` 的构造函数可知，第一个节点的 `parent`  和 `child` 都是 `nil`，当第一个 `AutoreleasePoolPage` 满了，会再创建一个 `AutoreleasePoolPage`，此时会拿第一个节点作为 `newParent` 参数来构建这第二个节点，即第一个节点的 `child` 指向第二个节点，第二个节点的 `parent` 指向第一个节点。
 
 ```c++
 AutoreleasePoolPage(AutoreleasePoolPage *newParent) :
     AutoreleasePoolPageData(begin(),
-                            // 当前所处的线程
+                            // 当前所处的线程，这获取线程的函数好复杂，下面会进行具体分析
                             objc_thread_self(),
-                            // parent
+                            // parent 
                             newParent,
-                            // 大概是序号，第一个节点的 depth 是 0，第二个节点是 1，第三个节点是 2....
+                            // 可以理解为 page 的序号，第一个节点的 depth 是 0，第二个节点是 1，第三个节点是 2，依次累加
                             newParent ? 1+newParent->depth : 0,
-                            // 这个值目前还不清楚...
+                            // high-water
                             newParent ? newParent->hiwat : 0)
 { 
     if (parent) {
-        // 检查 parent 节点是否合规
+        // 检查 parent 节点是否合规，检查 magic 和 thread
         parent->check();
-        // parent 节点的 child 必须为 nil，因为当前构建的节点要作为 parent 的 child
+        
+        // parent 节点的 child 必须为 nil，因为当前新建的 page 要作为 parent 的 child
         ASSERT(!parent->child);
         
-        // 当前什么也不做
+        // 可读可写
         parent->unprotect();
         
-        // 把当前节点作为 parent 的 child 节点
+        // 把当前节点作为入参 newParent 的 child 节点
         parent->child = this;
         
-        // 但前什么也不做
+        // 只可读
         parent->protect();
     }
     
-    // 当前什么也不做
+    // 只可读
     protect();
 }
 
@@ -372,16 +389,16 @@ AutoreleasePoolPage(AutoreleasePoolPage *newParent) :
     // 检查
     check();
     
-    // 当前什么也不做
+    // 可读可写
     unprotect();
     
-    // 必须为空
+    // page 里面没有 autorelease 对象否则执行断言
     ASSERT(empty());
 
     // Not recursive: we don't want to blow out the stack 
     // if a thread accumulates a stupendous amount of garbage
     
-    // child 不存在
+    // child 指向 nil 否则执行断言
     ASSERT(!child);
 }
 ```
@@ -415,7 +432,7 @@ void busted_die() const {
 }
 ```
 ### `check/fastcheck`
-&emsp;检查 `magic`是否等于默认值和当前所处的线程，然后 `log` 传递 `_objc_inform` 或 `_objc_fatal` 调用 `busted` 函数。 
+&emsp;检查 `magic`是否等于默认值和检查当前所处的线程，然后 `log` 传递 `_objc_inform` 或 `_objc_fatal` 调用 `busted` 函数。 
 ```c++
     inline void
     check(bool die = true) const
@@ -436,6 +453,7 @@ void busted_die() const {
 #if CHECK_AUTORELEASEPOOL
         check();
 #else
+        // 如果 magic.fastcheck() 失败则执行 busted_die
         if (! magic.fastcheck()) {
             busted_die();
         }
@@ -445,9 +463,9 @@ void busted_die() const {
 ### `begin/end/empty/full/lessThanHalfFull`
 
 #### `begin`
-&emsp;`begin` 函数超关键的，而且中间藏了一个很重要的点。首先要清楚一点 `begin` 是 `AutoreleasePoolPage` 中存放的 **自动释放对象** 的起点。回顾上面的的 `new` 函数的实现我们已知系统总共给 `AutoreleasePoolPage` 分配了 `4096` 个字节的空间，这么大的空间除了前面一部分空间用来保存 `AutoreleasePoolPage` 的成员变量外，剩余的空间都是用来存放放进自动释放池的对象的。
+&emsp;`begin` 函数超关键的，首先要清楚一点 `begin` 是 `AutoreleasePoolPage` 中存放的 **自动释放对象** 的起点。回顾上面的的 `new` 函数的实现我们已知系统总共给 `AutoreleasePoolPage` 分配了 `4096` 个字节的空间，这么大的空间除了前面一部分空间用来保存 `AutoreleasePoolPage` 的成员变量外，剩余的空间都是用来存放自动释放对象的。
 
-`AutoreleasePoolPage` 的成员变量都是继承自 `AutoreleasePoolPageDate`，它们总共需要 `56` 个字节的空间，然后剩余 `4040` 字节空间，一个对象指针占 `8` 个字节，那么一页 `AutoreleasePoolPage` 能存放 `505` 个需要自动释放的对象。（可在 `main.m` 中引入 `#include "NSObject-internal.h"` 打印 `sizeof(AutoreleasePoolPageData)` 的值确实是 `56`）
+`AutoreleasePoolPage` 的成员变量都是继承自 `AutoreleasePoolPageDate`，它们总共需要 `56` 个字节的空间，然后剩余 `4040` 字节空间，一个对象指针占 `8` 个字节，那么一个 `AutoreleasePoolPage` 能存放 `505` 个需要自动释放的对象。（可在 `main.m` 中引入 `#include "NSObject-internal.h"` 打印 `sizeof(AutoreleasePoolPageData)` 的值确实是 `56`）
 
 ```c++
 id * begin() {
@@ -456,6 +474,7 @@ id * begin() {
     // 然后保证 (uint8_t *)this 加 56 时是按 56 个字节前进的
     
     // sizeof(*this) 是 AutoreleasePoolPage 所有成员变量的宽度是 56 个字节
+    // 返回从 page 的起始地址开始前进 8 个字节后的内存地址
     return (id *) ((uint8_t *)this+sizeof(*this));
 }
 ```
@@ -468,7 +487,7 @@ id * end() {
 }
 ```
 #### `empty`
-&emsp;`next` 指针指向的是当前自动释放池内最后面一个自动释放对象的后面，如果此时它指向 `begin` 的位置，表示目前自动释放池内没有存放自动释放对象。
+&emsp;`next` 指针通常指向的是当前自动释放池内最后面一个自动释放对象的后面，如果此时 `next` 指向 `begin` 的位置，表示目前自动释放池内没有存放自动释放对象。
 ```c++
 bool empty() {
     return next == begin();
@@ -496,19 +515,19 @@ id *add(id obj)
     // 如果自动释放池已经满了，则执行断言
     ASSERT(!full());
     
-    // 当前什么也不做
+    // 可读可写
     unprotect();
     
-    // 记录当前 next 的指向
+    // 记录当前 next 的指向，作为函数的返回值。比 `return next-1` 快，没看懂 aliasing 是什么意思
     id *ret = next;  // faster than `return next-1` because of aliasing
     
-    // next 是一个 objc_object **，先使用解引用操作符 * 取出 objc_object * 然后 obj 会赋值给它，然后 next 会做一次自增操作，指向下一个位置
+    // next 是一个 objc_object **，先使用解引用操作符 * 取出 objc_object * ，然后把 obj 赋值给它，然后 next 会做一次自增操作前进 8 个字节，指向下一个位置
     *next++ = obj;
     
-    // 当前什么也不做
+    // 只可读
     protect(); 
     
-    // ret 目前正是存放 obj 的位置
+    // ret 目前正是指向 obj 的位置。（obj 是 objc_object 指针，不是 objc_object）
     return ret;
 }
 ```
@@ -517,7 +536,8 @@ id *add(id obj)
 void releaseAll() 
 {
     // 调用 releaseUntil 并传入 begin
-    // 从 next 开始，一直往后移动，直到 begin，把 begin 到 next 的所有自动释放对象执行 objc_release 操作
+    // 从 next 开始，一直往后移动，直到 begin，
+    // 把 begin 到 next 之间的所有自动释放对象执行一次 objc_release 操作
     releaseUntil(begin());
 }
 ```
@@ -528,7 +548,7 @@ void releaseAll()
         // Not recursive: we don't want to blow out the stack 
         // if a thread accumulates a stupendous amount of garbage
         
-        // 循环结束的条件就是从 next 开始，一直后退，直到 next 到达 stop
+        // 循环从 next 开始，一直后退，直到 next 到达 stop
         while (this->next != stop) {
             // Restart from hotPage() every time, in case -release 
             // autoreleased more objects
@@ -537,20 +557,21 @@ void releaseAll()
             AutoreleasePoolPage *page = hotPage();
 
             // fixme I think this `while` can be `if`, but I can't prove it
-            // fixme 我认为“ while”可以是“ if”，但我无法证明
-            // 我觉得也是可以用 if 代替 while，
-            // 一个 page 满了生成链接下一个 page，所以从第一个 page 开始到 hotPage 的前一个page，应该都是满的
+            // fixme 我认为 “while” 可以是 “if”，但我无法证明
+            // 我觉得也是可以用 if 代替 while
+            // 一个 page 满了会生成一个新的 page 并链接为下一个 page，
+            // 所以从第一个 page 开始到 hotPage 的前一个page，应该都是满的
             
             // 如果当前 page 已经空了，则往后退一步，把前一个 AutoreleasePoolPage 作为 hotPage
             while (page->empty()) {
                 // 当前 page 已经空了，还没到 stop，
-                // 往后走，开始进入前一个 page
+                // 往后走 
                 page = page->parent;
-                // 把前一个 page 作为 hotPage
+                // 把 page 作为 hotPage
                 setHotPage(page);
             }
             
-            // 当前什么都不做
+            // 可读可写
             page->unprotect();
             
             // next 后移一步，并用解引用符取出 objc_object * 赋值给 obj
@@ -559,7 +580,7 @@ void releaseAll()
             // 把 page->next 开始的 sizeof(*page->next) 个字节置为 SCRIBBLE
             memset((void*)page->next, SCRIBBLE, sizeof(*page->next));
             
-            // 当前什么都不做
+            // 只可读
             page->protect();
             
             // 如果 obj 不为 nil，则执行 objc_release 操作
@@ -568,7 +589,8 @@ void releaseAll()
             }
         }
 
-        // 把当前 this 作为 hotPage
+        // 这里还是把 this 作为 hotPage，
+        // 可能从 stop 所在的 page 开始到 hotPage 这些 page 本来存放自动释放对象的位置都放的是 SCRIBBLE
         setHotPage(this);
 
 #if DEBUG
@@ -580,8 +602,12 @@ void releaseAll()
 #endif
     }
 ```
-&emsp;从最前面的 `page` 开始一直向后移动直到到达 `stop` 所在的 `page`，并把经过的 `page` 里保存的对象都执行一次 `objc_release` 操作，经过的 `page` 都被清空了，每个 `page` 的 `next` 都指向了该 `page` 的 `begin`。整体操作清晰明了，一直遍历向后。
+&emsp;从最前面的 `page` 开始一直向后移动直到到达 `stop` 所在的 `page`，并把经过的 `page` 里保存的对象都执行一次 `objc_release` 操作，把之前每个存放 `objc_object **` 的空间都置为 `SCRIBBLE`，每个 `page` 的 `next` 都指向了该 `page` 的 `begin`。
+
+**这里有一个疑问, this  和 hotPage 可能是同一个 page 吗？**
+
 ### `kill`
+&emsp;`release` 做的事情是遍历释放保存的自动释放对象，而 `kill` 做的事情是遍历对 `AutoreleasePoolPage` 执行 `delete` 操作。
 ```c++
 void kill() 
 {
@@ -589,13 +615,13 @@ void kill()
     // if a thread accumulates a stupendous amount of garbage
     
     AutoreleasePoolPage *page = this;
-    
-    // 从当前 page 开始一直沿着 child 链往前走，直到最后一个 page
+    // 从当前 page 开始一直沿着 child 链往前走，直到 AutoreleasePool 的双向链表的最后一个 page
     while (page->child) page = page->child;
 
-    // 临时变量
+    // 临时变量（死亡指针）
     AutoreleasePoolPage *deathptr;
-    // 是 do while 循环，所以会至少进行一次 delete，即当前 page 也会被执行 delete
+    
+    // 是 do while 循环，所以会至少进行一次 delete，即当前 page 也会被执行 delete（不同与上面的 release 操作，入参 stop 并不会执行 objc_release 操作）
     do {
         // 要执行 delete 的 page
         deathptr = page;
@@ -604,13 +630,18 @@ void kill()
         page = page->parent;
         
         // 如果当前 page 的 parent 存在的话，要把这个 parent 的 child 置为 nil
+        // 这个是链表算法题的经典操作
         if (page) {
-            // 当前什么也不做
+            // 可读可写
             page->unprotect();
+            
             // child 置为 nil
             page->child = nil;
+            
+            // 可写
             page->protect();
         }
+        
         // delete page
         delete deathptr;
     } while (deathptr != this);
@@ -618,24 +649,27 @@ void kill()
 ```
 &emsp;从当前的 `page` 开始，一直根据 `child` 链向前走直到 `child` 为空，把经过的 `page` 全部执行 `delete` 操作（包括当前 `page`）。
 ### `tls_dealloc`
-
-// 🔫🔫 等下再回来重看
-// Thread Local Storage
-
+&emsp;`Thread Local Stroge` `dealloc` 的时候，要把自动释放池内的所有自动释放对象执行 `release` 操作，然后所有的 `page` 执行 `kill`。 
 ```c++
 static void tls_dealloc(void *p) 
 {
     // # define EMPTY_POOL_PLACEHOLDER ((id*)1)
+    // 如果 p 是空占位池则 return
     if (p == (void*)EMPTY_POOL_PLACEHOLDER) {
         // No objects or pool pages to clean up here.
+        // 这里没有 objects 或者 pages 需要清理
         return;
     }
 
     // reinstate TLS value while we work
+    // 这里直接把 p 保存在 TLS 中作为 hotPage
     setHotPage((AutoreleasePoolPage *)p);
 
     if (AutoreleasePoolPage *page = coldPage()) {
+        // 如果 coldPage 存在（双向链表中的第一个 page）
+        // 
         if (!page->empty()) objc_autoreleasePoolPop(page->begin());  // pop all of the pools
+        
         if (slowpath(DebugMissingPools || DebugPoolAllocation)) {
             // pop() killed the pages already
         } else {
