@@ -262,7 +262,7 @@
 		D2330A2424AF0FD500C6480D /* Algorithm_C */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = Algorithm_C; sourceTree = BUILT_PRODUCTS_DIR; };
 		D2330A2724AF0FD500C6480D /* main.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
 		D23730582514A96E00274FBA /* iOS 从源码解析Runtime (四)：由 sidetable_retain 函数引发的解读 RefcountMap(DenseMapBase篇).md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 从源码解析Runtime (四)：由 sidetable_retain 函数引发的解读 RefcountMap(DenseMapBase篇).md"; sourceTree = "<group>"; };
-		D2373059251C880C00274FBA /* iOS 从源码解析Runtime (七)：聚焦 isa、objc_object(dealloc、autorelease等相关内容篇).md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 从源码解析Runtime (七)：聚焦 isa、objc_object(dealloc、autorelease等相关内容篇).md"; sourceTree = "<group>"; };
+		D2373059251C880C00274FBA /* iOS 从源码解析Runtime (七)：聚焦 isa、objc_object(dealloc、autorelease返回值优化篇).md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 从源码解析Runtime (七)：聚焦 isa、objc_object(dealloc、autorelease返回值优化篇).md"; sourceTree = "<group>"; };
 		D237305A251C888D00274FBA /* iOS 从源码解析Runtime (六)：由 rootAutorelease 函数引发的解读 AutoreleasePool.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 从源码解析Runtime (六)：由 rootAutorelease 函数引发的解读 AutoreleasePool.md"; sourceTree = "<group>"; };
 		D237C63D24D24648001E0B21 /* StackWithMin.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = StackWithMin.cpp; sourceTree = "<group>"; };
 		D237C63E24D24648001E0B21 /* StackWithMin.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = StackWithMin.hpp; sourceTree = "<group>"; };
@@ -885,7 +885,7 @@
 				D23730582514A96E00274FBA /* iOS 从源码解析Runtime (四)：由 sidetable_retain 函数引发的解读 RefcountMap(DenseMapBase篇).md */,
 				D24C822225120D1400E3BF5E /* iOS 从源码解析Runtime (五)：聚焦 isa、objc_object(retain、release、retaincount相关内容篇).md */,
 				D237305A251C888D00274FBA /* iOS 从源码解析Runtime (六)：由 rootAutorelease 函数引发的解读 AutoreleasePool.md */,
-				D2373059251C880C00274FBA /* iOS 从源码解析Runtime (七)：聚焦 isa、objc_object(dealloc、autorelease等相关内容篇).md */,
+				D2373059251C880C00274FBA /* iOS 从源码解析Runtime (七)：聚焦 isa、objc_object(dealloc、autorelease返回值优化篇).md */,
 			);
 			path = "已发布";
 			sourceTree = "<group>";
