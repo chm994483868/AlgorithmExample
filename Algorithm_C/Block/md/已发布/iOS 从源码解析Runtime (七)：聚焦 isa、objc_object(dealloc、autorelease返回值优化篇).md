@@ -582,4 +582,5 @@ prepareOptimizedReturn(ReturnDisposition disposition)
 **参考链接:🔗**
 + [__builtin_return_address(LEVEL)](https://blog.csdn.net/dayancn/article/details/18899157)
 + [返回值的 Autorelease 和 编译器优化](https://www.jianshu.com/p/aae7c3bd2191)
++ [objc_autoreleaseReturnValue和objc_retainAutoreleasedReturnValue函数对ARC的优化](https://www.jianshu.com/p/2f05060fa377?spm=a2c4e.11153940.blogcont690541.7.575f3c89jeD8IS)
 + [操作系统内存管理(思维导图详解)](https://blog.csdn.net/hguisu/article/details/5713164)
