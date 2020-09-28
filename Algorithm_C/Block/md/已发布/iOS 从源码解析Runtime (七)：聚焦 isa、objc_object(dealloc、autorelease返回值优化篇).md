@@ -336,59 +336,71 @@ setReturnDisposition(ReturnDisposition disposition)
 }
 ```
 ### `__builtin_return_address`
-1. `gcc` 默认不支持 `__builtin_return_address(LEVEL)` 的参数为非`0`。好像只支持参数为`0`。
-2. `__builtin_return_address(0)` 的含义是，得到当前函数返回地址，即此函数被别的函数调用，然后此函数执行完毕后，返回，所谓返回地址就是那时候的地址。
-3. `__builtin_return_address(1)` 的含义是，得到当前函数的调用者的返回地址。注意是调用者的返回地址，而不是函数起始地址。
+1. 这里函数返回地址不是函数返回值的地址是函数被调用后返回的地址，这里要从汇编的角度来理解。当我们的代码编译为汇编代码后，汇编指令从上到下一行一行来执行。比如我们在函数1 内部调用了函数 2，开始时根据汇编指令一条一条执行函数1 当执行到需要执行 函数 2 时，假如一个 `callq` 指令跳转到了函数 2 去执行，当函数 2 执行完毕返回的地址此时时接着刚刚 `callq` 指令，然后从函数 2 返回的地址接着一条一条指令的执行。（描述的用词可能很不恰当，对汇编实在是知之甚少，大概意思就是函数嵌套调用时，被嵌套调用的函数执行完毕后返回的地址就是接下来的要执行的指令的地址，（或者是一个固定的偏移位置，根据编译器不同情况不同））
+2. `gcc` 默认不支持 `__builtin_return_address(LEVEL)` 的参数为非`0`。好像只支持参数为`0`。
+3. `__builtin_return_address(0)` 的含义是，得到当前函数返回地址，即此函数被别的函数调用，然后此函数执行完毕后，返回，所谓返回地址就是那时候的地址。
+4. `__builtin_return_address(1)` 的含义是，得到当前函数的调用者的返回地址。注意是调用者的返回地址，而不是函数起始地址。
 
 ### `callerAcceptsOptimizedReturn`
 &emsp;这个函数针对不同的平台（`__x86__64__`/`__arm__`/`__arm64__`/`__i386`/`unknown`）有完全不同的实现。
 ```c++
 /*
   Fast handling of return through Cocoa's +0 autoreleasing convention.
-  The caller and callee cooperate to keep the returned object out of the autorelease pool and eliminate redundant retain/release pairs.
+  快速处理函数的返回值，不把函数的返回值放进自动释放池。
+  
+  The caller and callee cooperate to keep the returned object out of
+  the autorelease pool and eliminate redundant retain/release pairs.
   调用方和被调用方合作将返回的对象保留在自动释放池之外，并消除多余的 retain/release 对。
 
   An optimized callee looks at the caller's instructions following the return. 
   一个优化的被调用方在返回后会查看调用方的指示。
   
-  If the caller's instructions are also optimized then the callee skips all retain count operations: no autorelease, no retain/autorelease.
+  If the caller's instructions are also optimized then the callee skips
+  all retain count operations: no autorelease, no retain/autorelease.
   如果调用方的指令也得到了优化，则被调用方将跳过所有保留计数操作：（autorelease retain/release）
   
   Instead it saves the result's current retain count (+0 or +1) in thread-local storage. 
-  而是将结果的当前保留计数（+0 或 +1）保存在线程的存储空间中。（tls）
+  而是将结果的当前保留计数（+0 或 +1 此处是指 ReturnDisposition）保存在线程的存储空间中。（tls）
   
-  If the caller does not look optimized then the callee performs autorelease or retain/autorelease as usual.
-  如果调用方的指令看起来不能达到优化，则被调用方将照常执行 autorelease 或 retain/autorelease。
+  If the caller does not look optimized then the callee
+  performs autorelease or retain/autorelease as usual.
+  如果调用方的指令看起来不能被优化，则被调用方将照常执行 autorelease 或 retain/autorelease。
   
   An optimized caller looks at the thread-local storage. 
   一个优化的调用者会查看线程的本地存储空间。
   
-  If the result is set then it performs any retain or release needed to change the result from the retain count left by the callee to the retain count desired by the caller.
+  If the result is set then it performs any retain or release needed to change 
+  the result from the retain count left by the callee to the retain count desired by the caller.
   如果设置了结果，则它将执行将结果从被调用者留下的保留计数更改为调用者所需的保留计数所需的任何保留或释放操作。
   
-  Otherwise the caller assumes the result is currently at +0 from an unoptimized callee and performs any retain needed for that case.
+  Otherwise the caller assumes the result is currently at +0 from an unoptimized
+  callee and performs any retain needed for that case.
   否则，调用者会假设来自未优化的被调用者的结果当前为 +0，并执行该情况所需的任何 retain 操作。
   
   There are two optimized callees:
-  这是两个优化的被调用者：
+  这是两个优化的被调用者（有返回值的函数）：
   
     objc_autoreleaseReturnValue
-      result is currently +1. The unoptimized path autoreleases it.
+      result is currently +1. The unoptimized path autoreleases it. 
+      // 不能优化时调用：return objc_autorelease(obj);
       // + 1，未优化的执行路径是对它们执行 autorelease.
       
     objc_retainAutoreleaseReturnValue
-      result is currently +0. The unoptimized path retains and autoreleases it.
+      result is currently +0. The unoptimized path retains and autoreleases it. 
+      // 不能优化时调用：return objc_autorelease(objc_retain(obj)); 
       // + 0，未优化的执行路径是对它执行 retains 和 autorelease.
 
   There are two optimized callers:
-  这是两个优化的调用者：
+  这是两个优化的调用者（调用了 有返回值的函数 的函数）：
   
     objc_retainAutoreleasedReturnValue
       caller wants the value at +1. The unoptimized path retains it.
+      // 不能优化时调用：return objc_retain(obj);
       // 调用者希望引用计数 +1。未优化路径对它执行 retain 操作。
       
     objc_unsafeClaimAutoreleasedReturnValue
       caller wants the value at +0 unsafely. The unoptimized path does nothing.
+      // 不能优化时调用：objc_release(obj); return obj;
       // 调用者希望引用计数 +1 （不安全的）。未优化路径什么都不做。
 
   Example:
@@ -406,27 +418,34 @@ setReturnDisposition(ReturnDisposition disposition)
       // use ret at +1 here
 
     Callee sees the optimized caller, sets TLS, and leaves the result at +1.
+    如果是优化的被调用方，会把对象保存在 TLS 中，不用再保存在自动释放池中。
     
     Caller sees the TLS, clears it, and accepts the result at +1 as-is.
+    调用方会从 TLS 中取处出结果使用。
 
   The callee's recognition of the optimized caller is architecture-dependent.
   被调用方对优化的调用方的识别取决于体系结构。
   
+  // 这里涉及到了一些汇编知识，当我们的 OC 源码被转换为汇编代码后，
+  // 他们是连续的且内存地址都是固定，例如调用 objc_autoreleaseReturnValue 指令后，
+  // 后面是跟的 objc_retainAutoreleasedReturnValue 指令还是
+  // objc_unsafeClaimAutoreleasedReturnValue 都是已经固定的，
+  // 我们可以沿着 __builtin_return_address 返回的地址，
+  // 接着往下探测汇编指令到底是哪一条，继而来判断是直接返回 obj 还是把 obj 放进自动释放池。
+  
   x86_64: Callee looks for `mov rax, rdi` followed by a call or 
     jump instruction to objc_retainAutoreleasedReturnValue or 
     objc_unsafeClaimAutoreleasedReturnValue. 
-    
-  i386:  Callee looks for a magic nop `movl %ebp, %ebp` (frame pointer register)
-  
+  i386:  Callee looks for a magic nop `movl %ebp, %ebp` (frame pointer register 帧指针寄存器)
   armv7: Callee looks for a magic nop `mov r7, r7` (frame pointer register). 
-  
   arm64: Callee looks for a magic nop `mov x29, x29` (frame pointer register). 
 
   Tagged pointer objects do participate in the optimized return scheme, 
  // 标记的指针对象确实参与了优化的返回方案
   
-  because it saves message sends. They are not entered in the autorelease pool in the unoptimized case.
-  // 因为它节省了消息发送。在未优化的情况下，它们不会放入到自动释放池中。
+  because it saves message sends. 
+  They are not entered in the autorelease pool in the unoptimized case.
+  // 因为它节省了消息发送。在未优化的情况下，它们也不会放入到自动释放池中。
   
 */
 # if __x86_64__
@@ -465,6 +484,10 @@ callerAcceptsOptimizedReturn(const void * const ra0)
 #endif
     ra1 += 6l + (long)*(const unaligned_int32_t *)(ra1 + 2);
     sym = (const void **)ra1;
+    
+    // 如果接下来不是 objc_retainAutoreleasedReturnValue 指令且不是 objc_unsafeClaimAutoreleasedReturnValue 指令，则表示不能进行优化，
+    // 那么 rootAutorelease 函数就不能执行 return (id)this; 而是要执行 return rootAutorelease2(); 把对象放入自动释放池。
+    // 接下来的几个平台的实在看不懂...😭
     if (*sym != objc_retainAutoreleasedReturnValue  &&  
         *sym != objc_unsafeClaimAutoreleasedReturnValue) 
     {
@@ -558,11 +581,6 @@ prepareOptimizedReturn(ReturnDisposition disposition)
     // 要不然会执行断言
     ASSERT(getReturnDisposition() == ReturnAtPlus0);
 
-    // __builtin_return_address(0) 得到当前函数的返回地址。
-    
-    // callerAcceptsOptimizedReturn 里面很多硬编码
-    // __builtin_return_address(0) 返回值是 this 的地址吗 ？
-    
     if (callerAcceptsOptimizedReturn(__builtin_return_address(0))) {
         
         // 如果 disposition 是 true (ReturnAtPlus1) 则保存在线程的存储空间内
