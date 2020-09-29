@@ -220,7 +220,7 @@ objc_object::clearDeallocating_slow()
     table.unlock();
 }
 ```
-&emsp;至此 `rootDealloc` 函数涉及的全流程就分析完毕了，主要是在对象 `free` 之前做一些清理和收尾工作。
+&emsp;至此 `rootDealloc` 函数涉及的全流程就分析完毕了，主要是在对象 `free` 之前做一些清理和收尾工作。（这里有一个疑问，`ViewController` 的 `strong` 属性的变量是在什么时候释放的？）
 
 ## `sidetable_lock`
 ```c++
@@ -242,9 +242,33 @@ objc_object::sidetable_unlock()
     table.unlock();
 }
 ```
+## `MRC 函数返回值的释放操作`
+&emsp;一些结论：
+
+关于 `Autorelease`:
+1. 在没有手加 `AutoreleasePool` 的情况下，`Autorelease` 对象是在当前的 `runloop` 迭代结束时释放的，而它能够释放的原因是系统在每个 `runloop` 迭代中都加入了自动释放池 `Push` 和 `Pop`。
+2. `AutoreleasePool` 执行 `pop` 时完成的最重要的事情就是对池里的所有对象执行一次 `release` 操作。
+3. `AutoreleasePool` 从不会 `retain` 放进池里的对象，它所做的唯一事情就是延迟释放，直白一点理解的话就是在池 `pop` 时 `release` 放进池里的对象。
+4. 当对象连续调用 `autorelease` 函数时，对象会被放进自动释放池多次（对象放进自动释放池不会做重复检测），当自动释放池 `pop` 时会对对象调用对应次数的 `release` 操作，此时极有可能导致对象过度释放而使程序 `crash`。
+
+关于 `MRC` 下函数返回值放进自动释放池:
+```c++
++ (CusPerson *)returnInstanceValue; {
+    CusPerson *temp = [[[CusPerson alloc] init] autorelease]; // 情况 1
+    CusPerson *temp = [[CusPerson alloc] init]; // 情况 2
+    
+    NSLog(@"%@ %p", NSStringFromSelector(_cmd), temp);
+    return temp;
+}
+```
++ 情况 1 `temp` 调用 `autorelease` 函数被放进自动释放池。当我们在外部调用 `returnInstanceValue` 函数获取一个 `CusPerson` 对象并且不做 `retain` 操作时，我们不需要在调用 `returnInstanceValue` 函数的地方主动去执行一次 `release` 操作，`CusPerson` 对象在 `AutoreleasePool` 执行 `pop` 时会被 `release` 一次后得到正确销毁。
++ 情况 2 `temp` 对象没有放进自动释放池，需要在调用 `returnInstanceValue` 后当不再需要返回的对象时，对象要主动调用一次 `release` 或 `autorelease` 保证对象能正确释放。
++ 如果我们需要一直持有函数返回的对象，那么我们可以主动调用 `retain` 函数或者用一个 `retain/strong` 修饰的属性来接收函数返回值，当我们不使用对象时需要在合适的地方调用 `release` 操作，保证对象能正常销毁防止内存泄漏。
++ 成员变量默认是不持有赋值给它的对象，属性的话根据不同的修饰符来决定是否持有赋值给它的对象。（`strong/retain/weak/unsafe_unretain`）。
+&emsp;`ARC` 下情况则大不相同，下面我们开始分析。
 
 ## `rootAutorelease`
-&emsp;看到 `if (prepareOptimizedReturn(ReturnAtPlus1)) return (id)this;` 原来并不是所有对象都会被放进自动释放池的（Tagged Pointer  除外），。
+&emsp;看到 `if (prepareOptimizedReturn(ReturnAtPlus1)) return (id)this;` 并不是所有对象在调用 `rootAutorelease` 后都会被放进自动释放池的（`Tagged Pointer`  除外）。这里有一步优化操作，主要是针对函数返回值来做的，模拟出和 `MRC` 下函数返回值调用 `autorelease` 同等的效果，但是又不会真正的用到 `AutureleasePool`，这个优化的意思正是优化掉使用自动释放池的开销（优化为把对象保存在 `tls` 中，然后每次使用变量每次从 `tls` 读取）。
 ```c++
 // Base autorelease implementation, ignoring overrides.
 inline id 
@@ -253,11 +277,26 @@ objc_object::rootAutorelease()
     // 如果是 Tagged Pointer 则直接返回 (id)this
     if (isTaggedPointer()) return (id)this;
     
-    // 如果 prepareOptimizedReturn(ReturnAtPlus1) 返回 true，则直接返回 (id)this
+    // 如果 prepareOptimizedReturn(ReturnAtPlus1) 返回 true，则直接返回 (id)this 
+    // (返回值还是入参本身，不用对其有什么纠结，目前还没看到什么时候优化操作是什么时候把对象放进 tls 中的)
+    // 且这里传递的是 ReturnAtPlus1，表示优化时引用计数值加 1，ReturnAtPlus1 会被保存在 tls 中。
+    
+    // 此函数的主要目的是判断是否能优化把对象放入自动释放池的操作，如果能的话会根据 ReturnAtPlus1 来进行优化，
+    // 内部调用一个 callerAcceptsOptimizedReturn(__builtin_return_address(0)) 函数，
+    
+    // （它的目的就是判断 `objc_autoreleaseReturnValue` 的返回地址之后的汇编程序，
+    //   是否存在对 `objc_retainAutoreleasedReturnValue` 或 `objc_unsafeClaimAutoreleasedReturnValue` 的调用，
+    //   如果存在的话上层函数就可以对加入释放池的对象进行优化，不必将对象放入自动释放池，而是放在 `tls` 减少资源损耗。）
+    
+    // __builtin_return_address(0) 函数是找到当前函数的返回地址，并根据该地址继续找下面的汇编指令（x86_64 平台下的话）
+    // 如果是 objc_retainAutoreleasedReturnValue 或者 objc_unsafeClaimAutoreleasedReturnValue 的话表示可以进行优化
+    // callerAcceptsOptimizedReturn 函数此时会返回 true，并会把 ReturnAtPlus1 根据 RETURN_DISPOSITION_KEY 保存到
+    // 线程的存储空间内。
+    
     if (prepareOptimizedReturn(ReturnAtPlus1)) return (id)this;
     
     // 否则正常调用 AutoreleasePoolPage::autorelease((id)this) 把 this 放进自动释放池
-    // autorelease 可参考上篇
+    // autorelease 实现的内容可参考上篇
     return rootAutorelease2();
 }
 ```
@@ -274,9 +313,11 @@ enum ReturnDisposition : bool {
 // Thread keys reserved by libc for our use.
 // libc 保留供我们使用的线程 key。
 
-#if defined(__PTK_FRAMEWORK_OBJC_KEY0) // #define __PTK_FRAMEWORK_OBJC_KEY0    40
+// 如果是 #ifndef __ASSEMBLER__ 的情况下会有 #define __PTK_FRAMEWORK_OBJC_KEY0 40 这个宏定义
 
-#   define SUPPORT_DIRECT_THREAD_KEYS 1 // 这个宏涉及到内容挺多的，暂时还无法展开
+#if defined(__PTK_FRAMEWORK_OBJC_KEY0)
+
+#   define SUPPORT_DIRECT_THREAD_KEYS 1 // 支持在线程存储空间内保存数据
 
 // 这三个 key 暂时还没有见到在哪里使用
 #   define TLS_DIRECT_KEY        ((tls_key_t)__PTK_FRAMEWORK_OBJC_KEY0) // #define __PTK_FRAMEWORK_OBJC_KEY0    40
@@ -289,14 +330,15 @@ enum ReturnDisposition : bool {
 // 只要是非 TARGET_OS_WIN32 平台下都支持优化 autoreleased 返回值（优化方案是把返回值放在 tls 中，避免加入到 autoreleasePool 中）
 # if SUPPORT_RETURN_AUTORELEASE
 
-// 从 tls 中获取 disposition 
+// 从 tls 中获取 disposition，
+// RETURN_DISPOSITION_KEY 对应的 value 是 ReturnDisposition 优化设置，表示优化时引用计数加 0 或者 加 1
 #   define RETURN_DISPOSITION_KEY ((tls_key_t)__PTK_FRAMEWORK_OBJC_KEY4) // #define __PTK_FRAMEWORK_OBJC_KEY4    44
 
 # endif
 
 #else
 
-#   define SUPPORT_DIRECT_THREAD_KEYS 0 // 这个宏涉及到内容挺多的，暂时还无法展开
+#   define SUPPORT_DIRECT_THREAD_KEYS 0
 
 #endif
 
@@ -322,27 +364,30 @@ enum ReturnDisposition : bool {
 + `setReturnDisposition` 函数是以 `RETURN_DISPOSITION_KEY` 为 `key`，把 `disposition` 保存在 `tls` 中。 
 ```c++
 static ALWAYS_INLINE ReturnDisposition 
-getReturnDisposition()
-{
+getReturnDisposition() {
     return (ReturnDisposition)(uintptr_t)tls_get_direct(RETURN_DISPOSITION_KEY);
 }
 ```
 ```c++
 static ALWAYS_INLINE void 
-setReturnDisposition(ReturnDisposition disposition)
-{
+setReturnDisposition(ReturnDisposition disposition) {
     // 根据 RETURN_DISPOSITION_KEY 把传入的 disposition 保存在线程的存储空间内 
     tls_set_direct(RETURN_DISPOSITION_KEY, (void*)(uintptr_t)disposition);
 }
 ```
 ### `__builtin_return_address`
-1. 这里函数返回地址不是函数返回值的地址是函数被调用后返回的地址，这里要从汇编的角度来理解。当我们的代码编译为汇编代码后，汇编指令从上到下一行一行来执行。比如我们在函数1 内部调用了函数 2，开始时根据汇编指令一条一条执行函数1 当执行到需要执行 函数 2 时，假如一个 `callq` 指令跳转到了函数 2 去执行，当函数 2 执行完毕返回的地址此时时接着刚刚 `callq` 指令，然后从函数 2 返回的地址接着一条一条指令的执行。（描述的用词可能很不恰当，对汇编实在是知之甚少，大概意思就是函数嵌套调用时，被嵌套调用的函数执行完毕后返回的地址就是接下来的要执行的指令的地址，（或者是一个固定的偏移位置，根据编译器不同情况不同））
-2. `gcc` 默认不支持 `__builtin_return_address(LEVEL)` 的参数为非`0`。好像只支持参数为`0`。
+1. 这里函数返回地址不是函数返回值的地址是函数被调用后返回的地址，这里要从汇编的角度来理解。
+  当我们的代码编译为汇编代码后，汇编指令从上到下一行一行来执行。
+  比如我们在函数1 内部调用了函数 2，开始时根据汇编指令一条一条执行函数1，当执行到需要调用函数 2 时，
+  假如此时是用一个 `callq` 指令跳转到了函数 2 去执行，当函数 2 执行完毕后返回的地址是接着刚刚 `callq` 指令的地址的，
+  然后从函数 2 返回的地址处接着一条一条继续执行函数 1 的指令。
+  （描述的用词可能很不恰当，对汇编实在是知之甚少，大概意思就是函数嵌套调用时，被嵌套调用的函数执行完毕后返回的地址就是接下来的要执行的指令的地址，（或者是一个固定的偏移位置，根据编译器不同情况不同））
+2. `gcc` 默认不支持 `__builtin_return_address(LEVEL)` 的参数为非 `0`。好像只支持参数为 `0`。
 3. `__builtin_return_address(0)` 的含义是，得到当前函数返回地址，即此函数被别的函数调用，然后此函数执行完毕后，返回，所谓返回地址就是那时候的地址。
 4. `__builtin_return_address(1)` 的含义是，得到当前函数的调用者的返回地址。注意是调用者的返回地址，而不是函数起始地址。
 
 ### `callerAcceptsOptimizedReturn`
-&emsp;这个函数针对不同的平台（`__x86__64__`/`__arm__`/`__arm64__`/`__i386`/`unknown`）有完全不同的实现。
+&emsp;这个函数针对不同的平台（`__x86__64__`/`__arm__`/`__arm64__`/`__i386`/`unknown`）有完全不同的实现。它的目的就是判断 `objc_autoreleaseReturnValue` 的返回地址之后的汇编程序，是否存在对 `objc_retainAutoreleasedReturnValue` 或 `objc_unsafeClaimAutoreleasedReturnValue` 的调用，如果存在的话上层函数就可以对加入释放池的对象进行优化，不必将对象放入自动释放池，而是放在 `tls` 减少资源损耗。
 ```c++
 /*
   Fast handling of return through Cocoa's +0 autoreleasing convention.
@@ -353,7 +398,7 @@ setReturnDisposition(ReturnDisposition disposition)
   调用方和被调用方合作将返回的对象保留在自动释放池之外，并消除多余的 retain/release 对。
 
   An optimized callee looks at the caller's instructions following the return. 
-  一个优化的被调用方在返回后会查看调用方的指示。
+  一个可以被优化的被调用方，会在函数返回后查看调用方的接下来的指令。
   
   If the caller's instructions are also optimized then the callee skips
   all retain count operations: no autorelease, no retain/autorelease.
@@ -424,7 +469,7 @@ setReturnDisposition(ReturnDisposition disposition)
     调用方会从 TLS 中取处出结果使用。
 
   The callee's recognition of the optimized caller is architecture-dependent.
-  被调用方对优化的调用方的识别取决于体系结构。
+  被调用方对优化的调用方的判断识别取决于体系结构。（是否能进行优化，不同平台下不同的判断方式）
   
   // 这里涉及到了一些汇编知识，当我们的 OC 源码被转换为汇编代码后，
   // 他们是连续的且内存地址都是固定，例如调用 objc_autoreleaseReturnValue 指令后，
@@ -565,25 +610,25 @@ callerAcceptsOptimizedReturn(const void *ra)
 ### `prepareOptimizedReturn`
 ```c++
 // Try to prepare for optimized return with the given disposition (+0 or +1).
-// 尝试为优化做准备，返回给定的 disposition。（+0 或 +1）
+// 根据给定的 disposition（+0 或 +1）尝试准备优化返回值。
 
 // Returns true if the optimized path is successful.
 // 如果这条优化的路径是成功的则返回 true。
 
 // Otherwise the return value must be retained and/or autoreleased as usual.
-// 否则，必须照常保留 和/或 自动释放返回值。
+// 否则，返回值必须照常 retain 和/或 autorelease。
 
-// 
 static ALWAYS_INLINE bool 
 prepareOptimizedReturn(ReturnDisposition disposition)
 {
-    // 这里从 tls 中取得 RETURN_DISPOSITION_KEY 的值必须是 false(ReturnAtPlus0)，
-    // 要不然会执行断言
+    // 这里从 tls 中取得 RETURN_DISPOSITION_KEY 的值必须是 false(ReturnAtPlus0)，否则执行断言
     ASSERT(getReturnDisposition() == ReturnAtPlus0);
-
+    
+    // callerAcceptsOptimizedReturn 上面👆已经详细分析
+    // __builtin_return_address(0) 上面👆已经详细分析
     if (callerAcceptsOptimizedReturn(__builtin_return_address(0))) {
         
-        // 如果 disposition 是 true (ReturnAtPlus1) 则保存在线程的存储空间内
+        // 如果 disposition 是 true (ReturnAtPlus1 +1) 则保存在线程的存储空间内
         if (disposition) setReturnDisposition(disposition);
         
         // 返回 true
@@ -593,12 +638,410 @@ prepareOptimizedReturn(ReturnDisposition disposition)
     return false;
 }
 ```
+&emsp;至此 `rootAutorelease` 函数已经看完了，`rootAutorelease` 函数分为两个分支，当对象能进行优化时，就直接返回，不能进行优化时就正常放进自动释放池。下面我们查找上面提及的 `objc_autoreleaseReturnValue` 等函数的调用时机。首先我们先看一下它们在 `NSObject.mm` 中的定义。
+
+## `objc_retainAutoreleaseAndReturn`
+```c++
+// Same as objc_retainAutorelease but suitable for tail-calling 
+// if you don't want to push a frame before this point.
+// 与 objc_retainAutorelease 相同但适用于尾部调用，
+// if you don't want to push a frame before this point
+
+__attribute__((noinline))
+static id 
+objc_retainAutoreleaseAndReturn(id obj)
+{
+    return objc_retainAutorelease(obj);
+}
+```
+### `objc_retainAutorelease`
+```c++
+id
+objc_retainAutorelease(id obj)
+{
+    // 这种操作可以理解为延迟对象释放，先 retain 然后放进释放池，
+    // 当池 pop 时再执行 release 保证 obj 正常销毁不会导致内存泄露
+    return objc_autorelease(objc_retain(obj));
+}
+
+```
+## `objc_autoreleaseReturnValue`
+```c++
+// Prepare a value at +1 for return through a +0 autoreleasing convention.
+// 准备 +1 处的值，以通过 +0 自动释放约定返回。
+id 
+objc_autoreleaseReturnValue(id obj)
+{
+    // 同上面的 rootAutorelease 函数
+    if (prepareOptimizedReturn(ReturnAtPlus1)) return obj;
+    
+    // 一路判断最终依然调用 rootAutorelease2 函数
+    return objc_autorelease(obj);
+}
+```
+## `objc_retainAutoreleaseReturnValue`
+```c++
+// Prepare a value at +0 for return through a +0 autoreleasing convention.
+// 准备一个 +0 的值以通过 +0 自动释放约定返回
+id 
+objc_retainAutoreleaseReturnValue(id obj)
+{
+    // 同上面的 prepareOptimizedReturn 函数调用，此处入参是 ReturnAtPlus0
+    if (prepareOptimizedReturn(ReturnAtPlus0)) return obj;
+
+    // not objc_autoreleaseReturnValue(objc_retain(obj)) 
+    // because we don't need another optimization attempt
+    // 没有 objc_autoreleaseReturnValue(objc_retain(obj)) 
+    // 因为我们不需要其他优化尝试
+    
+    // 这种操作可以理解为延迟对象释放，先 retain 然后放进释放池，
+    // 当池 pop 时再执行 release 保证 obj 正常销毁不会导致内存泄露
+    return objc_retainAutoreleaseAndReturn(obj);
+}
+```
+## `objc_retainAutoreleasedReturnValue`
+```c++
+// Accept a value returned through a +0 autoreleasing convention for use at +1.
+// 接受通过 +0 自动释放约定返回的值，以用于 +1
+id
+objc_retainAutoreleasedReturnValue(id obj)
+{
+    // 从 tls 中取出 ReturnDisposition
+    if (acceptOptimizedReturn() == ReturnAtPlus1) return obj;
+
+    // 对 obj 执行 retain 操作
+    return objc_retain(obj);
+}
+```
+### `acceptOptimizedReturn`
+```c++
+// Try to accept an optimized return.
+// 尝试接受优化的返回值。
+
+// Returns the disposition of the returned object (+0 or +1).
+// 返回返回值的优化设置（+0 或 +1）。
+
+// An un-optimized return is +0.
+// 一个未优化的返回值返回 +0。
+
+static ALWAYS_INLINE ReturnDisposition 
+acceptOptimizedReturn()
+{
+    // 从 tls 中根据 RETURN_DISPOSITION_KEY 取得优化设置 
+    ReturnDisposition disposition = getReturnDisposition();
+    
+    // reset to the unoptimized state
+    // 重置为未优化状态
+    setReturnDisposition(ReturnAtPlus0); 
+    
+    // 返回优化设置 （+0 或 +1）
+    return disposition;
+}
+```
+## `objc_unsafeClaimAutoreleasedReturnValue`
+```c++
+// Accept a value returned through a +0 autoreleasing convention for use at +0.
+// 接受通过 +0 自动释放约定返回的值，以用于 +0。
+id
+objc_unsafeClaimAutoreleasedReturnValue(id obj)
+{
+    // 如果是 ReturnAtPlus0 直接返回 obj
+    if (acceptOptimizedReturn() == ReturnAtPlus0) return obj;
+
+    // 
+    return objc_releaseAndReturn(obj);
+}
+```
+### `objc_releaseAndReturn`
+```c++
+// Same as objc_release but suitable for tail-calling 
+// 与 objc_release 相同，但适用于尾部调用。
+
+// if you need the value back and don't want to push a frame before this point.
+// 如果您需要返回值，don't want to push a frame before this point
+
+__attribute__((noinline))
+static id 
+objc_releaseAndReturn(id obj)
+{
+    // 执行 release，这里如果执行完 release 后 obj dealloc 了怎么办 ？
+    objc_release(obj);
+    
+    // 返回 obj 
+    return obj;
+}
+```
+## `objc_retainAutorelease/_objc_deallocOnMainThreadHelper...`
+```c++
+id
+objc_retainAutorelease(id obj)
+{
+    // 这种操作可以理解为延迟对象释放，先 retain 然后放进释放池，
+    // 当池 pop 时再执行 release 保证 obj 正常销毁不会导致内存泄露
+    return objc_autorelease(objc_retain(obj));
+}
+
+// dispatch_barrier_async_f(dispatch_get_main_queue(), self, _objc_deallocOnMainThreadHelper); 
+void
+_objc_deallocOnMainThreadHelper(void *context)
+{
+    id obj = (id)context;
+    [obj dealloc];
+}
+
+// typedef const void* objc_objectptr_t; 只是一个 void* 类型
+
+// convert objc_objectptr_t to id, callee must take ownership.
+// 被调用方必须拥有所有权
+id objc_retainedObject(objc_objectptr_t pointer) { return (id)pointer; }
+
+// convert objc_objectptr_t to id, without ownership transfer.
+// 没有所有权转让
+id objc_unretainedObject(objc_objectptr_t pointer) { return (id)pointer; }
+
+// convert id to objc_objectptr_t, no ownership transfer.
+// 没有所有权转让
+objc_objectptr_t objc_unretainedPointer(id object) { return object; }
+
+// 在 map_images_nolock 函数内被调用
+void arr_init(void) 
+{
+    // 自动释放池初始化
+    AutoreleasePoolPage::init();
+    
+    // SideTablesMap 初始化
+    SideTablesMap.init();
+    
+    // AssociationsManager 初始化
+    _objc_associations_init();
+}
+```
+## `验证结论`
+&emsp;何时函数返回值会被放进自动释放池？
+```c++
+// 准备一个 NSObject 的分类用于在 ARC 下查看对象的引用计数
+// NSObject+Custom.m 文件，需要在 Compile Sources 中把 NSObject+Custom.m Compiler Flags 置为 -fno-objc-arc
+// NSObject+Custom.m 文件实现如下：（.h 仅包含 customRetainCount 声明）
+
+#import "NSObject+Custom.h"
+@implementation NSObject (Custom)
+- (NSUInteger)customRetainCount {
+    return self.retainCount;
+}
+@end
+```
+```c++
+// 把 NSObject+Custom.h 引入 ViewController 中
+// 把 _objc_autoreleasePoolPrint 如下声明放在 ViewController.m 文件顶部
+OBJC_EXPORT void
+_objc_autoreleasePoolPrint(void)
+    OBJC_AVAILABLE(10.7, 5.0, 9.0, 1.0, 2.0);
+    
+// 在 viewDidLoad 中编写如如下函数
+NSMutableArray *array = [NSMutableArray array];
+NSLog(@"array: %p %ld", array, array.customRetainCount);
+// 打印自动释放池内容
+_objc_autoreleasePoolPrint();
+```
+`ViewController` 标记为 `MRC` ：
+`array` `retainCount` 为 1，且根据 `array` 地址能在自动释放池里面找到 `array`。
+
+`ViewController` 标记为 `ARC` ：
+`array` `retainCount` 为 1，根据 `array` 地址不能在自动释放池里面找到 `array`。
+
+由于看不到 `[NSMutableArray array]` 内部实现，且重写 `NSMutableArray` 的 `dealloc` 会有很多干扰，所以整体看起来显得不够直观，那我们来定义一个自己的类来看。
+
+```c++
+// LGPerson.h 
+#import <Foundation/Foundation.h>
+NS_ASSUME_NONNULL_BEGIN
+@interface LGPerson : NSObject
++ (LGPerson *)returnInstanceValue;
+@end
+NS_ASSUME_NONNULL_END
+
+// LGPerson.m
+#import "LGPerson.h"
+#import "NSObject+Custom.h"
+@implementation LGPerson
++ (LGPerson *)returnInstanceValue {
+    LGPerson *temp = [[LGPerson alloc] init];
+    NSLog(@"%@ %p %ld", NSStringFromSelector(_cmd), temp, temp.customRetainCount);
+    return temp;
+}
+- (void)dealloc {
+    NSLog(@"🍀🍀🍀 %@ LGPerson dealloc", self);
+}
+@end
+
+// ViewControlle viewDidLoad 函数 中:
+LGPerson *person = [LGPerson returnInstanceValue];
+NSLog(@"person: %p %ld", person, person.customRetainCount);
+_objc_autoreleasePoolPrint();
+```
+`ViewController` 标记为 `MRC`，`LGPerson` 为 `ARC` 下打印结果:
+```c++
+returnInstanceValue 0x6000035405f0 1
+person: 0x6000035405f0 1
+objc[8620]: ##############
+objc[8620]: AUTORELEASE POOLS for thread 0x10eb45dc0
+objc[8620]: 572 releases pending.
+objc[8620]: [0x7fa59d804000]  ................  PAGE (full)  (cold)
+objc[8620]: [0x7fa59d804038]  ################  POOL 0x7fa59d804038
+objc[8620]: [0x7fa59d804040]  ################  POOL 0x7fa59d804040
+objc[8620]: [0x7fa59d804048]  ################  POOL 0x7fa59d804048
+objc[8620]: [0x7fa59d804050]    0x600001949c80  UIApplicationSceneSettings
+...
+objc[8620]: [0x7fa59d037248]    0x6000035405f0  LGPerson // 在释放池的末尾能看到 person
+objc[8620]: ##############
+🍀🍀🍀 <LGPerson: 0x6000035405f0> LGPerson dealloc // dealloc 函数正常调用
+```
+`ViewController` `LGPerson` 均为 `ARC` 下打印结果:
+```c++
+returnInstanceValue 0x600001b6afb0 1
+person: 0x600001b6afb0 1 // 引用计数为 1
+// AutoreleasePool 里面没有 person
+🍀🍀🍀 <LGPerson: 0x600001b6afb0> LGPerson dealloc // dealloc 函数正常调用
+```
+还有一种情况，我们把 `LGPerson` 修改如下，并在 `Compile Sources` 中把 `LGPerson.m` `Compiler Flags` 置为 `-fno-objc-arc`:
+```c++
++ (LGPerson *)returnInstanceValue {
+    LGPerson *temp = [[[LGPerson alloc] init] autorelease];
+    NSLog(@"%@ %p %ld", NSStringFromSelector(_cmd), temp, temp.customRetainCount);
+    return temp;
+}
+
+- (void)dealloc {
+    [super dealloc];
+    NSLog(@"🍀🍀🍀 LGPerson dealloc");
+}
+```
+`ViewController` `LGPerson` 均标记为 `MRC` 下打印结果:
+```c++
+returnInstanceValue 0x6000014266a0 1
+person: 0x6000014266a0 1
+objc[8741]: ##############
+objc[8741]: AUTORELEASE POOLS for thread 0x10bbdddc0
+objc[8741]: 583 releases pending.
+objc[8741]: [0x7f9569804000]  ................  PAGE (full)  (cold)
+objc[8741]: [0x7f9569804038]  ################  POOL 0x7f9569804038
+objc[8741]: [0x7f9569804040]  ################  POOL 0x7f9569804040
+objc[8741]: [0x7f9569804048]  ################  POOL 0x7f9569804048
+objc[8741]: [0x7f9569804050]    0x60000383d900  UIApplicationSceneSettings
+...
+objc[8741]: [0x7f9569024298]    0x6000014266a0  LGPerson // person 放在自动释放池里
+objc[8741]: [0x7f95690242a0]    0x600001669480  __NSCFString
+objc[8741]: ##############
+🍀🍀🍀 LGPerson dealloc // dealloc 函数正常调用
+```
+看到 `LGPerson` 采用 `ARC` 时和 `MRC` 时要保持结果相同的话需要对 `temp` 调用 `autorelease` 函数。为了对比在 `MRC` 下对 `temp` 不执行 `autorelease` 的话，打印结果只有 `returnInstanceValue 0x600001470510 1` `person: 0x600001470510 1`，自动释放池里没有 `person` 且 `person` 没有执行 `dealloc`，内存泄漏了，需要我们在 `viewDidLoad` 中主动调用 `[person release]` 或 `[person autorelease]` 才能正确释放内存。
+
+`ARC` 的情况下 `person` 没有被放入自动释放池，`returnInstanceValue` 函数返回的对象还是正常使用了，那么表示 `temp` 对象在出了 `returnInstanceValue` 函数的右边花括号时的 `release` 操作并没有导致 `temp` 对象被释放销毁。那么这时为什么呢？那么我们进一步来看一些汇编代码。
+
+🔫🔫🔫 （等下来补）先抛出结论，对比 `ViewController` 标记为 `MRC`，`LGPerson` 标记为 `ARC` 和 `ViewController` `LGPerson` 均为 `ARC` 的两种情况。看到同样的 `LGPerson` 函数，当在 `MRC` 中调用时，函数返回的对象被放入了自动释放池。即当在 `MRC` 中调用 `ARC` 的函数时，函数返回值会被放入自动释放池，而在 `ARC` 调用时，函数返回对象正常使用，但是它没有被放入自动释放池，那程序是怎么来维护函数返回值的引用计数的呢 ？
+
+### `objc_autoreleaseReturnValue` 调用时机
+&emsp;用两种方式找到 `objc_autoreleaseReturnValue` 的调用时机：
+```c++
++ (LGPerson *)returnInstanceValue {
+    return [[LGPerson alloc] init]; // ⬅️ 在这行打断点，并勾选 Debug -> Debug Workflow -> Always Show Disassembly
+}
+```
+执行程序可看到如下汇编：
+```c++
+Simple_iOS`+[LGPerson returnInstanceValue]:
+    0x10c43af50 <+0>:  pushq  %rbp
+    0x10c43af51 <+1>:  movq   %rsp, %rbp
+    0x10c43af54 <+4>:  subq   $0x20, %rsp
+    0x10c43af58 <+8>:  movq   %rdi, -0x8(%rbp)
+    0x10c43af5c <+12>: movq   %rsi, -0x10(%rbp)
+->  0x10c43af60 <+16>: movq   0x46f1(%rip), %rdi        ; (void *)0x000000010c43f788: LGPerson
+    0x10c43af67 <+23>: callq  0x10c43b30c               ; symbol stub for: objc_alloc
+    0x10c43af6c <+28>: movq   0x46d5(%rip), %rsi        ; "init"
+    0x10c43af73 <+35>: movq   0x2086(%rip), %rdi        ; (void *)0x00007fff513f7780: objc_msgSend
+    0x10c43af7a <+42>: movq   %rdi, -0x18(%rbp)
+    0x10c43af7e <+46>: movq   %rax, %rdi
+    0x10c43af81 <+49>: movq   -0x18(%rbp), %rax
+    0x10c43af85 <+53>: callq  *%rax
+    0x10c43af87 <+55>: movq   %rax, %rdi
+    0x10c43af8a <+58>: addq   $0x20, %rsp
+    0x10c43af8e <+62>: popq   %rbp
+    0x10c43af8f <+63>: jmp    0x10c43b31e               ; symbol stub for: objc_autoreleaseReturnValue // 在函数末尾调用了 objc_autoreleaseReturnValue 函数
+```
+第二种方式在终端执行: `clang -S -fobjc-arc LGPerson.m -o LGPerson.s` 指令，在当前文件夹下生成 `LGPerson.s` 文件，双击打开能看到 `returnInstanceValue` 函数被转成如下汇编代码：
+```c++
+    .p2align    4, 0x90         ## -- Begin function +[LGPerson returnInstanceValue]
+"+[LGPerson returnInstanceValue]":      ## @"\01+[LGPerson returnInstanceValue]"
+    .cfi_startproc
+## %bb.0:
+    pushq    %rbp
+    .cfi_def_cfa_offset 16
+    .cfi_offset %rbp, -16
+    movq    %rsp, %rbp
+    .cfi_def_cfa_register %rbp
+    subq    $32, %rsp
+    movq    %rdi, -8(%rbp)
+    movq    %rsi, -16(%rbp)
+    movq    L_OBJC_CLASSLIST_REFERENCES_$_(%rip), %rdi
+    callq    _objc_alloc
+    movq    L_OBJC_SELECTOR_REFERENCES_(%rip), %rsi
+    movq    _objc_msgSend@GOTPCREL(%rip), %rdi
+    movq    %rdi, -24(%rbp)         ## 8-byte Spill
+    movq    %rax, %rdi
+    movq    -24(%rbp), %rax         ## 8-byte Reload
+    callq    *%rax
+    movq    %rax, %rdi
+    addq    $32, %rsp
+    popq    %rbp
+    jmp    _objc_autoreleaseReturnValue ## TAILCALL
+    .cfi_endproc
+                                        ## -- End function
+```
+同样也在结尾处调用了 `_objc_autoreleaseReturnValue` 函数。为了对比我们使用 `clang -S -fno-objc-arc LGPerson.m -o LGPerson.s` 指令看下 `MRC` 下 `returnInstanceValue` 转换:
+```c++
+    .p2align    4, 0x90         ## -- Begin function +[LGPerson returnInstanceValue]
+"+[LGPerson returnInstanceValue]":      ## @"\01+[LGPerson returnInstanceValue]"
+    .cfi_startproc
+## %bb.0:
+    pushq    %rbp
+    .cfi_def_cfa_offset 16
+    .cfi_offset %rbp, -16
+    movq    %rsp, %rbp
+    .cfi_def_cfa_register %rbp
+    subq    $16, %rsp
+    movq    %rdi, -8(%rbp)
+    movq    %rsi, -16(%rbp)
+    movq    L_OBJC_CLASSLIST_REFERENCES_$_(%rip), %rsi
+    movq    %rsi, %rdi
+    callq    _objc_alloc_init
+    addq    $16, %rsp
+    popq    %rbp
+    retq
+    .cfi_endproc
+                                        ## -- End function
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 &emsp;至此 `objc_object` 的代码就全部看完了。已经记不清花费了多少时间，但是整体对 `objc_object` 已经有了一个全面的认知，花多少时间都是超值的。⛽️⛽️
 
 ## 参考链接
 **参考链接:🔗**
++ [黑幕背后的Autorelease](http://blog.sunnyxx.com/2014/10/15/behind-autorelease/)
 + [__builtin_return_address(LEVEL)](https://blog.csdn.net/dayancn/article/details/18899157)
 + [返回值的 Autorelease 和 编译器优化](https://www.jianshu.com/p/aae7c3bd2191)
 + [objc_autoreleaseReturnValue和objc_retainAutoreleasedReturnValue函数对ARC的优化](https://www.jianshu.com/p/2f05060fa377?spm=a2c4e.11153940.blogcont690541.7.575f3c89jeD8IS)
++ [ios – 为什么执行ARC的objc_autoreleaseReturnValue对于x86_64和ARM有所不同？](http://www.voidcn.com/article/p-npbahspk-bsx.html)
++ [https://zhuanlan.zhihu.com/p/161291275](https://zhuanlan.zhihu.com/p/161291275)
 + [操作系统内存管理(思维导图详解)](https://blog.csdn.net/hguisu/article/details/5713164)
