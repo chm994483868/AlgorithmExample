@@ -13,10 +13,88 @@ cache_t cache; // formerly cache pointer and vtable 以前缓存指针和虚函�
 ```
 > `typedef uintptr_t SEL;` 在 `Project Headers/objc-runtime-new.h` 的 `198` 行，看到 `SEL`。 
 
-&emsp;`cache` 是 `objc_class` 的第三个成员变量，类型是 `cache_t`。
+&emsp;`cache` 是 `objc_class` 的第三个成员变量，类型是 `cache_t`。从数据结构角度及使用方法来看 `cache_t` 的话，它是一个 `SEL`  作为 `Key` ，`SEL + IMP(bucket_t)` 作为 `Value` 的散列表。为了对方法缓存先有一个大致的了解，我们首先解读一下 `Source/objc-cache.mm` 文件开头的一大段注释内容。
+```c++
+/*
+objc-cache.m
+
+1. Method cache management 方法缓存管理
+2. Cache flushing 缓存刷新
+3. Cache garbage collection 缓存垃圾回收
+4. Cache instrumentation 缓存检测
+5. Dedicated allocator for large caches 大型缓存的专用分配器 (?)
+
+/*
+Method cache locking (GrP 2001-1-14)
+For speed, objc_msgSend does not acquire any locks when it reads method caches. 
+为了提高速度，objc_msgSend 在读取方法缓存时不获取任何锁。
+
+Instead, all cache changes are performed
+so that any objc_msgSend running concurrently with the cache mutator 
+will not crash or hang or get an incorrect result from the cache. 
+相反，将执行所有缓存更改，以便与缓存 mutator 并发运行的任何 objc_msgSend 都不会崩溃或挂起，
+或者从缓存中获得不正确的结果。（以 std::atomic 完成所有的原子操作）
+
+When cache memory becomes unused (e.g. the old cache after cache expansion), 
+it is not immediately freed, because a concurrent objc_msgSend could still be using it. 
+当缓存未使用时，（例如：缓存扩展后的旧缓存），它不会立即释放，因为并发的 objc_msgSend 可能仍在使用它。
+
+Instead, the memory is disconnected from the data structures and placed on a garbage list. 
+相反，内存与数据结构断开连接，并放在垃圾列表中。
+
+The memory is now only accessible to instances of objc_msgSend that were
+running when the memory was disconnected; 
+内存现在只能访问断开内存时运行的 objc_msgSend 实例；
+
+any further calls to objc_msgSend will not see the garbage memory because
+the other data structures don't point to it anymore.
+对 objc_msgSend 的任何进一步调用都不会看到垃圾内存，因为其他数据结构不再指向它。
+
+The collecting_in_critical function checks the PC of all threads and returns FALSE when
+all threads are found to be outside objc_msgSend. 
+collecting_in_critical 函数检查所有线程的PC，当发现所有线程都在 objc_msgSend 之外时返回 FALSE。
+
+This means any call to objc_msgSend that could have had access to the garbage has
+finished or moved past the cache lookup stage, so it is safe to free the memory. 
+这意味着可以访问垃圾的对 objc_msgSend 的任何调用都已完成或移动到缓存查找阶段，因此可以安全地释放内存。
+
+All functions that modify cache data or structures must acquire the cacheUpdateLock
+to prevent interference from concurrent modifications. 
+所有修改缓存数据或结构的函数都必须获取 cacheUpdateLock，以防止并发修改的干扰。
+
+The function that frees cache garbage must acquire the cacheUpdateLock and use
+collecting_in_critical() to flush out cache readers.
+释放缓存垃圾的函数必须获取 cacheUpdateLock，并使用 collecting_in_critical() 清除缓存读取器
+
+The cacheUpdateLock is also used to protect the custom allocator used for large method cache blocks.
+Cache readers (PC-checked by collecting_in_critical())
+cacheUpdateLock 还用于保护用于大型方法缓存块的自定义分配器。缓存读取器（由collecting_in_critical() 进行 PC 检查）
+
+objc_msgSend
+cache_getImp
+
+Cache writers (hold cacheUpdateLock while reading or writing; not PC-checked)
+(读取或写入时获取 cacheUpdateLock，不使用 PC-checked)
+
+cache_fill         (acquires lock)(获取锁)
+cache_expand       (only called from cache_fill)(仅从 cache_fill 调用)
+cache_create       (only called from cache_expand)(仅从 cache_expand 调用)
+bcopy               (only called from instrumented cache_expand)(仅从已检测的 cache_expand 调用)
+flush_caches        (acquires lock)(获取锁)
+cache_flush        (only called from cache_fill and flush_caches)(仅从 cache_fill 和 flush_caches 调用)
+cache_collect_free (only called from cache_expand and cache_flush)(仅从 cache_expand 和 cache_flush 调用)
+
+UNPROTECTED cache readers (NOT thread-safe; used for debug info only)(不是线程安全的；仅用于调试信息)
+cache_print cache 打印
+_class_printMethodCaches
+_class_printDuplicateCacheEntries
+_class_printMethodCacheStatistics
+*/
+```
+&emsp;到这里就看完注释了，有点懵，下面还是把源码一行一行看完，然后再回顾上面的内容到底指的是什么。
 
 ## `CACHE_IMP_ENCODING/CACHE_MASK_STORAGE`
-&emsp;首先看两个宏定义，`CACHE_IMP_ENCODING` 表示在 `bucket_t` 中 `IMP` 的存储方式，`CACHE_MASK_STORAGE` 表示 `cache_t` 中掩码的位置。`struct bucket_t` 和 `struct cache_t` 里面的不同实现部分正是根据这两个宏来判断的。
+&emsp;在进入 `cache_t/bucket_t` 内容之前，首先看两个宏定义，`CACHE_IMP_ENCODING` 表示在 `bucket_t` 中 `IMP` 的存储方式，`CACHE_MASK_STORAGE` 表示 `cache_t` 中掩码的位置。`struct bucket_t` 和 `struct cache_t` 里面的不同实现部分正是根据这两个宏来判断的。
 我们最关注的 `x86_64(mac)` 和 `arm64(iphone)` 两个平台下 `bucket_t` 中 `IMP` 都是以 `ISA` 与 `IMP` 异或的值存储。而掩码位置的话 `x86_64` 下是 `CACHE_MASK_STORAGE_OUTLINED` 没有掩码，`buckets` 散列数组和 `_mask` 以两个成员变量分别表示。在 `arm64` 下则是 `CACHE_MASK_STORAGE_HIGH_16` 高 `16` 位为掩码，散列数组和 `mask` 共同保存在 `_maskAndBuckets` 中。 
 ```c++
 // 三种方法缓存存储 IMP 的方式：（bucket_t 中 _imp 成员变量存储 IMP 的方式）
@@ -377,7 +455,7 @@ struct objc_cache _objc_empty_cache =
 struct bucket_t *cache_t::emptyBuckets()
 {
     // 直接使用 & 取 _objc_empty_cache 的地址并返回，
-    // _objc_empty_cache 是一个全局变量，故意用来标记当前类的缓存是一个空缓存吗？
+    // _objc_empty_cache 是一个全局变量，用来标记当前类的缓存是一个空缓存
     return (bucket_t *)&_objc_empty_cache;
 }
 
@@ -529,21 +607,102 @@ void cache_t::setBucketsAndMask(struct bucket_t *newBuckets, mask_t newMask)
 #### `initializeToEmpty`
 ```c++
 // bzero
+// 头文件：#include <string.h>
 // 函数原型：void bzero (void *s, int n);
-// 
+// 功能：将字符串 s 的前 n 个字节置为 0，一般来说 n 通常取 sizeof(s)，将整块空间清零
 
 // CACHE_MASK_STORAGE_OUTLINED
 void cache_t::initializeToEmpty()
 {
+    // 把 this 的内存清零
     bzero(this, sizeof(*this));
+    // 以原子方式把 _objc_empty_cache 的地址存储在 _buckets 中
     _buckets.store((bucket_t *)&_objc_empty_cache, memory_order::memory_order_relaxed);
 }
 
 // CACHE_MASK_STORAGE_HIGH_16
 void cache_t::initializeToEmpty()
 {
+    // 把 this 的内存清零
     bzero(this, sizeof(*this));
+    // 把 _objc_empty_cache 的地址转换为 uintptr_t然后以原子方式把其存储在 _maskAndBuckets 中 
     _maskAndBuckets.store((uintptr_t)&_objc_empty_cache, std::memory_order_relaxed);
+}
+```
+&emsp;两种模式下都是把 `_objc_empty_cache` 的地址取出用于设置 `_buckets/_maskAndBuckets`，两种模式下也都对应上面的 `emptyBuckets` 函数，取出 `(bucket_t *)&_objc_empty_cache` 返回。  
+#### `canBeFreed`
+&emsp;`canBeFreed` 函数只有下面一种实现，看名字我们大概也能猜出此函数的作用，正式判断能不能释放 `cache_t`。
+```c++
+bool cache_t::canBeFreed()
+{
+    // 
+    return !isConstantEmptyCache();
+}
+```
+#### `isConstantEmptyCache`
+```c++
+bool cache_t::isConstantEmptyCache()
+{
+    // occupied() 函数很简单就是获取 _occupied 成员变量的值然后直接返回，_occupied 表示散列表中已占用的容量
+    // 此处要求 occupied() 为 0 并且 buckets() 等于 emptyBucketsForCapacity(capacity(), false)
+    // 
+    return 
+        occupied() == 0  &&  
+        buckets() == emptyBucketsForCapacity(capacity(), false);
+}
+```
+#### `capacity`
+```c++
+// mask 是临界值，加 1 后就是散列表的容量
+unsigned cache_t::capacity()
+{
+    return mask() ? mask()+1 : 0; 
+}
+```
+### `emptyBucketsForCapacity`
+```c++
+bucket_t *emptyBucketsForCapacity(mask_t capacity, bool allocate = true)
+{
+#if CONFIG_USE_CACHE_LOCK
+    cacheUpdateLock.assertLocked();
+#else
+    runtimeLock.assertLocked();
+#endif
+
+    size_t bytes = cache_t::bytesForCapacity(capacity);
+
+    // Use _objc_empty_cache if the buckets is small enough.
+    if (bytes <= EMPTY_BYTES) {
+        return cache_t::emptyBuckets();
+    }
+
+    // Use shared empty buckets allocated on the heap.
+    static bucket_t **emptyBucketsList = nil;
+    static mask_t emptyBucketsListCount = 0;
+    
+    mask_t index = log2u(capacity);
+
+    if (index >= emptyBucketsListCount) {
+        if (!allocate) return nil;
+
+        mask_t newListCount = index + 1;
+        bucket_t *newBuckets = (bucket_t *)calloc(bytes, 1);
+        emptyBucketsList = (bucket_t**)
+            realloc(emptyBucketsList, newListCount * sizeof(bucket_t *));
+        // Share newBuckets for every un-allocated size smaller than index.
+        // The array is therefore always fully populated.
+        for (mask_t i = emptyBucketsListCount; i < newListCount; i++) {
+            emptyBucketsList[i] = newBuckets;
+        }
+        emptyBucketsListCount = newListCount;
+
+        if (PrintCaches) {
+            _objc_inform("CACHES: new empty buckets at %p (capacity %zu)", 
+                         newBuckets, (size_t)capacity);
+        }
+    }
+
+    return emptyBucketsList[index];
 }
 ```
 
