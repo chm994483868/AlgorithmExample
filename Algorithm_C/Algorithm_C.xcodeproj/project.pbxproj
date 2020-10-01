@@ -140,6 +140,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		8E0E62B22525ECB10076A530 /* iOS 从源码解析Runtime (九)：聚焦 objc_class(cache_t 及方法缓存实现相关内容篇(2)).md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 从源码解析Runtime (九)：聚焦 objc_class(cache_t 及方法缓存实现相关内容篇(2)).md"; sourceTree = "<group>"; };
 		8E15F1D424E423FE00660C93 /* iOS消息转发机制.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS消息转发机制.md"; sourceTree = "<group>"; };
 		8E15F1D624E5768C00660C93 /* HHStaff.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = HHStaff.h; sourceTree = "<group>"; };
 		8E15F1D724E5768C00660C93 /* HHStaff.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = HHStaff.m; sourceTree = "<group>"; };
@@ -888,6 +889,7 @@
 				D237305A251C888D00274FBA /* iOS 从源码解析Runtime (六)：由 rootAutorelease 函数引发的解读 AutoreleasePool.md */,
 				D2373059251C880C00274FBA /* iOS 从源码解析Runtime (七)：聚焦 isa、objc_object(dealloc、autorelease返回值优化篇).md */,
 				8E6DFE182523862B00D2830E /* iOS 从源码解析Runtime (八)：聚焦 objc_class(cache_t 及方法缓存实现相关内容篇(1)).md */,
+				8E0E62B22525ECB10076A530 /* iOS 从源码解析Runtime (九)：聚焦 objc_class(cache_t 及方法缓存实现相关内容篇(2)).md */,
 			);
 			path = "已发布";
 			sourceTree = "<group>";
