@@ -162,7 +162,7 @@
 		8E2572D624D304DE0080F598 /* Array.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Array.cpp; sourceTree = "<group>"; };
 		8E2572D724D304DE0080F598 /* Array.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = Array.hpp; sourceTree = "<group>"; };
 		8E5CCE0624B9FF3D0081B5FF /* Review_1.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Review_1.cpp; sourceTree = "<group>"; };
-		8E6DFE182523862B00D2830E /* iOS 从源码解析Runtime (八)：聚焦 objc_class(cache_t 及方法缓存实现相关内容篇).md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 从源码解析Runtime (八)：聚焦 objc_class(cache_t 及方法缓存实现相关内容篇).md"; sourceTree = "<group>"; };
+		8E6DFE182523862B00D2830E /* iOS 从源码解析Runtime (八)：聚焦 objc_class(cache_t 及方法缓存实现相关内容篇(1)).md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 从源码解析Runtime (八)：聚焦 objc_class(cache_t 及方法缓存实现相关内容篇(1)).md"; sourceTree = "<group>"; };
 		8EA593D624CDB969002785EF /* OfferReview */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = OfferReview; sourceTree = BUILT_PRODUCTS_DIR; };
 		8EA593D824CDB969002785EF /* main.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
 		8EA593DE24CDBD0B002785EF /* AssignmentOperator.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = AssignmentOperator.cpp; sourceTree = "<group>"; };
@@ -887,7 +887,7 @@
 				D24C822225120D1400E3BF5E /* iOS 从源码解析Runtime (五)：聚焦 isa、objc_object(retain、release、retaincount相关内容篇).md */,
 				D237305A251C888D00274FBA /* iOS 从源码解析Runtime (六)：由 rootAutorelease 函数引发的解读 AutoreleasePool.md */,
 				D2373059251C880C00274FBA /* iOS 从源码解析Runtime (七)：聚焦 isa、objc_object(dealloc、autorelease返回值优化篇).md */,
-				8E6DFE182523862B00D2830E /* iOS 从源码解析Runtime (八)：聚焦 objc_class(cache_t 及方法缓存实现相关内容篇).md */,
+				8E6DFE182523862B00D2830E /* iOS 从源码解析Runtime (八)：聚焦 objc_class(cache_t 及方法缓存实现相关内容篇(1)).md */,
 			);
 			path = "已发布";
 			sourceTree = "<group>";

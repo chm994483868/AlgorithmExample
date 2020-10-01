@@ -1,4 +1,4 @@
-# iOS 从源码解析Runtime (七)：聚焦 objc_class(cache_t 及方法缓存实现相关内容篇)
+# iOS 从源码解析Runtime (八)：聚焦 objc_class(cache_t 及方法缓存实现相关内容篇(1))
 
 > 前面连续几篇我们已经详细分析了 `objc_object` 的相关的所有源码，接下来几篇则开始分析定义于 `objc-runtime-new.h` 中的 `objc_class`，本篇先从 `struct objc_class : objc_object` 的 `cache_t cache` 开始，`cache_t` 主要实现方法缓存，帮助我们更快的找到方法地址进行调用。
   纵览 `objc-runtime-new.h` 文件真的超长，那我们就分块来学习，一起 ⛽️⛽️ 吧！
@@ -656,7 +656,8 @@ bool cache_t::isConstantEmptyCache()
     return 
         occupied() == 0  &&  
         buckets() == emptyBucketsForCapacity(capacity(), false); 
-        // 且这里用了 false 则下面不执行 emptyBucketsList 相关的申请空间的逻辑，会直接 if (!allocate) return nil;
+        // 且这里用了 false 则下面不执行 emptyBucketsList 相关的申请空间的逻辑，
+        // 会直接 if (!allocate) return nil;
 }
 ```
 #### `capacity`
@@ -722,6 +723,7 @@ bucket_t *emptyBucketsForCapacity(mask_t capacity, bool allocate = true)
         
         // 申请 bytes 个字节的容量，并赋值为 1
         // capacity 大于 9/1026 那么 bytes 大于 9 * 16/1026 * 16，16 Kb也可太大了
+        // 分配 bytes 个长度为 1 的连续内存空间，且内存初始化为 0
         bucket_t *newBuckets = (bucket_t *)calloc(bytes, 1);
         
         // ⚠️
@@ -733,7 +735,8 @@ bucket_t *emptyBucketsForCapacity(mask_t capacity, bool allocate = true)
         
         // 先判断当前的指针是否有足够的连续空间，如果有，扩大 mem_address 指向的地址，并且将 mem_address 返回，
         // 如果空间不够，先按照 newsize 指定的大小分配空间，将原有数据从头到尾拷贝到新分配的内存区域，
-        // 而后释放原来 mem_address 所指内存区域（注意：原来指针是自动释放，不需要使用 free），同时返回新分配的内存区域的首地址，即重新分配存储器块的地址。
+        // 而后释放原来 mem_address 所指内存区域（注意：原来指针是自动释放，不需要使用 free），
+        // 同时返回新分配的内存区域的首地址，即重新分配存储器块的地址。
         
         // 对 emptyBucketsList 进行扩容
         emptyBucketsList = (bucket_t**)
@@ -750,7 +753,8 @@ bucket_t *emptyBucketsForCapacity(mask_t capacity, bool allocate = true)
             emptyBucketsList[i] = newBuckets;
         }
         
-        // 更新 emptyBucketsListCount，且 emptyBucketsListCount 是函数内的静态局部变量，函数进来 emptyBucketsListCount 都保持上次的值
+        // 更新 emptyBucketsListCount，且 emptyBucketsListCount 是函数内的静态局部变量，
+        // 函数进来 emptyBucketsListCount 都保持上次的值
         emptyBucketsListCount = newListCount;
         
         // OPTION( PrintCaches, OBJC_PRINT_CACHE_SETUP, "log processing of method caches")
@@ -776,15 +780,19 @@ bucket_t *emptyBucketsForCapacity(mask_t capacity, bool allocate = true)
 // NOTE: To define this condition, do so in the build command, NOT by uncommenting the line here.  
 // NOTE: 若要定义此条件，请在 build 命令中执行此操作，而不是取消下面 OBJC_INSTRUMENTED 的注释。
 
-// This is because objc-class.h heeds this condition, but objc-class.h can not #include this file (objc-config.h) because objc-class.h is public and objc-config.h is not.
-// 这是因为 objc-class.h 注意到了这个条件，但是 objc-class.h 不能包括这个文件（objc-config.h），因为 objc-class.h 是公共的，而 objc-config.h 不是。
+// This is because objc-class.h heeds this condition, but objc-class.h can not 
+// #include this file (objc-config.h) because objc-class.h is public and objc-config.h is not.
+// 这是因为 objc-class.h 注意到了这个条件，但是 objc-class.h 不能包括这个文件（objc-config.h），
+// 因为 objc-class.h 是公共的，而 objc-config.h 不是。
 
 //#define OBJC_INSTRUMENTED
 
 // --------------- 以上与 CONFIG_USE_CACHE_LOCK 无关
 
-// In __OBJC2__, the runtimeLock is a mutex always held hence the cache lock is redundant and can be elided.
-// 在 __OBJC2__ 中，runtimeLock 是 "始终保持" 的互斥锁，因此 cache lock 是多余的，可以忽略。(始终保持那里的意思是指 runtime Lock 始终是一个互斥锁吗？)
+// In __OBJC2__, the runtimeLock is a mutex always held hence the cache 
+// lock is redundant and can be elided.
+// 在 __OBJC2__ 中，runtimeLock 是 "始终保持" 的互斥锁，因此 cache lock 是多余的，可以忽略。
+// (始终保持那里的意思是指 runtime Lock 始终是一个互斥锁吗？)
 
 // If the runtime lock ever becomes a rwlock again, the cache lock would need to be used again.
 // 如果 runtime lock 再次变为 rwlock，则需要再次使用 cache lock。
@@ -829,8 +837,10 @@ size_t cache_t::bytesForCapacity(uint32_t cap)
 // EMPTY_BYTES includes space for a cache end marker bucket.
 // EMPTY_BYTES 是包括 缓存结束标记 bucket 的空间。
 
-// This end marker doesn't actually have the wrap-around pointer because cache scans always find an empty bucket before they might wrap.
-// 这个结束标记实际上没有 wrap-around 指针，因为缓存扫描总是在可能进行换行之前找到一个空的bucket。(因为 buckets 的扩容机制)
+// This end marker doesn't actually have the wrap-around pointer 
+// because cache scans always find an empty bucket before they might wrap.
+// 这个结束标记实际上没有 wrap-around 指针，
+// 因为缓存扫描总是在可能进行换行之前找到一个空的bucket。(因为 buckets 的扩容机制)
 
 // 1024 buckets is fairly common.
 // 1024 bukcets 很常见。
@@ -863,67 +873,125 @@ size_t cache_t::bytesForCapacity(uint32_t cap)
 ### `FAST_CACHE_ALLOC_MASK`
 ```c++
 // Fast Alloc fields:
-// This stores the word-aligned size of instances + "ALLOC_DELTA16", or 0 if the instance size doesn't fit.
+// This stores the word-aligned size of instances + "ALLOC_DELTA16", 
+// or 0 if the instance size doesn't fit.
 // 它存储实例的字对齐大小 + "ALLOC_DELTA16"，如果实例大小不适合，则存储0。
 
-// These bits occupy the same bits than in the instance size, so that the size can be extracted with a simple mask operation.
+// These bits occupy the same bits than in the instance size, 
+// so that the size can be extracted with a simple mask operation.
 // 这些位占用与实例大小相同的位，因此可以通过简单的掩码操作提取大小。
 
-// FAST_CACHE_ALLOC_MASK16 allows to extract the instance size rounded rounded up to the next 16 byte boundary, which is a fastpath for _objc_rootAllocWithZone()
-// FAST_CACHE_ALLOC_MASK16 允许提取四舍五入到下一个 16 字节边界的实例大小，这是 _objc_rootAllocWithZone() 的快速路径
+// FAST_CACHE_ALLOC_MASK16 allows to extract the instance size rounded
+// rounded up to the next 16 byte boundary, which is a fastpath for _objc_rootAllocWithZone()
+// FAST_CACHE_ALLOC_MASK16 允许提取四舍五入到下一个 16 字节边界的实例大小，
+// 这是 _objc_rootAllocWithZone() 的快速路径
 
 #define FAST_CACHE_ALLOC_MASK         0x1ff8 // 0b0001 1111 1111 1000
 #define FAST_CACHE_ALLOC_MASK16       0x1ff0 // 0b0001 1111 1111 0000
 #define FAST_CACHE_ALLOC_DELTA16      0x0008 // 0b0000 0000 0000 1000
 ```
 ### `hasFastInstanceSize/fastInstanceSize/setFastInstanceSize`
-&emsp;在 `__LP64__` 平台下，`cache_t` 多了一个 `uint16_t _flags`。
+&emsp;在 `__LP64__` 平台下，`cache_t` 多了一个 `uint16_t _flags`。以下函数是根据 `_flags` 中的一些标志位做出不同的处理。
 
 ```c++
 #if FAST_CACHE_ALLOC_MASK
     bool hasFastInstanceSize(size_t extra) const
     {
         if (__builtin_constant_p(extra) && extra == 0) {
+            // 如果 extra 在编译时是不是常量，则 _flags & 0b0001 1111 1111 0000 的值返回，
+            // 判断 cache_t 是否有快速实例化的大小
             return _flags & FAST_CACHE_ALLOC_MASK16;
         }
+        // _flags & 0b0001 1111 1111 1000 的值
         return _flags & FAST_CACHE_ALLOC_MASK;
     }
 
+    // 快速实例化的大小
     size_t fastInstanceSize(size_t extra) const
-    {
+    {   
+        // 断言
         ASSERT(hasFastInstanceSize(extra));
 
         if (__builtin_constant_p(extra) && extra == 0) {
+            // 如果 extra 在编译时不是常量，则直接返回 _flags & 0b0001 1111 1111 0000 的值
             return _flags & FAST_CACHE_ALLOC_MASK16;
         } else {
+            // _flags & 0b0001 1111 1111 1000
             size_t size = _flags & FAST_CACHE_ALLOC_MASK;
-            // remove the FAST_CACHE_ALLOC_DELTA16 that was added
-            // by setFastInstanceSize
+            
+            // remove the FAST_CACHE_ALLOC_DELTA16 that was added by setFastInstanceSize
+            // 删除由 setFastInstanceSize 添加的 FAST_CACHE_ALLOC_DELTA16
+            
+            // static inline size_t align16(size_t x) {
+            //     return (x + size_t(15)) & ~size_t(15);
+            // }
+            // align16 函数是计算大于等于 x 的最小的 16 的倍数，即计算 16 字节对齐时的长度
+            // 0b1000 8
+            // 0b1111 15
+            // 0b0001 0111  8 + 15 = 23
+            // &
+            // 0b0000 ~15
+            // 0b0001 0000 16
+            
+            // 16 字节对齐
             return align16(size + extra - FAST_CACHE_ALLOC_DELTA16);
         }
     }
 
+    // 设置快速实例化的大小
     void setFastInstanceSize(size_t newSize)
     {
         // Set during realization or construction only. No locking needed.
+        // 仅在 实现 或 构造 期间设置。不需要加锁。
+        // #define FAST_CACHE_ALLOC_MASK         0x1ff8 // 0b0001 1111 1111 1000
+        // _flags & 0b1110 0000 0000 0111
+        
         uint16_t newBits = _flags & ~FAST_CACHE_ALLOC_MASK;
         uint16_t sizeBits;
 
-        // Adding FAST_CACHE_ALLOC_DELTA16 allows for FAST_CACHE_ALLOC_MASK16
-        // to yield the proper 16byte aligned allocation size with a single mask
+        // Adding FAST_CACHE_ALLOC_DELTA16 allows for FAST_CACHE_ALLOC_MASK16 to yield
+        // the proper 16byte aligned allocation size with a single mask.
+        // 添加 FAST_CACHE_ALLOC_DELTA16 允许 FAST_CACHE_ALLOC_MASK16 通过单个掩码产生正确的 16 字节对齐的分配大小。
+        
+        // #ifdef __LP64__
+        // #   define WORD_MASK 7UL
+        // #else
+        // #   define WORD_MASK 3UL
+        // #endif
+        
+        // 0b0101 5
+        // 0b0111 7
+        // 0b1100 5 + 7
+        // 0b1000 ~7
+        // &
+        // 0b1000 // 8
+        
+        // static inline size_t word_align(size_t x) {
+        //     return (x + WORD_MASK) & ~WORD_MASK;
+        // }
+        // word_align 函数是进行字对齐，即 8 字节对齐
+        
+        // newSize 8 字节对齐 
         sizeBits = word_align(newSize) + FAST_CACHE_ALLOC_DELTA16;
+        
+        // 与操作
         sizeBits &= FAST_CACHE_ALLOC_MASK;
+        
         if (newSize <= sizeBits) {
+            // 或操作
             newBits |= sizeBits;
         }
+        
+        // _flags 赋值
         _flags = newBits;
     }
 #else
-    // 不支持 FAST_CACHE_ALLOC_MASK 时
+    // 不支持 FAST_CACHE_ALLOC_MASK 时，返回 false
     bool hasFastInstanceSize(size_t extra) const {
         return false;
     }
     size_t fastInstanceSize(size_t extra) const {
+        // 直接 abort
         abort();
     }
     void setFastInstanceSize(size_t extra) {
@@ -931,13 +999,512 @@ size_t cache_t::bytesForCapacity(uint32_t cap)
     }
 #endif
 ```
+#### `__builtin_constant_p`
+`__builtin_constant_p` 是编译器 `gcc` 内置函数，用于判断一个值是否为编译时常量，如果是常数，函数返回 `1 `，否则返回 `0`。此内置函数的典型用法是在宏中用于手动编译时优化。
+```c++
+// 在 main.m 中做如下测试：
+printf("😊😊 %d\n", __builtin_constant_p(101)); // 打印: 😊😊 1
+
+constexpr int a = 12 * 13;
+printf("😊😊 %d\n", __builtin_constant_p(a)); // 打印: 😊😊 1
+
+int a = 12 * 13;
+printf("😊😊 %d\n", __builtin_constant_p(a)); // 打印: 😊😊 0
+```
 ### `endMarker`
 ```c++
-
+// CACHE_END_MARKER 值为 1 时，定义 endMarker 函数
+bucket_t *cache_t::endMarker(struct bucket_t *b, uint32_t cap)
+{
+    // 最后一个 bucket_t 的指针，-1 是从内存末尾再前移一个 bucket_t 的宽度
+    return (bucket_t *)((uintptr_t)b + bytesForCapacity(cap)) - 1;
+}
 ```
+#### `CACHE_END_MARKER`
+&emsp;标记是否支持 `cache_t` 的 `buckets` 散列数组的内存末尾标记。
+```c++
+#if __arm__  ||  __x86_64__  ||  __i386__
 
+// objc_msgSend has few registers available.
+// objc_msgSend 可用寄存器很少。
+
+// Cache scan increments and wraps at special end-marking bucket.
+// 缓存扫描增量包裹在特殊的末端标记桶上。
+
+#define CACHE_END_MARKER 1 // 定为 1
+
+static inline mask_t cache_next(mask_t i, mask_t mask) {
+    return (i+1) & mask;
+}
+
+#elif __arm64__
+
+// objc_msgSend has lots of registers available.
+// objc_msgSend 有很多可用的寄存器。
+
+// Cache scan decrements. No end marker needed.
+// 缓存扫描减量。无需结束标记。
+
+#define CACHE_END_MARKER 0 // 定为 0
+
+static inline mask_t cache_next(mask_t i, mask_t mask) {
+    return i ? i-1 : mask;
+}
+
+#else
+
+// 未知的架构
+#error unknown architecture
+
+#endif
+```
+### `reallocate`
+```c++
+ALWAYS_INLINE
+void cache_t::reallocate(mask_t oldCapacity, mask_t newCapacity, bool freeOld)
+{
+    // 一个临时变量用于记录旧的散列表
+    bucket_t *oldBuckets = buckets();
+    
+    // 为新散列表申请指定容量的空间
+    bucket_t *newBuckets = allocateBuckets(newCapacity);
+
+    // Cache's old contents are not propagated.
+    // 缓存的旧内容不会传播。
+    
+    // This is thought to save cache memory at the cost of extra cache fills.
+    // 这被认为是以额外的缓存填充为代价来节省缓存内存的。
+    // fixme re-measure this 重新测量
+
+    ASSERT(newCapacity > 0);
+    ASSERT((uintptr_t)(mask_t)(newCapacity-1) == newCapacity-1);
+    
+    // 设置 buckets 和 mask
+    setBucketsAndMask(newBuckets, newCapacity - 1);
+    
+    if (freeOld) {
+        // 这里不是立即释放旧的 bukckts，而是将旧的 buckets 添加到存放旧散列表的列表中，
+        // 以便稍后释放，注意这里是稍后释放。
+        cache_collect_free(oldBuckets, oldCapacity);
+    }
+}
+```
+#### `allocateBuckets`
+```c++
+#if CACHE_END_MARKER
+
+bucket_t *allocateBuckets(mask_t newCapacity)
+{
+    // Allocate one extra bucket to mark the end of the list.
+    // 分配一个额外的 bucket 以标记列表的末尾。
+    
+    // This can't overflow mask_t because newCapacity is a power of 2.
+    // 因为 newCapacity 是 2 的幂，所以它不会溢出 mask_t。
+    
+    // 申请 sizeof(bucket_t) * newCapacity 个长度为 1 的连续内存空间，且内存初始化为 0
+    bucket_t *newBuckets = (bucket_t *)
+        calloc(cache_t::bytesForCapacity(newCapacity), 1);
+
+    // end 标记的 bucket_t
+    bucket_t *end = cache_t::endMarker(newBuckets, newCapacity);
+
+#if __arm__
+    // arm 32位架构下
+    // End marker's sel is 1 and imp points BEFORE the first bucket.
+    // 结束标记的 sel 为1，imp 指向第一个 bucket 之前。
+    
+    // This saves an instruction in objc_msgSend.
+    // 这会将指令保存在 objc_msgSend 中。
+    
+    // bucket_t 的 set 函数，设置 _sel 和 _imp，_imp 设置为了 (newBuckets - 1)
+    // _sel 设置为 1
+    end->set<NotAtomic, Raw>((SEL)(uintptr_t)1, (IMP)(newBuckets - 1), nil);
+#else
+    // 其他
+    // End marker's sel is 1 and imp points to the first bucket.
+    // 结束标记的 sel 为1，imp 指向第一个存储桶。
+    end->set<NotAtomic, Raw>((SEL)(uintptr_t)1, (IMP)newBuckets, nil);
+#endif
+    
+    // 缓存容量统计
+    if (PrintCaches) recordNewCache(newCapacity);
+
+    return newBuckets;
+}
+
+#else
+
+bucket_t *allocateBuckets(mask_t newCapacity)
+{
+    // 缓存容量统计
+    if (PrintCaches) recordNewCache(newCapacity);
+    
+    // 申请 sizeof(bucket_t) * newCapacity 个长度为 1 的连续内存空间，且内存初始化为 0 
+    return (bucket_t *)calloc(cache_t::bytesForCapacity(newCapacity), 1);
+}
+
+#endif
+```
+#### `cache_collect_free`
+&emsp;`cache_collect_free` 函数声明在 `objc-cache.mm` 文件顶部，定义在 `objc-cache.mm` 的 `Line 977`。
+```c++
+/*
+cache_collect_free.
+
+Add the specified malloc'd memory to the list of them to free at some later point.
+将指定的已分配内存添加到它们的列表中，以便稍后释放。
+
+size is used for the collection threshold. It does not have to be precisely the block's size.
+size 用于收集阈值。它不必精确地是 块 的大小。
+
+Cache locks: cacheUpdateLock must be held by the caller.
+cacheUpdateLock 必须由调用方持有。需要加锁。（__objc2__ 下使用的是 runtimeLock）
+
+*/
+static void cache_collect_free(bucket_t *data, mask_t capacity)
+{
+#if CONFIG_USE_CACHE_LOCK
+    cacheUpdateLock.assertLocked();
+#else
+    runtimeLock.assertLocked(); // 加锁，加锁失败执行断言
+#endif
+
+    // 记录等待释放的容量 
+    if (PrintCaches) recordDeadCache(capacity);
+
+    // 为 garbage 准备空间，需要时进行扩容
+    _garbage_make_room ();
+    
+    // 增加 garbage_byte_size 的值
+    garbage_byte_size += cache_t::bytesForCapacity(capacity);
+    
+    // 把旧的 buckets 放进 garbage_refs 中，garbage_count 并自增 1
+    garbage_refs[garbage_count++] = data;
+    
+    // 尝试去释放累积的旧缓存（bucket_t）
+    cache_collect(false);
+}
+```
+#### `_garbage_make_room`
+&emsp;同样 `_garbage_make_room` 函数声明在 `objc-cache.mm` 顶部，定义在 `objc-cache.mm` 的 `Line 947`。
+```c++
+/*
+_garbage_make_room.  
+Ensure that there is enough room for at least one more ref in the garbage.
+确保 garbage 中有足够的空间容纳至少一个引用。
+*/
+
+// amount of memory represented by all refs in the garbage.
+// garbage 中所有引用所表示的内存量。
+static size_t garbage_byte_size = 0;
+
+// do not empty the garbage until garbage_byte_size gets at least this big.
+// 在 garbage 中字节大小（garbage_byte_size）至少达到这么大（garbage_threshold）之前，不要清空 garbage。
+static size_t garbage_threshold = 32*1024;
+
+// table of refs to free.
+// bucket_t **
+static bucket_t **garbage_refs = 0;
+
+// current number of refs in garbage_refs.
+// 当前 garbage_refs 中 bucket_t * 的数量。
+static size_t garbage_count = 0;
+
+// capacity of current garbage_refs.
+// 当前 garbage_refs 的容量。
+static size_t garbage_max = 0;
+
+// capacity of initial garbage_refs
+// 初始 garbage_refs 的容量。
+enum {
+    INIT_GARBAGE_COUNT = 128
+};
+
+static void _garbage_make_room(void)
+{
+    static int first = 1; // 静态局部变量，下次进来 first 依然是上次的值
+
+    // Create the collection table the first time it is needed
+    // 第一次需要时创建收集表
+    if (first)
+    {
+        first = 0; // 此处置为 0 后，以后调用 _garbage_make_room 再也不会进到这个 if
+        // 申请初始空间
+        // 申请 INIT_GARBAGE_COUNT * sizeof(void *) 字节个空间。
+        // (malloc 不会对空间进行初始化，会保持申请时的垃圾数据)
+        garbage_refs = (bucket_t**)malloc(INIT_GARBAGE_COUNT * sizeof(void *));
+        
+        // 当前 garbage_refs 的容量是 INIT_GARBAGE_COUNT
+        garbage_max = INIT_GARBAGE_COUNT;
+    }
+
+    // Double the table if it is full
+    // 如果当前 garbage_refs 中 refs 的数量等于 garbage_max 就对 garbage_refs 扩容为当前的 2 倍
+    else if (garbage_count == garbage_max)
+    {
+        // garbage_refs 扩容为 2 倍
+        garbage_refs = (bucket_t**)
+            realloc(garbage_refs, garbage_max * 2 * sizeof(void *));
+        // 更新 garbage_max 为 2 倍
+        garbage_max *= 2;
+    }
+}
+```
+#### `cache_collect`
+```c++
+/*
+cache_collect.  
+Try to free accumulated dead caches.
+尝试释放累积的死缓存。
+
+collectALot tries harder to free memory.
+collectALot 如果为 true 则即使 garbage_byte_size 未达到阀值也会去释放内存（旧的 bucket_t）。
+
+Cache locks: cacheUpdateLock must be held by the caller.
+cacheUpdateLock 必须由调用方持有。需要加锁。（__objc2__ 下使用的是 runtimeLock）
+
+*/
+void cache_collect(bool collectALot)
+{
+#if CONFIG_USE_CACHE_LOCK
+    cacheUpdateLock.assertLocked();
+#else
+    runtimeLock.assertLocked(); // 加锁，加锁失败会执行断言
+#endif
+
+    // Done if the garbage is not full
+    // 如果 garbage 未满，则返回
+    // 32*1024
+    // 未达到释放阀值，且 collectALot 为 false
+    if (garbage_byte_size < garbage_threshold  &&  !collectALot) {
+        return;
+    }
+
+    // Synchronize collection with objc_msgSend and other cache readers.
+    // objc_msgSend 和其他 缓存读取器 同步收集。
+    if (!collectALot) {
+    
+        if (_collecting_in_critical ()) {
+            // objc_msgSend (or other cache reader) is currently looking in the cache and might still be using some garbage.
+            // objc_msgSend（或其他缓存读取器）当前正在缓存中查找，并且可能仍在使用某些 garbage。
+            // 打印
+            if (PrintCaches) {
+                _objc_inform ("CACHES: not collecting; "
+                              "objc_msgSend in progress");
+            }
+            // 直接 return
+            return;
+        }
+    } 
+    else {
+        // No excuses.
+        // 一直循环直到 _collecting_in_critical 为 false.
+        while (_collecting_in_critical()) 
+            ;
+    }
+
+    // No cache readers in progress - garbage is now deletable.
+    // 没有正在进行中的 缓存读取器 -现在可以删除 garbage 了。
+
+    // Log our progress
+    // Log
+    if (PrintCaches) {
+        cache_collections++; // 自增
+        // 打印 garbage_byte_size garbage 使用的字节 cache_allocations 分配了多少 cache_t
+        _objc_inform ("CACHES: COLLECTING %zu bytes (%zu allocations, %zu collections)", garbage_byte_size, cache_allocations, cache_collections);
+    }
+    
+    // Dispose all refs now in the garbage.
+    // 处理 garbage 中的所有 refs。
+    
+    // Erase each entry so debugging tools don't see stale pointers.
+    // 擦除每个条目，以便调试工具不会看到过时的指针。
+    
+    // 循环释放 garbage_refs 中的 bucket_t *
+    while (garbage_count--) {
+        auto dead = garbage_refs[garbage_count];
+        garbage_refs[garbage_count] = nil;
+        free(dead);
+    }
+    
+    // Clear the garbage count and total size indicator.
+    // garbage_count 和 garbage_byte_size 置 0。
+    
+    garbage_count = 0;
+    garbage_byte_size = 0;
+
+    // 打印 Cache statistics 中的内容
+    if (PrintCaches) {
+        size_t i;
+        size_t total_count = 0;
+        size_t total_size = 0;
+
+        for (i = 0; i < countof(cache_counts); i++) {
+            int count = cache_counts[i];
+            int slots = 1 << i;
+            size_t size = count * slots * sizeof(bucket_t);
+
+            if (!count) continue;
+
+            _objc_inform("CACHES: %4d slots: %4d caches, %6zu bytes", 
+                         slots, count, size);
+
+            total_count += count;
+            total_size += size;
+        }
+
+        _objc_inform("CACHES:      total: %4zu caches, %6zu bytes", 
+                     total_count, total_size);
+    }
+}
+```
+#### `_collecting_in_critical`
+&emsp;同样 `_collecting_in_critical` 函数声明在 `objc-cache.mm` 顶部，定义在 `objc-cache.mm` 的 `Line 838`。
+返回 `true` 表示 `objc_msgSend`（或其他缓存读取器（`cache reader`））当前正在缓存中查找，并且可能仍在使用某些 `garbage`。返回 `false` 的话表示 `garbage` 中的 `bucket_t` 没有被在使用。
+
+```c++
+static int _collecting_in_critical(void)
+{
+#if TARGET_OS_WIN32 // 如果是 TARGET_OS_WIN32 则一直返回 true
+    return TRUE;
+#elif HAVE_TASK_RESTARTABLE_RANGES (arm64 和 x86_64 都支持)
+    // Only use restartable ranges if we registered them earlier.
+    // 如果我们较早注册它们，请仅使用 restartable ranges。
+    // #if HAVE_TASK_RESTARTABLE_RANGES
+    // static bool shouldUseRestartableRanges = true;
+    // #endif
+    
+    if (shouldUseRestartableRanges) {
+        // typedef int kern_return_t;
+        kern_return_t kr = task_restartable_ranges_synchronize(mach_task_self());
+        
+        if (kr == KERN_SUCCESS) return FALSE; // return FALSE 表示 garbage 没有被在使用，此时处于可清空状态。
+        （如果 collectALot 为真则表示必须清空，如果是不可清空状态则会一直等待，上面的 while (_collecting_in_critical()) ; ）
+        
+        _objc_fatal("task_restartable_ranges_synchronize failed (result 0x%x: %s)",
+                    kr, mach_error_string(kr));
+    }
+#endif // !HAVE_TASK_RESTARTABLE_RANGES
+
+    // Fallthrough if we didn't use restartable ranges.
+    // 如果我们不使用 restartable ranges，则会失败。
+
+    thread_act_port_array_t threads;
+    unsigned number;
+    unsigned count;
+    kern_return_t ret;
+    int result;
+
+    // objc_thread_self: (pthread_t)tls_get_direct(_PTHREAD_TSD_SLOT_PTHREAD_SELF);
+    // 从线程的存储空间读取
+    
+    mach_port_t mythread = pthread_mach_thread_np(objc_thread_self());
+
+    // Get a list of all the threads in the current task.
+    // 获取当前任务中所有线程的列表。
+#if !DEBUG_TASK_THREADS
+    ret = task_threads(mach_task_self(), &threads, &number);
+#else
+    ret = objc_task_threads(mach_task_self(), &threads, &number);
+#endif
+
+    if (ret != KERN_SUCCESS) {
+        // See DEBUG_TASK_THREADS below to help debug this.
+        // 请参阅下面的 DEBUG_TASK_THREADS 来帮助调试。
+        
+        _objc_fatal("task_threads failed (result 0x%x)\n", ret);
+    }
+
+    // Check whether any thread is in the cache lookup code.
+    // 检查缓存查找代码中是否有线程。
+    
+    result = FALSE;
+    for (count = 0; count < number; count++)
+    {
+        int region;
+        uintptr_t pc;
+
+        // Don't bother checking ourselves.
+        // 不要打扰自己
+        if (threads[count] == mythread)
+            continue;
+
+        // Find out where thread is executing.
+        // 找出线程在哪里执行。
+        pc = _get_pc_for_thread (threads[count]);
+
+        // Check for bad status, and if so, assume the worse (can't collect).
+        // 检查状态是否良好，如果是，则假设情况更糟（无法收集）。
+        if (pc == PC_SENTINEL)
+        {
+            result = TRUE;
+            goto done;
+        }
+        
+        // Check whether it is in the cache lookup code.
+        // 检查它是否在缓存查找代码中。
+        for (region = 0; objc_restartableRanges[region].location != 0; region++)
+        {
+            uint64_t loc = objc_restartableRanges[region].location;
+            if ((pc > loc) &&
+                (pc - loc < (uint64_t)objc_restartableRanges[region].length))
+            {
+                result = TRUE;
+                goto done;
+            }
+        }
+    }
+
+ done:
+    // Deallocate the port rights for the threads
+    // 取消分配线程的端口权限
+    for (count = 0; count < number; count++) {
+        mach_port_deallocate(mach_task_self (), threads[count]);
+    }
+
+    // Deallocate the thread list
+    // 取消分配线程列表
+    vm_deallocate (mach_task_self (), (vm_address_t) threads, sizeof(threads[0]) * number);
+
+    // Return our finding
+    // 返回我们的发现
+    return result;
+}
+```
+##### `HAVE_TASK_RESTARTABLE_RANGES`
+```c++
+// Define HAVE_TASK_RESTARTABLE_RANGES to enable usage of task_restartable_ranges_synchronize().
+// 定义 HAVE_TASK_RESTARTABLE_RANGES 以启用使用 task_restartable_ranges_synchronize() 函数。
+
+#if TARGET_OS_SIMULATOR || defined(__i386__) || defined(__arm__) || !TARGET_OS_MAC
+#   define HAVE_TASK_RESTARTABLE_RANGES 0
+#else
+#   define HAVE_TASK_RESTARTABLE_RANGES 1
+#endif
+```
+##### `task_restartable_ranges_synchronize`
+```c++
+/*!
+ * @function task_restartable_ranges_synchronize
+ *
+ * @brief
+ * Require for all threads in the task to reset their PC if within a restartable range.
+ * 如果在可重新启动的范围内，则要求任务中的所有线程重置其 PC。
+ *
+ * @param task
+ * The task to operate on (needs to be current task)
+ * 要执行的任务（需要是当前任务）
+ * @returns
+ * - KERN_SUCCESS
+ * - KERN_FAILURE if the task isn't the current one 如果任务不是当前任务
+ */
+extern kern_return_t task_restartable_ranges_synchronize(task_t task);
+```
+&emsp;`cache_t` 的内容先分析到这里，下篇我们接着来看 `cache_t` 剩余的 `insert` 和 `bad_cache`，以及最重要的 `objc-cache.h` 文件中声明的一系列方法，正是它们完整构成了方法缓存的实现。 
 
 ## 参考链接
 **参考链接:🔗**
-+ [黑幕背后的Autorelease](http://blog.sunnyxx.com/2014/10/15/behind-autorelease/)
++ [方法查找流程 objc_msg_arm64.s](https://www.jianshu.com/p/a8668b81c5d6)
++ [OC 底层探索 09、objc_msgSend 流程 1-缓存查找](https://www.cnblogs.com/zhangzhang-y/p/13704597.html)
++ [汇编指令解读](https://blog.csdn.net/peeno/article/details/53068412)
 
