@@ -635,20 +635,28 @@ void cache_t::initializeToEmpty()
 ```c++
 bool cache_t::canBeFreed()
 {
-    // 
+    // 调用 isConstantEmptyCache 函数，如果它返回 true，
+    // 则表明 cache_t 的 buckets 当前正是那些准备的标记 emptyBuckets 的静态值
+    //（应该估计都是 cache_t::emptyBuckets() 全局的 (bucket_t *)&_objc_empty_cache 值），则不能进行释放，
+    // 否则是我们自己申请的有效的方法缓存内容，可进行释放。
     return !isConstantEmptyCache();
 }
 ```
 #### `isConstantEmptyCache`
+&emsp;看完下面的 `emptyBucketsForCapacity` 实现才知道 `isConstantEmptyCache` 中 `Constant` 的含义。
 ```c++
 bool cache_t::isConstantEmptyCache()
 {
-    // occupied() 函数很简单就是获取 _occupied 成员变量的值然后直接返回，_occupied 表示散列表中已占用的容量
+    // occupied() 函数很简单就是获取 _occupied 成员变量的值然后直接返回，
+    // _occupied 表示散列表中已占用的容量
     // 此处要求 occupied() 为 0 并且 buckets() 等于 emptyBucketsForCapacity(capacity(), false)
-    // 
+    // emptyBucketsForCapacity 函数则是根据 capacity() 去找其对应的 emptyBuckets，
+    // 且这些 emptyBuckets 地址都是固定的，
+    // 它们是作标记用的静态值，如果此时 buckets 正是这些个静态值，说明此时 cache_t 是一个空缓存
     return 
         occupied() == 0  &&  
-        buckets() == emptyBucketsForCapacity(capacity(), false);
+        buckets() == emptyBucketsForCapacity(capacity(), false); 
+        // 且这里用了 false 则下面不执行 emptyBucketsList 相关的申请空间的逻辑，会直接 if (!allocate) return nil;
 }
 ```
 #### `capacity`
@@ -660,43 +668,94 @@ unsigned cache_t::capacity()
 }
 ```
 ### `emptyBucketsForCapacity`
+&emsp;根据入参 `capacity`，返回一个指定 `capacity` 容量的空的散列表，返回的这个 `bucket_t *` 是  `static bucket_t **emptyBucketsList` 这个静态变量指定下标的值，当 `capacity` 位于指定的区间时，返回的 `bucket_t *` 都是相同的。
+例如：`capacity` 值在 `[8，15]` 之内时，通过 `index = log2u(capacity)` 计算的 `index` 值都是相同的，那么调用 `emptyBucketsForCapacity` 函数返回的都是相同的 `emptyBucketsList[index]`。由于这里有 `EMPTY_BYTES` 限制，所以至少 `capacity`  大于 `9/1025` 才会使用到 `emptyBucketsList` 相关的逻辑，内部 `index` 是从 `3/10` 开始的。其它的情况则一律返回 `cache_t::emptyBuckets()`。
 ```c++
 bucket_t *emptyBucketsForCapacity(mask_t capacity, bool allocate = true)
 {
 #if CONFIG_USE_CACHE_LOCK
     cacheUpdateLock.assertLocked();
 #else
-    runtimeLock.assertLocked();
+    runtimeLock.assertLocked(); // 走此分支，加锁（加锁失败会执行断言）
 #endif
 
+    // buckets 总字节占用（sizeof(bucket_t) * capacity）
     size_t bytes = cache_t::bytesForCapacity(capacity);
-
+    
     // Use _objc_empty_cache if the buckets is small enough.
+    // 如果 buckets 足够小的话使用 _objc_empty_cache。
     if (bytes <= EMPTY_BYTES) {
+        // 小于 ((8+1)*16) 主要针对的是 DEBUG 模式下：
+        // 小于 ((1024+1)*16) 非 DEBUG 模式（后面的乘以 16 是因为 sizeof(bucket_t) == 16）
+        //（觉得这个 1025 的容量就已经很大大了，可能很难超过，大概率这里就直接返回 cache_t::emptyBuckets() 了）
         return cache_t::emptyBuckets();
     }
 
     // Use shared empty buckets allocated on the heap.
+    // 使用在堆上分配的 shared empty buckets。
+    
+    // 静态的 bucket_t **，下次再进入 emptyBucketsForCapacity 函数的话依然依然是保持上次的值
+    // 且返回值正是 emptyBucketsList[index]，就是说调用 emptyBucketsForCapacity 获取就是一个静态的定值
     static bucket_t **emptyBucketsList = nil;
+    
+    // 静态的 mask_t (uint32_t)，下次再进入 emptyBucketsForCapacity 函数的话依然依然是保持上次的值
     static mask_t emptyBucketsListCount = 0;
     
+    // ⚠️
+    // template <typename T>
+    // static inline T log2u(T x) {
+    //     return (x<2) ? 0 : log2u(x>>1)+1;
+    // }
+    
+    // log2u 计算的是小于等于 x 的最大的 2 幂的指数
+    // x 在 [8，15] 区间内，大于等于 2^3，所以返回值为 3
+    // x 在 [16, 31] 区间内，大于等于 2^4, 所以返回值为 4
+    
     mask_t index = log2u(capacity);
+
 
     if (index >= emptyBucketsListCount) {
         if (!allocate) return nil;
 
+        // index + 1 此值还没有看出来是什么意思
         mask_t newListCount = index + 1;
+        
+        // 申请 bytes 个字节的容量，并赋值为 1
+        // capacity 大于 9/1026 那么 bytes 大于 9 * 16/1026 * 16，16 Kb也可太大了
         bucket_t *newBuckets = (bucket_t *)calloc(bytes, 1);
+        
+        // ⚠️
+        // extern void *realloc(void *mem_address, unsigned int newsize);
+        //（数据类型*）realloc（要改变内存大小的指针名，新的大小）
+        // 新的大小可大可小，如果新的大小大于原内存大小，则新分配部分不会被初始化；如果新的大小小于原内存大小，可能会导致数据丢失。
+        // 注意事项: 重分配成功旧内存会被自动释放，旧指针变成了野指针。
+        // 返回值: 如果重新分配成功则返回指向被分配内存的指针，否则返回空指针 NULL。
+        
+        // 先判断当前的指针是否有足够的连续空间，如果有，扩大 mem_address 指向的地址，并且将 mem_address 返回，
+        // 如果空间不够，先按照 newsize 指定的大小分配空间，将原有数据从头到尾拷贝到新分配的内存区域，
+        // 而后释放原来 mem_address 所指内存区域（注意：原来指针是自动释放，不需要使用 free），同时返回新分配的内存区域的首地址，即重新分配存储器块的地址。
+        
+        // 对 emptyBucketsList 进行扩容
         emptyBucketsList = (bucket_t**)
             realloc(emptyBucketsList, newListCount * sizeof(bucket_t *));
+            
         // Share newBuckets for every un-allocated size smaller than index.
+        // 对于每个小于索引的未分配大小，Share newBucket。
         // The array is therefore always fully populated.
+        // 因此，array 始终总是完全填充。
+        
+        // 把新扩容的 emptyBucketsList 的 新位置上都放上 newBuckets
         for (mask_t i = emptyBucketsListCount; i < newListCount; i++) {
+            // 把新扩容的 emptyBucketsList 的 新位置上都放上 newBuckets
             emptyBucketsList[i] = newBuckets;
         }
+        
+        // 更新 emptyBucketsListCount，且 emptyBucketsListCount 是函数内的静态局部变量，函数进来 emptyBucketsListCount 都保持上次的值
         emptyBucketsListCount = newListCount;
-
+        
+        // OPTION( PrintCaches, OBJC_PRINT_CACHE_SETUP, "log processing of method caches")
         if (PrintCaches) {
+            // 如果开启了 OBJC_PRINT_CACHE_SETUP 则打印 
             _objc_inform("CACHES: new empty buckets at %p (capacity %zu)", 
                          newBuckets, (size_t)capacity);
         }
@@ -705,6 +764,178 @@ bucket_t *emptyBucketsForCapacity(mask_t capacity, bool allocate = true)
     return emptyBucketsList[index];
 }
 ```
+#### `CONFIG_USE_CACHE_LOCK`
+&emsp;`emptyBucketsForCapacity` 函数的入口就是一个 `CONFIG_USE_CACHE_LOCK` 宏定义，它是用来标志 `emptyBucketsForCapacity` 函数使用 `cacheUpdateLock` 还是 `runtimeLock`，注意这里针对的是 `Objective-C` 的版本，`__OBJC2__` 下使用的是 `runtimeLock` 否则使用 `cacheUpdateLock`。
+```c++
+// OBJC_INSTRUMENTED controls whether message dispatching is dynamically monitored.
+// OBJC_INSTRUMENTED 控制是否动态监视消息调度。
+
+// Monitoring introduces substantial overhead.
+// 监控会带来大量开销。
+
+// NOTE: To define this condition, do so in the build command, NOT by uncommenting the line here.  
+// NOTE: 若要定义此条件，请在 build 命令中执行此操作，而不是取消下面 OBJC_INSTRUMENTED 的注释。
+
+// This is because objc-class.h heeds this condition, but objc-class.h can not #include this file (objc-config.h) because objc-class.h is public and objc-config.h is not.
+// 这是因为 objc-class.h 注意到了这个条件，但是 objc-class.h 不能包括这个文件（objc-config.h），因为 objc-class.h 是公共的，而 objc-config.h 不是。
+
+//#define OBJC_INSTRUMENTED
+
+// --------------- 以上与 CONFIG_USE_CACHE_LOCK 无关
+
+// In __OBJC2__, the runtimeLock is a mutex always held hence the cache lock is redundant and can be elided.
+// 在 __OBJC2__ 中，runtimeLock 是 "始终保持" 的互斥锁，因此 cache lock 是多余的，可以忽略。(始终保持那里的意思是指 runtime Lock 始终是一个互斥锁吗？)
+
+// If the runtime lock ever becomes a rwlock again, the cache lock would need to be used again.
+// 如果 runtime lock 再次变为 rwlock，则需要再次使用 cache lock。
+
+// 可在 objc-runtime-new.mm 中看到如下定义，表明 cacheUpdateLock 只是一个在旧版本中使用的锁
+// #if CONFIG_USE_CACHE_LOCK
+// mutex_t cacheUpdateLock;
+// #endif
+
+#if __OBJC2__
+
+#define CONFIG_USE_CACHE_LOCK 0 // Objective-C 2.0 下是 0 
+
+#else
+
+#define CONFIG_USE_CACHE_LOCK 1 //  其他情况下是 1
+
+#endif
+
+// 对应与如下调用：
+#if CONFIG_USE_CACHE_LOCK
+    cacheUpdateLock.assertLocked();
+#else
+    // extern mutex_t runtimeLock; 在 objc-locks-new.h 中一个外联声明
+    // mutex_t runtimeLock; 在 objc-runtime-new.mm Line 75 定义（类型是互斥锁） 
+    
+    // assertLocked 进行加锁，如果加锁失败是导致断言
+    runtimeLock.assertLocked(); // 在 __OBJC2__ 下是使用 runtimeLock
+#endif
+```
+#### `bytesForCapacity`
+&emsp;`bucket_t` 散列数组的总的内存占用（以字节为单位）。
+```c++
+size_t cache_t::bytesForCapacity(uint32_t cap)
+{   
+    // 总容量乘以每个 bucket_t 的字节大小
+    return sizeof(bucket_t) * cap;
+}
+```
+#### `EMPTY_BYTES`
+```c++
+// EMPTY_BYTES includes space for a cache end marker bucket.
+// EMPTY_BYTES 是包括 缓存结束标记 bucket 的空间。
+
+// This end marker doesn't actually have the wrap-around pointer because cache scans always find an empty bucket before they might wrap.
+// 这个结束标记实际上没有 wrap-around 指针，因为缓存扫描总是在可能进行换行之前找到一个空的bucket。(因为 buckets 的扩容机制)
+
+// 1024 buckets is fairly common.
+// 1024 bukcets 很常见。
+
+// 一个 bucket_t 的实例变量的大小应该是 16 字节
+
+#if DEBUG
+    // Use a smaller size to exercise heap-allocated empty caches.
+    // 使用较小的容量来执行堆分配的空缓存。
+#   define EMPTY_BYTES ((8+1)*16)
+#else
+#   define EMPTY_BYTES ((1024+1)*16)
+#endif
+```
+### `getBit/setBit/clearBit`
+&emsp;针对 `__LP64__` 平台下的 `_flags` 的操作。[atomic_fetch_or/atomic_fetch_and](https://en.cppreference.com/w/cpp/atomic/atomic_fetch_or)
+```c++
+#if __LP64__
+    bool getBit(uint16_t flags) const {
+        return _flags & flags;
+    }
+    void setBit(uint16_t set) {
+        __c11_atomic_fetch_or((_Atomic(uint16_t) *)&_flags, set, __ATOMIC_RELAXED);
+    }
+    void clearBit(uint16_t clear) {
+        __c11_atomic_fetch_and((_Atomic(uint16_t) *)&_flags, ~clear, __ATOMIC_RELAXED);
+    }
+#endif
+```
+### `FAST_CACHE_ALLOC_MASK`
+```c++
+// Fast Alloc fields:
+// This stores the word-aligned size of instances + "ALLOC_DELTA16", or 0 if the instance size doesn't fit.
+// 它存储实例的字对齐大小 + "ALLOC_DELTA16"，如果实例大小不适合，则存储0。
+
+// These bits occupy the same bits than in the instance size, so that the size can be extracted with a simple mask operation.
+// 这些位占用与实例大小相同的位，因此可以通过简单的掩码操作提取大小。
+
+// FAST_CACHE_ALLOC_MASK16 allows to extract the instance size rounded rounded up to the next 16 byte boundary, which is a fastpath for _objc_rootAllocWithZone()
+// FAST_CACHE_ALLOC_MASK16 允许提取四舍五入到下一个 16 字节边界的实例大小，这是 _objc_rootAllocWithZone() 的快速路径
+
+#define FAST_CACHE_ALLOC_MASK         0x1ff8 // 0b0001 1111 1111 1000
+#define FAST_CACHE_ALLOC_MASK16       0x1ff0 // 0b0001 1111 1111 0000
+#define FAST_CACHE_ALLOC_DELTA16      0x0008 // 0b0000 0000 0000 1000
+```
+### `hasFastInstanceSize/fastInstanceSize/setFastInstanceSize`
+&emsp;在 `__LP64__` 平台下，`cache_t` 多了一个 `uint16_t _flags`。
+
+```c++
+#if FAST_CACHE_ALLOC_MASK
+    bool hasFastInstanceSize(size_t extra) const
+    {
+        if (__builtin_constant_p(extra) && extra == 0) {
+            return _flags & FAST_CACHE_ALLOC_MASK16;
+        }
+        return _flags & FAST_CACHE_ALLOC_MASK;
+    }
+
+    size_t fastInstanceSize(size_t extra) const
+    {
+        ASSERT(hasFastInstanceSize(extra));
+
+        if (__builtin_constant_p(extra) && extra == 0) {
+            return _flags & FAST_CACHE_ALLOC_MASK16;
+        } else {
+            size_t size = _flags & FAST_CACHE_ALLOC_MASK;
+            // remove the FAST_CACHE_ALLOC_DELTA16 that was added
+            // by setFastInstanceSize
+            return align16(size + extra - FAST_CACHE_ALLOC_DELTA16);
+        }
+    }
+
+    void setFastInstanceSize(size_t newSize)
+    {
+        // Set during realization or construction only. No locking needed.
+        uint16_t newBits = _flags & ~FAST_CACHE_ALLOC_MASK;
+        uint16_t sizeBits;
+
+        // Adding FAST_CACHE_ALLOC_DELTA16 allows for FAST_CACHE_ALLOC_MASK16
+        // to yield the proper 16byte aligned allocation size with a single mask
+        sizeBits = word_align(newSize) + FAST_CACHE_ALLOC_DELTA16;
+        sizeBits &= FAST_CACHE_ALLOC_MASK;
+        if (newSize <= sizeBits) {
+            newBits |= sizeBits;
+        }
+        _flags = newBits;
+    }
+#else
+    // 不支持 FAST_CACHE_ALLOC_MASK 时
+    bool hasFastInstanceSize(size_t extra) const {
+        return false;
+    }
+    size_t fastInstanceSize(size_t extra) const {
+        abort();
+    }
+    void setFastInstanceSize(size_t extra) {
+        // nothing
+    }
+#endif
+```
+### `endMarker`
+```c++
+
+```
+
 
 ## 参考链接
 **参考链接:🔗**
