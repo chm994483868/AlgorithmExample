@@ -674,7 +674,7 @@ method4 - %p",method1,method2,method3,method4);
 // 打印:
 method1 - 0x0 // 入参是从类对象中获取实例方法，返回 nil
 method2 - 0x0 // 入参是从元类对象获取实例方法，返回 nil
-method3 - 0x100003140 // 从类对象获取类方法，找到了且与下面玩去相同
+method3 - 0x100003140 // 从类对象获取类方法，找到了且与下面完全相同
 method4 - 0x100003140 // 从元类对象中获取类方法，找到了
 ```
 ⚠️⚠️⚠️ 3 和 4 都有值，且是一样的，盲猜的话 4 应该正常返回，3 应该返回 nil，这里查看源码验证，为什么 3 从类对象中获取到了类方法：
@@ -687,7 +687,7 @@ method4 - 0x100003140 // 从元类对象中获取类方法，找到了
 Method class_getClassMethod(Class cls, SEL sel)
 {
     if (!cls  ||  !sel) return nil;
-    // cls->getMeta() 获取 cls 的元类，如果 cls 是类对象则返回它的元类，如果已经是 类对象了，则返回它自己
+    // cls->getMeta() 获取 cls 的元类，如果 cls 是类对象则返回它的元类，如果已经是元类对象了，则返回它自己
     return class_getInstanceMethod(cls->getMeta(), sel);
 }
 
