@@ -1068,6 +1068,11 @@ LLookupRecover$1:
 + [.align 5的是多少字节对齐](https://blog.csdn.net/yunying_si/article/details/9736173?ops_request_misc=%257B%2522request%255Fid%2522%253A%2522160185721219724839257560%2522%252C%2522scm%2522%253A%252220140713.130102334..%2522%257D&request_id=160185721219724839257560&biz_id=0&utm_medium=distribute.pc_search_result.none-task-blog-2~all~first_rank_v2~rank_v28-3-9736173.pc_first_rank_v2_rank_v28&utm_term=.align+&spm=1018.2118.3001.4187)
 + [解读objc_msgSend](https://www.jianshu.com/p/75a4737741fd)
 + [ARM汇编指令](https://blog.csdn.net/qq_27522735/article/details/75043870)
++ [翻译-为什么objc_msgSend必须用汇编实现](http://tutuge.me/2016/06/19/translation-why-objcmsgsend-must-be-written-in-assembly/)
++ [iOS runtime 底层详解、内部原理、场景应用](https://www.it610.com/article/1278625871489417216.htm)
++ [iOS - Runtime 中 Class、消息机制、super 关键字](https://www.jianshu.com/p/2faae9f0dcb3)
++ [深入iOS系统底层之汇编语言](https://juejin.im/post/6844903560140816398)
++ [操作系统内存管理(思维导图详解)](https://blog.csdn.net/hguisu/article/details/5713164)
 
 **ARM 的栈是自减栈，栈是向下生长的，也就是栈底处于高地址处，栈顶处于低地址处，所以栈区一般都是放在内存的顶端。**
 
