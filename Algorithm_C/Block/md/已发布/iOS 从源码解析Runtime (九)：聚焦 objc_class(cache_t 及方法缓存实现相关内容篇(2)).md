@@ -2,6 +2,8 @@
 
 > 上篇分析了 `bucket_t` 和 `cache_t` 的几乎全部内容，最后由于篇幅限制剩两个函数留在本篇来分析，然后准备接着分析 `objc-cache.mm` 文件中与 `objc-cache.h` 文件对应的几个核心函数，正是由它们构成了完整的方法缓存实现，那么一起 ⛽️⛽️ 吧！
 
+> 这篇文章发的太晚了，主要是这几天时间都花在看汇编上了，我的汇编水平大概只是一年前看过王爽老师的那本汇编的书，然后就没怎么接触过了，感觉接下来的源码学习涉及到汇编的地方太多了，所以还是特别有必要对汇编做一个整体的认知和学习的，而不是单单只知道寄存器和单个指令是什么意思。本篇后半部分对 `objc-msg-arm64.s` 文件的每一行都做到了分析，那么一起⛽️⛽️吧！
+
 
 ## `insert`
 &emsp;把指定的 `sel` 和 `imp` 插入到 `cache_t` 中，如果开始是空状态，则首先会初始一个容量为 4 散列数组再进行插入。其它情况插入之前会计算已用的容量占比是否到了临界值，如果是则首先进行扩容，然后再进行插入操作，如果还没有达到则直接插入。插入操作如果发生了哈希冲突则依次进行 `+1/-1` 的哈希探测。
@@ -704,6 +706,104 @@ return 0;
 
 ### `objc-msg-arm64.s`
 
+#### ``
+```c++
+/*
+ * objc-msg-arm64.s - ARM64 code to support objc messaging
+ * objc-msg-arm64.s - 支持 objc 消息传递的 ARM64 代码
+ */
+```
+```c++
+#ifdef __arm64__ // 限定属于 __arm64__ 平台
+
+#include <arm/arch.h>
+#include "isa.h"
+#include "arm64-asm.h"
+#include "objc-config.h"
+
+// 汇编程序中以 . 开头的名称并不是指令的助记符，不会被翻译成机器指令，而是给汇编器一些特殊提示，
+// 称为汇编指示（Assembler Directive）或伪操作（Pseudo-operation），由于它不是真正的指令所以加个 "伪" 字。
+
+// .section 指示把代码划分成若干个段（Section），程序被操作系统加载执行时，每个段被加载到不同的地址，
+// 操作系统对不同的页面设置不同的读、写、执行权限。
+
+// .section .data 
+// .data 段保存程序的数据，是可读可写的，相当于 C 程序的全局变量。
+
+// .section .text 
+// .text 段保存代码，是只读和可执行的，后面那些指令都属于 .text 段。
+
+// .section 分段，可以通过 .section 伪操作来自定义一个段
+// .section expr; // expr 可以是 .text/.data/.bss
+// .text 将定义符开始的代码编译到代码段
+// .data 将定义符开始的数据编译到数据段
+// .bss 将变量存放到 .bss 段，bss 段通常是指用来存放程序中未初始化的全局变量的一块内存区域，
+// 数据段通常是指用来存放程序中已初始化的全局变量的一块内存区域
+// 注意：源程序中 .bss 段应该在 .text 之前
+
+.data // 表示将定义符开始的数据编译到数据段
+
+// _objc_restartableRanges is used by method dispatch caching code to figure out whether
+// any threads are actively in the cache for dispatching. 
+// The labels surround the asm code that do cache lookups.
+// The tables are zero-terminated.
+
+// 方法调度缓存代码使用 _objc_restartableRanges 
+// 来确定是否有任何线程在 缓存 中处于活动状态以进行调度。
+// labels 围绕着执行缓存查找的 asm 代码。这些表以零结尾。
+
+
+.macro RestartableEntry
+#if __LP64__
+    .quad    LLookupStart$0 // .quad 定义一个 8 个字节（两 word）的类型（以 L 开头的标签叫本地标签，这些标签只能用于函数内部） 
+#else
+    .long    LLookupStart$0 // .long 定义一个 4 个字节的长整型
+    .long    0 // 这个 0 不知道是干啥用的，难道这个是补位的吗，硬补 4 个字节 ？
+#endif
+
+    .short    LLookupEnd$0 - LLookupStart$0 // .short 定义一个 2 个字节的短整型
+    .short    LLookupRecover$0 - LLookupStart$0
+    .long    0 // 这个 0 不知道是干啥用的，难道这个是补位的吗，硬补 4 个字节 ？
+.endmacro // RestartableEntry 宏定义结束，主要用于下面的声明（对应下面的 fill，一个 RestartableEntry 刚好 16 字节）
+
+    .align 4 // 表示以 2^4 16 字节对齐
+    .private_extern _objc_restartableRanges // 私有外联吗 ？
+_objc_restartableRanges:
+    
+    // 定义 6 个私有的 RestartableEntry，看名字可以对应到我们日常使用到的函数
+    // 这里可以理解为 C 语言中的函数声明，它们的实现都在下面，等下我们一行一行来解读
+    
+    RestartableEntry _cache_getImp 
+    RestartableEntry _objc_msgSend
+    RestartableEntry _objc_msgSendSuper
+    RestartableEntry _objc_msgSendSuper2
+    RestartableEntry _objc_msgLookup
+    RestartableEntry _objc_msgLookupSuper2
+    
+    // .fill repeat, size, value 含义是反复拷贝 size 个字节，重复 repeat 次，
+    // 其中 size 和 value 是可选的，默认值分别是 1 和 0 
+    // 全部填充 0
+    
+    .fill    16, 1, 0
+
+// 下面是 C 的宏定义，C 与 汇编混编
+/* objc_super parameter to sendSuper */
+
+#define RECEIVER         0
+#define CLASS            __SIZEOF_POINTER__
+
+/* Selected field offsets in class structure */
+#define SUPERCLASS       __SIZEOF_POINTER__
+#define CACHE            (2 * __SIZEOF_POINTER__)
+
+/* Selected field offsets in method structure */
+#define METHOD_NAME      0
+#define METHOD_TYPES     __SIZEOF_POINTER__
+#define METHOD_IMP       (2 * __SIZEOF_POINTER__)
+
+#define BUCKET_SIZE      (2 * __SIZEOF_POINTER__)
+```
+
 #### `ENTRY/STATIC_ENTRY/STATIC_ENTRY`
 ```c++
 /*
@@ -712,11 +812,34 @@ return 0;
  * END_ENTRY functionName
  */
 
+// 定义一个汇编宏 ENTRY，表示在 text 段定义一个 32 字节对齐的 global 函数，"$0" 同时生产一个函数入口标签。
+
 .macro ENTRY /* name */
-    .text
-    .align 5 // 
-    .globl    $0 // .global 关键字用来让一个符号对链接器可见，可以供其他链接对象模块使用
+    .text // .text 定义一个代码段，处理器开始执行代码的时候，代表后面是代码，这是 GCC 必须的。
+    .align 5 // 2^5，32 个字节对齐
+    .globl    $0 // .global 关键字用来让一个符号对链接器可见，可以供其他链接对象模块使用，
+                 // 告诉汇编器后续跟的是一个全局可见的名字（可能是变量，也可以是函数名）
+                 
+                 // 00001:
+                 // 00002: .text
+                 // 00003: .global _start
+                 // 00004:
+                 // 00005: _start:
+                 
+                 // .global _start 和 _start: 配合，给代码开始地址定义一个全局标记 _start。
+                 // _start 是一个函数的起始地址，也是编译、链接后程序的起始地址。由于程序是通过加载器来加载的，
+                 // 必须要找到 _start 名字的的函数，因此 _start 必须定义成全局的，以便存在于编译后的全局符号表中，
+                 // 供其他程序（如加载器）寻找到。 
+                 
+                 // .global _start 让 _start 符号成为可见的标示符，
+                 // 这样链接器就知道跳转到程序中的什么地方并开始执行。
+                 // Linux 寻找这个 _start 标签作为程序的默认进入点
+                 
                  // .extern xxx 说明 xxx 为外部函数，调用的时候可以遍访所有文件找到该函数并且使用它
+                 
+// 在汇编和 C 混合编程中，在 GNU ARM 编译环境下，汇编程序中要使用 .global 伪操作声明汇编程序为全局的函数，
+// 意即可被外部函数调用，同时 C 程序中要使用 extern 声明要被汇编调用的函数。
+
 $0:
 .endmacro
 
@@ -942,6 +1065,9 @@ LLookupRecover$1:
 + [汇编跳转指令B、BL、BX、BLX 和 BXJ的区别](https://blog.csdn.net/bytxl/article/details/49883103)
 + [iOS开发同学的arm64汇编入门](https://blog.cnbluebox.com/blog/2017/07/24/arm64-start/)
 + [C语言栈区的讲解(基于ARM)以及ARM sp,fp寄存器的作用](https://blog.csdn.net/Lcloud671/article/details/78232401)
++ [.align 5的是多少字节对齐](https://blog.csdn.net/yunying_si/article/details/9736173?ops_request_misc=%257B%2522request%255Fid%2522%253A%2522160185721219724839257560%2522%252C%2522scm%2522%253A%252220140713.130102334..%2522%257D&request_id=160185721219724839257560&biz_id=0&utm_medium=distribute.pc_search_result.none-task-blog-2~all~first_rank_v2~rank_v28-3-9736173.pc_first_rank_v2_rank_v28&utm_term=.align+&spm=1018.2118.3001.4187)
++ [解读objc_msgSend](https://www.jianshu.com/p/75a4737741fd)
++ [ARM汇编指令](https://blog.csdn.net/qq_27522735/article/details/75043870)
 
 **ARM 的栈是自减栈，栈是向下生长的，也就是栈底处于高地址处，栈顶处于低地址处，所以栈区一般都是放在内存的顶端。**
 
