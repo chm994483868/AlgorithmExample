@@ -699,6 +699,8 @@ return 0;
 ```
 &emsp;看到这里发现我们日常编写的 `OC` 函数调用其实是被转化为 `objc_msgSend` 函数，此函数我们之前也多次见过，例如我们前几天刚看到的 `((id(*)(objc_object *, SEL))objc_msgSend)(this, @selector(retain));` 当重写了 `retain` 函数时会这样去调用。前面我们分析 `bucket_t` 时多次提到 `SEL` 是函数名字的字符串 `IMP` 是函数的地址，而函数执行的本质就是去找到函数的地址然后执行它，而这正是 `objc_msgSend` 所做的事情，再具体一点就是在 `id` 上找到 `SEL` 函数的地址并执行它。那么 `objc_msgSend` 是怎么实现的呢？乍看它以为是一个 `C/C++` 函数，但它其实是汇编实现的。
 使用汇编的原因，除了 “快速，方法的查找操作是很频繁的，汇编是相对底层的语言更容易被机器识别，节省中间的一些编译过程”  还有一些重要的原因，可参考这篇 [翻译-为什么objc_msgSend必须用汇编实现](http://tutuge.me/2016/06/19/translation-why-objcmsgsend-must-be-written-in-assembly/)
++ 汇编更容易被机器识别。
++ 参数未知、类型未知对于 `C` 和 `C++` 来说不如汇编更得心应手
 
 ### `objc_msgSend` 汇编实现
 
@@ -706,7 +708,7 @@ return 0;
 
 ### `objc-msg-arm64.s`
 
-#### ``
+#### `RestartableEntry`
 ```c++
 /*
  * objc-msg-arm64.s - ARM64 code to support objc messaging
@@ -752,9 +754,11 @@ return 0;
 // 来确定是否有任何线程在 缓存 中处于活动状态以进行调度。
 // labels 围绕着执行缓存查找的 asm 代码。这些表以零结尾。
 
+// 用于定义下面 6 个私有的 RestartableEntry, 6 个和我们的消息发送息息相关的 “函数”
 
 .macro RestartableEntry
 #if __LP64__
+    // 在 arm64 的 64 位操作系统下 
     .quad    LLookupStart$0 // .quad 定义一个 8 个字节（两 word）的类型（以 L 开头的标签叫本地标签，这些标签只能用于函数内部） 
 #else
     .long    LLookupStart$0 // .long 定义一个 4 个字节的长整型
@@ -770,7 +774,7 @@ return 0;
     .private_extern _objc_restartableRanges // 私有外联吗 ？
 _objc_restartableRanges:
     
-    // 定义 6 个私有的 RestartableEntry，看名字可以对应到我们日常使用到的函数
+    // 定义 6 个私有的 RestartableEntry，看名字可以对应到我们日常消息发送中使用到的函数
     // 这里可以理解为 C 语言中的函数声明，它们的实现都在下面，等下我们一行一行来解读
     
     RestartableEntry _cache_getImp 
@@ -787,21 +791,144 @@ _objc_restartableRanges:
     .fill    16, 1, 0
 
 // 下面是 C 的宏定义，C 与 汇编混编
-/* objc_super parameter to sendSuper */
+
+/* objc_super parameter to sendSuper */ 
+// 这里的注释 objc_super 在 Public Header/message.h 中有其定义
+// struct objc_super, 有两个成员变量, id receiver 和 Class super_class/ Class class
 
 #define RECEIVER         0
-#define CLASS            __SIZEOF_POINTER__
+#define CLASS            __SIZEOF_POINTER__ // 全局找不到 __SIZEOF_POINTER__ 的定义，如果只看名字的话，应该是一个指针的大小 8 个字节
 
 /* Selected field offsets in class structure */
+/* class 结构体中 Selected 字段的偏移量 */
+// 这里说的是 objc_class 结构体的成员，我们知道它的第一个成员变量是继承自 objc_object 的 isa_t isa 然后是 Class superclass、cache_t cache
+// 这里刚好对应下面的 superclass 偏移 8 个字节，然后 cache 偏移 16 个字节
+
 #define SUPERCLASS       __SIZEOF_POINTER__
 #define CACHE            (2 * __SIZEOF_POINTER__)
 
 /* Selected field offsets in method structure */
+/* method 结构体中 Selected 字段的偏移量*/
+// 这里对应 method_t 结构体，它有 3 个成员变量：SEL name、const char *types、MethodListIMP imp
+// name 偏移 0，(SEL 实际类型是 unsigned long 占 8 个字节，所以 types 成员变量偏移是 8) 
+// type 偏移是 8 (const char * 是一个指针，占 8 个字节)
+// imp 偏移量是 8
+
 #define METHOD_NAME      0
 #define METHOD_TYPES     __SIZEOF_POINTER__
 #define METHOD_IMP       (2 * __SIZEOF_POINTER__)
 
+// 这里宏定义是 bucket_t 的大小，它有两个成员变量 _imp 和 _sel 分别占 8 个字节
+// 所以这里是 16 个字节
 #define BUCKET_SIZE      (2 * __SIZEOF_POINTER__)
+```
+
+#### `GetClassFromIsa_p16`
+&emsp;从 `isa` 中获取类指针并放在通用寄存器 `p16` 上。
+```c++
+/*
+ * GetClassFromIsa_p16 src
+ * src is a raw isa field. Sets p16 to the corresponding class pointer.
+ * src 是一个原始的 isa 字段。将 p16 设置为相应的类指针。
+ *
+ * The raw isa might be an indexed isa to be decoded, 
+ * or a packed isa that needs to be masked.
+ * 从非指针的 isa 中获取类信息时，一种是通过掩码直接从相应位中获取类的指针，
+ * 一种是从相应位中获取类的索引然后在全局的类表中再获取对应的类
+ * ISA_BITFIELD 中的 uintptr_t shiftcls : 33; 和 uintptr_t indexcls : 15;
+ *
+ * On exit:
+ *   $0 is unchanged
+ *   p16 is a class pointer
+ *   x10 is clobbered
+ * 退出时：$0 不改变，p16 保存一个类指针 x10 是 clobbered
+ */
+
+// x86_64 和 arm64 都不支持，主要在 watchOS 中使用（__arm64__ && !__LP64__）（armv7k or arm64_32）
+#if SUPPORT_INDEXED_ISA 
+    // 如果优化的 isa 中存放的是 indexcls
+    .align 3 // 以 2^3 = 8 字节对齐
+    .globl _objc_indexed_classes // 定义一个全局的标记 _objc_indexed_classes
+_objc_indexed_classes:
+
+    // PTRSIZE 定义在 arm64-asm.h 中，在 arm64 下是 8 在 arm64_32 下是 4，
+    // 表示一个指针的宽度，8 个字节或者 4 个字节
+    // ISA_INDEX_COUNT 定义在 isa.h 中
+    
+    // #define ISA_INDEX_BITS 15
+    // #define ISA_INDEX_COUNT (1 << ISA_INDEX_BITS) // 1 左移 15 位
+    
+    // uintptr_t nonpointer        : 1;
+    // uintptr_t has_assoc         : 1;
+    // uintptr_t indexcls          : 15;
+    // ...
+    // indexcls 是第 2-16 位
+    
+    // .fill repeat, size, value 含义是反复拷贝 size 个字节，重复 repeat 次，
+    // 其中 size 和 value 是可选的，默认值分别是 1 和 0 
+    // 全部填充 0
+    
+    .fill ISA_INDEX_COUNT, PTRSIZE, 0
+#endif
+
+// 汇编宏定义 GetClassFromIsa_p16
+.macro GetClassFromIsa_p16 /* src */
+
+// 以下分别针对我们熟知的三种情况
+// 1. isa 中以掩码形式保存的是类的索引
+// 2. isa 中以掩码形式保存的是类的指针
+// 3. isa 中就是原始的类指针
+
+#if SUPPORT_INDEXED_ISA
+    // Indexed isa
+    // 如果 isa 中存放的是类索引
+    
+    // 把 $0 设置给 p16，这个 $0 是 isa_t/Class isa
+    mov    p16, $0            // optimistically set dst = src
+    
+    // #define ISA_INDEX_IS_NPI_BIT  0 // 定义在 isa.h 中
+    // p16[0] 与 1f 进行比较
+    
+    // 如果不是非指针 isa，则完成
+    tbz    p16, #ISA_INDEX_IS_NPI_BIT, 1f    // done if not non-pointer isa
+    
+    // isa in p16 is indexed
+    // p16 中的 isa 已建立索引
+    
+    // 将 _objc_indexed_classes 所在的页的基址 读入 x10 寄存器 
+    adrp    x10, _objc_indexed_classes@PAGE
+    
+    // x10 = x10 + _objc_indexed_classes(page 中的偏移量) x10基址 根据 偏移量 进行 内存偏移 
+    add    x10, x10, _objc_indexed_classes@PAGEOFF
+    
+    // #define ISA_INDEX_SHIFT 2
+    // #define ISA_INDEX_BITS 15
+    
+    // 从 p16 的第 ISA_INDEX_SHIFT 位开始，提取 ISA_INDEX_BITS 位到 p16 寄存器，剩余的高位用 0 补充  
+    ubfx    p16, p16, #ISA_INDEX_SHIFT, #ISA_INDEX_BITS  // extract index
+    
+    // 从数组加载类到 p16 中
+    ldr    p16, [x10, p16, UXTP #PTRSHIFT]    // load class from array
+1: // 这里的这个 1 是什么意思？
+
+#elif __LP64__
+    // 如果 class pointer 保存在 isa 中
+    // #define ISA_MASK 0x0000000ffffffff8ULL
+    // ISA_MASK 和 $0 做与运算提取出 class pointer 放在 p16 中
+
+    // 64-bit packed isa
+    and    p16, $0, #ISA_MASK
+
+#else
+    // 最后一种情况，isa 就是原始的类指针
+    
+    // 32-bit raw isa
+    // 直接放入 p16 中
+    mov    p16, $0
+
+#endif
+
+.endmacro // 宏定义结束
 ```
 
 #### `ENTRY/STATIC_ENTRY/STATIC_ENTRY`
@@ -860,7 +987,6 @@ LExit$0:
  * objc-msg-arm64.s - ARM64 code to support objc messaging
  * objc-msg-arm64.s - 支持 objc 消息传递的 ARM64 代码
  */
-
 ```
 #### `CacheLookup`
 ```c++
