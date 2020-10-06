@@ -841,10 +841,11 @@ _objc_restartableRanges:
  *   $0 is unchanged
  *   p16 is a class pointer
  *   x10 is clobbered
- * 退出时：$0 不改变，p16 保存一个类指针 x10 是 clobbered
+ * 退出时：$0(宏定义入参 isa) 不改变，p16 保存一个类指针 x10 是 clobbered
  */
 
-// x86_64 和 arm64 都不支持，主要在 watchOS 中使用（__arm64__ && !__LP64__）（armv7k or arm64_32）
+// SUPPORT_INDEXED_ISA 在 x86_64 和 arm64 都不支持，
+// 主要在 watchOS 中使用（__arm64__ && !__LP64__）（armv7k or arm64_32）
 #if SUPPORT_INDEXED_ISA 
     // 如果优化的 isa 中存放的是 indexcls
     .align 3 // 以 2^3 = 8 字节对齐
@@ -879,42 +880,91 @@ _objc_indexed_classes:
 // 2. isa 中以掩码形式保存的是类的指针
 // 3. isa 中就是原始的类指针
 
+// SUPPORT_INDEXED_ISA 在 x86_64 和 arm64 都不支持，
+// 主要在 watchOS 中使用（__arm64__ && !__LP64__）（armv7k or arm64_32）
 #if SUPPORT_INDEXED_ISA
     // Indexed isa
     // 如果 isa 中存放的是类索引
     
+    // $parameter 为宏指令的参数。
+    // 当宏指令被展开时将被替换成相应的值，
+    // 类似于函数中的形式参数，
+    // 可以在宏定义时为参数指定相应的默认值。
+    // 就是我们 C 中使用的带参数的宏。
+    // $0 表示宏的第一个参数。
+    
     // 把 $0 设置给 p16，这个 $0 是 isa_t/Class isa
+    
     mov    p16, $0            // optimistically set dst = src
     
-    // #define ISA_INDEX_IS_NPI_BIT  0 // 定义在 isa.h 中
-    // p16[0] 与 1f 进行比较
+    // #define ISA_INDEX_IS_NPI_BIT  0 
+    // 定义在 isa.h 中
     
-    // 如果不是非指针 isa，则完成
+    // p16[0] 与 1f 进行比较，这里正是对我们的 ISA_BITFIELD 中
+    // uintptr_t nonpointer : 1;
+    // 标识位进行比较，如果值是 1 则表示是优化的 isa，如果不是则表示是原始指针 
+    
+    // TBNZ X1，#3 label // 若 X1[3] != 0，则跳转到 label
+    // TBZ X1，#3 label // 若 X1[3]==0，则跳转到 label
+    
+    // 没有找到 tbz 指令的详细解释，这里的猜想是，
+    // 如果 p16[0] != 1 的话，表示现在 p16 中保存的不是非指针的 isa，则直接结束宏定义
+    
     tbz    p16, #ISA_INDEX_IS_NPI_BIT, 1f    // done if not non-pointer isa
     
     // isa in p16 is indexed
-    // p16 中的 isa 已建立索引
+    // p16 中的 isa 
     
-    // 将 _objc_indexed_classes 所在的页的基址 读入 x10 寄存器 
+    // 下面的操作大概是根据 isa 中的索引从全局的类表中找到类指针吗？
+    
+    // ADR
+    // 作用：小范围的地址读取指令。ADR 指令将基于 PC 相对偏移的地址值读取到寄存器中。
+    // 原理：将有符号的 21 位的偏移，加上 PC, 结果写入到通用寄存器，可用来计算 +/- 1MB 范围的任意字节的有效地址。
+    
+    // ADRP
+    // 作用：以页为单位的大范围的地址读取指令，这里的 P 就是 page 的意思。
+    // 通俗来讲，ADRP 指令就是先进行 PC+imm（偏移值）然后找到 lable 所在的一个 4KB 的页，
+    // 然后取得 label 的基址，再进行偏移去寻址。
+    
+    // 将 _objc_indexed_classes 所在的页的基址读入 x10 寄存器 
     adrp    x10, _objc_indexed_classes@PAGE
     
-    // x10 = x10 + _objc_indexed_classes(page 中的偏移量) x10基址 根据 偏移量 进行 内存偏移 
+    // x10 = x10 + _objc_indexed_classes(page 中的偏移量) 
+    // x10 基址根据偏移量进行内存偏移 
     add    x10, x10, _objc_indexed_classes@PAGEOFF
+    
+    // 无符号位域提取指令
+    // UBFX Wd, Wn, #lsb, #width ; 32-bit
+    // UBFX Xd, Xn, #lsb, #width ; 64-bit
+    // 作用：从 Wn 寄存器的第 lsb 位开始，提取 width 位到 Wd 寄存器，剩余高位用 0 填充
     
     // #define ISA_INDEX_SHIFT 2
     // #define ISA_INDEX_BITS 15
     
-    // 从 p16 的第 ISA_INDEX_SHIFT 位开始，提取 ISA_INDEX_BITS 位到 p16 寄存器，剩余的高位用 0 补充  
+    // 从 p16 的第 ISA_INDEX_SHIFT 位开始，提取 ISA_INDEX_BITS 位到 p16 寄存器，剩余的高位用 0 补充
+    // 即从位域中提出 indexcls
+    
     ubfx    p16, p16, #ISA_INDEX_SHIFT, #ISA_INDEX_BITS  // extract index
+    
+    // __LP64__ 下: #define PTRSHIFT 3  // 1<<PTRSHIFT == PTRSIZE 2^3 #define PTRSIZE 8
+    // !__LP64_ 下: #define PTRSHIFT 2  // 1<<PTRSHIFT == PTRSIZE 2^2 #define PTRSIZE 4
+    
+    // __LP64__: #define UXTP UXTX
+    // !__LP64__: #define UXTP UXTW
+    // 扩展指令, 扩展 p16 左移 8/4 位
+    // 然后是从 x10 开始偏对应的位，然后把此处的值存储到 p16 中去。
+    // 暂不明白为什么这样就可以找到类了，还有全局的类表是存在哪里的呢 ？
     
     // 从数组加载类到 p16 中
     ldr    p16, [x10, p16, UXTP #PTRSHIFT]    // load class from array
-1: // 这里的这个 1 是什么意思？
+    
+1: // 这里的这个 1 是什么意思，是给上面的 tbz 指令做跳转用的吗？
 
 #elif __LP64__
     // 如果 class pointer 保存在 isa 中
     // #define ISA_MASK 0x0000000ffffffff8ULL
-    // ISA_MASK 和 $0 做与运算提取出 class pointer 放在 p16 中
+    // ISA_MASK 和 $0(isa) 做与运算提取出其中的 class pointer 放在 p16 中
+    // 和我们的 (Class)(isa.bits & ISA_MASK) 一模一样
 
     // 64-bit packed isa
     and    p16, $0, #ISA_MASK
@@ -923,14 +973,13 @@ _objc_indexed_classes:
     // 最后一种情况，isa 就是原始的类指针
     
     // 32-bit raw isa
-    // 直接放入 p16 中
+    // 直接把 isa 放入 p16 中
     mov    p16, $0
 
 #endif
 
 .endmacro // 宏定义结束
 ```
-
 #### `ENTRY/STATIC_ENTRY/STATIC_ENTRY`
 ```c++
 /*
@@ -940,12 +989,15 @@ _objc_indexed_classes:
  */
 
 // 定义一个汇编宏 ENTRY，表示在 text 段定义一个 32 字节对齐的 global 函数，"$0" 同时生产一个函数入口标签。
+// 上一节中我们分析 GetClassFromIsa_p16 时，说过 $0 表示宏定义的第一个入参 (不知道支不支持多个入参例如 $1 $2 啥的...)
 
 .macro ENTRY /* name */
-    .text // .text 定义一个代码段，处理器开始执行代码的时候，代表后面是代码，这是 GCC 必须的。
+    .text // .text 定义一个代码段，处理器开始执行代码的时候，代表后面是代码。这是 GCC 必须的。
     .align 5 // 2^5，32 个字节对齐
     .globl    $0 // .global 关键字用来让一个符号对链接器可见，可以供其他链接对象模块使用，
                  // 告诉汇编器后续跟的是一个全局可见的名字（可能是变量，也可以是函数名）
+                 
+                 // 这里用来指定 $0，$0 代表入参，是不是就是表示 ENTRY 标注的函数都是全局可见的函数
                  
                  // 00001:
                  // 00002: .text
@@ -970,24 +1022,454 @@ _objc_indexed_classes:
 $0:
 .endmacro
 
-.macro STATIC_ENTRY /*name*/
+// STATIC_ENTRY
+.macro STATIC_ENTRY /*name*/ // 同上
     .text
     .align 5
-    .private_extern $0
+    .private_extern $0 // 这里是 private_extern (私有函数)
 $0:
 .endmacro
 
+// END_ENTRY entry 结束
 .macro END_ENTRY /* name */
-LExit$0:
+LExit$0: // 只有一个 LExit$0 标签 （以 L 开头的标签叫本地标签，这些标签只能用于函数内部） 
 .endmacro
 ```
+#### `UNWIND`
+&emsp;看到下面每一个 `UNWIND` 的使用时机都是跟在 `ENTRY/STATIC_ENTRY` 后面的。
 
 ```c++
 /*
- * objc-msg-arm64.s - ARM64 code to support objc messaging
- * objc-msg-arm64.s - 支持 objc 消息传递的 ARM64 代码
+ * UNWIND name, flags
+ * Unwind info generation
+ * (展开信息生成)
  */
+.macro UNWIND
+    .section __LD,__compact_unwind,regular,debug
+    
+    // __LP64__: #define PTR .quad
+    // !__LP64__: #define PTR .long 
+    
+    PTR $0 // .quad 定义 8 个字节（两 word）的类型 / .long 定义 4 个字节的长整型
+    
+    .set  LUnwind$0, LExit$0 - $0 // .set 给一个 全局变量或局部变量 赋值
+    
+    .long LUnwind$0 // .long 定义 4 个字节的长整型 （以 L 开头的标签叫本地标签，这些标签只能用于函数内部） 
+    .long $1 // 这里还真的见到了 $1，上面的说宏多参的情况是随口说的
+    
+    PTR 0     /* no personality */ // .quad 定义 8 个字节（两 word）的类型 / .long 定义 4 个字节的长整型 (这里也是补位的吗 ？)
+    PTR 0  /* no LSDA */ // .quad 定义 8 个字节（两 word）的类型 / .long 定义 4 个字节的长整型 (这里也是补位的吗 ？)
+    
+    .text // .text 定义一个代码段，处理器开始执行代码的时候，代表后面是代码。这是 GCC 必须的。
+.endmacro
+
+// 硬编码定值 （暂时还不知道是什么意思）
+#define NoFrame 0x02000000  // no frame, no SP adjustment
+#define FrameWithNoSaves 0x04000000  // frame, no non-volatile saves
 ```
+#### `TailCallCachedImp`
+&emsp;在 `Project Headers/arm64-asm.h` 文件中定义了几个汇编宏来处理 `CacheLookup NORMAL|GETIMP|LOOKUP <function>` 函数的不同结果。
+当缓存命中的的时候，且是 `NORMAL` 的情况下，会使用 `TailCallCachedImp`，它功能是验证并且调用 `imp`。
+```c++
+.macro TailCallCachedImp
+    
+    // eor 异或指令(exclusive or)
+    // eor 指令的格式为：eor{条件}{S}  Rd，Rn，operand 
+    // eor 指令将 Rn 的值与操作数 operand 按位逻辑”异或”，相同为0，不同为1，结果存放到目的寄存器 Rd 中。
+    
+    // $0 = cached imp, $1 = address of cached imp, $2 = SEL, $3 = isa
+    
+    // 把 SEL 和 imp 的地址按位进行异或操作，并把结果放在 $1 中 (混合 SEL 到 ptrauth modifier 中) 
+    eor    $1, $1, $2    // mix SEL into ptrauth modifier
+    
+    // 把 isa 和 $1 按位进行异或的操作放在 $1 中 (混合 isa 到 ptrauth modifier 中)
+    eor    $1, $1, $3  // mix isa into ptrauth modifier
+    
+    // bra 无条件跳转指令
+    // 这里表示跳转到 $0 去执行 IMP 吗，那 $1 是什么用法？
+    // bra 指令的信息可太少了，目前只搜到说是 无条件跳转指令
+    brab    $0, $1
+.endmacro
+```
+#### `AuthAndResignAsIMP`
+&emsp;仅验证 `IMP`。
+```c++
+.macro AuthAndResignAsIMP
+    // $0 = cached imp, $1 = address of cached imp, $2 = SEL, $3 = isa
+    // note: assumes the imp is not nil 假设 imp 不是 nil
+    
+    // $1 和 $2 按位进行异或，并把结果放在 $1 中
+    eor    $1, $1, $2    // mix SEL into ptrauth modifier
+    
+    // $1 和 $3 按位进行异或，并把结果放在 $1 中
+    eor    $1, $1, $3  // mix isa into ptrauth modifier
+    
+    // 使用键 B 验证指令地址。此指令使用修饰符和键 B 验证指令地址。
+    autib    $0, $1        // authenticate cached imp
+    
+    // xzr 是零寄存器
+    // 把 $0 中的内容放到 xzr 中
+    ldr    xzr, [$0]    // crash if authentication failed authentication 失败时 crash
+    
+    // 暂时未找到给指令的信息
+    paciza    $0        // resign cached imp as IMP
+.endmacro
+```
+
+#### `CacheLookup`
+```c++
+/*
+ *
+ * CacheLookup NORMAL|GETIMP|LOOKUP <function>
+ * (分别代表三种不同的执行目的，LOOKUP 是进行查找，GETIMP 是获取 IMP, NORMAL 则是正常的找到 IMP 执行并返回)
+ *
+ * Locate the implementation for a selector in a class method cache.
+ * 在类方法缓存中找到 select 的实现。
+ *
+ * When this is used in a function that doesn't hold the runtime lock, this represents the critical section that may access dead memory.
+ * 当它在不持有 runtime lock 的函数中使用时，它表示可能访问 死内存 的 关键部分。
+ *
+ * If the kernel causes one of these functions to go down the recovery path, 
+ * we pretend the lookup failed by jumping the JumpMiss branch.
+ * 如果内核导致这些功能之一沿恢复路径消失，我们将跳过 JumpMiss 分支来假装查找失败。
+ *
+ * Takes:
+ *     x1 = selector // x1 寄存器存放 selector
+ *     x16 = class to be searched // x16 寄存器中存放 Class
+ *
+ * Kills:
+ *      x9,x10,x11,x12, x17
+ *
+ * On exit: (found) calls or returns IMP
+ *                  with x16 = class, x17 = IMP
+ *          (not found) jumps to LCacheMiss
+ * 1. 如果找到的话，会调用或返回 IMP，x16 中保存类信息，x17 中保存 IMP
+ * 2. 如果未找到的话，跳转到 LCacheMiss 
+ */
+
+#define NORMAL 0
+#define GETIMP 1
+#define LOOKUP 2
+
+// CacheHit: x17 = cached IMP, x12 = address of cached IMP, x1 = SEL, x16 = isa
+// 缓存命中：x17 缓存的 IMP x12 IMP 的地址 x1 SEL x16 中保存类信息
+
+// 缓存命中的宏:
+.macro CacheHit
+
+.if $0 == NORMAL
+    // NORMAL 表示通常情况下在缓存中找到了函数执行并返回
+    
+    // TailCallCachedImp 定义在 arm64-asm.h 中
+    // 验证并执行 IMP
+    TailCallCachedImp x17, x12, x1, x16    // authenticate and call imp 验证并调用 imp
+    
+.elseif $0 == GETIMP
+    // GETIMP 仅在缓存中查找 IMP
+    
+    mov    p0, p17 // 把 p17 的内容放到 p0 中
+    
+    // CBZ 比较（Compare），如果结果为零（Zero）就转移（只能跳到后面的指令）
+    // CBNZ 比较，如果结果非零（Non Zero）就转移（只能跳到后面的指令）
+    
+    // CBZ 和 CBNZ
+    // 比较，为零则跳转；比较，为非零则跳转
+    // 语法
+    // CBZ Rn, label
+    // CBNZ Rn, label
+    // 其中：Rn 是存放操作数的寄存器，label 是跳转目标
+    
+    // 如果 p0 是 0，则跳转到 标签 9 处，标签 9 处直接执行 ret
+    cbz    p0, 9f            // don't ptrauth a nil imp
+    
+    // AuthAndResignAsIMP 定义在 arm64-asm.h 中
+    // 验证和 xxx IMP
+    AuthAndResignAsIMP x0, x12, x1, x16    // authenticate imp and re-sign as IMP
+    
+    // return IMP
+9:    ret                // return IMP
+.elseif $0 == LOOKUP
+    // LOOKUP 查找
+    
+    // No nil check for ptrauth: the caller would crash anyway when they jump to a nil IMP.
+    // We don't care if that jump also fails ptrauth.
+    // ptr 验证没有 nil 检测：调用者跳到 nil IMP 时无论如何都会崩溃。我们不在乎那跳跃是否也会失败。
+    
+    //  AuthAndResignAsIMP 定义在 arm64-asm.h 中
+    // 验证和 xxx IMP 
+    AuthAndResignAsIMP x17, x12, x1, x16    // authenticate imp and re-sign as IMP
+    
+    // return imp
+    ret                // return imp via x17
+.else
+
+// .abort 停止汇编
+// 当某些比较致命的问题出现时，我们的 Linux 内核也会抱歉的对我们说：“哎呦（Oops），对不起，我把事情搞砸了”。
+// Linux内核在发生 kernel panic 时会打印出 Oops 信息，把目前的寄存器状态、堆栈内容、以及完整的 Call trace 都 show 给我们看，
+// 这样就可以帮助我们定位错误。
+.abort oops
+
+.endif
+.endmacro // 结束 CacheHit 汇编宏定义
+
+// 缓存未命中的宏:
+.macro CheckMiss
+    // miss if bucket->sel == 0
+    // 如果查找缓存时 bucket 的 sel 为 0
+    
+.if $0 == GETIMP
+    // CBZ 比较（Compare），如果结果为零（Zero）就转移（只能跳到后面的指令）
+    // CBNZ 比较，如果结果非零（Non Zero）就转移（只能跳到后面的指令）
+
+    // CBZ 和 CBNZ
+    // 比较，为零则跳转；比较，为非零则跳转
+    // 语法
+    // CBZ Rn, label
+    // CBNZ Rn, label
+    // 其中：Rn 是存放操作数的寄存器，label 是跳转目标
+
+    // 如果 p9 是 0，则跳转到 标签 LGetImpMiss 处
+    cbz    p9, LGetImpMiss
+    
+.elseif $0 == NORMAL
+    // 如果 p9 是 0，则跳转到 标签 __objc_msgSend_uncached 处
+    cbz    p9, __objc_msgSend_uncached
+    
+.elseif $0 == LOOKUP
+    // 如果 p9 是 0，则跳转到 标签 __objc_msgLookup_uncached 处
+    cbz    p9, __objc_msgLookup_uncached
+    
+.else
+
+// .abort 停止汇编
+// 当某些比较致命的问题出现时，我们的 Linux 内核也会抱歉的对我们说：“哎呦（Oops），对不起，我把事情搞砸了”。
+// Linux内核在发生 kernel panic 时会打印出 Oops 信息，把目前的寄存器状态、堆栈内容、以及完整的 Call trace 都 show 给我们看，
+// 这样就可以帮助我们定位错误。
+.abort oops
+
+.endif
+.endmacro // 结束 CheckMiss 汇编宏定义
+
+// 汇编宏 JumpMiss
+.macro JumpMiss
+
+.if $0 == GETIMP
+    // 跳转到 标签 LGetImpMiss 处
+    b    LGetImpMiss
+    
+.elseif $0 == NORMAL
+    // 跳转到 标签 __objc_msgSend_uncached
+    b    __objc_msgSend_uncached
+    
+.elseif $0 == LOOKUP
+    // 跳转到 标签 __objc_msgLookup_uncached
+    b    __objc_msgLookup_uncached
+    
+.else
+
+// .abort 停止汇编
+// 当某些比较致命的问题出现时，我们的 Linux 内核也会抱歉的对我们说：“哎呦（Oops），对不起，我把事情搞砸了”。
+// Linux内核在发生 kernel panic 时会打印出 Oops 信息，把目前的寄存器状态、堆栈内容、以及完整的 Call trace 都 show 给我们看，
+// 这样就可以帮助我们定位错误。
+.abort oops
+
+.endif
+.endmacro // 结束 JumpMiss 汇编宏定义
+
+// 通过 CacheLookup NORMAL 来找到缓存查找汇编源码
+.macro CacheLookup
+    //
+    // Restart protocol:
+    // 重启协议:
+    //
+    // As soon as we're past the LLookupStart$1 label we may have loaded an invalid cache pointer or mask.
+    // 一旦超过 LLookupStart$1 标签，我们可能已经加载了无效的 缓存指针 或 掩码。
+    // 
+    // When task_restartable_ranges_synchronize() is called, (or when a signal hits us) before we're past LLookupEnd$1,
+    // then our PC will be reset to LLookupRecover$1 which forcefully jumps to the cache-miss codepath which have the following.
+    // 当我们在超过 LLookupEnd$1 之前（或当 信号 命中我们）调用 task_restartable_ranges_synchronize()，我们的 PC 将重置为 LLookupRecover$1，这将强制跳转到缓存未命中的代码路径，其中包含以下内容。
+    // requirements:
+    // 要求:
+    //
+    // GETIMP:
+    // 获得 IMP:
+    // The cache-miss is just returning NULL (setting x0 to 0) // 缓存未命中只是返回 NULL
+    //
+    // NORMAL and LOOKUP:
+    // - x0 contains the receiver // x0 表示函数接收者
+    // - x1 contains the selector // x1 表示 SEL
+    // - x16 contains the isa // x16 是class 的 isa
+    // - other registers are set as per calling conventions // 其它寄存器根据调用约定来设置
+    //
+LLookupStart$1:
+
+    // p1 = SEL, p16 = isa p1 表示 SEL，p16 表示 isa
+    // #define CACHE (2 * __SIZEOF_POINTER__) // 即 16
+    // [x16, #CACHE] 则表示 x16(isa) + 16 的内存地址，即 cache 的地址。
+    
+    // (对应于 objc_class 的第一个成员变量是 isa_t isa，
+    //  第二个成员变量是 Class superclass，
+    //  第三个成员变量是 cache_t cache，根据他们的类型可以知道 isa 和 cache 刚好相差 16 个字节)
+    
+    // 将 cache 的内容读取到 p11 中 (它一次是读取 8 个字节码)
+    // 在 __arm64__ && __LP64__ 中, 高 16 位是 mask 低 48 位是 buckets
+    ldr    p11, [x16, #CACHE]                // p11 = mask|buckets
+
+// 根据掩码类型来做不同的处理
+#if CACHE_MASK_STORAGE == CACHE_MASK_STORAGE_HIGH_16
+    // p11 & #0x0000ffffffffffff，表示直接舍弃 p11 高 16 位的内容，只要后 48 位的 buckets 
+    // 把 p11 & 0x0000ffffffffffff 的结果保存在 p10 中，即 p10 就是 buckets
+    and    p10, p11, #0x0000ffffffffffff    // p10 = buckets
+    
+    // LSR 逻辑右移(Logic Shift Right)
+    // p11, LSR #48 表示 _maskAndBuckets 右移 48 位取得 _mask
+    // and 按位与，与 C 的 "&" 功能相同
+    // p1 是 SEL，然后和上面 👆 取得的 _mask 做与操作即取得 SEL 的哈希值并保存在 p12 中
+    and    p12, p1, p11, LSR #48        // x12 = _cmd & mask (在函数内部 _cmd 即表示函数的 SEL)
+    
+#elif CACHE_MASK_STORAGE == CACHE_MASK_STORAGE_LOW_4
+    // 掩码在低 4 位的情况
+    
+    and    p10, p11, #~0xf            // p10 = buckets
+    and    p11, p11, #0xf            // p11 = maskShift
+    mov    p12, #0xffff
+    lsr    p11, p12, p11                // p11 = mask = 0xffff >> p11
+    
+    // 同样将 SEL 的哈希值保存在 p12 中
+    and    p12, p1, p11                // x12 = _cmd & mask
+#else
+
+// ARM64 不支持的缓存掩码存储。
+#error Unsupported cache mask storage for ARM64.
+
+#endif
+    // 在 Project Headers/arm64-asm.h 中可以看到 PTRSHIFT 的宏定义
+    // #if __arm64__
+    // #if __LP64__ // 64 位系统架构
+    // #define PTRSHIFT 3  // 1<<PTRSHIFT == PTRSIZE // 0b1000 表示一个指针 8 个字节
+    // // "p" registers are pointer-sized
+    // // true arm64
+    // #else
+    // // arm64_32 // 32 位系统架构
+    // #define PTRSHIFT 2  // 1<<PTRSHIFT == PTRSIZE // 0b100 表示一个指针 4 个字节
+    // // "p" registers are pointer-sized
+    // // arm64_32
+    // #endif
+
+    // LSL 逻辑左移(Logic Shift Left)
+    // p10 是 buckets
+    // p12 是 (_cmd & mask) // 哈希值
+    // 即 p12 先做逻辑左移运算(这里的逻辑左移是表示在对哈希值做乘法扩大为 8 倍)，然后和 p10 相加，并把最后结果存放在 p12 中
+    // p12 = buckets + ((_cmd & mask) << (1+PTRSHIFT))
+    
+    // (把 SEL 的哈希值左移 4 位意思是哈希值乘以 8，这个 8 指的的是一个指针占了 8 个字节的意思
+    // 即算出 SEL 对应的 bucket_t 指针的位置与 buckets 的起始地址的距离，
+    // 这里的距离单位是按字节计算的，所以要乘以 8)
+    // 即此时 p12 中存放的是 SEL 哈希值对应的在 buckets 散列数组下标下的 bucket_t 指针的起始地址
+    add    p12, p10, p12, LSL #(1+PTRSHIFT)
+                     // p12 = buckets + ((_cmd & mask) << (1+PTRSHIFT))
+
+    // ldr 把指定地址的存储器中的内容加载 (Load) 到一个寄存器 (Register) 中
+    // str 把寄存器中的内容存储 (Store) 到存储器中
+    // 示例: 
+    // ldr r1, =0x123456789 大范围的地址读取指令: r1 = 0x123456789
+    
+    // ldr r1, [r2, #4] 内存访问指令（当 ldr 后面没有 = 号时为内存读取指令）
+    // 将内存地址为 r2+4 的数据读取到 r1 中，相当于 C 语言中的 * 操作
+    
+    // 这种 [xxx] 与 #x 分离的情况比较特殊，要注意（它这个内容读取完毕以后再增加 r2 的距离，改变 r2 的指向）
+    // ldr r1, [r2], #4 将内存地址为 r2 的数据读取到 r1 中，再将地址加 4，r2 = r2 + 4
+    
+    // str r1, [r2, #4] 存储指令: 将 r1 的值存入地址为 r2 + 4 的内存中
+    
+    // 这种 [xxx] 与 #x 分离的情况比较特殊，要注意（它这个内容存储完毕以后再增加 r2 地址值，改变 r2 的指向）
+    // str r1, [r2], #4 将 r1 的值存入地址为 r2 的内存中，再将地址加 4，r2 = r2 + 4
+    
+    // ldp/stp 是 ldr/str 的衍生，可以同时读/写两个寄存器，ldr/str 只能读写一个
+    // 示例: ldp x1, x0, [sp, #0x10] 将 sp 偏移 16 个字节的值取出来，放入 x1 和 x0
+    
+    // 这里 x12 就是 p12，表示以 SEL 哈希值为数组下标，在 buckets 散列数组中对应的 bucket_t 指针
+    // 目前 p10 是 buckets，p12 是 SEL 在 buckets 数组中对应的 bucket_t 指针
+    // 在不同的平台下，bucket_t 的 _sel 和 _imp 的顺序是相反的，在 __arm64__ 下是 _imp 在前 _sel 在后，其他平台下则是相反的
+    
+    // 从 x12 中取出 bucket_t，分别将 _imp 和 _sel 存入 p17(_imp) 和 p9(_sel)
+    ldp    p17, p9, [x12]        // {imp, sel} = *bucket 
+    
+    // cmp 比较指令
+    // p1 = SEL (p1 的值自开始就没有被改变过)
+    // 判断以 SEL 哈希值找到的 bucket_t 的 _sel 是否就是 SEL，这里可能会因为哈希冲突而导致与 SEL 不一样，
+    // 此时需要根据不同的平台执行向前或者向后的线性探测找到对应的 bucket_t.
+    // 在 __arm64__ 下是从起始位置往后面探测（(i+1) & mask）🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟
+    
+    // 这里还有一个点，p1 是 8 个字节，p9 应该至少是从 bucket_t 中取出来的 _sel 
+1:  cmp    p9, p1            // if (bucket->sel != _cmd) // 这里的 1: 好像表示是段还是区来着，此时表示不同，
+    b.ne    2f            //     scan more
+    CacheHit $0            // call or return imp
+    
+2:  // not hit: p12 = not-hit bucket 未命中
+    // CheckMiss normal -> 判断 p9 是否为 0 // 空 bucket_t 的初始值会是 0，而那个 end 占位的 bucket_t 的 _sel 是 1
+    // 即判断查找到的是不是空，如果为空，即表示当前方法缓存列表里面没有缓存 sel 对应的方法，此时需要去类的方法列表里面去查找方法
+    // 如果不是空，则表示此时发生了哈希冲突，bucket_t 存在别处，继续向前或者向后查找
+    CheckMiss $0            // miss if bucket->sel == 0
+    // 判断是否已经是第一个了，如果是首个就去类的方法列表查找
+    cmp    p12, p10        // wrap if bucket == buckets
+    b.eq    3f // 跳转到下面的 3f
+    
+    // 还可以继续冲突的向前查找
+    // #define BUCKET_SIZE (2 * __SIZEOF_POINTER__) 16 个字节，正是 bucket_t 的宽度
+    // 往前查找
+    ldp    p17, p9, [x12, #-BUCKET_SIZE]!    // {imp, sel} = *--bucket
+    // 循环
+    b    1b            // loop
+
+3:    // wrap: p12 = first bucket, w11 = mask
+#if CACHE_MASK_STORAGE == CACHE_MASK_STORAGE_HIGH_16
+    // p11 是 buckets 或者 _maskAndBuckets
+    // p11 逻辑右移 44（这里包含了两步，首先 p11 右移 48 位得到 mask，然后再左移 4 位，
+    // 表示扩大 8 倍（可代表指针的字节宽度），即整体 p11 右移了 44 位，这个值可以表示 buckets 指针需要需要移动的总距离）
+    
+    add    p12, p12, p11, LSR #(48 - (1+PTRSHIFT))
+                    // 那么此时 p12 指向的是谁呢
+                    // p12 = buckets + (mask << 1+PTRSHIFT)
+                    
+#elif CACHE_MASK_STORAGE == CACHE_MASK_STORAGE_LOW_4
+    // 当低 4 位是掩码时，基本完全一样的操作
+    add    p12, p12, p11, LSL #(1+PTRSHIFT)
+                    // p12 = buckets + (mask << 1+PTRSHIFT)
+#else
+
+// ARM64不支持的缓存掩码存储。
+#error Unsupported cache mask storage for ARM64.
+
+#endif
+
+    // Clone scanning loop to miss instead of hang when cache is corrupt.
+    // 当缓存损坏时，克隆扫描循环将丢失而不是挂起。
+    // The slow path may detect any corruption and halt later.
+    // slow path 可能会检测到任何损坏并在稍后停止。
+    
+    // x12 的内容读取到 p17、p9 中
+    ldp    p17, p9, [x12]        // {imp, sel} = *bucket
+    // 比较
+1:    cmp    p9, p1            // if (bucket->sel != _cmd)
+    b.ne    2f            //     scan more
+    CacheHit $0            // call or return imp
+    
+2:    // not hit: p12 = not-hit bucket
+    CheckMiss $0            // miss if bucket->sel == 0
+    cmp    p12, p10        // wrap if bucket == buckets
+    b.eq    3f
+    ldp    p17, p9, [x12, #-BUCKET_SIZE]!    // {imp, sel} = *--bucket
+    b    1b            // loop
+
+LLookupEnd$1:
+LLookupRecover$1:
+3:    // double wrap
+    JumpMiss $0
+
+.endmacro
+```
+
 #### `CacheLookup`
 ```c++
 .macro CacheLookup
@@ -1199,6 +1681,12 @@ LLookupRecover$1:
 + [iOS - Runtime 中 Class、消息机制、super 关键字](https://www.jianshu.com/p/2faae9f0dcb3)
 + [深入iOS系统底层之汇编语言](https://juejin.im/post/6844903560140816398)
 + [操作系统内存管理(思维导图详解)](https://blog.csdn.net/hguisu/article/details/5713164)
++ [ARM指令浅析2（adrp、b）](https://blog.csdn.net/liao392781/article/details/79162919?ops_request_misc=%257B%2522request%255Fid%2522%253A%2522160193907419724839222280%2522%252C%2522scm%2522%253A%252220140713.130102334..%2522%257D&request_id=160193907419724839222280&biz_id=0&utm_medium=distribute.pc_search_result.none-task-blog-2~all~first_rank_v2~rank_v28-2-79162919.pc_first_rank_v2_rank_v28&utm_term=adrp&spm=1018.2118.3001.4187)
++ [Arm64汇编：UBFX指令](https://blog.csdn.net/LQMIKU/article/details/104361219?ops_request_misc=%257B%2522request%255Fid%2522%253A%2522160194046219725271750548%2522%252C%2522scm%2522%253A%252220140713.130102334..%2522%257D&request_id=160194046219725271750548&biz_id=0&utm_medium=distribute.pc_search_result.none-task-blog-2~all~first_rank_v2~rank_v28-1-104361219.pc_first_rank_v2_rank_v28&utm_term=ubfx&spm=1018.2118.3001.4187)
++ [第9部分- Linux ARM汇编 语法](https://blog.csdn.net/notbaron/article/details/106578015?biz_id=102&utm_term=汇编%20UXTW&utm_medium=distribute.pc_search_result.none-task-blog-2~all~sobaiduweb~default-2-106578015&spm=1018.2118.3001.4187)
++ [CBZ和CBNZ指令使用说明《realview编译工具》](http://blog.sina.com.cn/s/blog_3fd4da4a0102vvyg.html)
++ [二、linux 内核OOPS（1）](https://blog.csdn.net/qq_20678703/article/details/52237784?utm_medium=distribute.pc_aggpage_search_result.none-task-blog-2~all~sobaiduend~default-1-52237784.nonecase&utm_term=oops出错是什么意思&spm=1000.2123.3001.4430)
++ [BRAA, BRAAZ, BRAB, BRABZ](https://developer.arm.com/docs/ddi0596/h/base-instructions-alphabetic-order/braa-braaz-brab-brabz-branch-to-register-with-pointer-authentication)
 
 **ARM 的栈是自减栈，栈是向下生长的，也就是栈底处于高地址处，栈顶处于低地址处，所以栈区一般都是放在内存的顶端。**
 
