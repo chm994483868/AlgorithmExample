@@ -1,9 +1,8 @@
-#  iOS 从源码解析Runtime (九)：聚焦 objc_class(cache_t 及方法缓存实现相关内容篇(2))
+# iOS 从源码解析Runtime (九)：聚焦 objc_class(cache_t 及方法缓存实现相关内容篇(2)(objc-msg-arm64.s 文件全解析))
 
 > 上篇分析了 `bucket_t` 和 `cache_t` 的几乎全部内容，最后由于篇幅限制剩两个函数留在本篇来分析，然后准备接着分析 `objc-cache.mm` 文件中与 `objc-cache.h` 文件对应的几个核心函数，正是由它们构成了完整的方法缓存实现，那么一起 ⛽️⛽️ 吧！
 
 > 这篇文章发的太晚了，主要是这几天时间都花在看汇编上了，我的汇编水平大概只是一年前看过王爽老师的那本汇编的书，然后就没怎么接触过了，感觉接下来的源码学习涉及到汇编的地方太多了，所以还是特别有必要对汇编做一个整体的认知和学习的，而不是单单只知道寄存器和单个指令是什么意思。本篇后半部分对 `objc-msg-arm64.s` 文件的每一行都做到了分析，那么一起⛽️⛽️吧！
-
 
 ## `insert`
 &emsp;把指定的 `sel` 和 `imp` 插入到 `cache_t` 中，如果开始是空状态，则首先会初始一个容量为 4 散列数组再进行插入。其它情况插入之前会计算已用的容量占比是否到了临界值，如果是则首先进行扩容，然后再进行插入操作，如果还没有达到则直接插入。插入操作如果发生了哈希冲突则依次进行 `+1/-1` 的哈希探测。
@@ -1398,35 +1397,50 @@ LLookupStart$1:
     // cmp 比较指令
     // p1 = SEL (p1 的值自开始就没有被改变过)
     // 判断以 SEL 哈希值找到的 bucket_t 的 _sel 是否就是 SEL，这里可能会因为哈希冲突而导致与 SEL 不一样，
-    // 此时需要根据不同的平台执行向前或者向后的线性探测找到对应的 bucket_t.
-    // 在 __arm64__ 下是从起始位置往后面探测（(i+1) & mask）🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟
+    // 此时需要根据不同的平台执行向前或者向后的线性探测找到对应的 bucket_t。
+    // 在 __arm64__ 下是从起始位置往后面探测（(i+1) & mask）
     
-    // 这里还有一个点，p1 是 8 个字节，p9 应该至少是从 bucket_t 中取出来的 _sel 
-1:  cmp    p9, p1            // if (bucket->sel != _cmd) // 这里的 1: 好像表示是段还是区来着，此时表示不同，
+    // 比较 p1 和 p9，p9 是从散列表中找到的 bucket_t 的 _sel，p1 是传入的 sel（如果没有发生哈希冲突的话，它们两个应该是一样的）
+1:  cmp    p9, p1            // if (bucket->sel != _cmd)
+
+    // 如果 p9 和 p1 不相等的话，则跳转到标签 2 处（进行哈希探测）
     b.ne    2f            //     scan more
+    
+    // 如果 p9 和 p1 相等的话，即 CacheHit 缓存命中，直接调用或返回 imp
     CacheHit $0            // call or return imp
     
 2:  // not hit: p12 = not-hit bucket 未命中
     // CheckMiss normal -> 判断 p9 是否为 0 // 空 bucket_t 的初始值会是 0，而那个 end 占位的 bucket_t 的 _sel 是 1
     // 即判断查找到的是不是空，如果为空，即表示当前方法缓存列表里面没有缓存 sel 对应的方法，此时需要去类的方法列表里面去查找方法
     // 如果不是空，则表示此时发生了哈希冲突，bucket_t 存在别处，继续向前或者向后查找
+    
     CheckMiss $0            // miss if bucket->sel == 0
+    
     // 判断是否已经是第一个了，如果是首个就去类的方法列表查找
+    // 判断 p12(下标对应的 bucket) 是否等于 p10(buckets 数组第一个元素)，如果等于的话跳转到下面的标签 3 处
     cmp    p12, p10        // wrap if bucket == buckets
-    b.eq    3f // 跳转到下面的 3f
+    
+    // 如果 p12 等于 p10，则跳转到下面的标签 3 处，这里处理哈希冲突的时候一直往前走到了散列数组的首部了
+    // 这时继续往前走的话是跳到散列数组的末尾的继续探测
+    b.eq    3f
     
     // 还可以继续冲突的向前查找
     // #define BUCKET_SIZE (2 * __SIZEOF_POINTER__) 16 个字节，正是 bucket_t 的宽度
     // 往前查找
+    // 从 x12 移动到下一个 bucket_t，然后把它的 _imp 存储到 p17 中，_sel 存储到 p9 中
     ldp    p17, p9, [x12, #-BUCKET_SIZE]!    // {imp, sel} = *--bucket
-    // 循环
+    
+    // 跳转到第一步，继续对比 sel 和 cmd 
+    // (这里有一个知识点 sel 不多说就是我们的从散列数组中找到的 bucket_t 中的 _sel，而 cmd 呢正是 p1 中存储的代表当前函数 SEL 的 _cmd
+    // 而且 p0-p7 是保存函数参数，p0 放的是 id 是我们平时使用的 self，而 p1 呢，就是 _cmd)
     b    1b            // loop
 
-3:    // wrap: p12 = first bucket, w11 = mask
+3:   // wrap: p12 = first bucket, w11 = mask
 #if CACHE_MASK_STORAGE == CACHE_MASK_STORAGE_HIGH_16
-    // p11 是 buckets 或者 _maskAndBuckets
+    // p11 是 _maskAndBuckets
     // p11 逻辑右移 44（这里包含了两步，首先 p11 右移 48 位得到 mask，然后再左移 4 位，
     // 表示扩大 8 倍（可代表指针的字节宽度），即整体 p11 右移了 44 位，这个值可以表示 buckets 指针需要需要移动的总距离）
+    // 即此时移动到了散列数组的末尾。（mask 的值是 capacity(总容量) - 1）
     
     add    p12, p12, p11, LSR #(48 - (1+PTRSHIFT))
                     // 那么此时 p12 指向的是谁呢
@@ -1448,219 +1462,346 @@ LLookupStart$1:
     // The slow path may detect any corruption and halt later.
     // slow path 可能会检测到任何损坏并在稍后停止。
     
-    // x12 的内容读取到 p17、p9 中
+    // 再查找一遍缓存
+    
+    
+    // x12(bucket_t) 的内容读取到 p17(_imp)、p9(_sel) 中
     ldp    p17, p9, [x12]        // {imp, sel} = *bucket
-    // 比较
-1:    cmp    p9, p1            // if (bucket->sel != _cmd)
+    
+    // 比较 sel 和 p1(传入的参数 cmd)
+1:  cmp    p9, p1            // if (bucket->sel != _cmd)
+
+    // 如果不相等则跳转到标签 2 
     b.ne    2f            //     scan more
+    
+    // 如果相等即缓存命中，直接返回 imp
     CacheHit $0            // call or return imp
     
-2:    // not hit: p12 = not-hit bucket
+2:  // not hit: p12 = not-hit bucket
+    // 如果一直找不到，则 CheckMiss
     CheckMiss $0            // miss if bucket->sel == 0
+    
+    // 判断p12（下标对应的bucket） 是否 等于 p10（buckets数组第一个元素），表示前面已经没有了，但是还是没有找到
     cmp    p12, p10        // wrap if bucket == buckets
+    
+    // 如果等于，则跳转到下面的标签 3
     b.eq    3f
+    
+    // 从x12（即p12 buckets首地址）实际需要平移的内存大小 BUCKET_SIZE，
+    // 得到得到第二个 bucket 元素，imp-sel 分别存入p17-p9，即向前查找
     ldp    p17, p9, [x12, #-BUCKET_SIZE]!    // {imp, sel} = *--bucket
+    
+    // 跳转到标签 1，继续对比 sel 与 cmd  
     b    1b            // loop
 
-LLookupEnd$1:
+LLookupEnd$1: // 对应上面的 LLookupStart$1:
+
 LLookupRecover$1:
 3:    // double wrap
+// 跳转至 JumpMiss 因为是 normal，跳转至 __objc_msgSend_uncached  
     JumpMiss $0
 
 .endmacro
 ```
-
-#### `CacheLookup`
+#### `objc_msgSend`
+&emsp;终于来到了我们最核心的 `objc_msgSend` 函数。
 ```c++
-.macro CacheLookup
-    //
-    // Restart protocol:
-    // 重启协议:
-    //
-    // As soon as we're past the LLookupStart$1 label we may have loaded an invalid cache pointer or mask.
-    // 一旦超过 LLookupStart$1 标签，我们可能已经加载了无效的 缓存指针 或 掩码。
-    // 
-    // When task_restartable_ranges_synchronize() is called, (or when a signal hits us) before we're past LLookupEnd$1,
-    // then our PC will be reset to LLookupRecover$1 which forcefully jumps to the cache-miss codepath which have the following.
-    // 当我们在超过 LLookupEnd$1 之前（或当 信号 命中我们）调用 task_restartable_ranges_synchronize()，我们的 PC 将重置为 LLookupRecover$1，这将强制跳转到缓存未命中的代码路径，其中包含以下内容。
-    // requirements:
-    // 要求:
-    //
-    // GETIMP:
-    // 获得 IMP:
-    // The cache-miss is just returning NULL (setting x0 to 0) // 缓存未命中只是返回 NULL
-    //
-    // NORMAL and LOOKUP:
-    // - x0 contains the receiver // x0 表示函数接收者
-    // - x1 contains the selector // x1 表示 SEL
-    // - x16 contains the isa // x16 是class 的 isa
-    // - other registers are set as per calling conventions // 其它寄存器根据调用约定来设置
-    //
-LLookupStart$1:
+/*
+ *
+ * id objc_msgSend(id self, SEL _cmd, ...);
+ * IMP objc_msgLookup(id self, SEL _cmd, ...);
+ * 
+ * objc_msgLookup ABI:
+ * IMP returned in x17
+ * x16 reserved for our use but not used
+ *
+ */
 
-    // p1 = SEL, p16 = isa p1 表示 SEL，p16 表示 isa
-    // #define CACHE (2 * __SIZEOF_POINTER__) // 即 16
-    // [x16, #CACHE] 则表示 x16(isa) + 16 的内存地址，即 cache 的地址。
-    
-    // (对应于 objc_class 的第一个成员变量是 isa_t isa，
-    //  第二个成员变量是 Class superclass，
-    //  第三个成员变量是 cache_t cache，根据他们的类型可以知道 isa 和 cache 刚好相差 16 个字节)
-    
-    // ldr r1, [r2, #4] 将内存地址为 r2+4 的数据读取到 r1 中
-    // 将 cache 的内容读取到 p11 中 (这里 cache_t 第一个成员变量是 8 个字节，读取如果按字的话，一次只能 2 个字节)
-    // 即把 buckets 指针或者 _maskAndBuckets 读取到 p11 中（它们都是 8 个字节），会根据不同的掩码类型来进行读取
-    ldr    p11, [x16, #CACHE]                // p11 = mask|buckets
-
-// 根据掩码类型来做不同的处理
-#if CACHE_MASK_STORAGE == CACHE_MASK_STORAGE_HIGH_16
-    // p11 & #0x0000ffffffffffff，表示直接舍弃 p11 高 16 位的内容，只要后 48 位的 buckets 
-    // 把 p11 & 0x0000ffffffffffff 的结果保存在 p10 中，即 p10 就是 buckets
-    and    p10, p11, #0x0000ffffffffffff    // p10 = buckets
-    
-    // LSR 逻辑右移(Logic Shift Right)
-    // p11, LSR #48 表示 _maskAndBuckets 右移 48 位取得 _mask
-    // and 按位与，与 C 的 "&" 功能相同
-    // p1 是 SEL，然后和上面👆取得的 _mask 做与操作即取得 SEL 的哈希值并保存在 p12 中
-    // 在这里的时候 p12 和 x12 都是 SEL 的哈希值
-    and    p12, p1, p11, LSR #48        // x12 = _cmd & mask (在函数内部 _cmd 即表示函数的 SEL)
-#elif CACHE_MASK_STORAGE == CACHE_MASK_STORAGE_LOW_4
-    // 掩码在低 4 位的情况
-    and    p10, p11, #~0xf            // p10 = buckets
-    and    p11, p11, #0xf            // p11 = maskShift
-    mov    p12, #0xffff
-    lsr    p11, p12, p11                // p11 = mask = 0xffff >> p11
-    // 同样将 SEL 的哈希值保存在 p12 中
-    and    p12, p1, p11                // x12 = _cmd & mask
-#else
-
-// ARM64 不支持的缓存掩码存储。
-#error Unsupported cache mask storage for ARM64.
-
-#endif
-    // 在 Project Headers/arm64-asm.h 中可以看到 PTRSHIFT 的宏定义
-    // #if __arm64__
-    // #if __LP64__ // 64 位系统架构
-    // #define PTRSHIFT 3  // 1<<PTRSHIFT == PTRSIZE // 0b1000 表示一个指针 8 个字节
-    // // "p" registers are pointer-sized
-    // // true arm64
-    // #else
-    // // arm64_32 // 32 位系统架构
-    // #define PTRSHIFT 2  // 1<<PTRSHIFT == PTRSIZE // 0b100 表示一个指针 4 个字节
-    // // "p" registers are pointer-sized
-    // // arm64_32
-    // #endif
-
-    // LSL 逻辑左移(Logic Shift Left)
-    // p10 是 buckets
-    // p12 是 (_cmd & mask) // 哈希值
-    // 即 p12 先做逻辑左移运算(这里的逻辑左移是表示在对哈希值做乘法扩大为 8 倍)，然后和 p10 相加，并把最后结果存放在 p12 中
-    // p12 = buckets + ((_cmd & mask) << (1+PTRSHIFT))
-    
-    // (把 SEL 的哈希值左移 4 位意思是哈希值乘以 8，这个 8 指的的是一个指针占了 8 个字节的意思
-    //  即算出 SEL 对应的 bucket_t 指针的位置与 buckets 的起始地址的距离，
-    //  这里的距离单位是按字节计算的，所以要乘以 8)
-    // 即此时 p12 指向的是 SEL 哈希值对应的在 buckets 散列数组下标下的 bucket_t 指针的起始地址
-    add    p12, p10, p12, LSL #(1+PTRSHIFT)
-                     // p12 = buckets + ((_cmd & mask) << (1+PTRSHIFT))
-
-    // ldr 从存储器中加载 (Load) 字到一个寄存器 (Register) 中
-    // str 把一个寄存器按字存储 (Store) 到存储器中
-    // 示例: 
-    // ldr r1, =0x123456789 大范围的地址读取指令: r1 = 0x123456789
-    
-    // ldr r1, [r2, #4] 内存访问指令（当 ldr 后面没有 = 号时为内存读取指令）
-    // 将内存地址为 r2+4 的数据读取到 r1 中，相当于 C 语言中的 * 操作
-    
-    // 这种 [xxx] 与 #x 分离的情况比较特殊，要注意（它这个内容读取完毕以后再增加 r2 的距离，改变 r2 的指向）
-    // ldr r1, [r2], #4 将内存地址为 r2 的数据读取到 r1 中，再将地址加 4，r2 = r2 + 4
-    
-    // str r1, [r2, #4] 存储指令: 将 r1 的值存入地址为 r2 + 4 的内存中
-    
-    // 这种 [xxx] 与 #x 分离的情况比较特殊，要注意（它这个内容存储完毕以后再增加 r2 地址值，改变 r2 的指向）
-    // str r1, [r2], #4 将 r1 的值存入地址为 r2 的内存中，再将地址加 4，r2 = r2 + 4
-    
-    // ldp/stp 是 ldr/str 的衍生，可以同时读/写两个寄存器，ldr/str 只能读写一个
-    // 示例: ldp x1, x0, [sp, #0x10] 将 sp 偏移 16 个字节的值取出来，放入 x1 和 x0
-    
-    // 这里 x12 就是 p12 吗 ？，表示以 SEL 哈希值为数组下标，在 buckets 散列数组中对应的 bucket_t 指针
-    // 目前已知的变量 p10 是 buckets p12 是 SEL 在 buckets 数组中对应的 bucket_t 指针，那么这个 x12 到底是什么？
-    // 而且在不同的平台下，bucket_t 的 _sel 和 _imp 的顺序是相反的，在 __arm64__ 下是 _imp 在前 _sel 在后，其他平台下则是相反的
-    
-    ldp    p17, p9, [x12]        // {imp, sel} = *bucket 那么 p17 和 p9  x12 此时都是同一个值了
-    
-    // cmp 比较指令
-    // p1 = SEL (p1 的值自开始就没有被改变过)
-    // 判断以 SEL 哈希值找到的 bucket_t 的 _sel 是否就是 SEL，这里可能会因为哈希冲突而导致与 SEL 不一样，
-    // 此时需要根据不同的平台执行向前或者向后的线性探测找到对应的 bucket_t.
-    
-    // 这里还有一个点，p1 是 8 个字节，p9 应该至少是从 bucket_t 中取出来的 _sel 
-1:  cmp    p9, p1            // if (bucket->sel != _cmd) // 这里的 1: 好像表示是段还是区来着，此时表示不同，
-    b.ne    2f            //     scan more
-    CacheHit $0            // call or return imp
-    
-2:  // not hit: p12 = not-hit bucket 未命中
-    // CheckMiss normal -> 判断 p9 是否为 0 // 空 bucket_t 的初始值会是 0，而那个 end 占位的 bucket_t 的 _sel 是 1
-    // 即判断查找到的是不是空，如果为空，即表示当前方法缓存列表里面没有缓存 sel 对应的方法，此时需要去类的方法列表里面去查找方法
-    // 如果不是空，则表示此时发生了哈希冲突，bucket_t 存在别处，继续向前或者向后查找
-    CheckMiss $0            // miss if bucket->sel == 0
-    // 判断是否已经是第一个了，如果是首个就去类的方法列表查找
-    cmp    p12, p10        // wrap if bucket == buckets
-    b.eq    3f // 跳转到下面的 3f
-    
-    // 还可以继续冲突的向前查找
-    // #define BUCKET_SIZE (2 * __SIZEOF_POINTER__) 16 个字节，正是 bucket_t 的宽度
-    // 往前查找
-    ldp    p17, p9, [x12, #-BUCKET_SIZE]!    // {imp, sel} = *--bucket
-    // 循环
-    b    1b            // loop
-
-3:    // wrap: p12 = first bucket, w11 = mask
-#if CACHE_MASK_STORAGE == CACHE_MASK_STORAGE_HIGH_16
-    // p11 是 buckets 或者 _maskAndBuckets
-    // p11 逻辑右移 44（这里包含了两步，首先 p11 右移 48 位得到 mask，然后再左移 4 位，
-    // 表示扩大 8 倍（可代表指针的字节宽度），即整体 p11 右移了 44 位，这个值可以表示 buckets 指针需要需要移动的总距离）
-    
-    add    p12, p12, p11, LSR #(48 - (1+PTRSHIFT))
-                    // 那么此时 p12 指向的是谁呢
-                    // p12 = buckets + (mask << 1+PTRSHIFT)
-                    
-#elif CACHE_MASK_STORAGE == CACHE_MASK_STORAGE_LOW_4
-    // 当低 4 位是掩码时，基本完全一样的操作
-    add    p12, p12, p11, LSL #(1+PTRSHIFT)
-                    // p12 = buckets + (mask << 1+PTRSHIFT)
-#else
-
-// ARM64不支持的缓存掩码存储。
-#error Unsupported cache mask storage for ARM64.
-
+#if SUPPORT_TAGGED_POINTERS
+    .data
+    .align 3
+    .globl _objc_debug_taggedpointer_classes
+_objc_debug_taggedpointer_classes:
+    .fill 16, 8, 0
+    .globl _objc_debug_taggedpointer_ext_classes
+_objc_debug_taggedpointer_ext_classes:
+    .fill 256, 8, 0
 #endif
 
-    // Clone scanning loop to miss instead of hang when cache is corrupt.
-    // 当缓存损坏时，克隆扫描循环将丢失而不是挂起。
-    // The slow path may detect any corruption and halt later.
-    // slow path 可能会检测到任何损坏并在稍后停止。
-    
-    // x12 的内容读取到 p17、p9 中
-    ldp    p17, p9, [x12]        // {imp, sel} = *bucket
-    // 比较
-1:    cmp    p9, p1            // if (bucket->sel != _cmd)
-    b.ne    2f            //     scan more
-    CacheHit $0            // call or return imp
-    
-2:    // not hit: p12 = not-hit bucket
-    CheckMiss $0            // miss if bucket->sel == 0
-    cmp    p12, p10        // wrap if bucket == buckets
-    b.eq    3f
-    ldp    p17, p9, [x12, #-BUCKET_SIZE]!    // {imp, sel} = *--bucket
-    b    1b            // loop
+    ENTRY _objc_msgSend
+    UNWIND _objc_msgSend, NoFrame
 
-LLookupEnd$1:
-LLookupRecover$1:
-3:    // double wrap
-    JumpMiss $0
+    cmp    p0, #0            // nil check and tagged pointer check
+#if SUPPORT_TAGGED_POINTERS
+    b.le    LNilOrTagged        //  (MSB tagged pointer looks negative)
+#else
+    b.eq    LReturnZero
+#endif
+    ldr    p13, [x0]        // p13 = isa
+    GetClassFromIsa_p16 p13        // p16 = class
+LGetIsaDone:
+    // calls imp or objc_msgSend_uncached
+    CacheLookup NORMAL, _objc_msgSend
+
+#if SUPPORT_TAGGED_POINTERS
+LNilOrTagged:
+    b.eq    LReturnZero        // nil check
+
+    // tagged
+    adrp    x10, _objc_debug_taggedpointer_classes@PAGE
+    add    x10, x10, _objc_debug_taggedpointer_classes@PAGEOFF
+    ubfx    x11, x0, #60, #4
+    ldr    x16, [x10, x11, LSL #3]
+    adrp    x10, _OBJC_CLASS_$___NSUnrecognizedTaggedPointer@PAGE
+    add    x10, x10, _OBJC_CLASS_$___NSUnrecognizedTaggedPointer@PAGEOFF
+    cmp    x10, x16
+    b.ne    LGetIsaDone
+
+    // ext tagged
+    adrp    x10, _objc_debug_taggedpointer_ext_classes@PAGE
+    add    x10, x10, _objc_debug_taggedpointer_ext_classes@PAGEOFF
+    ubfx    x11, x0, #52, #8
+    ldr    x16, [x10, x11, LSL #3]
+    b    LGetIsaDone
+// SUPPORT_TAGGED_POINTERS
+#endif
+
+LReturnZero:
+    // x0 is already zero
+    mov    x1, #0
+    movi    d0, #0
+    movi    d1, #0
+    movi    d2, #0
+    movi    d3, #0
+    ret
+
+    END_ENTRY _objc_msgSend
+
+
+    ENTRY _objc_msgLookup
+    UNWIND _objc_msgLookup, NoFrame
+    cmp    p0, #0            // nil check and tagged pointer check
+#if SUPPORT_TAGGED_POINTERS
+    b.le    LLookup_NilOrTagged    //  (MSB tagged pointer looks negative)
+#else
+    b.eq    LLookup_Nil
+#endif
+    ldr    p13, [x0]        // p13 = isa
+    GetClassFromIsa_p16 p13        // p16 = class
+LLookup_GetIsaDone:
+    // returns imp
+    CacheLookup LOOKUP, _objc_msgLookup
+
+#if SUPPORT_TAGGED_POINTERS
+LLookup_NilOrTagged:
+    b.eq    LLookup_Nil    // nil check
+
+    // tagged
+    adrp    x10, _objc_debug_taggedpointer_classes@PAGE
+    add    x10, x10, _objc_debug_taggedpointer_classes@PAGEOFF
+    ubfx    x11, x0, #60, #4
+    ldr    x16, [x10, x11, LSL #3]
+    adrp    x10, _OBJC_CLASS_$___NSUnrecognizedTaggedPointer@PAGE
+    add    x10, x10, _OBJC_CLASS_$___NSUnrecognizedTaggedPointer@PAGEOFF
+    cmp    x10, x16
+    b.ne    LLookup_GetIsaDone
+
+LLookup_ExtTag:    
+    adrp    x10, _objc_debug_taggedpointer_ext_classes@PAGE
+    add    x10, x10, _objc_debug_taggedpointer_ext_classes@PAGEOFF
+    ubfx    x11, x0, #52, #8
+    ldr    x16, [x10, x11, LSL #3]
+    b    LLookup_GetIsaDone
+// SUPPORT_TAGGED_POINTERS
+#endif
+
+LLookup_Nil:
+    adrp    x17, __objc_msgNil@PAGE
+    add    x17, x17, __objc_msgNil@PAGEOFF
+    ret
+
+    END_ENTRY _objc_msgLookup
+
+    
+    STATIC_ENTRY __objc_msgNil
+
+    // x0 is already zero
+    mov    x1, #0
+    movi    d0, #0
+    movi    d1, #0
+    movi    d2, #0
+    movi    d3, #0
+    ret
+    
+    END_ENTRY __objc_msgNil
+
+
+    ENTRY _objc_msgSendSuper
+    UNWIND _objc_msgSendSuper, NoFrame
+
+    ldp    p0, p16, [x0]        // p0 = real receiver, p16 = class
+    // calls imp or objc_msgSend_uncached
+    CacheLookup NORMAL, _objc_msgSendSuper
+
+    END_ENTRY _objc_msgSendSuper
+
+    // no _objc_msgLookupSuper
+
+    ENTRY _objc_msgSendSuper2
+    UNWIND _objc_msgSendSuper2, NoFrame
+
+    ldp    p0, p16, [x0]        // p0 = real receiver, p16 = class
+    ldr    p16, [x16, #SUPERCLASS]    // p16 = class->superclass
+    CacheLookup NORMAL, _objc_msgSendSuper2
+
+    END_ENTRY _objc_msgSendSuper2
+
+    
+    ENTRY _objc_msgLookupSuper2
+    UNWIND _objc_msgLookupSuper2, NoFrame
+
+    ldp    p0, p16, [x0]        // p0 = real receiver, p16 = class
+    ldr    p16, [x16, #SUPERCLASS]    // p16 = class->superclass
+    CacheLookup LOOKUP, _objc_msgLookupSuper2
+
+    END_ENTRY _objc_msgLookupSuper2
+
+
+.macro MethodTableLookup
+    
+    // push frame
+    SignLR
+    stp    fp, lr, [sp, #-16]!
+    mov    fp, sp
+
+    // save parameter registers: x0..x8, q0..q7
+    sub    sp, sp, #(10*8 + 8*16)
+    stp    q0, q1, [sp, #(0*16)]
+    stp    q2, q3, [sp, #(2*16)]
+    stp    q4, q5, [sp, #(4*16)]
+    stp    q6, q7, [sp, #(6*16)]
+    stp    x0, x1, [sp, #(8*16+0*8)]
+    stp    x2, x3, [sp, #(8*16+2*8)]
+    stp    x4, x5, [sp, #(8*16+4*8)]
+    stp    x6, x7, [sp, #(8*16+6*8)]
+    str    x8,     [sp, #(8*16+8*8)]
+
+    // lookUpImpOrForward(obj, sel, cls, LOOKUP_INITIALIZE | LOOKUP_RESOLVER)
+    // receiver and selector already in x0 and x1
+    mov    x2, x16
+    mov    x3, #3
+    bl    _lookUpImpOrForward
+
+    // IMP in x0
+    mov    x17, x0
+    
+    // restore registers and return
+    ldp    q0, q1, [sp, #(0*16)]
+    ldp    q2, q3, [sp, #(2*16)]
+    ldp    q4, q5, [sp, #(4*16)]
+    ldp    q6, q7, [sp, #(6*16)]
+    ldp    x0, x1, [sp, #(8*16+0*8)]
+    ldp    x2, x3, [sp, #(8*16+2*8)]
+    ldp    x4, x5, [sp, #(8*16+4*8)]
+    ldp    x6, x7, [sp, #(8*16+6*8)]
+    ldr    x8,     [sp, #(8*16+8*8)]
+
+    mov    sp, fp
+    ldp    fp, lr, [sp], #16
+    AuthenticateLR
 
 .endmacro
+
+    STATIC_ENTRY __objc_msgSend_uncached
+    UNWIND __objc_msgSend_uncached, FrameWithNoSaves
+
+    // THIS IS NOT A CALLABLE C FUNCTION
+    // Out-of-band p16 is the class to search
+    
+    MethodTableLookup
+    TailCallFunctionPointer x17
+
+    END_ENTRY __objc_msgSend_uncached
+
+
+    STATIC_ENTRY __objc_msgLookup_uncached
+    UNWIND __objc_msgLookup_uncached, FrameWithNoSaves
+
+    // THIS IS NOT A CALLABLE C FUNCTION
+    // Out-of-band p16 is the class to search
+    
+    MethodTableLookup
+    ret
+
+    END_ENTRY __objc_msgLookup_uncached
+
+
+    STATIC_ENTRY _cache_getImp
+
+    GetClassFromIsa_p16 p0
+    CacheLookup GETIMP, _cache_getImp
+
+LGetImpMiss:
+    mov    p0, #0
+    ret
+
+    END_ENTRY _cache_getImp
 ```
+#### `_objc_msgForward`
+```c++
+/*
+*
+* id _objc_msgForward(id self, SEL _cmd,...);
+*
+* _objc_msgForward is the externally-callable
+*   function returned by things like method_getImplementation().
+* _objc_msgForward_impcache is the function pointer actually stored in
+*   method caches.
+*
+*/
+
+    STATIC_ENTRY __objc_msgForward_impcache
+
+    // No stret specialization.
+    b    __objc_msgForward
+
+    END_ENTRY __objc_msgForward_impcache
+
+    
+    ENTRY __objc_msgForward
+
+    adrp    x17, __objc_forward_handler@PAGE
+    ldr    p17, [x17, __objc_forward_handler@PAGEOFF]
+    TailCallFunctionPointer x17
+    
+    END_ENTRY __objc_msgForward
+    
+    
+    ENTRY _objc_msgSend_noarg
+    b    _objc_msgSend
+    END_ENTRY _objc_msgSend_noarg
+
+    ENTRY _objc_msgSend_debug
+    b    _objc_msgSend
+    END_ENTRY _objc_msgSend_debug
+
+    ENTRY _objc_msgSendSuper2_debug
+    b    _objc_msgSendSuper2
+    END_ENTRY _objc_msgSendSuper2_debug
+
+    
+    ENTRY _method_invoke
+    // x1 is method triplet instead of SEL
+    add    p16, p1, #METHOD_IMP
+    ldr    p17, [x16]
+    ldr    p1, [x1, #METHOD_NAME]
+    TailCallMethodListImp x17, x16
+    END_ENTRY _method_invoke
+
+#endif
+```
+
+**ARM 的栈是自减栈，栈是向下生长的，也就是栈底处于高地址处，栈顶处于低地址处，所以栈区一般都是放在内存的顶端。**
 
 ## 参考链接
 **参考链接:🔗**
@@ -1687,6 +1828,3 @@ LLookupRecover$1:
 + [CBZ和CBNZ指令使用说明《realview编译工具》](http://blog.sina.com.cn/s/blog_3fd4da4a0102vvyg.html)
 + [二、linux 内核OOPS（1）](https://blog.csdn.net/qq_20678703/article/details/52237784?utm_medium=distribute.pc_aggpage_search_result.none-task-blog-2~all~sobaiduend~default-1-52237784.nonecase&utm_term=oops出错是什么意思&spm=1000.2123.3001.4430)
 + [BRAA, BRAAZ, BRAB, BRABZ](https://developer.arm.com/docs/ddi0596/h/base-instructions-alphabetic-order/braa-braaz-brab-brabz-branch-to-register-with-pointer-authentication)
-
-**ARM 的栈是自减栈，栈是向下生长的，也就是栈底处于高地址处，栈顶处于低地址处，所以栈区一般都是放在内存的顶端。**
-
