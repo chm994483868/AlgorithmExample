@@ -168,7 +168,7 @@ public:
     // fixme 这至少在没有编译器障碍的情况下并不是真正安全的，而当实现Class更改数据字段时可能没有内存障碍
     
     const class_ro_t *safe_ro() {
-        class_rw_t *maybe_rw = data();
+        class_rw_t *maybe_rw = data();h9h
         if (maybe_rw->flags & RW_REALIZED) {
             // maybe_rw is rw
             return maybe_rw->ro();
