@@ -194,7 +194,6 @@ void changeInfo(uint32_t set, uint32_t clear) {
         cache.clearBit(FAST_CACHE_HAS_DEFAULT_AWZ);
     }
 #else
-    
     // 直接判断 class_rw_t 的 flags 二进制表示的第 16 位的值是否为 1。
     bool hasCustomAWZ() const {
         return !(bits.data()->flags & RW_HAS_DEFAULT_AWZ);
@@ -216,19 +215,301 @@ void changeInfo(uint32_t set, uint32_t clear) {
 #endif
 ```
 ### `FAST_CACHE_HAS_DEFAULT_CORE/RW_HAS_DEFAULT_CORE`
+&emsp;`FAST_CACHE_HAS_DEFAULT_CORE` 用以在 `__LP64__` 平台下判断 `objc_class` 的 `cache_t cache` 的 `uint16_t _flags` 二进制表示时第 `15` 位的值是否为 `1`，以此表示该类或者父类是否有 `new/self/class/respondsToSelector/isKindOfClass` 函数的默认实现。而在 `非 __LP64__` 平台下，则是使用 `RW_HAS_DEFAULT_CORE`，且判断的位置发生了变化，`RW_HAS_DEFAULT_CORE` 用以判断从 `objc_class` 的  `class_data_bits_t bits` 中取得 `class_rw_t` 指针指向的 `class_rw_t` 实例的 `uint32_t flags` 的第 `13` 位的值是否为 `1`，以此表示该类或者父类是否有 `new/self/class/respondsToSelector/isKindOfClass` 函数的默认实现。
 ```c++
 #if __LP64__
 ...
 // class or superclass has default new/self/class/respondsToSelector/isKindOfClass
-// 类或者
+// 类或者父类有默认的 new/self/class/respondsToSelector/isKindOfClass
+
 #define FAST_CACHE_HAS_DEFAULT_CORE   (1<<15)
 ...
 #else
 ...
 // class or superclass has default new/self/class/respondsToSelector/isKindOfClass
+// 类或者父类有默认的 new/self/class/respondsToSelector/isKindOfClass
+
 #define RW_HAS_DEFAULT_CORE   (1<<13)
 ...
 #endif
+```
+### `hasCustomCore/setHasDefaultCore/setHasCustomCore`
+&emsp;在 `__LP64__` 平台和其它平台下判断、设置、清除 `objc_class` 的默认 `Core` 函数的标记位。
+```c++
+#if FAST_CACHE_HAS_DEFAULT_CORE
+    // 直接判断 cache_t cache 的 uint16_t _flags 二进制表示的第 15 位的值是否为 1。
+    bool hasCustomCore() const {
+        return !cache.getBit(FAST_CACHE_HAS_DEFAULT_CORE);
+    }
+    
+    // 以原子方式把 cache_t cache 的 uint16_t _flags 二进制表示的第 15 位设置为 1。
+    void setHasDefaultCore() {
+        return cache.setBit(FAST_CACHE_HAS_DEFAULT_CORE);
+    }
+    
+    // Default 和 Custom 是相反的，如果 objc_calss 有 CustomCore 则没有 DefaultCore。
+    // 以原子方式把 cache_t cache 的 uint16_t _flags 二进制表示的第 15 位设置为 0，
+    // 表示 objc_calss 有自定义的 new/self/class/respondsToSelector/isKindOfClass 函数，
+    // 即 objc_class 的 new/self/class/respondsToSelector/isKindOfClass 函数已经被重载了。 
+    
+    void setHasCustomCore() {
+        return cache.clearBit(FAST_CACHE_HAS_DEFAULT_CORE);
+    }
+#else
+    // 直接判断 class_rw_t 的 uint32_t flags 二进制表示的第 13 位的值是否为 1。
+    bool hasCustomCore() const {
+        return !(bits.data()->flags & RW_HAS_DEFAULT_CORE);
+    }
+    
+    // 以原子方式把 class_rw_t 的 uint32_t flags 二进制表示的第 13 位设置为 1。
+    void setHasDefaultCore() {
+        bits.data()->setFlags(RW_HAS_DEFAULT_CORE);
+    }
+    
+    // Default 和 Custom 是相反的，如果 objc_class 有 CustomCore 则没有 DefaultCore。
+    // 以原子方式把 class_rw_t 的 uint32_t flags 二进制表示的第 13 位设置为 0，
+    // 表示 objc_class 有自定义的 new/self/class/respondsToSelector/isKindOfClass 函数，
+    // 即 objc_class 的 new/self/class/respondsToSelector/isKindOfClass 函数已经被重载了。
+    void setHasCustomCore() {
+        bits.data()->clearFlags(RW_HAS_DEFAULT_CORE);
+    }
+#endif
+```
+### `FAST_CACHE_HAS_CXX_CTOR/RW_HAS_CXX_CTOR/FAST_CACHE_HAS_CXX_DTOR/RW_HAS_CXX_DTOR`
+&emsp;`FAST_CACHE_HAS_CXX_CTOR` 用以在 `__LP64__` 平台下判断 `objc_class` 的 `cache_t cache` 的 `uint16_t _flags` 二进制表示时第 `1` 位的值是否为 `1`，以此表示该类或者父类是否有 `.cxx_construct` 函数实现。而在 `非 __LP64__` 平台下，则是使用 `RW_HAS_CXX_CTOR`，且判断的位置发生了变化，`RW_HAS_CXX_CTOR` 用以判断从 `objc_class` 的 `class_data_bits_t bits` 中取得 `class_rw_t` 指针指向的 `class_rw_t` 实例的 `uint32_t flags` 的第 `18` 位的值是否为 `1`，以此表示该类或者父类是否有 `.cxx_construct` 函数实现。对应的 `FAST_CACHE_HAS_CXX_DTOR` 和 `RW_HAS_CXX_DTOR` 表示该类或者父类是否有 `.cxx_destruct` 函数实现。
+这里需要注意的是在 `__LP64__ && __arm64__` 平台下 `FAST_CACHE_HAS_CXX_DTOR` 是 `1<<0`，而在 `__LP64__ && !__arm64__` 平台下 `FAST_CACHE_HAS_CXX_DTOR` 是 `1<<2`。 
+```c++
+#if __LP64__
+...
+#if __arm64__
+// class or superclass has .cxx_construct/.cxx_destruct implementation。
+// 类或者父类有 .cxx_construct/.cxx_destruct 函数实现。
+
+// FAST_CACHE_HAS_CXX_DTOR is the first bit so that setting
+// it in isa_t::has_cxx_dtor is a single bfi.
+// FAST_CACHE_HAS_CXX_DTOR 是第一位，
+// 因此在 isa_t::has_cxx_dtor 中进行设置仅是一个位字段。
+// uintptr_t has_cxx_dtor      : 1;
+
+// __LP64__ && __arm64__ 平台下
+
+#define FAST_CACHE_HAS_CXX_DTOR       (1<<0)
+#define FAST_CACHE_HAS_CXX_CTOR       (1<<1)
+...
+#else
+...
+// class or superclass has .cxx_construct/.cxx_destruct implementation.
+// 类或者父类有 .cxx_construct/.cxx_destruct 函数实现。
+
+// FAST_CACHE_HAS_CXX_DTOR is chosen to alias with isa_t::has_cxx_dtor.
+// 选择 FAST_CACHE_HAS_CXX_DTOR 作为 isa_t::has_cxx_dtor 的别名。
+
+// __LP64__ && !__arm64__ 平台下
+
+#define FAST_CACHE_HAS_CXX_CTOR       (1<<1)
+#define FAST_CACHE_HAS_CXX_DTOR       (1<<2)
+#endif
+...
+#else
+...
+// class or superclass has .cxx_construct implementation.
+// 类或者父类有 .cxx_construct 函数实现。
+#define RW_HAS_CXX_CTOR       (1<<18)
+
+// class or superclass has .cxx_destruct implementation
+// 类或者父类有 .cxx_destruct 函数实现。 
+#define RW_HAS_CXX_DTOR       (1<<17)
+...
+#endif
+```
+### `hasCxxCtor/setHasCxxCtor/hasCxxDtor/setHasCxxDtor`
+&emsp;在 `__LP64__` 平台和其它平台下判断、设置（注意这里没有清除）`objc_class` 的 `.cxx_construct/.cxx_destruct` 函数实现的标记位。
+```c++
+#if FAST_CACHE_HAS_CXX_CTOR
+    // 直接判断 cache_t cache 的 uint16_t _flags 二进制表示的第 1 位的值是否为 1。
+    bool hasCxxCtor() {
+        ASSERT(isRealized());
+        return cache.getBit(FAST_CACHE_HAS_CXX_CTOR);
+    }
+    
+    // 以原子方式把 cache_t cache 的 uint16_t _flags 二进制表示的第 1 位设置为 1。
+    void setHasCxxCtor() {
+        cache.setBit(FAST_CACHE_HAS_CXX_CTOR);
+    }
+#else
+    // 直接判断 class_rw_t 的 flags 二进制表示的第 18 位的值是否为 1。
+    bool hasCxxCtor() {
+        ASSERT(isRealized());
+        return bits.data()->flags & RW_HAS_CXX_CTOR;
+    }
+    
+    // 以原子方式把 class_rw_t 的 uint32_t flags 二进制表示的第 18 位设置为 1。
+    void setHasCxxCtor() {
+        bits.data()->setFlags(RW_HAS_CXX_CTOR);
+    }
+#endif
+
+#if FAST_CACHE_HAS_CXX_DTOR
+    // 在 __LP64__ 的 __arm64__ 下是 0，在 !__arm64__ 下是 2。
+    // 直接判断 cache_t cache 的 uint16_t _flags 二进制表示的第 0/2 位的值是否为 1。
+    bool hasCxxDtor() {
+        ASSERT(isRealized());
+        return cache.getBit(FAST_CACHE_HAS_CXX_DTOR);
+    }
+    
+    // 以原子方式把 cache_t cache 的 uint16_t _flags 二进制表示的第 0/2 位设置为 1。
+    void setHasCxxDtor() {
+        cache.setBit(FAST_CACHE_HAS_CXX_DTOR);
+    }
+#else
+    // 直接判断 class_rw_t 的 uint32_t flags 二进制表示的第 17 位的值是否为 1。
+    bool hasCxxDtor() {
+        ASSERT(isRealized());
+        return bits.data()->flags & RW_HAS_CXX_DTOR;
+    }
+    
+    // 以原子方式把 class_rw_t 的 uint32_t flags 二进制表示的第 17 位设置为 1。
+    void setHasCxxDtor() {
+        bits.data()->setFlags(RW_HAS_CXX_DTOR);
+    }
+#endif
+```
+### `FAST_CACHE_REQUIRES_RAW_ISA/RW_REQUIRES_RAW_ISA`
+&emsp;`FAST_CACHE_REQUIRES_RAW_ISA` 用以在 `__LP64__` 平台下判断 `objc_class` 的 `cache_t cache` 的 `uint16_t _flags` 二进制表示时第 `13` 位的值是否为 `1`，以此表示类实例对象（此处是指类对象，不是使用类构建的实例对象，一定要记得）是否需要原始的 `isa`。而在 `非 __LP64__` 且 `SUPPORT_NONPOINTER_ISA` 的平台下，则是使用 `RW_REQUIRES_RAW_ISA`，且判断的位置发生了变化，`RW_REQUIRES_RAW_ISA` 用以判断从 `objc_class` 的 `class_data_bits_t bits` 中取得 `class_rw_t` 指针指向的 `class_rw_t` 实例的 `uint32_t flags` 的第 `15` 位的值是否为 `1`，以此表示类实例对象（此处是指类对象，不是使用类构建的实例对象，一定要记得）是否需要原始的 `isa`。
+```c++
+#if __LP64__
+...
+// class's instances requires raw isa.
+// 类实例需要 raw isa。
+
+#define FAST_CACHE_REQUIRES_RAW_ISA   (1<<13)
+...
+
+#else
+...
+// class's instances requires raw isa.
+// 类实例需要 raw isa。
+
+#if SUPPORT_NONPOINTER_ISA
+#define RW_REQUIRES_RAW_ISA   (1<<15)
+#endif
+...
+
+#endif
+```
+### `instancesRequireRawIsa/setInstancesRequireRawIsa`
+&emsp;在 `__LP64__` 平台和其它平台下判断、设置类实例（此处是指类对象，不是使用类构建的实例对象，一定要记得）需要原始 `isa` 的标记位。
+```c++
+#if FAST_CACHE_REQUIRES_RAW_ISA
+    // 直接判断 cache_t cache 的 uint16_t _flags 二进制表示的第 13 位的值是否为 1。
+    bool instancesRequireRawIsa() {
+        return cache.getBit(FAST_CACHE_REQUIRES_RAW_ISA);
+    }
+    
+    // 以原子方式把 cache_t cache 的 uint16_t _flags 二进制表示的第 13 位设置为 1。
+    void setInstancesRequireRawIsa() {
+        cache.setBit(FAST_CACHE_REQUIRES_RAW_ISA);
+    }
+#elif SUPPORT_NONPOINTER_ISA
+    // 直接判断 class_rw_t 的 uint32_t flags 二进制表示的第 15 位的值是否为 1。
+    bool instancesRequireRawIsa() {
+        return bits.data()->flags & RW_REQUIRES_RAW_ISA;
+    }
+    
+    // 以原子方式把 class_rw_t 的 uint32_t flags 二进制表示的第 15 位设置为 1。
+    void setInstancesRequireRawIsa() {
+        bits.data()->setFlags(RW_REQUIRES_RAW_ISA);
+    }
+#else
+    // 当 isa 是原始 isa 时，直接返回 true。
+    bool instancesRequireRawIsa() {
+        return true;
+    }
+    void setInstancesRequireRawIsa() {
+        // nothing
+    }
+#endif
+```
++ 当 `! __LP64__` 平台下，所有掩码都存储在 `class_rw_t` 的 `uint32_t flags`。
++ `__LP64__` 平台下，`FAST_HAS_DEFAULT_RR` 存储在 `class_data_bits_t bits` 的 `uintptr_t bits`。（`1UL<<2`）（`retain/release/autorelease/retainCount/_tryRetain/_isDeallocating/retainWeakReference/allowsWeakReference`）
++ `__LP64__` 平台下，`FAST_CACHE_HAS_DEFAULT_AWZ` 存储在 `cache_t cache` 的 `uint16_t _flags` 下。（`1<<14`）（`alloc/allocWithZone:`）
++ `__LP64__` 平台下，`FAST_CACHE_HAS_DEFAULT_CORE` 存储在 `cache_t cache` 的 `uint16_t _flags` 下。（`1<<15`）（`new/self/class/respondsToSelector/isKindOfClass`）
++ `__LP64__` 平台下，`FAST_CACHE_HAS_CXX_CTOR` 存储在 `cache_t cache` 的 `uint16_t _flags` 下。（`1<<1`）（`.cxx_construct`）
++ `__LP64__` 平台下，`FAST_CACHE_HAS_CXX_DTOR` 存储在 `cache_t cache` 的 `uint16_t _flags` 下。（`1<<2` / `1<<0`）（`.cxx_destruct`）
++ `__LP64__` 平台下，`FAST_CACHE_REQUIRES_RAW_ISA` 存储在 `cache_t cache` 的 `uint16_t _flags` 下。（`1<<13`）（`requires raw isa`）
+
+### `void printInstancesRequireRawIsa(bool inherited)`
+&emsp;打印类对象需要原始 `isa`，当环境变量 `OBJC_PRINT_RAW_ISA` `Value` 为 `true` 时会调用该函数，`inherited` 表示该类是否是一个子类。
+`OPTION( PrintRawIsa, OBJC_PRINT_RAW_ISA, "log classes that require raw pointer isa fields")`
+```c++
+void
+objc_class::printInstancesRequireRawIsa(bool inherited)
+{
+    // 打印标识开启，否则执行断言
+    ASSERT(PrintRawIsa);
+    // 类对象需要原始的 isa，否则执行断言 
+    ASSERT(instancesRequireRawIsa());
+    
+    // 控制台输出需要原始 isa 的类名等信息
+    _objc_inform("RAW ISA:  %s%s%s", nameForLogging(), 
+                 isMetaClass() ? " (meta)" : "", 
+                 inherited ? " (inherited)" : "");
+}
+```
+
+### `void setInstancesRequireRawIsaRecursively(bool inherited = false)`
+&emsp;将此类及其所有子类标记为需要原始 `isa` 指针，标记函数 `setInstancesRequireRawIsa` 很简单，上面我们已经分析过了， 这里涉及到一个更重要的知识点，就是我们如何才能获取一个类的所有子类呢 ？这里正式使用到了 `struct class_rw_t` 的两个成员变量 `Class firstSubclass` 和 `Class nextSiblingClass`，下面我们跟着函数调用流程一起来分析一下吧。
+
+```c++
+/*
+* Mark this class and all of its subclasses as requiring raw isa pointers.
+* 将此类及其所有子类标记为需要原始 isa 指针。
+*/
+void objc_class::setInstancesRequireRawIsaRecursively(bool inherited)
+{
+    // struct objc_class 的函数内部的 this 自然是 objc_class *。
+    
+    // 取得 objc_class 指针。
+    Class cls = (Class)this;
+    
+    // 加锁，加锁失败则执行断言。
+    runtimeLock.assertLocked();
+    
+    // 如果此类已经被标记为需要原始 isa，则直接 return。
+    if (instancesRequireRawIsa()) return;
+    
+    // 枚举一个类及其所有已实现的子类。
+    //（foreach_realized_class_and_subclass 函数是我们要重点关注的对象，正是它获取了所有子类）
+    foreach_realized_class_and_subclass(cls, [=](Class c){
+        
+        if (c->instancesRequireRawIsa()) {
+            // 如果此类已经被标记为需要原始 isa，则直接 return false，跳过该类继续遍历下一个子类。
+            return false;
+        }
+        
+        // 把 c 标记为需要原始 isa。
+        c->setInstancesRequireRawIsa();
+        
+        // 是否在控制台打印
+        if (PrintRawIsa) c->printInstancesRequireRawIsa(inherited || c != cls);
+        
+        // return true 继续执行遍历。
+        return true;
+    });
+}
+```
+#### `foreach_realized_class_and_subclass`
+```c++
+// Enumerates a class and all of its realized subclasses.
+// 枚举一个类及其所有已实现的子类。
+static void
+foreach_realized_class_and_subclass(Class top, bool (^code)(Class) __attribute((noescape)))
+{
+    // 
+    unsigned int count = unreasonableClassCount();
+
+    foreach_realized_class_and_subclass_2(top, count, false, code);
+}
 ```
 
 ## 参考链接
