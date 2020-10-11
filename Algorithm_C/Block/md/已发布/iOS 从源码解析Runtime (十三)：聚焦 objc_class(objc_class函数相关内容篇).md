@@ -505,12 +505,115 @@ void objc_class::setInstancesRequireRawIsaRecursively(bool inherited)
 static void
 foreach_realized_class_and_subclass(Class top, bool (^code)(Class) __attribute((noescape)))
 {
-    // 
     unsigned int count = unreasonableClassCount();
 
     foreach_realized_class_and_subclass_2(top, count, false, code);
 }
 ```
+#### `unreasonableClassCount`
+```c++
+/*
+* unreasonableClassCount
+* Provides an upper bound for any iteration of classes, to prevent spins when runtime metadata is corrupted.
+* 为类的任何迭代提供上限，以防止在运行时元数据损坏时发生死循环。
+*/
+static unsigned unreasonableClassCount()
+{
+    // 加锁
+    runtimeLock.assertLocked();
+    
+    int base = NXCountMapTable(gdb_objc_realized_classes) +
+    getPreoptimizedClassUnreasonableCount();
+
+    // Provide lots of slack here. Some iterations touch metaclasses too.
+    // 在此处提供大量的余地。一些迭代也涉及元类。
+    // Some iterations backtrack (like realized class iteration).
+    // 一些迭代回溯（例如实现的类迭代）。
+    // We don't need an efficient bound, merely one that prevents spins.
+    // 我们不需要有效的界限，只需防止旋转即可。
+    
+    return (base + 1) * 16;
+}
+```
+#### `foreach_realized_class_and_subclass_2`
+```c++
+/*
+* Class enumerators 类枚举器
+* The passed in block returns `false` if subclasses can be skipped.
+* 如果可以跳过子类，则传入的块将返回 "false"。
+* Locking: runtimeLock must be held by the caller.
+* runtimeLock 必须由调用方持有。
+*/
+
+// foreach_realized_class_and_subclass_2(top, count, false, code);
+// top 是当前类，skip_metaclass 值是 false，code 就是我们枚举时的块 
+// __attribute((noescape)) 想到了 Swift 中的闭包
+
+static inline void
+foreach_realized_class_and_subclass_2(Class top, unsigned &count,
+                                      bool skip_metaclass,
+                                      bool (^code)(Class) __attribute((noescape)))
+{
+    Class cls = top;
+
+    runtimeLock.assertLocked();
+    ASSERT(top);
+
+    while (1) {
+        if (--count == 0) {
+            _objc_fatal("Memory corruption in class list.");
+        }
+
+        bool skip_subclasses;
+
+        if (skip_metaclass && cls->isMetaClass()) {
+            skip_subclasses = true;
+        } else {
+            skip_subclasses = !code(cls);
+        }
+
+        if (!skip_subclasses && cls->data()->firstSubclass) {
+            cls = cls->data()->firstSubclass;
+        } else {
+            while (!cls->data()->nextSiblingClass  &&  cls != top) {
+                cls = cls->superclass;
+                if (--count == 0) {
+                    _objc_fatal("Memory corruption in class list.");
+                }
+            }
+            if (cls == top) break;
+            cls = cls->data()->nextSiblingClass;
+        }
+    }
+}
+```
+### `bool canAllocNonpointer()`
+&emsp;表示 `objc_class` 的 `isa` 是非指针，即类对象不需要原始 `isa` 时，能根据该函数返回值设置 `isa_t isa` 的 `uintptr_t nonpointer : 1` 字段，标记该类的 `isa` 是非指针。
+```c++
+bool canAllocNonpointer() {
+    ASSERT(!isFuture());
+    return !instancesRequireRawIsa();
+}
+```
+### `bool isSwiftStable()`
+&emsp;调用 `class_data_bits_t bits` 的 `isSwiftStable` 函数，内部实现是通过与操作判断 `uintptr_t bits` 的二进制表示的第 `1` 位是否是 `1`，表示该类是否是有稳定的 `Swift ABI` 的 `Swift` 类。
+```c++
+// class is a Swift class from the stable Swift ABI.
+// class 是一个有稳定的 Swift ABI 的 Swift类。
+// #define FAST_IS_SWIFT_STABLE    (1UL<<1)
+
+bool isSwiftStable() {
+    return bits.isSwiftStable();
+}
+```
+### `bool isSwiftLegacy()`
+```c++
+bool isSwiftLegacy() {
+    return bits.isSwiftLegacy();
+}
+```
+
+# 方法查找的慢速查找的知识点需要补充。
 
 ## 参考链接
 **参考链接:🔗**
