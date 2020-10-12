@@ -898,7 +898,7 @@ size_t cache_t::bytesForCapacity(uint32_t cap)
     bool hasFastInstanceSize(size_t extra) const
     {
         if (__builtin_constant_p(extra) && extra == 0) {
-            // 如果 extra 在编译时是不是常量，则 _flags & 0b0001 1111 1111 0000 的值返回，
+            // 如果 extra 在编译时不是常量，则 _flags & 0b0001 1111 1111 0000 的值返回，
             // 判断 cache_t 是否有快速实例化的大小
             return _flags & FAST_CACHE_ALLOC_MASK16;
         }

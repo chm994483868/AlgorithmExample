@@ -514,7 +514,8 @@ foreach_realized_class_and_subclass(Class top, bool (^code)(Class) __attribute((
 ```c++
 /*
 * unreasonableClassCount
-* Provides an upper bound for any iteration of classes, to prevent spins when runtime metadata is corrupted.
+* Provides an upper bound for any iteration of classes,
+* to prevent spins when runtime metadata is corrupted.
 * 为类的任何迭代提供上限，以防止在运行时元数据损坏时发生死循环。
 */
 static unsigned unreasonableClassCount()
@@ -607,13 +608,587 @@ bool isSwiftStable() {
 }
 ```
 ### `bool isSwiftLegacy()`
+&emsp;调用 `class_data_bits_t bits` 的 `isSwiftLegacy` 函数，内部实现是通过与操作判断 `uintptr_t bits` 的二进制表示的第 `0` 位是否是 `1`，表示该类是否是有稳定的 `Swift ABI` 的 `Swift` 类。（遗留的类）
 ```c++
+// class is a Swift class from the pre-stable Swift ABI.
+// class 是来自稳定的 Swift ABI 的 Swift 类。(遗留的类)
+// #define FAST_IS_SWIFT_LEGACY    (1UL<<0)
+
 bool isSwiftLegacy() {
     return bits.isSwiftLegacy();
 }
 ```
+### `bool isAnySwift()`
+&emsp;调用 `class_data_bits_t bits` 的 `isAnySwift` 函数，`isSwiftStable` 或者 `isSwiftLegacy`。
+```c++
+bool isAnySwift() {
+    return bits.isAnySwift();
+}
 
-# 方法查找的慢速查找的知识点需要补充。
+// struct class_data_bits_t 的 isAnySwift 函数实现: 
+bool isAnySwift() {
+    return isSwiftStable() || isSwiftLegacy();
+}
+```
+### `bool isSwiftStable_ButAllowLegacyForNow()`
+&emsp;调用 `struct class_data_bits_t` 的 `isSwiftStable_ButAllowLegacyForNow` 函数。
+```c++
+bool isSwiftStable_ButAllowLegacyForNow() {
+    return bits.isSwiftStable_ButAllowLegacyForNow();
+}
+
+// struct class_data_bits_t 的 isSwiftStable_ButAllowLegacyForNow 函数实现
+// fixme remove this once the Swift runtime uses the stable bits.
+// fixme 一旦 Swift runtime 使用稳定位将其删除。
+bool isSwiftStable_ButAllowLegacyForNow() {
+    return isAnySwift();
+}
+
+bool isAnySwift() {
+    return isSwiftStable() || isSwiftLegacy();
+}
+```
+### `bool isStubClass() const`
+&emsp;全局搜索此函数发现只在 `objc_class` 的 `bool isRealized() const` 函数内调用了一次，它用于判断类对象是否已经实现完成。 
+```c++
+bool isStubClass() const {
+    // isaBits 函数继承自 struct objc_object，
+    // 它的实现只有一行就是取出 isa_t isa 的 uintptr_t bits 成员变量。
+    // 如果 isa 是原始指针的话，那么取出的值是一个内存地址被强转为一个 unsigned long 值，
+    // 即使 isa 不是原始的 isa，是一个优化的 isa，那它强转为 unsigned long 的值的话也会远大于 16 吧
+    
+    uintptr_t isa = (uintptr_t)isaBits();
+    
+    return 1 <= isa && isa < 16;
+}
+```
+### `bool isUnfixedBackwardDeployingStableSwift()`
+```c++
+// Swift stable ABI built for old deployment targets looks weird.
+// 为旧的部署目标构建的 Swift 稳定的 ABI 看起来很奇怪。
+
+// The is-legacy bit is set for compatibility with old libobjc.
+// 设置 is-legacy 位是为了与旧的 libobjc 兼容。
+
+// We are on a "new" deployment target so we need to rewrite that bit.
+// 我们的部署目标是“新的”，因此我们需要重写一下。
+
+// These stable-with-legacy-bit classes are distinguished from real
+// legacy classes using another bit in the Swift data.
+// 这些具有传统稳定性的类使用 Swift 数据中的另一位与实际的传统类区分开.
+// (ClassFlags::IsSwiftPreStableABI)
+
+bool isUnfixedBackwardDeployingStableSwift() {
+    // Only classes marked as Swift legacy need apply.
+    // 仅需要标记为 Swift legacy 的类适用。
+    if (!bits.isSwiftLegacy()) return false;
+
+    // Check the true legacy vs stable distinguisher.
+    // 检查真正的传统 vs 稳定的区分符。
+    
+    // The low bit of Swift's ClassFlags is SET for true 
+    // legacy and UNSET for stable pretending to be legacy.
+    // Swift 的 ClassFlags 的低位设置为 SET（表示真正的遗留物），而 UNSET（低位）用于稳定地假装为遗留物。
+    
+    // 用 & 取出 class_data_bits_t bits 的地址加 1 是什么操作，
+    // struct class_data_bits 只有一个成员变量 uintptr_t bits，
+    // 那对 class_data_bits_t bits 取地址取出也是 uintptr_t bits 的地址，
+    // 通过前面的分析我们已知 uintptr_t bits 的第 0 位是标记 #define FAST_IS_SWIFT_LEGACY (1UL<<0),
+    // 这里的加 1 操作....
+    
+    // 对 bits 的地址加 1,
+    uint32_t swiftClassFlags = *(uint32_t *)(&bits + 1);
+    
+    bool isActuallySwiftLegacy = bool(swiftClassFlags & 1);
+    return !isActuallySwiftLegacy;
+}
+```
+### `fixupBackwardDeployingStableSwift`
+```c++
+void fixupBackwardDeployingStableSwift() {
+    if (isUnfixedBackwardDeployingStableSwift()) {
+        // Class really is stable Swift, pretending to be pre-stable.
+        // 类确实是稳定的 Swift，假装是稳定的。
+        // Fix its lie.
+        // 修正谎言
+        
+        // 把 class_data_bits_t bits 的 uintptr_t bits 的 #define FAST_IS_SWIFT_STABLE (1UL<<1)
+        // 置为 1, 并把 #define FAST_IS_SWIFT_LEGACY (1UL<<0) 置为 0。
+        bits.setIsSwiftStable();
+    }
+}
+
+// 暂时不理解是干啥用的
+_objc_swiftMetadataInitializer swiftMetadataInitializer() {
+    return bits.swiftMetadataInitializer();
+}
+```
+
+**下面的一些掩码相关的操作我们开始用到 `struct class_ro_t` 的 `uint32_t flags`了！它们的宏定义都是以 `RO_` 开头的。**
+
+### `RO_IS_ARC/RO_HAS_WEAK_WITHOUT_ARC`
+&emsp;在 `struct class_ro_t` 的 `uint32_t flags` 中使用的掩码。
+```c++
+// class compiled with ARC
+// 由 ARC 编译的类
+#define RO_IS_ARC             (1<<7)
+// class is not ARC but has ARC-style weak ivar layout.
+// 类不是 ARC，但具有 ARC 风格的 weak ivar 布局。
+#define RO_HAS_WEAK_WITHOUT_ARC (1<<9)
+```
+### `bool hasAutomaticIvars()`
+&emsp;从 `class_data_bits_t bits` 中取出 `class_rw_t` 指针，然后从 `struct class_rw_t` 中取出 `explicit_atomic<uintptr_t> ro_or_rw_ext` 对应的 `class_rw_ext_t` 指针，然后从 `struct class_rw_ext_t` 中取出 `const class_ro_t *ro`，然后取出 `uint32_t flags` 和 （`RO_IS_ARC | RO_HAS_WEAK_WITHOUT_ARC` （二进制表示第 `7` 位和第 `9` 位是 `1`，其它位都是 `0`））做与操作。
+```c++
+// Return YES if the class's ivars are managed by ARC, or the class is MRC but has ARC-style weak ivars.
+// 如果类的 ivars 由 ARC 管理，或者该类是 MRC 但具有 ARC 样式的 weak ivars，则返回 YES。
+// (weak 修饰符是可以在 MRC 中使用的，weak 是和 ARC 一起推出的，
+// 根据之前 weak 的实现原理也可知它的实现流程和 ARC 或者 MRC 是完成没有关系的。)
+
+bool hasAutomaticIvars() {
+    return data()->ro()->flags & (RO_IS_ARC | RO_HAS_WEAK_WITHOUT_ARC);
+}
+```
+### `bool isARC()`
+&emsp;同上，最后取出 `class_ro_t` 的 `uint32_t flags` 和 `RO_IS_ARC` 做与操作。
+```c++
+// Return YES if the class's ivars are managed by ARC.
+// 如果类的 ivar 由 ARC 管理，则返回 YES。
+bool isARC() {
+    return data()->ro()->flags & RO_IS_ARC;
+}
+```
+### `RW_FORBIDS_ASSOCIATED_OBJECTS`
+&emsp;禁止类的实例对象进行关联对象的掩码，看到它前缀是 `RW` 开始的，表示它用在 `struct class_rw_t` 的 `uint32_t flags` 中。（`AssociatedObject` 的实现原理可以参考之前的文章）
+```c++
+// class does not allow associated objects on its instances.
+// 类不允许在其实例上使用 关联对象。
+#define RW_FORBIDS_ASSOCIATED_OBJECTS       (1<<20)
+```
+### `bool forbidsAssociatedObjects()`
+&emsp;禁止该类的实例对象进行 `AssociatedObject`。从 `class_data_bits_t bits` 中取出 `class_rw_t` 指针，然后从 `struct class_rw_t` 中取出 `uint32_t flags` 和 `RW_FORBIDS_ASSOCIATED_OBJECTS`（第 `20` 位值为 `1`）与操作的结果。
+```c++
+bool forbidsAssociatedObjects() {
+    // class_rw_t 的 flags 做与操作
+    return (data()->flags & RW_FORBIDS_ASSOCIATED_OBJECTS);
+}
+```
+### `instancesHaveAssociatedObjects/setInstancesHaveAssociatedObjects`
+&emsp;在 `struct class_rw_t` 的 `uint32_t flags` 做掩码操作。
+```c++
+// class instances may have associative references.
+// 类实例可能具有关联引用。
+#define RW_INSTANCES_HAVE_ASSOCIATED_OBJECTS (1<<22)
+
+#if SUPPORT_NONPOINTER_ISA
+    // Tracked in non-pointer isas; not tracked otherwise
+#else
+    bool instancesHaveAssociatedObjects() {
+        // this may be an unrealized future class in the CF-bridged case.
+        // 在 CF 桥接的情况下，这可能是未实现的未来 class。
+        ASSERT(isFuture()  ||  isRealized());
+        // class_rw_t 的 flags
+        return data()->flags & RW_INSTANCES_HAVE_ASSOCIATED_OBJECTS;
+    }
+
+    void setInstancesHaveAssociatedObjects() {
+        // this may be an unrealized future class in the CF-bridged case.
+        // 在CF桥接的情况下，这可能是未实现的未来 class。
+        ASSERT(isFuture()  ||  isRealized());
+        // class_rw_t 的 flags
+        setInfo(RW_INSTANCES_HAVE_ASSOCIATED_OBJECTS);
+    }
+#endif
+```
+### `shouldGrowCache/setShouldGrowCache`
+```c++
+// 默认为 true
+bool shouldGrowCache() {
+    return true;
+}
+
+void setShouldGrowCache(bool) {
+    // fixme good or bad for memory use?
+}
+```
+### `RW_INITIALIZING`
+&emsp;判断 `objc_class` 是否正在进行初始化的掩码。判断位置在 `struct class_rw_t` 的 `uint32_t flags` 中。
+```c++
+// class is initializing
+// class 正在初始化 （class_rw_t flags 的 第 28 位）
+#define RW_INITIALIZING       (1<<28)
+```
+### `bool isInitializing()`
+&esmp;`RW_INITIALIZING` 是 `RW` 前缀开头，可直接联想到其判断位置在 `struct class_rw_t` 的 `uint32_t flags` 中，与前面的一些判断相比这里 `objc_class` 的位置发生了变化，前面我们所有的判断都是在当前的 `objc_class` 中进行的，而此处的判断要转移到当前 `objc_class` 的元类中，元类的类型也是 `struct objc_class`，所以它们同样也有 `class_data_bits_t bits`、`cache_t cache` 等成员变量，这里 `isInitializing` 函数使用的正是元类的 `class_data_bits_t bits` 成员变量。`getMeta` 函数是取得当前 `objc_class` 的元类，然后 `data`  函数从元类的 `class_data_bits_t bits` 中取得 `class_rw_t` 指针，然后取得 `struct class_rw_t` 的 `uint32_t flags` 和 `RW_INITIALIZING` 做与操作，取得 `flags` 二进制表示的第 `28` 位的值作为结果返回。
+```c++
+bool isInitializing() {
+    return getMeta()->data()->flags & RW_INITIALIZING;
+}
+```
+### `void setInitialized()`
+&emsp;标记该类初始化完成。
+```c++
+/*
+* Locking: write-locks runtimeLock
+* 此过程需要加锁
+*/
+void 
+objc_class::setInitialized()
+{
+    // 记录当前类的元类的临时变量
+    Class metacls;
+    // 记录当前类的临时变量
+    Class cls;
+
+    // 如果当前类是元类，则执行断言
+    ASSERT(!isMetaClass());
+
+    // 当前类
+    cls = (Class)this;
+    // 元类
+    metacls = cls->ISA();
+
+    // 加锁
+    mutex_locker_t lock(runtimeLock);
+
+    // Special cases:
+    // 特别情况
+    // - NSObject AWZ  class methods are default.
+    // - NSObject RR   class and instance methods are default.
+    // - NSObject Core class and instance methods are default.
+    
+    // adjustCustomFlagsForMethodChange() also knows these special cases.
+    // attachMethodLists() also knows these special cases.
+
+    objc::AWZScanner::scanInitializedClass(cls, metacls);
+    objc::RRScanner::scanInitializedClass(cls, metacls);
+    objc::CoreScanner::scanInitializedClass(cls, metacls);
+
+    // Update the +initialize flags.
+    // 更新 +initialize 字段。
+    // Do this last.
+    // 设置元类的 RW_INITIALIZED 标记位，并清除 RW_INITIALIZING 标记位
+    //（struct class_rw_t 的 uint32_t flags 成员变量）
+    metacls->changeInfo(RW_INITIALIZED, RW_INITIALIZING);
+}
+```
+### `bool isLoadable()`
+&emsp;默认为 `true`。
+```c++
+bool isLoadable() {
+    ASSERT(isRealized());
+    // any class registered for +load is definitely loadable.
+    return true;
+}
+```
+### `IMP getLoadMethod()`
+&emsp;获取一个类的 `+load` 函数，首先我们要对 `+load` 函数和别的函数做出一些理解上的区别，首先我们在任何时候都不应该自己主动去调用 `+load` 函数，它是由系统自动调用的，且它被系统调用时是直接通过它的函数地址调用的，它是不走 `objc_msgSend` 消息发送流程的。当我们在自己的类定义中添加了 `+load` 函数，编译过程中编译器会把它存储在元类的 `struct class_ro_t` 的 `method_list_t * baseMethodList` 成员变量中。那么 `category` 中的 `+load` 函数在编译过程中会被放在哪里呢？ 
+```c++
+/*
+* objc_class::getLoadMethod
+* fixme
+* Called only from add_class_to_loadable_list.
+* 仅从 add_class_to_loadable_list 调用。
+* Locking: runtimeLock must be read- or write-locked by the caller.
+* Locking: runtimeLock 必须是读写锁。
+*/
+IMP 
+objc_class::getLoadMethod()
+{
+    // 加锁
+    runtimeLock.assertLocked();
+
+    // 临时变量，const 表示 mlist 指向的 method_list_t 不可变。
+    const method_list_t *mlist;
+
+    // 当前 objc_class 和其元类 已经实现完成，
+    // 当前 objc_class 不能是元类，且它的 ISA() 是元类
+    ASSERT(isRealized());
+    ASSERT(ISA()->isRealized());
+    ASSERT(!isMetaClass());
+    ASSERT(ISA()->isMetaClass());
+
+    // 获取当前类的元类的 class_ro_t 的 method_list_t * baseMethodList
+    mlist = ISA()->data()->ro()->baseMethods();
+    
+    // 如果 mlist 存在，则遍历找到 +load 函数
+    if (mlist) {
+        for (const auto& meth : *mlist) {
+            // 取得函数的名字 (SEL)
+            const char *name = sel_cname(meth.name);
+            // 如果是 +load 函数，则直接返回 +load 函数的 imp
+            if (0 == strcmp(name, "load")) {
+                return meth.imp;
+            }
+        }
+    }
+    // 如果没有找到则返回 nil
+    return nil;
+}
+```
+### `RW_REALIZED`
+&emsp;在 `struct class_rw_t` 的 `uint32_t flags` 二进制表示的第 `31` 位
+```c++
+#define RW_REALIZED           (1<<31)
+```
+### `bool isRealized() const`
+&emsp;`struct class_rw_t` 的 `uint32_t flags` 二进制表示的第 `31` 位和 `RW_REALIZED` 与操作的结果。 
+```c++
+// Locking: To prevent concurrent realization, hold runtimeLock.
+// Locking: 为了防止并发实现，需要加锁。
+bool isRealized() const {
+    return !isStubClass() && (data()->flags & RW_REALIZED);
+}
+```
+### `RW_FUTURE`
+```c++
+// class is unresolved future class.
+// class 是未解决的 future class。
+#define RW_FUTURE             (1<<30)
+```
+### `bool isFuture() const`
+&emsp;`struct class_rw_t` 的 `uint32_t flags` 二进制表示的第 `30` 位和 `RW_REALIZED` 与操作的结果。 
+```c++
+// Returns true if this is an unrealized future class.
+// 如果这是未实现的 future class，则返回true。
+// Locking: To prevent concurrent realization, hold runtimeLock.
+// Locking: 为了防止并发实现，需要加锁。
+bool isFuture() const {
+    return data()->flags & RW_FUTURE;
+}
+```
+### `FAST_CACHE_META/RW_META/RO_META`
+&emsp;在 `__LP64__` 平台下标识 `objc_class` 是否是元类的值在 `cache_t cache` 中，其它情况则是在 `struct class_rw_t` 的 `uint32_t flags` 中（需要根据指针进行寻址）。
+```c++
+// class is a metaclass.
+// 类是元类。
+#define RO_META               (1<<0)
+// class is a metaclass (copied from ro).
+// 类是元类。
+#define RW_META               RO_META // (1<<0)
+
+#if __LP64__
+...
+#if __arm64__
+...
+// Denormalized RO_META to avoid an indirection.
+// 为避免间接化，对 RO_META 进行了规范化处理。
+#define FAST_CACHE_META               (1<<2)
+#else
+// Denormalized RO_META to avoid an indirection.
+// 为避免间接化，对 RO_META 进行了规范化处理。
+#define FAST_CACHE_META               (1<<0)
+...
+#endif
+...
+#else
+...
+#endif
+```
+### `bool isMetaClass()`
+&emsp;如果 `FAST_CACHE_META` 存在，则从 `cache_t cache` 的 `uint16_t _flags` 二进制表示的第 `2/0` 位判断当前 `objc_class` 是否是元类。其它情况则从 `class_data_bits_t bits` 中取得 `class_rw_t` 指针指向的 `class_rw_t` 实例的 `uint32_t flags` 二进制表示的第 `0` 位进行判断。
+```c++
+    bool isMetaClass() {
+        ASSERT(this);
+        ASSERT(isRealized());
+        
+#if FAST_CACHE_META
+        return cache.getBit(FAST_CACHE_META);
+#else
+        return data()->flags & RW_META;
+#endif
+    }
+```
+### `bool isMetaClassMaybeUnrealized()`
+```c++
+// Like isMetaClass, but also valid on un-realized classes.
+// 类似于 isMetaClass，但在未实现的类上也有效。
+bool isMetaClassMaybeUnrealized() {
+    static_assert(offsetof(class_rw_t, flags) == offsetof(class_ro_t, flags), "flags alias");
+    static_assert(RO_META == RW_META, "flags alias");
+    
+    // 同上，从 struct class_rw_t 的 uint32_t flags 中判断 
+    return data()->flags & RW_META;
+}
+```
+### `Class getMeta()`
+&emsp;取得当前类的元类。
+```c++
+// NOT identical to this->ISA when this is a metaclass.
+Class getMeta() {
+    // 如果当前类是元类，则直接返回 this，
+    // 如果不是元类，则调用 objc_object::ISA() 函数取得元类。
+    //（多半是从 isa 中根据掩码取出类的地址：(Class)(isa.bits & ISA_MASK)）
+    
+    if (isMetaClass()) return (Class)this;
+    else return this->ISA();
+}
+```
+### `bool isRootClass()`
+&emsp;判断一个类是否是根类，只是判断一个类的 `superclass` 是否为 `nil`。
++ 根类的父类是 `nil`，根类的元类是根元类。
++ 根元类的父类是根类，根元类的元类是自己。
+```c++
+bool isRootClass() {
+    // 如果 objc_class 的 superclass 是 nil，则该类是根类。 
+    return superclass == nil;
+}
+```
+### `bool isRootMetaclass()`
+&emsp;根元类的元类指向自己。
+```c++
+bool isRootMetaclass() {
+    // 如果一个 objc_class 的元类是自己的话，那么只可能是根元类。
+    return ISA() == (Class)this;
+}
+```
+### `const char *mangledName()`
+&emsp;伪装一个类的名字，看到其是保存在 `struct class_ro_t` 的 `const char * name` 内。
+```c++
+const char *mangledName() { 
+    // fixme can't assert locks here
+    // fixme 不能在这里断言锁
+    
+    ASSERT(this);
+
+    if (isRealized()  ||  isFuture()) {
+        // 如果类已经实现了则 data() 返回的是 class_rw_t *，
+        // 然后再从 class_rw_ext_t * 返回 const class_ro_t *ro，
+        // 然后再返回 struct class_ro_t 的 const char * name。
+        return data()->ro()->name;
+    } else {
+        // data() 返回的是 class_ro_t *，
+        // 然后返回 const char * name。
+        return ((const class_ro_t *)data())->name;
+    }
+}
+
+const char *demangledName(bool needsLock);
+const char *nameForLogging();
+```
+### `word_align`
+&emsp;根据入参 `x` 进行 `8/4` 字节对齐。
+```c++
+#ifdef __LP64__
+...
+#   define WORD_MASK 7UL
+...
+#else
+...
+#   define WORD_MASK 3UL
+...
+#endif
+
+static inline uint32_t word_align(uint32_t x) {
+    // __LP64__ 下 WORD_MASK 7UL :
+    // x = 12        => 0b 0000 0000 0000 0000 0000 0000 0000 1100 
+    // WORD_MASK     => 0b 0000 0000 0000 0000 0000 0000 0000 0111 
+    // ~WORD_MASK    => 0b 1111 1111 1111 1111 1111 1111 1111 1000
+    // x + WORD_MASK => 0b 0000 0000 0000 0000 0000 0000 0001 0011
+    // & ~WORD_MASK  => 0b 0000 0000 0000 0000 0000 0000 0001 0000
+    
+    // 16
+    return (x + WORD_MASK) & ~WORD_MASK;
+}
+```
+### `uint32_t unalignedInstanceStart() const`
+&emsp;`unalignedInstanceStart` 只是表示第一个成员变量的所占用的字节大小吗？（如之前定义的一个继承自 `NSObject` 的类的 `instanceStart` 的值是 `8`）
+```c++
+// May be unaligned depending on class's ivars.
+// 根据 class 的 ivars 可能没有内存对齐。
+uint32_t unalignedInstanceStart() const {
+    ASSERT(isRealized());
+    
+    // 直接返回 struct class_ro_t 的 uint32_t instanceStart
+    return data()->ro()->instanceStart;
+}
+```
+### `uint32_t alignedInstanceStart() const`
+```c++
+// Class's instance start rounded up to a pointer-size boundary.
+// 类的实例开始四舍五入到指针大小的边界。
+// This is used for ARC layout bitmaps.
+// 这用于 ARC 布局位图。
+
+uint32_t alignedInstanceStart() const {
+    // 调用 word_align 工具函数，计算一个大于等于入参的最小的 8 的倍数。
+    // 如 x = 7 返回 8
+    // 如 x = 8 返回 8
+    // 如 x = 12 返回 16 
+    // ...
+    return word_align(unalignedInstanceStart());
+}
+```
+### `uint32_t unalignedInstanceSize() const`
+```c++
+// May be unaligned depending on class's ivars.
+// 根据 class 的 ivars 可能没有内存对齐。
+uint32_t unalignedInstanceSize() const {
+    ASSERT(isRealized());
+    
+    // 直接返回 struct class_ro_t 的 uint32_t instanceSize
+    // 根据内存对齐计算成员变量从前到后所占用的内存大小，
+    // 不过没有进行总体的内存对齐，例如最后一个成员变量是 char 时，
+    // 则最后只是加 1，instanceSize 的值是一个奇数，
+    // 再进行一个整体 8 字节对齐就好了，
+    // alignedInstanceSize 函数，完成了这最后一步的整体内存对齐
+    return data()->ro()->instanceSize;
+}
+```
+### `uint32_t alignedInstanceSize() const`
+```c++
+// Class's ivar size rounded up to a pointer-size boundary.
+// 类的ivar大小四舍五入到指针大小的边界。
+//（对 instanceSize 进行 8 字节对齐）
+uint32_t alignedInstanceSize() const {
+    // __LP64__ 平台下 8 字节对齐，其它则是 4 字节对齐
+    return word_align(unalignedInstanceSize());
+}
+```
+### `size_t instanceSize(size_t extraBytes) const`
+&emsp;
+```c++
+size_t instanceSize(size_t extraBytes) const {
+    // 从 cache_t cache 的 uint16_t _flags 判断是否能快速获取实例大小
+    if (fastpath(cache.hasFastInstanceSize(extraBytes))) {
+        return cache.fastInstanceSize(extraBytes);
+    }
+
+    // 正常调用 alignedInstanceSize 并添加需要延展的 bytes。
+    size_t size = alignedInstanceSize() + extraBytes;
+    
+    // CF requires all objects be at least 16 bytes.
+    // CF要求所有对象至少为 16 个字节。
+    
+    if (size < 16) size = 16;
+    
+    return size;
+}
+```
+### `void setInstanceSize(uint32_t newSize)`
+&emsp;`cache.setFastInstanceSize(newSize)` 把类实例的大小放在了 `cache_t cache` 的 `uint16_t _flags` 中，方便进行快速获取，减少了 `class_rw_t` 指针的寻址。
+```c++
+void setInstanceSize(uint32_t newSize) {
+    ASSERT(isRealized());
+    ASSERT(data()->flags & RW_REALIZING);
+    
+    // 取得 class_ro_t
+    auto ro = data()->ro();
+    
+    if (newSize != ro->instanceSize) {
+        // 如果 newSize 不等于 ro->instanceSize
+        ASSERT(data()->flags & RW_COPIED_RO);
+        // 更新 instanceSize 
+        *const_cast<uint32_t *>(&ro->instanceSize) = newSize;
+    }
+    
+    // 把 newSize 保存在 cache_t cache 的 uint16_t _flags 中，方便进行快速获取，减少了 class_rw_t 指针的寻址
+    cache.setFastInstanceSize(newSize);
+}
+```
+### `chooseClassArrayIndex/setClassArrayIndex/classArrayIndex`
+&emsp;关于类在全局类表中的索引，这里不再展开了。
+
+至此，`objc_class` 的所有函数就全部看完了。
 
 ## 参考链接
 **参考链接:🔗**
