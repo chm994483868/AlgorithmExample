@@ -432,7 +432,15 @@ void objc_setProperty_atomic_copy(id self, SEL _cmd, id newValue, ptrdiff_t offs
 `objc_atomic_weak`、`objc_atomic_unsafe_unretained`、`objc_atomic_assign` 和对应的 `nonatomic` 修饰的属性的 `setter` `getter` 函数相同，就不再展开了。
 属性修饰符的内容看完了，那么我们常用的 `__strong`、`__weak`、`__unsafe_unretained` 等等修饰成员变量的修饰符系统又是如何处理的呢？下面我们来一探究竟。
 ## 成员变量修饰符
-
+&emsp;定义如下类:
+```c++
+@interface LGPerson : NSObject {
+    __strong NSObject *ivar_strong; // 无修饰符的对象默认会加 __strong
+    __weak NSObject *ivar_weak;
+    __unsafe_unretained NSObject *ivar_unsafe_unretained;
+}
+@end
+```
 
 ## 参考链接
 **参考链接:🔗**
@@ -440,6 +448,7 @@ void objc_setProperty_atomic_copy(id self, SEL _cmd, id newValue, ptrdiff_t offs
 + [Objective-C类成员变量深度剖析](http://quotation.github.io/objc/2015/05/21/objc-runtime-ivar-access.html)
 + [iOS基础系列-- atomic, nonatomic](https://xiaozhuanlan.com/topic/2354790168)
 + [低于0.01%的极致Crash率是怎么做到的？](https://wetest.qq.com/lab/view/393.html?from=content_csdnblog)
++ [[iOS]深入理解ivar及property](https://developer.aliyun.com/article/58989)
 + [Declared Properties](https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/ObjCRuntimeGuide/Articles/ocrtPropertyIntrospection.html)
 + [iOS @property 属性相关的总结](https://juejin.im/post/6844903824436494343)
 + [atomic关键字的一些理解](https://www.jianshu.com/p/5951cb93bcef)
