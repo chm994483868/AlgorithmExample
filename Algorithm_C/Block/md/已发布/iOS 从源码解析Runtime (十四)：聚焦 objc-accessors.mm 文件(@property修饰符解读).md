@@ -1,8 +1,8 @@
-# iOS 从源码解析Runtime (十四)：由源码解读属性修饰符
+# iOS 从源码解析Runtime (十四)：由源码解读属性&成员变量的修饰符
 
 > 当我们分别使用 `atomic` 和 `nonatomic` 来修饰属性时，编译器是怎么处理这两种不同的情况的呢？大家都知道即使使用 `atomic` 修饰属性也并不能保证线程安全，那它和 `nonatomic` 有什么区别呢，那 `atomic` 的性能损耗来自哪里呢？`copy` 属性是怎么实现的？等等，关于属性修饰符的各种疑问我们本篇来统一来解读。⛽️⛽️
 
-## `示例代码`
+## `@property 修饰符`
 &emsp;首先定义一个 `LGPerson` 类，添加一系列如下不同修饰符的属性，属性的本质编译器自动帮我们生成:  成员变量 + `setter` + `getter`。
 ```objective-c
 // LGPerson.h，.m 文件什么也不写
@@ -136,8 +136,11 @@ Ltmp11:
     ldr    x1, [sp, #24]
     orr    w8, wzr, #0x18
     mov    x2, x8
-    mov    w8, #0
-    mov    x3, x8
+    
+    mov    w8, #0 // 低字节存 0
+    mov    x3, x8 // x3 存的值是 0，表示下面跳转到 objc_getProperty 函数时，第 4 个参数 BOOL atomic 是 0（false）
+                  // x0 - x7 寄存器保存函数参数
+                  
     str    x0, [sp, #8]            ; 8-byte Folded Spill
     mov    x0, x1
     ldr    x1, [sp, #8]            ; 8-byte Folded Reload
@@ -377,13 +380,65 @@ Lfunc_end8:
 ```
 &emsp;`objc_nonatomic_unsafe_unretained` 属性的 `setter` 函数看到内部没有调用任何其它函数，就是纯粹的入参、地址偏移、存储入参到成员变量的位置。这里也验证了 `unsafe_unretained` 的 `setter` 的本质，即不 `retain` 新值也不 `release` 旧值。`setter` 和 `getter` 函数都是简单的根据地址存入值和读取值。所以这里也引出另一个问题，赋值给 `unsafe_unretained` 属性的对象并不会被 `unsafe_unretained` 属性所持有，那么当此对象正常释放销毁以后，也并没有把 `unsafe_unretained` 属性置为 `nil`，此时我们如果再用 `unsafe_unretained` 属性根据地址读取对象，会直接引发野指针访问导致 `crash`。
 ### `[LGPerson objc_nonatomic_assign]/[LGPerson setObjc_nonatomic_assign:]`
+&emsp;`objc_nonatomic_assign` 属性的 `setter` 和 `getter` 函数和 `objc_nonatomic_unsafe_unretained` 属性如出一辙，这里就不展开了。
+### `[LGPerson objc_nonatomic_strong_readonly]`
+&emsp;`objc_nonatomic_strong_readonly` 属性只生成了 `getter` 函数，也符合我们的预期。
+### `[LGPerson objc_atomic_strong]/[LGPerson setObjc_atomic_strong:]`
+```c++
+// getter
+...
+...
+// 零寄存器的值和 0x1 做或操作，并把结果存入 w3，表示 w3 = 1，同时表示下面调用 objc_getProperty 函数是第 4 个参数 BOOL atomic 是 true
+// x0 - x7 寄存器保存函数参数
+orr    w3, wzr, #0x1
+...
+b    _objc_getProperty
+...
 
+// setter
+...
+bl    _objc_setProperty_atomic
+...
+```
+```c++
+void objc_setProperty_atomic(id self, SEL _cmd, id newValue, ptrdiff_t offset)
+{
+    // atomic 值使用的是 true
+    reallySetProperty(self, _cmd, newValue, offset, true, false, false);
+}
+```
+&emsp;`objc_atomic_strong` 属性在 `setter` 和 `getter` 函数中都加了锁。
+### `[LGPerson objc_atomic_retain]/[LGPerson setObjc_atomic_retain:]`
+&emsp;`objc_atomic_retain` 属性 和 `objc_atomic_strong` 属性的 `setter` 和 `getter` 函数如出一辙，不再展开。
+### `[LGPerson objc_atomic_copy]/[LGPerson setObjc_atomic_copy:]`
+```c++
+// getter
+...
+orr    w3, wzr, #0x1 // 第 4 个参数 BOOL atomic 是 true
+...
+b    _objc_getProperty
+...
 
+// setter
+bl    _objc_setProperty_atomic_copy
+```
+```c++
+void objc_setProperty_atomic_copy(id self, SEL _cmd, id newValue, ptrdiff_t offset)
+{
+    // atomic 值使用的是 true
+    reallySetProperty(self, _cmd, newValue, offset, true, true, false);
+}
+```
+`objc_atomic_weak`、`objc_atomic_unsafe_unretained`、`objc_atomic_assign` 和对应的 `nonatomic` 修饰的属性的 `setter` `getter` 函数相同，就不再展开了。
+
+## 成员变量修饰符
+// 
 
 ## 参考链接
 **参考链接:🔗**
 + [ObjC如何通过runtime修改Ivar的内存管理方式](https://www.cnblogs.com/dechaos/p/7246351.html) 
 + [iOS基础系列-- atomic, nonatomic](https://xiaozhuanlan.com/topic/2354790168)
++ [低于0.01%的极致Crash率是怎么做到的？](https://wetest.qq.com/lab/view/393.html?from=content_csdnblog)
 + [Declared Properties](https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/ObjCRuntimeGuide/Articles/ocrtPropertyIntrospection.html)
 + [iOS @property 属性相关的总结](https://juejin.im/post/6844903824436494343)
 + [atomic关键字的一些理解](https://www.jianshu.com/p/5951cb93bcef)
