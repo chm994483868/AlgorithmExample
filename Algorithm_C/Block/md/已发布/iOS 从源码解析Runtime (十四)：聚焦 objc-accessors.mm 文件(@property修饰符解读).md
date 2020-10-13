@@ -437,6 +437,7 @@ void objc_setProperty_atomic_copy(id self, SEL _cmd, id newValue, ptrdiff_t offs
 ## 参考链接
 **参考链接:🔗**
 + [ObjC如何通过runtime修改Ivar的内存管理方式](https://www.cnblogs.com/dechaos/p/7246351.html) 
++ [Objective-C类成员变量深度剖析](http://quotation.github.io/objc/2015/05/21/objc-runtime-ivar-access.html)
 + [iOS基础系列-- atomic, nonatomic](https://xiaozhuanlan.com/topic/2354790168)
 + [低于0.01%的极致Crash率是怎么做到的？](https://wetest.qq.com/lab/view/393.html?from=content_csdnblog)
 + [Declared Properties](https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/ObjCRuntimeGuide/Articles/ocrtPropertyIntrospection.html)
