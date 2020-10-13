@@ -303,7 +303,7 @@ struct class_ro_t {
     uint32_t reserved;
 #endif
 
-    // 成员变量布局
+    // 记录了哪些是 strong 的 ivar
     const uint8_t * ivarLayout;
     
     // name = 0x0000000100000f93 "LGPerson"
@@ -317,7 +317,7 @@ struct class_ro_t {
     // 成员变量列表
     const ivar_list_t * ivars;
     
-    // weak 成员变量布局
+    // 记录了哪些是 weak 的 ivar
     const uint8_t * weakIvarLayout;
     // 属性列表
     property_list_t *baseProperties;
@@ -779,7 +779,21 @@ struct ivar_t {
     // offset for their benefit.
     // 一些代码使用所有 64 位。class_addIvar() 为他们的利益过度分配了偏移量。
 #endif
-    // 成员变量的位置的指针
+
+    // 首先这里要和结构体中成员变量的偏移距离做出理解上的区别。
+
+    // offset 它是一个指针，那它指向谁呢，它指向一个全局变量，
+    // 编译器为每个类的每个成员变量都分配了一个全局变量，用于存储该成员变量的偏移值。
+
+    // 如果 offset 仅是成员变量偏移距离的一个整数的话，能想到的成员变量的读取可能是这样的：
+    // 当我们读取成员变量时从实例对象的 isa 找到类，然后 data() 找到 class_rw_t 
+    // 然后在找到 class_ro_t 然后再找到 ivar_list_t，
+    // 然后再比较 ivar_t 的 name 和我们要访问的成员变量的名字是否相同，然后再读出 int 类型的 offset,
+    // 再进行 self + offset 指针偏移找到这个成员变量。
+
+    // 现在当我们访问一个成员变量时，只需要 self + *offset 就可以了。
+    // 下面会单独讲解 offset 指针。
+    
     int32_t *offset;
     
     // 成员变量名称（如果类中有属性的话，编译器会自动生成 _属性名 的成员变量）
@@ -815,6 +829,47 @@ struct ivar_t {
         return 1 << alignment_raw;
     }
 };
+```
+##### `验证 int32_t *offset`
+我们首先定义一个 `LGPerson` 类：
+```c++
+// 定义一个 LGPerson 类
+// LGPerson.h 如下，.m 为空即可
+@interface LGPerson : NSObject
+@property (nonatomic, strong) NSMutableArray *arr;
+@end
+```
+然后在终端执行 `clang -rewrite-objc LGPerson.m` 生成 `LGPerson.cpp`。 
+摘录 `LGPerson.cpp`:
+`ivar_list_t` 如下，`arr` 为仅有的成员变量，它对应的 `ivar_t` 初始化部分 `int32_t *offset` 值使用了 `(unsigned long int *)&OBJC_IVAR_$_LGPerson$_arr`。
+```c++
+static struct /*_ivar_list_t*/ {
+    unsigned int entsize;  // sizeof(struct _prop_t)
+    unsigned int count;
+    struct _ivar_t ivar_list[1];
+} _OBJC_$_INSTANCE_VARIABLES_LGPerson __attribute__ ((used, section ("__DATA,__objc_const"))) = {
+    sizeof(_ivar_t),
+    1,
+    {{(unsigned long int *)&OBJC_IVAR_$_LGPerson$_arr, "_arr", "@\"NSMutableArray\"", 3, 8}}
+};
+```
+在 `LGPerson.cpp` 文件中全局搜索 `OBJC_IVAR_$_LGPerson$_arr` 有如下结果:
+```c++
+// 全局变量声明和定义赋值
+extern "C" unsigned long OBJC_IVAR_$_LGPerson$_arr;
+extern "C" unsigned long int 
+           OBJC_IVAR_$_LGPerson$_arr 
+           __attribute__ ((used, section ("__DATA,__objc_ivar"))) = 
+           __OFFSETOFIVAR__(struct LGPerson, _arr);
+
+// arr 的 setter getter 函数，看到都是直接使用了 OBJC_IVAR_$_LGPerson$_arr
+static NSMutableArray * _Nonnull _I_LGPerson_arr(LGPerson * self, SEL _cmd) { 
+    return (*(NSMutableArray * _Nonnull *)((char *)self + OBJC_IVAR_$_LGPerson$_arr)); 
+}
+
+static void _I_LGPerson_setArr_(LGPerson * self, SEL _cmd, NSMutableArray * _Nonnull arr) { 
+    (*(NSMutableArray * _Nonnull *)((char *)self + OBJC_IVAR_$_LGPerson$_arr)) = arr; 
+}
 ```
 #### `property_list_t`
 &emsp;`property_list_t` 是 `class_ro_t` 中保存属性的数据结构，同样继承自 `entsize_list_tt`，`FlagMask` 模版参数是 `0`。
