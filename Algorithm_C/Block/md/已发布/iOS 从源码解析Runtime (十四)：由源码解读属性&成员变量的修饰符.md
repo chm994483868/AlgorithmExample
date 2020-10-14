@@ -432,19 +432,167 @@ void objc_setProperty_atomic_copy(id self, SEL _cmd, id newValue, ptrdiff_t offs
 `objc_atomic_weak`、`objc_atomic_unsafe_unretained`、`objc_atomic_assign` 和对应的 `nonatomic` 修饰的属性的 `setter` `getter` 函数相同，就不再展开了。
 属性修饰符的内容看完了，那么我们常用的 `__strong`、`__weak`、`__unsafe_unretained` 等等修饰成员变量的修饰符系统又是如何处理的呢？下面我们来一探究竟。
 ## 成员变量修饰符
-&emsp;定义如下类:
+&emsp;当我们定义一个类的实例变量的时候，可以为其指定其修饰符 `__strong`、`__weak`、`__unsafe_unretained`（未指定是默认为 `__strong`），这使得成员变量可以像 `strong`、`weak`、`unsafe_unretained` 修饰符修饰的属性一样在 `ARC` 下进行正确的引用计数管理。定义如下测试类:
 ```c++
+// LGPerson.h .m 什么都不用实现
 @interface LGPerson : NSObject {
-    __strong NSObject *ivar_strong; // 无修饰符的对象默认会加 __strong
+    NSObject *ivar_none; // 无修饰符的对象默认会加 __strong
+    __strong NSObject *ivar_strong;
     __weak NSObject *ivar_weak;
     __unsafe_unretained NSObject *ivar_unsafe_unretained;
 }
 @end
+
+// 编写如下代码，分别进行测试：
+    LGPerson *person = [[LGPerson alloc] init];
+    NSObject *temp = [[NSObject alloc] init];
+    
+    NSLog(@"START");
+    person->ivar_none = temp;
+    
+//    person->ivar_strong = temp;
+//    NSLog(@"TTT %@", person->ivar_strong);
+
+//    person->ivar_weak = temp;
+//    NSLog(@"read weak: %@", person->ivar_weak);
+
+//    person->ivar_unsafe_unretained = temp;
+    NSLog(@"END"); // ⬅️ 在这里打断点
 ```
+&emsp;在 `END` 行打断点，然后 `xcode` 菜单栏依次 `Debug -> Debug Workflow -> Always Show Disassembly` 勾选 `Always Show Disassembly`，运行程序当断点执行时，我们的代码会被编译为汇编代码，依次看到 `temp` 为属性赋值时的指令跳转：
+
++ `ivar_none` 赋值时 `bl 0x10092e470; symbol stub for: objc_storeStrong`
++ `ivar_strong` 赋值时 `bl 0x1009be470; symbol stub for: objc_storeStrong`
++ `ivar_weak` 赋值时 `bl 0x1009be47c; symbol stub for: objc_storeWeak`，读取时调用了 `objc_loadWeakRetained` 和 `objc_release`
++ `ivar_unsafe_unretained` 赋值时没有发生任何指令跳转，只是单纯的根据地址存储值。
+
+结果和我们上面的不同修饰符修饰属性时测试的结果完全相同。分析上面属性的汇编代码时我们已知编译器在重写属性的 `getter` `setter` 函数时会针对不同的属性修饰符做不同的处理来正确管理对象的引用计数，那么我们为不同的成员变量指定的修饰符信息又是保存在哪里？又是怎么其起作用的呢？
+
+### `ivarLayout/weakIvarLayout`
+&emsp;`struct class_ro_t` 的 `const uint8_t * ivarLayout` 和 `const uint8_t * weakIvarLayout` 分别记录了那些成员变量是 `strong` 或是 `weak`，都未记录的就是基本类型和 `__unsafe_unretained` 的对象类型。这两个值可以通过 `runtime` 提供的几个 `API` 来访问和修改:
+```c++
+OBJC_EXPORT const uint8_t * _Nullable class_getIvarLayout(Class _Nullable cls) OBJC_AVAILABLE(10.5, 2.0, 9.0, 1.0, 2.0);
+OBJC_EXPORT const uint8_t * _Nullable class_getWeakIvarLayout(Class _Nullable cls) OBJC_AVAILABLE(10.5, 2.0, 9.0, 1.0, 2.0);
+OBJC_EXPORT void class_setIvarLayout(Class _Nullable cls, const uint8_t * _Nullable layout) OBJC_AVAILABLE(10.5, 2.0, 9.0, 1.0, 2.0);
+OBJC_EXPORT void class_setWeakIvarLayout(Class _Nullable cls, const uint8_t * _Nullable layout) OBJC_AVAILABLE(10.5, 2.0, 9.0, 1.0, 2.0);
+```
+`ivarLayout` 和 `weakIvarLayout` 类型是 `uint8_t *`，一个 `uint8_t` 在 `16` 进制下是两位。
+
+> `ivarLayout` 是一系列的字符，每两个一组，比如 `\xmn`，每一组 `Ivar Layout` 中第一位表示有 `m` 个非强属性，第二位表示接下来有 `n` 个强属性。
+
+🌰 1：
+```objective-c
+// LGPerson.h 
+@interface LGPerson : NSObject {
+    __strong NSObject *ivar_strong; // 无修饰符的对象默认会加 __strong
+    __strong NSObject *ivar_strong2;
+    __weak NSObject *ivar_weak;
+    __weak NSObject *ivar_weak2;
+    __unsafe_unretained NSObject *ivar_unsafe_unretained;
+}
+```
+控制台执行如下指令:
+```c++
+// class_getIvarLayout 获取 ivarLayout
+(lldb) p class_getIvarLayout([LGPerson class])
+(const uint8_t *) $0 = 0x0000000100000f89 "\x02"
+(lldb) x/2xb $0
+0x100000f89: 0x02 0x00 
+// 0x02 前面是 0，后面 2 表示连续两个 strong Ivar (ivar_strong、ivar_strong2)。
+
+// class_getWeakIvarLayout 获取 weakIvarLayout
+(lldb) p class_getWeakIvarLayout([LGPerson class])
+(const uint8_t *) $1 = 0x0000000100000f8b """
+(lldb) x/2xb $1
+0x100000f8b: 0x22 0x00 
+// 0x22 前面一个 2 表示连续两个非 weak Ivar (ivar_strong、ivar_strong2) ，
+// 后面 2 是连续两个 weak Ivar (ivar_weak、ivar_weak2)。
+```
+🌰 2：
+```objective-c
+@interface LGPerson : NSObject {
+    __strong NSObject *ivar_strong; // 无修饰符的对象默认会加 __strong
+    int a;
+    __strong NSObject *ivar_strong2;
+    __weak NSObject *ivar_weak;
+    __weak NSObject *ivar_weak2;
+    __unsafe_unretained NSObject *ivar_unsafe_unretained;
+}
+```
+控制台执行如下指令:
+```c++
+(lldb) p class_getIvarLayout([LGPerson class])
+(const uint8_t *) $0 = 0x0000000100000f8b "\x01\x11"
+(lldb) x/3xb $0
+0x100000f8b: 0x01 0x11 0x00
+// 0x01 前面是 0，1 表示一个 strong Ivar (ivar_strong) ，
+// 0x11 前面 1 表示非 strong Ivar (a) 后面 1 表示一个 strong Ivar (ivar_strong2)。
+
+(lldb) p class_getWeakIvarLayout([LGPerson class])
+(const uint8_t *) $1 = 0x0000000100000f8e "2"
+(lldb) x/2xb $1
+0x100000f8e: 0x32 0x00 
+// 0x32 前面 3 表示连续 3 个非 weak Ivar (ivar_strong、a、ivar_strong2) ，
+// 后面 2 表示连续两个 weak Ivar (ivar_weak、ivar_weak2)。
+```
+🌰 3：
+```objective-c
+@interface LGPerson : NSObject {
+    int a;
+    __strong NSObject *ivar_strong; // 无修饰符的对象默认会加 __strong
+    int b;
+    __strong NSObject *ivar_strong2;
+    __strong NSObject *ivar_strong3;
+    int c;
+    __weak NSObject *ivar_weak;
+    int d;
+    __weak NSObject *ivar_weak2;
+    __weak NSObject *ivar_weak3;
+    __weak NSObject *ivar_weak4;
+    __strong NSObject *ivar_strong4;
+    __unsafe_unretained NSObject *ivar_unsafe_unretained;
+}
+```
+控制台执行如下指令:
+```c++
+(lldb) p class_getIvarLayout([LGPerson class])
+(const uint8_t *) $0 = 0x0000000100000f85 "\x11\x12a"
+(lldb) x/4xb $0
+0x100000f85: 0x11 0x12 0x61 0x00
+// 0x11 前面 1 表示一个非 strong Ivar (a)，
+// 后面 1 表示 strong Ivar (ivar_strong)。
+// 0x12 前面 1 表示非 strong Ivar (b)，
+// 后面 2 表示连续两个 strong Ivar (ivar_strong2、ivar_strong3)。
+// 0x61 前面 6 表示连续六个非 strong Ivar (c、ivar_weak、d、ivar_weak2、ivar_weak3、ivar_strong4)，
+// 后面 1 表示一个 strong Ivar (ivar_strong4)。
+
+(lldb) p class_getWeakIvarLayout([LGPerson class])
+(const uint8_t *) $1 = 0x0000000100000f89 "a\x13"
+(lldb) x/3xb $1
+0x100000f89: 0x61 0x13 0x00
+// 0x61 前面 6 表示连续六个非 weak Ivar (a、ivar_strong、b、ivar_strong2、ivar_strong3、c)，
+// 后面 1 表示一个 weak Ivar (ivar_weak)。
+// 0x13 前面 1 表示一个非 weak Ivar (d)，
+// 后面 3 表示连续三个 weak Ivar (ivar_weak2、ivar_weak3、ivar_weak4)
+```
+
+> 对于 `ivarLayout` 来说，每个 `uint8_t` 的高 `4` 位代表连续是非 `storng` 类型 `Ivar` 的数量（`m`），`m ∈ [0x0, 0xf]`，低 `4` 位代表连续是 `strong` 类型 `Ivar` 的数量（`n`），`n ∈ [0x0, 0xf]`。
+  对于 `weakIvarLayout` 来说，每个 `uint8_t` 的高 `4` 位代表连续是非 `weak` 类型 `Ivar` 的数量（`m`），`m ∈ [0x0, 0xf]`，低 `4` 位代表连续是 `weak` 类型 `Ivar` 的数量（`n`），`n ∈ [0x0, 0xf]`。
+  无论是 `ivarLayout` 还是 `weakIvarLayout`，结尾都需要填充 `\x00` 结尾。
+
+
+
+
+
+
++ +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+类对象的地址后三位是 `0`，类对象是遵循 `8` 字节对齐。
+类的成员变量内存对齐是采用 `8` 字节对齐，类实例化时分配空间时则是遵循 `16` 字节对齐。
 
 ## 参考链接
 **参考链接:🔗**
 + [ObjC如何通过runtime修改Ivar的内存管理方式](https://www.cnblogs.com/dechaos/p/7246351.html) 
++ [Objective-C Class Ivar Layout 探索](http://blog.sunnyxx.com/2015/09/13/class-ivar-layout/)
 + [Objective-C类成员变量深度剖析](http://quotation.github.io/objc/2015/05/21/objc-runtime-ivar-access.html)
 + [iOS基础系列-- atomic, nonatomic](https://xiaozhuanlan.com/topic/2354790168)
 + [低于0.01%的极致Crash率是怎么做到的？](https://wetest.qq.com/lab/view/393.html?from=content_csdnblog)
