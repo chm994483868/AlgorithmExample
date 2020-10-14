@@ -575,19 +575,42 @@ OBJC_EXPORT void class_setWeakIvarLayout(Class _Nullable cls, const uint8_t * _N
 // 0x13 前面 1 表示一个非 weak Ivar (d)，
 // 后面 3 表示连续三个 weak Ivar (ivar_weak2、ivar_weak3、ivar_weak4)
 ```
+🌰 4：（那如果连续的 `strong Ivar` 超过了 `0xf` 个怎么办呢？会重新开始一个 `uint8_t` 来记录 ）
+```objective-c
+@interface LGPerson : NSObject {
+    __weak NSObject *ivar_weak1;
+    ...
+    __weak NSObject *ivar_weak18; // 连续定义 18 个 weak Ivar
+    
+    __strong NSObject *ivar_strong4;
+    __unsafe_unretained NSObject *ivar_unsafe_unretained;
+}
+@end
+```
+控制台执行如下指令:
+```c++
+(lldb) p class_getIvarLayout([LGPerson class])
+(const uint8_t * _Nullable) $0 = 0x0000000100003e98 "\xfffffff01"
+(lldb) x/3xb $0
+0x100003e98: 0xf0 0x31 0x00
+// 0xf0 前面 f 表示连续十五个非 strong Ivar，
+// 后面 0 表示零个 strong Ivar。
+// 0x31 前面 3 表示连续三个非 strong Ivar 和前面的 15 加起来总共 18 个 weak Ivar，
+// 后面 1 表示一个 strong Ivar (ivar_strong4)
+
+(lldb) p class_getWeakIvarLayout([LGPerson class])
+(const uint8_t * _Nullable) $1 = 0x0000000100003e9b "\x0f\x03"
+(lldb) x/3xb $1
+0x100003e9b: 0x0f 0x03 0x00
+// 0x0f 和 0x03，f + 3 表示连续 18 个 weak Ivar
+```
 
 > 对于 `ivarLayout` 来说，每个 `uint8_t` 的高 `4` 位代表连续是非 `storng` 类型 `Ivar` 的数量（`m`），`m ∈ [0x0, 0xf]`，低 `4` 位代表连续是 `strong` 类型 `Ivar` 的数量（`n`），`n ∈ [0x0, 0xf]`。
   对于 `weakIvarLayout` 来说，每个 `uint8_t` 的高 `4` 位代表连续是非 `weak` 类型 `Ivar` 的数量（`m`），`m ∈ [0x0, 0xf]`，低 `4` 位代表连续是 `weak` 类型 `Ivar` 的数量（`n`），`n ∈ [0x0, 0xf]`。
   无论是 `ivarLayout` 还是 `weakIvarLayout`，结尾都需要填充 `\x00` 结尾。
 
+&emsp;对于 `ivarLayout` 来说，它只关心 `strong` 成员变量的数量，而记录前面有多少个非 `strong` 变量的数量无非是为了正确移动索引值而已。在最后一个 `strong` 变量后面的所有非 `strong` 变量，都会被自动忽略。`weakIvarLayout` 同理，`apple` 这么做的初衷是为了尽可能少的内存去描述类的每一个成员变量的内存修饰符。像上面的例子 `20` 个成员变量，`ivarLayout` 用了 `2 + 1 = 3` 个字节 `weakIvarLayout` 用了 `2 + 1 = 3` 个字节，就描述了 `20` 个变量的内存修饰符。
 
-
-
-
-
-+ +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-类对象的地址后三位是 `0`，类对象是遵循 `8` 字节对齐。
-类的成员变量内存对齐是采用 `8` 字节对齐，类实例化时分配空间时则是遵循 `16` 字节对齐。
 
 ## 参考链接
 **参考链接:🔗**
