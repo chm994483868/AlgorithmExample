@@ -369,7 +369,7 @@
 		D2EB013A24DA2DC8009EAFD6 /* TwoSum.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = TwoSum.hpp; sourceTree = "<group>"; };
 		D2EB014024DB7A5C009EAFD6 /* Block */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = Block; sourceTree = BUILT_PRODUCTS_DIR; };
 		D2EB014224DB7A5C009EAFD6 /* main.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = main.m; sourceTree = "<group>"; };
-		D2EB014724DB7B3A009EAFD6 /* iOS 从 libclosure-74 研究 Block 实现原理.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 从 libclosure-74 研究 Block 实现原理.md"; sourceTree = "<group>"; };
+		D2EB014724DB7B3A009EAFD6 /* iOS 从 libclosure-74 源码来研究 Block 实现原理.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 从 libclosure-74 源码来研究 Block 实现原理.md"; sourceTree = "<group>"; };
 		D2EB014D24DC0002009EAFD6 /* Father.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Father.h; sourceTree = "<group>"; };
 		D2EB014E24DC0002009EAFD6 /* Father.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = Father.m; sourceTree = "<group>"; };
 		D2EB015324DC00CE009EAFD6 /* Son.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Son.h; sourceTree = "<group>"; };
@@ -875,7 +875,7 @@
 		D2164F1C24F7AF070000A6AA /* 已发布 */ = {
 			isa = PBXGroup;
 			children = (
-				D2EB014724DB7B3A009EAFD6 /* iOS 从 libclosure-74 研究 Block 实现原理.md */,
+				D2EB014724DB7B3A009EAFD6 /* iOS 从 libclosure-74 源码来研究 Block 实现原理.md */,
 				D2C74D042537F2100051B89F /* block_Temp.md */,
 				D2164F1724F3B9A20000A6AA /* iOS weak 底层实现原理(一)：DisguisedPtr.md */,
 				D2164F1A24F4FC850000A6AA /* iOS weak 底层实现原理(二)：StripedMap.md */,
