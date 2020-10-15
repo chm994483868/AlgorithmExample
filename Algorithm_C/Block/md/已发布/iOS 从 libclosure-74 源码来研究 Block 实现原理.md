@@ -201,7 +201,7 @@ NSLog(@"⛈⛈⛈ a = %d", a);
 ### `__block` 说明符
 &emsp;`block` 截获外部变量值，截获的是 `block` 语法定义时此外部变量瞬间的值，保存后就不能改写该值。这个不能改写该值是 `block` 的语法规定（实际在 `block` 花括号内使用的值早已不再是外部的同名的值，虽然它们的变量名完全一样），如果截获的是指针变量的话，可以通过指针来修改内存空间里面的值。比如传入 `NSMutableArray` 变量，可以往里面添加对象，但是不能对该 `NSMutableArray` 变量进行赋值。传入 `int* val` 也可以直接用 `*val = 20` 来修改 `val` 指针指向的内存里面保存的值，并且如果截获的是指针变量的话，在 `block` 内部修改其指向内存里面的内容后，在 `block` 外部读取该指针指向的值时也与 `block` 内部的修改都是同步的。**因为本身它们操作的就是同一块内存地址**。
 这里之所以语法定为不能修改，可能的原因是因为修改了值以后是无法传出去的，只是在 `block` 内部使用，是没有意义的。就比如 `block` 定义里面截获了变量 `val`，你看着这时用的是 `val` 这个变量，其实只是把 `val` 变量的值赋值给了 `block` 结构体的 `val` 成员变量。这时在 `block` 内部修改 `val` 的值，可以理解为只是修改 `block` 结构体 `val` 成员变量的值，与 `block` 外部的 `val` 已经完全无瓜葛了，然后截获指针变量也是一样的，其实截获的只是指针变量所指向的地址，在 `block` 内部修改的只是 `block` 结构体成员变量的指向，这种修改针对外部变量而言都是毫无瓜葛的。
-```
+```c++
 // 示例 🌰：
 int dmy = 256;
 int temp = 10;
@@ -232,7 +232,7 @@ printf("🎉🎉 val = %d\n", *val); // block 执行时把 *val 修改为 22
 ```
 以上不能修改（或者理解为为其赋值）时，可以用 `__block` 说明符来修饰该变量，该变量称为 `__block` 变量。
 > 注意：在 `block` 内部不能使用 `C` 语言数组，这是因为现在的 `block` 截获外部变量的方法并没有实现对 `C` 语言数组的截获，实质是因为 `C` 语言规定，数组不能直接赋值，可用 `char*` 代替。
-```
+```c++
 const char text[] = "Hello"; 
 void (^blk)(void) = ^{ 
   // Cannot refer to declaration with an array type inside block 
@@ -293,7 +293,7 @@ int main() {
  } __main_block_desc_0_DATA = { 0, sizeof(struct __main_block_impl_0)};
  ```
 + **main 函数内部**
-```
+```c++
 int main(int argc, const char * argv[]) {
     /* @autoreleasepool */ { __AtAutoreleasePool __autoreleasepool; 
     NSLog((NSString *)&__NSConstantStringImpl__var_folders_24_5w9yv8jx63bgfg69gvgclmm40000gn_T_main_948e6f_mi_0);
@@ -493,31 +493,43 @@ static void __main_block_func_0(struct __main_block_impl_0* __cself) {
 ```
 &emsp;看完转换后的源码，`block` 中所使用的被截获外部变量就如 “带有自动变量值的匿名函数” 所说，仅截获外部变量的值。在 `block` 的结构体实例中重写该成员变量也不会改变原先截获的外部变量。当试图在 `block ` 表达式内部改变同名于外部变量的成员变量时，会发生编译错误。因为在实现上不能改写被截获外部变量的值，所以当编译器在编译过程中检出给被截获外部变量赋值的操作时，便产生编译错误。理论上 `block` 内部的成员变量已经和外部变量完全无瓜葛了，理论上 `block` 结构体的成员变量是能修改的，但是这里修改的仅是结构体自己的成员变量，且又和外部完全同名，如果修改了内部成员变量开发者会误以为连带外部变量一起修改了，索性直接发生编译错误更好！（而 `__block` 变量就是为了在 `block` 表达式内修改外部变量而生的）。
 
-在 `block` 表达式中修改外部变量的办法有两种：
+在 `block` 表达式中修改外部变量的办法有两种，（这里忽略上面很多例子中出现的直接传递指针来修改变量的值）：
 1. `C` 语言中有变量类型允许 `block` 改写值:
  + 静态变量
  + 静态全局变量
  + 全局变量
  
- 虽然 `block` 语法的匿名函数部分简单转换为了 `C`  语言函数，但从这个变换的函数中访问 **静态全局变量/全局变量** 并没有任何改变，可直接使用。
- **但是静态局部变量的情况下，转换后的函数原本就设置在含有 `Block` 语法的函数外，所以无法从变量作用域访问。**
+ 虽然 `block` 语法的匿名函数部分简单转换为了 `C`  语言函数，但从这个变换的函数中访问 **静态全局变量/全局变量** 并没有任何改变，可直接使用。**但是静态局部变量的情况下，转换后的函数原本就设置在含有 `block` 语法的函数之外，所以无法从变量作用域直接访问静态局部变量。在我们用 `clang -rewrite-objc` 转换的 `C++` 代码中可以清楚的看到静态局部变量定义在 `main` 函数内，而 `static void __main_block_func_0(struct __main_block_impl_0 *__cself){ ... }` 则是完全在外部定义的一个静态函数。**
  
- **这里的静态变量的访问，作用域之外，应该深入思考下，虽然代码写在了一起，但是转换后并不在同一个作用域，能跨域请求只能靠指针。！！！！**
+ **这里的静态变量的访问，作用域之外，应该深入思考下，虽然代码写在了一起，但是转换后并不在同一个作用域内，能跨作用域访问数据只能靠指针了。**
  
  代码验证:
- ```
- int global_val = 1;
- static int static_global_val = 2;
+ ```c++
+ int global_val = 1; // 全局变量
+ static int static_global_val = 2; // 静态全局变量
  
  int main(int argc, const char * argv[]) {
  @autoreleasepool {
      // insert code here...
-     static int static_val = 3;
+     
+     // 这里如果静态局部变量是指针类型的话，
+     // 那么在 block 结构体中会被转化为指向指针的指针，
+     // 例如: NSMutableArray **static_val;
+     
+     static int static_val = 3; // 静态局部变量
+     
+     // 这里看似 block 表达式和 static_val 是同一个作用域的，
+     // 其实它们两个完全不是同一作用域的
      void (^blk)(void) = ^{
+     
+        // 直接在 block 内修改两种不同的类型的外部变量
         global_val *= 2;
         static_global_val *= 2;
+        
+        // 静态变量则是通过指针来修改的
         static_val *= 3;
      };
+     
      static_val = 12;
      blk();
                 
@@ -525,21 +537,22 @@ static void __main_block_func_0(struct __main_block_impl_0* __cself) {
      printf("static_val = %d, global_val = %d, static_global_val = %d\n", static_val, global_val, static_global_val);
  }
 }
-// 执行结果:
+// 打印结果:
+// static_val = 36, global_val = 2, static_global_val = 4
+
 // 看到 static_val 是 36， 即 blk 执行前 static_val 修改为了 12
 // 然后 blk 执行时 static_val = 12 * 3 => static_val = 36
-// 即 block 内部可以修改 static_val 且 static_val 外部的修改也会
+// block 内部可以修改 static_val 且 static_val 外部的修改也会
 // 传递到 blk 内部
-// static_val = 36, global_val = 2, static_global_val = 4
  ```
  clang 转换后的源代码:
- __main_block_impl_0 追加了 static_val 指针为成员变量
- ```
+ `__main_block_impl_0` 追加了 `static_val` 指针为成员变量:
+ ```c++
  struct __main_block_impl_0 {
    struct __block_impl impl;
    struct __main_block_desc_0* Desc;
    
-   // 记得是 int *，传递进来的是 static_val 的指针 
+   // int *，初始化列表传递进来的是 static_val 的指针 
    int *static_val;
    
    __main_block_impl_0(void *fp, struct __main_block_desc_0 *desc, int *_static_val, int flags=0) : static_val(_static_val) {
@@ -550,11 +563,11 @@ static void __main_block_func_0(struct __main_block_impl_0* __cself) {
    }
  };
  ```
- __main_block_func_0 
- ```
+ `__main_block_func_0`： 
+ ```c++
  static void __main_block_func_0(struct __main_block_impl_0 *__cself) {
  
-    // 从 block 结构体中取出 static_val 指针
+    // 从 block 结构体实例中取出 static_val 指针
     int *static_val = __cself->static_val; // bound by copy
     
     global_val *= 2;
@@ -562,8 +575,8 @@ static void __main_block_func_0(struct __main_block_impl_0* __cself) {
     (*static_val) *= 3;
 }
  ```
- main 函数
- ```
+ `main` 函数：
+ ```c++
  int main(int argc, const char * argv[]) {
      /* @autoreleasepool */ { __AtAutoreleasePool __autoreleasepool; 
 
@@ -572,6 +585,7 @@ static void __main_block_func_0(struct __main_block_impl_0* __cself) {
          // static_val 初始化
          static int static_val = 3;
          
+         // 看到 _static_val 入参是 &static_val
          void (*blk)(void) = ((void (*)())&__main_block_impl_0((void *)__main_block_func_0, &__main_block_desc_0_DATA, &static_val));
          
          // 这里的赋值只是赋值，可以和 __block 的 forwarding 指针方式寻值进行比较思考
@@ -579,34 +593,33 @@ static void __main_block_func_0(struct __main_block_impl_0* __cself) {
          
          ((void (*)(__block_impl *))((__block_impl *)blk)->FuncPtr)((__block_impl *)blk);
 
-
          printf("static_val = %d, global_val = %d, static_global_val = %d\n", static_val, global_val, static_global_val);
      }
 
      return 0;
  }
  ```
- 
-可看到 `global_val` 和 `static_global_val` 的访问和转换前完全相同。
-使用静态变量 `static_val` 的指针对其进行访问。将 static_val 的指针传递给 `__main_block_impl_0` 结构体的构造函数并保存。这是超出作用域使用变量的最简单方法。
-静态变量的这种方法似乎也适用于自动变量的访问，但是为什么没有这么做呢？
-实际上，在由 Block 语法生成的值 Block 上，可以存有超过其变量作用域的被截获对象的自动变量。变量作用域结束的同时，原来的自动变量被废弃，因此 Block 中超过变量作用域而存在的变量同静态变量一样，将不能通过指针访问原来的自动变量。
+&emsp;可看到在 `__main_block_func_0` 内 `global_val` 和 `static_global_val` 的访问和转换前完全相同。静态变量 `static_val` 则是通过指针对其进行访问修改，在 `__main_block_impl_0` 结构体的构造函数的初始化列表中 `&static_val` 赋值给 `struct __main_block_impl_0` 的 `int *static_val` 这个成员变量，这种是通过地址在超出变量作用域的地方访问和修改变量。
 
-**原因在于，我们的静态变量是存在数据区的，在程序结束前它其实一直都会存在，之所以会被称为局部，只是说出了作用域无法调用到它了，并不是说这块数据不存在了。因此我们只要自己准备好一个指针，保证出了作用域依然能调用到他就行；而对于自动变量，它们真正的问题在于一但出了作用域，直接被释放了，所以要在结构体里开辟空间重新存放，进行值传递**
+> 静态变量的这种方法似乎也适用于自动变量的访问，但是为什么没有这么做呢？
 
-2. 第二种是使用 "__block 说明符"。更准确的表达方式为 "__block 存储域说明符"（__block storage-class-specifier）。
-&ensp;C 语言中有以下存储域类说明符:
-+ typedef
-+ extern
-+ static
-+ auto
-+ register
-__block 说明符类似于 static、auto 和 register 说明符，他们用于指定将变量设置到哪个存储域中。例如: `auto` 表示作为自动变量存储在栈中，`static` 表示作为静态变量存储在数据区中。
+实际上，在由 `block` 语法生成的值 `block` 上，可以存有超过其变量作用域的被截获对象的自动变量，但是如果 `block` 不强引用该自动变量的话，变量作用域结束的同时，该自动变量很可能会释放并销毁，而此时再去访问该自动变量的话会直接因为野指针访问而 `crash`。**而访问静态局部变量不会 `crash` 的原因在于，静态变量是存储在静态变量区的，在程序结束前它一直都会存在，之所以会被称为局部，只是说出了作用域无法直接通过变量名访问它了（对比全局变量在整个模块的任何位置都可以直接访问），并不是说这块数据不存在了，因此我们只要有一个指向该静态变量的指针，那么出了作用域依然能正常访问到它；而对于自动变量，`block` 并不持有它的话，那么一旦出了作用域，自动变量很可能直接释放并销毁，如果此时再访问的话会直接 `crash`，所以针对自动变量 `block` 并不能采用和静态局部变量一样的处理方式。**
 
-**对于使用__block修饰的变量，不管在块里有没有使用，都会相应的给他生成一个结构体**
+2. 第二种是使用 `__block` 说明符。更准确的表达方式为 "`__block` 存储域说明符"（`__block storage-class-specifier`）。
 
-在前面编译错误的源代码的自动变量声明上追加 __block 说明符：
-```
+`C` 语言中有以下存储域类说明符:
++ `typedef`
++ `extern`
++ `static`
++ `auto`
++ `register`
+
+`__block` 说明符类似于 `static`、`auto` 和 `register` 说明符，他们用于指定将变量设置到哪个存储域中。例如: `auto` 表示作为自动变量存储在栈中，`static` 表示作为静态变量存储在数据区。
+
+**对于使用 `__block` 修饰的变量，不管在 `block` 中有没有使用它，都会相应的给它生成一个结构体实例。**
+
+在前面编译错误的源代码的自动变量声明上追加 `__block` 说明符：
+```c++
 int main(int argc, const char* argv[]) {
 const char* fmt = "val = %d\n";
 __block int val = 10;
@@ -619,9 +632,8 @@ blk();
 return 0;
 }
 ```
-转换如下:
-根据 `main` 函数里面的实现发现，直接根据 `val` 定义了一个结构体`__block_byref_val_0`
-```
+根据 `clang -rewrite-objc` 转换结果发现，`__block val` 被转化为了 `struct __block_byref_val_0` 结构体实例。
+```c++
 struct __Block_byref_val_0 {
   void *__isa;
 __Block_byref_val_0 *__forwarding;
@@ -630,8 +642,8 @@ __Block_byref_val_0 *__forwarding;
  int val;
 };
 ```
-如果 __block 修饰的是对象类型时，会多两个函数指针类型的成员变量: `__Block_byref_id_object_copy`  `__Block_byref_id_object_dispose` 。
-```
+如果 `__block` 修饰的是对象类型的话，则 `struct __Block_byref_val_0` 会多两个函数指针类型的成员变量: `__Block_byref_id_object_copy`、`__Block_byref_id_object_dispose` 。
+```c++
 struct __Block_byref_m_Parray_1 {
   void *__isa;
 __Block_byref_m_Parray_1 *__forwarding;
@@ -643,7 +655,7 @@ __Block_byref_m_Parray_1 *__forwarding;
 };
 ```
 `__block_impl`，作为一个被复用结构体，保持不变
-```
+```c++
 struct __block_impl {
   void *isa;
   int Flags;
