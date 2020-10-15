@@ -483,6 +483,145 @@ NSLog(@"⛈⛈⛈ object retainCount = %lu ---%p---%p", (unsigned long)[object a
 
 +++++++++++++++++++++++++++++++++++++
 
+void (*__Block_byref_id_object_copy)(void*, void*);
+void (*__Block_byref_id_object_dispose)(void*);
+
+NSObject *object;
+};
+
+struct __main_block_impl_0 {
+ struct __block_impl impl;
+ struct __main_block_desc_0* Desc;
+ 
+ // 对应 5 个 __block 变量的结构体类型的成员变量
+ __Block_byref_fmt_0 *fmt; // by ref
+ __Block_byref_val_1 *val; // by ref
+ __Block_byref_temp_2 *temp; // by ref
+ __Block_byref_array_3 *array; // by ref
+ __Block_byref_object_4 *object; // by ref
+ 
+ // 初始化列表：
+ // fmt(_fmt->__forwarding), 
+ // val(_val->__forwarding), 
+ // temp(_temp->__forwarding),
+ // array(_array->__forwarding),
+ // object(_object->__forwarding)
+ 
+ __main_block_impl_0(void *fp, struct __main_block_desc_0 *desc, __Block_byref_fmt_0 *_fmt, __Block_byref_val_1 *_val, __Block_byref_temp_2 *_temp, __Block_byref_array_3 *_array, __Block_byref_object_4 *_object, int flags=0) : fmt(_fmt->__forwarding), val(_val->__forwarding), temp(_temp->__forwarding), array(_array->__forwarding), object(_object->__forwarding) {
+   impl.isa = &_NSConcreteStackBlock;
+   impl.Flags = flags;
+   impl.FuncPtr = fp;
+   Desc = desc;
+ }
+ 
+ static void __main_block_func_0(struct __main_block_impl_0 *__cself) {
+ // 取出成员变量
+ __Block_byref_fmt_0 *fmt = __cself->fmt; // bound by ref
+ __Block_byref_val_1 *val = __cself->val; // bound by ref
+ __Block_byref_temp_2 *temp = __cself->temp; // bound by ref
+ __Block_byref_array_3 *array = __cself->array; // bound by ref
+ __Block_byref_object_4 *object = __cself->object; // bound by ref
+           
+           // 这里函数执行有一手，用的 ->__forwarding->fmt 去找值
+           // 保证不管是堆区还是栈区执行函数，找到的一个值都是堆上的或者栈上的，
+           // 就是大家操作的都是同一个地址的数据
+           (fmt->__forwarding->fmt) = "FMT val = %d\n";
+           printf((fmt->__forwarding->fmt), (val->__forwarding->val));
+           (temp->__forwarding->temp) = 30;
+           
+           ((void (*)(id, SEL, ObjectType _Nonnull))(void *)objc_msgSend)((id)(array->__forwarding->array), sel_registerName("addObject:"), (id _Nonnull)(object->__forwarding->object));
+   }
+   
+   // Block 用的 copy，只有 Block 中使用 __block 变量时才会出现 
+   static void __main_block_copy_0(struct __main_block_impl_0*dst, struct __main_block_impl_0*src) {_Block_object_assign((void*)&dst->fmt, (void*)src->fmt, 8/*BLOCK_FIELD_IS_BYREF*/);_Block_object_assign((void*)&dst->val, (void*)src->val, 8/*BLOCK_FIELD_IS_BYREF*/);_Block_object_assign((void*)&dst->temp, (void*)src->temp, 8/*BLOCK_FIELD_IS_BYREF*/);_Block_object_assign((void*)&dst->array, (void*)src->array, 8/*BLOCK_FIELD_IS_BYREF*/);_Block_object_assign((void*)&dst->object, (void*)src->object, 8/*BLOCK_FIELD_IS_BYREF*/);}
+
+   // Block 用的 dispose，只有 Block 中使用 __block 变量时才会出现
+   static void __main_block_dispose_0(struct __main_block_impl_0*src) {_Block_object_dispose((void*)src->fmt, 8/*BLOCK_FIELD_IS_BYREF*/);_Block_object_dispose((void*)src->val, 8/*BLOCK_FIELD_IS_BYREF*/);_Block_object_dispose((void*)src->temp, 8/*BLOCK_FIELD_IS_BYREF*/);_Block_object_dispose((void*)src->array, 8/*BLOCK_FIELD_IS_BYREF*/);_Block_object_dispose((void*)src->object, 8/*BLOCK_FIELD_IS_BYREF*/);}
+   
+   // 不变
+   static struct __main_block_desc_0 {
+     size_t reserved;
+     size_t Block_size;
+     void (*copy)(struct __main_block_impl_0*, struct __main_block_impl_0*);
+     void (*dispose)(struct __main_block_impl_0*);
+   } __main_block_desc_0_DATA = { 0, sizeof(struct __main_block_impl_0), __main_block_copy_0, __main_block_dispose_0};
+   
+   // 5 个 __block 变量的初始化：
+   // fmt
+   __attribute__((__blocks__(byref))) __Block_byref_fmt_0 fmt = {(void*)0,(__Block_byref_fmt_0 *)&fmt, 0, sizeof(__Block_byref_fmt_0), "val = %d\n"};
+   
+   // val
+   __attribute__((__blocks__(byref))) __Block_byref_val_1 val = {(void*)0,(__Block_byref_val_1 *)&val, 0, sizeof(__Block_byref_val_1), 10};
+   
+   // temp
+   __attribute__((__blocks__(byref))) __Block_byref_temp_2 temp = {(void*)0,(__Block_byref_temp_2 *)&temp, 0, sizeof(__Block_byref_temp_2), 20};
+   
+   // array
+   __attribute__((__blocks__(byref))) __Block_byref_array_3 array = {(void*)0,(__Block_byref_array_3 *)&array, 33554432, sizeof(__Block_byref_array_3), __Block_byref_id_object_copy_131, __Block_byref_id_object_dispose_131, ((NSMutableArray * _Nonnull (*)(id, SEL))(void *)objc_msgSend)((id)objc_getClass("NSMutableArray"), sel_registerName("array"))};
+   
+   // object
+   __attribute__((__blocks__(byref))) __Block_byref_object_4 object = {(void*)0,(__Block_byref_object_4 *)&object, 33554432, sizeof(__Block_byref_object_4), __Block_byref_id_object_copy_131, __Block_byref_id_object_dispose_131, ((NSObject *(*)(id, SEL))(void *)objc_msgSend)((id)((NSObject *(*)(id, SEL))(void *)objc_msgSend)((id)objc_getClass("NSObject"), sel_registerName("alloc")), sel_registerName("init"))};
+
+   // array 和 object 里面有新东西
+   // __Block_byref_id_object_copy_131
+   // __Block_byref_id_object_dispose_131
+   // 结构体里面定义是两个函数指针:
+   // void (*__Block_byref_id_object_copy)(void*, void*);
+   // void (*__Block_byref_id_object_dispose)(void*);
+   
+   // 在 110 行和 113 行找到了定义
+   static void __Block_byref_id_object_copy_131(void *dst, void *src) {
+    _Block_object_assign((char*)dst + 40, *(void * *) ((char*)src + 40), 131);
+   }
+   
+   static void __Block_byref_id_object_dispose_131(void *src) {
+    _Block_object_dispose(*(void * *) ((char*)src + 40), 131);
+   }
+   
+   // 需要到 libclosure74 里面看源码
+   // 看到里面调用了 _Block_object_assign 和 _Block_object_dispose
+   // 这和上面的 __main_block_copy_0 和 __main_block_dispose_0 里面调用是是一样的函数
+   // _Block_object_dispose 和 _Block_object_assign 函数。
+   // 已知 Block 截获对象类型和使用 __block 变量时
+   // 会添加 __main_block_copy_0 和 __main_block_dispose_0 函数。 
+};
+
+// 看到 68 行的定义:
+// Runtime copy/destroy helper functions (from Block_private.h)
+#ifdef __OBJC_EXPORT_BLOCKS
+extern "C" __declspec(dllexport) void _Block_object_assign(void *, const void *, const int);
+extern "C" __declspec(dllexport) void _Block_object_dispose(const void *, const int);
+extern "C" __declspec(dllexport) void *_NSConcreteGlobalBlock[32];
+extern "C" __declspec(dllexport) void *_NSConcreteStackBlock[32];
+#else
+__OBJC_RW_DLLIMPORT void _Block_object_assign(void *, const void *, const int);
+__OBJC_RW_DLLIMPORT void _Block_object_dispose(const void *, const int);
+__OBJC_RW_DLLIMPORT void *_NSConcreteGlobalBlock[32];
+__OBJC_RW_DLLIMPORT void *_NSConcreteStackBlock[32];
+#endif
+
+```
+OC 对象类型用 __block 修饰时的情况单独拿出来说一下:
+```
+// object
+__attribute__((__blocks__(byref))) __Block_byref_object_4 object = {(void*)0,(__Block_byref_object_4 *)&object, 33554432, sizeof(__Block_byref_object_4), __Block_byref_id_object_copy_131, __Block_byref_id_object_dispose_131, ((NSObject *(*)(id, SEL))(void *)objc_msgSend)((id)((NSObject *(*)(id, SEL))(void *)objc_msgSend)((id)objc_getClass("NSObject"), sel_registerName("alloc")), sel_registerName("init"))};
+
+// 简化后
+__Block_byref_object_4 object = {
+(void*)0, // isa
+(__Block_byref_object_4 *)&object, // __forwarding
+33554432, // __flags
+sizeof(__Block_byref_object_4), // __size
+__Block_byref_id_object_copy_131, // __Block_byref_id_object_copy
+__Block_byref_id_object_dispose_131, // __Block_byref_id_object_dispose
+((NSObject *(*)(id, SEL))(void *)objc_msgSend)((id)((NSObject *(*)(id, SEL))(void *)objc_msgSend)((id)objc_getClass("NSObject"), sel_registerName("alloc")), sel_registerName("init")) // obj
+}
+```
++ __flags = 33554432 即二进制的 10000000000000000000000000 即 1 << 25，BLOCK_HAS_COPY_DISPOSE = (1 << 25), // compiler 译：compiler 含有 copy_dispose 助手【即拥有 copy 和 dispose 函数】
+
+
+
+
 ## Block 存储域
 &ensp;通过前面的研究可知，Block 转换为 Block 的结构体类型的自动变量，__block 变量转换为 __block 变量的结构体类型的自动变量。所谓结构体类型的自动变量，即**栈上生成的该结构体的实例**。如表:
 |  名称  |  实质  |
