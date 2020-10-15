@@ -291,7 +291,7 @@ static inline void reallySetProperty(id self, SEL _cmd, id newValue, ptrdiff_t o
         
         // 从全局的属性锁列表内取得锁
         spinlock_t& slotlock = PropertyLocks[slot];
-        // 加锁
+        // 加锁 
         slotlock.lock();
         
         // 把 *slot 赋值给 oldValue，会在函数末尾释放 oldValue

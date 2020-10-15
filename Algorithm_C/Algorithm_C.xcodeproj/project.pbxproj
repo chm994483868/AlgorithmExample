@@ -332,6 +332,7 @@
 		D2C74CF5253046AE0051B89F /* iOS 从源码解析Runtime (十二)：聚焦 objc_class(class_rw_t、class_rw_ext_t相关内容篇).md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 从源码解析Runtime (十二)：聚焦 objc_class(class_rw_t、class_rw_ext_t相关内容篇).md"; sourceTree = "<group>"; };
 		D2C74CF62531A79C0051B89F /* iOS 从源码解析Runtime (十三)：聚焦 objc_class(objc_class函数相关内容篇).md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 从源码解析Runtime (十三)：聚焦 objc_class(objc_class函数相关内容篇).md"; sourceTree = "<group>"; };
 		D2C74CF7253457C10051B89F /* iOS 从源码解析Runtime (十四)：由源码解读属性&成员变量的修饰符.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 从源码解析Runtime (十四)：由源码解读属性&成员变量的修饰符.md"; sourceTree = "<group>"; };
+		D2C74D042537F2100051B89F /* block_Temp.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = block_Temp.md; sourceTree = "<group>"; };
 		D2E0674D2506118F008BF0E9 /* iOS Category 底层实现原理(二)：函数分析与加载流程.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS Category 底层实现原理(二)：函数分析与加载流程.md"; sourceTree = "<group>"; };
 		D2E067692508E82E008BF0E9 /* iOS Category 底层实现原理(三)：附加+load函数超详细解析.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS Category 底层实现原理(三)：附加+load函数超详细解析.md"; sourceTree = "<group>"; };
 		D2E0676C2509A8A2008BF0E9 /* iOS 从源码解析Runtime (二)：聚焦 isa、objc_object(ISA_BITFIELD相关内容篇).md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 从源码解析Runtime (二)：聚焦 isa、objc_object(ISA_BITFIELD相关内容篇).md"; sourceTree = "<group>"; };
@@ -874,6 +875,8 @@
 		D2164F1C24F7AF070000A6AA /* 已发布 */ = {
 			isa = PBXGroup;
 			children = (
+				D2EB014724DB7B3A009EAFD6 /* iOS 从 libclosure-74 研究 Block 实现原理.md */,
+				D2C74D042537F2100051B89F /* block_Temp.md */,
 				D2164F1724F3B9A20000A6AA /* iOS weak 底层实现原理(一)：DisguisedPtr.md */,
 				D2164F1A24F4FC850000A6AA /* iOS weak 底层实现原理(二)：StripedMap.md */,
 				D2164F1624F3B7C00000A6AA /* iOS weak 底层实现原理(三)：weak_entry_t.md */,
@@ -1526,7 +1529,6 @@
 				D2164F1D24F8856E0000A6AA /* 野指针.md */,
 				D21333F224E63B6C00A6175C /* 深入理解Objective-C中的alloc和init.md */,
 				D2E526D124E4B2E200ACD06F /* 深入理解Objective-C中的Class.md */,
-				D2EB014724DB7B3A009EAFD6 /* iOS 从 libclosure-74 研究 Block 实现原理.md */,
 				D20B350224E7EFAE00092DE5 /* iOS底层isa结构(isa_t).md */,
 				D20B34FF24E6791600092DE5 /* iOS底层class_getInstanceSize和malloc_size.md */,
 				D20B350624E8D6A700092DE5 /* iOS底层Class探索和方法执行过程.md */,
