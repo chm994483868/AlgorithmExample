@@ -38,7 +38,7 @@ void (*funcPtr)(int) = &Func;
 2. 带有 `^`。
 
 `block` 定义范式如下:
-`^ 返回值类型 参数列表 表达式`
+**^ 返回值类型 参数列表 表达式**
 “返回值类型” 同 `C` 语言函数的返回值类型，“参数列表” 同 `C` 语言函数的参数列表，“表达式” 同 `C` 语言函数中允许使用的表达式。
 
 &emsp;在 `block` 语法下，可将 `block` 语法赋值给声明为 `block` 类型的变量中。即源代码中一旦使用 `block` 语法就相当于生成了可赋值给 `block` 类型变量的 “值”。`Blocks` 中由 `Block` 语法生成的值也称为 `block`。`block` 既指源代码中的 `block` 语法，也指由 `block` 语法所生成的值。
@@ -140,9 +140,7 @@ void (^blk)(void) = ^{
 };
 
 // val 用 __block 修饰后，类型已经不是 int，它已转变为结构体类型，具体细节会在下面展开
-// blk 内部持有的也是 val 的地址，
-// 这里也代表着修改了内存地址里面存放的值，
-// 所以 blk 执行时，读出来的也是这个 2
+// val 已转换为一个结构体实例，且该实例被 block 持有
 val = 2;
 fmt = "These values were changed. val = %d\n";
 
@@ -236,7 +234,7 @@ printf("🎉🎉 val = %d\n", *val); // block 执行时把 *val 修改为 22
 const char text[] = "Hello"; 
 void (^blk)(void) = ^{ 
   // Cannot refer to declaration with an array type inside block 
-  // 这是因为现在的 Blocks 截获自动变量的方法并没有实现对 C 语言数组的截获。
+  // 这是因为现在的 Blocks 截获外部变量的方法并没有实现对 C 语言数组的截获。
   // 实质是因为 C 语言规定，数组不能直接赋值，可用 char* 代替
   printf("%c\n", text[0]);
 }; 
@@ -302,7 +300,8 @@ int main(int argc, const char * argv[]) {
     // 等号右边去掉 &(取地址符) 前面的强制类型转换后，可看到后面是创建了一个，
     // __main_block_impl_0 结构体实例，所以此处可以理解为在栈上创建了一个 Block 结构体实例，
     // 并把它的地址转化为了一个函数指针。
-    void (*blk)(void) = ((void (*)())&__main_block_impl_0((void *)__main_block_func_0, &__main_block_desc_0_DATA));
+    void (*blk)(void) = ((void (*)())&__main_block_impl_0((void *)__main_block_func_0,
+                                                          &__main_block_desc_0_DATA));
     
     // 取出 __block_impl 里面的 FuncPtr 函数执行。
     // __main_block_func_0 函数的参数是类型是 struct __main_block_impl_0 指针，
@@ -321,7 +320,8 @@ int main(int argc, const char * argv[]) {
 struct __main__block_impl_0 tmp = __main_block_impl_0(__main_block_func_0, &__main_block_desc_0_DATA);
 struct __main_block_impl_0 *blk = &tmp;
 
-// 该源代码将 __main_block_impl_0 结构体类型的自动变量，即栈上生成的 __main_block_impl_0 结构体实例的指针，赋值 __main_block_impl_0 结构体指针类型的变量 blk。
+// 该源代码将 __main_block_impl_0 结构体类型的自动变量，
+// 即栈上生成的 __main_block_impl_0 结构体实例的指针，赋值 __main_block_impl_0 结构体指针类型的变量 blk。
 
 void (^blk)(void) = ^{printf("Block\n");};
 
@@ -345,7 +345,6 @@ void (^blk)(void) = ^{printf("Block\n");};
 ```c++
 // 如果把 __main_block_impl_0 展开的话，
 // 把 struct __block_impl impl 的成员变量直接展开，
-
 // 已经几乎和 OC 对象相同
 struct __main_block_impl_0 {
 void* isa; // isa 是类的实例对象指向所属类的指针
@@ -402,7 +401,7 @@ struct __block_impl {
   void *FuncPtr;
 };
 ```
-`__main_block_impl_0` 成员变量增加了，`block` 语法表达式中使用的外部变量（看似，其实只是同名）被作为成员变量追加到了 `__main_block_impl_0` 结构体中，且类型与外部变量完全相同。`__main_block_impl_0` 构造函数具体内容就是对 `impl` 中相应的内容进行赋值，要说明的是 `impl.isa = &_NSConcreteStackBlock` 这个是指 `block` 的存储域 和 当前 `block` 的元类，被 `block` 截获的外部变量值被放入到该结构体的成员变量中，构造函数也发生了变化，初始化列表内要给 `fmt`、`val`、`valPtr` 赋值，这里我们就能大概猜出截获外部变量的原理了，被使用的外部变量值会被存入 `block` 结构体中，而在 `block` 表达式中看似是使用外部变量其实是使用了一个名字一模一样的 `block` 结构体实例的成员变量，所以我们不能对它进行赋值操作，看似操作的是外部变量值，其实是 `block` 结构体实例的成员变量。
+&emsp;`__main_block_impl_0` 成员变量增加了，`block` 语法表达式中使用的外部变量（看似，其实只是同名）被作为成员变量追加到了 `__main_block_impl_0` 结构体中，且类型与外部变量完全相同。`__main_block_impl_0` 构造函数具体内容就是对 `impl` 中相应的内容进行赋值，要说明的是 `impl.isa = &_NSConcreteStackBlock` 这个是指 `block` 的存储域 和 当前 `block` 的元类，被 `block` 截获的外部变量值被放入到该结构体的成员变量中，构造函数也发生了变化，初始化列表内要给 `fmt`、`val`、`valPtr` 赋值，这里我们就能大概猜出截获外部变量的原理了，被使用的外部变量值会被存入 `block` 结构体中，而在 `block` 表达式中看似是使用外部变量其实是使用了一个名字一模一样的 `block` 结构体实例的成员变量，所以我们不能对它进行赋值操作，看似操作的是外部变量值，其实是 `block` 结构体实例的成员变量。
 ```c++
 struct __main_block_impl_0 {
   struct __block_impl impl;
@@ -463,7 +462,11 @@ int main(int argc, const char * argv[]) {
         const char* fmt = "val = %d\n";
         
         // 根据传递给构造函数的参数对 struct __main_block_impl_0 中由自动变量追加的成员变量进行初始化
-        void (*blk)(void) = ((void (*)())&__main_block_impl_0((void *)__main_block_func_0, &__main_block_desc_0_DATA, fmt, val, valPtr));
+        void (*blk)(void) = ((void (*)())&__main_block_impl_0((void *)__main_block_func_0,
+                                                              &__main_block_desc_0_DATA,
+                                                              fmt,
+                                                              val,
+                                                              valPtr));
 
         val = 2;
         fmt = "These values were changed. val = %d\n";
@@ -475,7 +478,7 @@ int main(int argc, const char * argv[]) {
     return 0;
 }
 ```
-**总的来说，所谓 “截获外部变量值” 意味着在执行 `block` 语法时，`block` 语法表达式使用的与外部变量同名的变量其实是 `block` 的结构体实例（即 `block` 自身）的成员变量，而这些成员变量的初始化值则来自于截获的外部变量的值。** 这里前面提到的 `Block` 不能直接使用 `C` 语言数组类型的自动变量，如前所述，截获外部变量时，将值传递给结构体的构造函数进行保存，如果传入的是 `C` 数组，假设是 `a[10]`，那构造函数内部发生的赋值是 `int b[10] = a` 这是 `C` 语言规范所不允许的，`block` 是完全遵循 `C` 语言规范的。
+**总的来说，所谓 “截获外部变量值” 意味着在执行 `block` 语法时，`block` 语法表达式使用的与外部变量同名的变量其实是 `block` 的结构体实例（即 `block` 自身）的成员变量，而这些成员变量的初始化值则来自于截获的外部变量的值。** 这里前面提到的 `block` 不能直接使用 `C` 语言数组类型的自动变量，如前所述，截获外部变量时，将值传递给结构体的构造函数进行保存，如果传入的是 `C` 数组，假设是 `a[10]`，那构造函数内部发生的赋值是 `int b[10] = a` 这是 `C` 语言规范所不允许的，`block` 是完全遵循 `C` 语言规范的。
 
 ### `__block` 说明符的实质
 回顾前面截获外部变量值的例子：
@@ -499,7 +502,7 @@ static void __main_block_func_0(struct __main_block_impl_0* __cself) {
  + 静态全局变量
  + 全局变量
  
- 虽然 `block` 语法的匿名函数部分简单转换为了 `C`  语言函数，但从这个变换的函数中访问 **静态全局变量/全局变量** 并没有任何改变，可直接使用。**但是静态局部变量的情况下，转换后的函数原本就设置在含有 `block` 语法的函数之外，所以无法从变量作用域直接访问静态局部变量。在我们用 `clang -rewrite-objc` 转换的 `C++` 代码中可以清楚的看到静态局部变量定义在 `main` 函数内，而 `static void __main_block_func_0(struct __main_block_impl_0 *__cself){ ... }` 则是完全在外部定义的一个静态函数。**
+ &emsp;虽然 `block` 语法的匿名函数部分简单转换为了 `C`  语言函数，但从这个变换的函数中访问 **静态全局变量/全局变量** 并没有任何改变，可直接使用。**但是静态局部变量的情况下，转换后的函数原本就设置在含有 `block` 语法的函数之外，所以无法从变量作用域直接访问静态局部变量。在我们用 `clang -rewrite-objc` 转换的 `C++` 代码中可以清楚的看到静态局部变量定义在 `main` 函数内，而 `static void __main_block_func_0(struct __main_block_impl_0 *__cself){ ... }` 则是完全在外部定义的一个静态函数。**
  
  **这里的静态变量的访问，作用域之外，应该深入思考下，虽然代码写在了一起，但是转换后并不在同一个作用域内，能跨作用域访问数据只能靠指针了。**
  
@@ -534,7 +537,9 @@ static void __main_block_func_0(struct __main_block_impl_0* __cself) {
      blk();
                 
      // static_val = 111;
-     printf("static_val = %d, global_val = %d, static_global_val = %d\n", static_val, global_val, static_global_val);
+     printf("static_val = %d, global_val = %d, static_global_val = %d\n", static_val,
+                                                                          global_val,
+                                                                          static_global_val);
  }
 }
 // 打印结果:
@@ -545,7 +550,7 @@ static void __main_block_func_0(struct __main_block_impl_0* __cself) {
 // block 内部可以修改 static_val 且 static_val 外部的修改也会
 // 传递到 blk 内部
  ```
- clang 转换后的源代码:
+ `clang` 转换后的源代码:
  `__main_block_impl_0` 追加了 `static_val` 指针为成员变量:
  ```c++
  struct __main_block_impl_0 {
@@ -555,7 +560,10 @@ static void __main_block_func_0(struct __main_block_impl_0* __cself) {
    // int *，初始化列表传递进来的是 static_val 的指针 
    int *static_val;
    
-   __main_block_impl_0(void *fp, struct __main_block_desc_0 *desc, int *_static_val, int flags=0) : static_val(_static_val) {
+   __main_block_impl_0(void *fp,
+                       struct __main_block_desc_0 *desc,
+                       int *_static_val,
+                       int flags=0) : static_val(_static_val) {
      impl.isa = &_NSConcreteStackBlock;
      impl.Flags = flags;
      impl.FuncPtr = fp;
@@ -586,24 +594,65 @@ static void __main_block_func_0(struct __main_block_impl_0* __cself) {
          static int static_val = 3;
          
          // 看到 _static_val 入参是 &static_val
-         void (*blk)(void) = ((void (*)())&__main_block_impl_0((void *)__main_block_func_0, &__main_block_desc_0_DATA, &static_val));
+         void (*blk)(void) = ((void (*)())&__main_block_impl_0((void *)__main_block_func_0,
+                                                               &__main_block_desc_0_DATA,
+                                                               &static_val));
          
          // 这里的赋值只是赋值，可以和 __block 的 forwarding 指针方式寻值进行比较思考
          static_val = 12;
          
          ((void (*)(__block_impl *))((__block_impl *)blk)->FuncPtr)((__block_impl *)blk);
 
-         printf("static_val = %d, global_val = %d, static_global_val = %d\n", static_val, global_val, static_global_val);
+         printf("static_val = %d, global_val = %d, static_global_val = %d\n", static_val,
+                                                                              global_val,
+                                                                              static_global_val);
      }
 
      return 0;
  }
  ```
-&emsp;可看到在 `__main_block_func_0` 内 `global_val` 和 `static_global_val` 的访问和转换前完全相同。静态变量 `static_val` 则是通过指针对其进行访问修改，在 `__main_block_impl_0` 结构体的构造函数的初始化列表中 `&static_val` 赋值给 `struct __main_block_impl_0` 的 `int *static_val` 这个成员变量，这种是通过地址在超出变量作用域的地方访问和修改变量。
+&emsp;可看到在 `__main_block_func_0` 内 `global_val` 和 `static_global_val` 的访问和转换前完全相同。静态变量 `static_val` 则是通过指针对其进行访问修改，在 `__main_block_impl_0` 结构体的构造函数的初始化列表中 `&static_val` 赋值给 `struct __main_block_impl_0` 的 `int *static_val` 这个成员变量，这种方式是通过地址在超出变量作用域的地方访问和修改变量。
 
-> 静态变量的这种方法似乎也适用于自动变量的访问，但是为什么没有这么做呢？
+> 静态变量的这种方法似乎也适用于外部变量的访问，但是为什么没有这么做呢？
 
-实际上，在由 `block` 语法生成的值 `block` 上，可以存有超过其变量作用域的被截获对象的自动变量，但是如果 `block` 不强引用该自动变量的话，变量作用域结束的同时，该自动变量很可能会释放并销毁，而此时再去访问该自动变量的话会直接因为野指针访问而 `crash`。**而访问静态局部变量不会 `crash` 的原因在于，静态变量是存储在静态变量区的，在程序结束前它一直都会存在，之所以会被称为局部，只是说出了作用域无法直接通过变量名访问它了（对比全局变量在整个模块的任何位置都可以直接访问），并不是说这块数据不存在了，因此我们只要有一个指向该静态变量的指针，那么出了作用域依然能正常访问到它；而对于自动变量，`block` 并不持有它的话，那么一旦出了作用域，自动变量很可能直接释放并销毁，如果此时再访问的话会直接 `crash`，所以针对自动变量 `block` 并不能采用和静态局部变量一样的处理方式。**
+&emsp;实际上，在由 `block` 语法生成的值 `block` 上，可以存有超过其变量作用域的被截获对象的外部变量，但是如果 `block` 不持有该变量的话，例如 `bock` 截获的是 `weak` 、`unsafe_unretained` 变量，当变量作用域结束的同时，该自动变量很可能会释放并销毁，而此时再去访问该自动变量的话，如果是 `weak` 变量则已被置为 `nil`，而如果是 `unsafe_unretained` 变量，则会直接因为野指针访问而 `crash`。**而访问静态局部变量则不会出现这种问题，静态变量是存储在静态变量区的，在程序结束前它一直都会存在，之所以会被称为局部，只是说出了作用域无法直接通过变量名访问它了（对比全局变量在整个模块的任何位置都可以直接访问），并不是说这块数据不存在了，只要我们有一个指向该静态变量的指针，那么出了作用域依然能正常访问到它，所以针对外部变量 `block` 并不能采用和静态局部变量一样的处理方式。**
+
+示例代码:
+```c++
+// block 不持有 object
+void (^blk)(void);
+
+{
+    NSObject *object = [[NSObject alloc] init];
+    NSObject * __weak object2 = object;
+    // 右边栈区 block 被复制到堆区
+    // object2 是 object 的弱引用，所以 blk 截获的只是 object 的弱引用
+    // 出了下面花括号，object 被释放废弃，object2 也被置为 nil 
+    blk = ^{
+        NSLog(@"object2 = %@", object2);
+    };
+}
+
+blk();
+//打印：
+object2 = (null)
+
+// block 持有 object
+void (^blk)(void);
+{
+    NSObject *object = [[NSObject alloc] init];
+    // NSObject * __weak object2 = object;
+    
+    // 出了花括号 object 依然存在，因为它被 blk 强引用
+    blk = ^{
+        NSLog(@"object = %@", object);
+    };
+}
+blk();
+
+// 打印：
+object = <NSObject: 0x10059cee0>
+```
 
 2. 第二种是使用 `__block` 说明符。更准确的表达方式为 "`__block` 存储域说明符"（`__block storage-class-specifier`）。
 
@@ -614,7 +663,7 @@ static void __main_block_func_0(struct __main_block_impl_0* __cself) {
 + `auto`
 + `register`
 
-`__block` 说明符类似于 `static`、`auto` 和 `register` 说明符，他们用于指定将变量设置到哪个存储域中。例如: `auto` 表示作为自动变量存储在栈中，`static` 表示作为静态变量存储在数据区。
+`__block` 说明符类似于 `static`、`auto` 和 `register` 说明符，他们用于指定将变量设置到哪个存储域中。例如: `auto` 表示作为变量存储在栈中，`static` 表示作为静态变量存储在数据区。
 
 **对于使用 `__block` 修饰的变量，不管在 `block` 中有没有使用它，都会相应的给它生成一个结构体实例。**
 
@@ -628,12 +677,16 @@ void (^blk)(void) = ^{
     printf(fmt, val);
 };
 
+val = 30;
+
 blk();
 return 0;
 }
 ```
 根据 `clang -rewrite-objc` 转换结果发现，`__block val` 被转化为了 `struct __Block_byref_val_0` （`0` 表示当前是第几个 `__block` 变量）结构体实例。
 （`__Block_byref_val_0` 命名规则是 `__Block` 做前缀，然后是 `byref` 表示是被 `__block` 修饰的变量，`val` 表示原始的变量名，`0` 表示当前是第几个 `__block` 变量）
+
+`__Block_byref_val_0`
 ```c++
 struct __Block_byref_val_0 {
   void *__isa;
@@ -643,7 +696,11 @@ __Block_byref_val_0 *__forwarding; // 指向自己的指针
  int val;
 };
 ```
-如果 `__block` 修饰的是对象类型的话，则 `struct __Block_byref_val_0` 会多两个函数指针类型的成员变量: `__Block_byref_id_object_copy`、`__Block_byref_id_object_dispose` 。
+且 `__Block_byref_val_0` 单独拿出来的定义，这样可以在多个 `block` 中重用。
+
+如果 `__block` 修饰的是对象类型的话，则 `struct __Block_byref_val_0` 会多两个函数指针类型的成员变量： `__Block_byref_id_object_copy`、`__Block_byref_id_object_dispose` 。
+
+`__Block_byref_m_Parray_1`
 ```c++
 struct __Block_byref_m_Parray_1 {
   void *__isa;
@@ -657,7 +714,7 @@ __Block_byref_m_Parray_1 *__forwarding;
  NSMutableArray *m_Parray;
 };
 ```
-`__block_impl`，作为一个被复用的结构体，保持不变
+`__block_impl`，作为一个被复用的结构体，保持不变：
 ```c++
 struct __block_impl {
   void *isa;
@@ -684,7 +741,11 @@ struct __main_block_impl_0 {
   // 但是在初始化列表中用的是 val(_val->forwarding 指针)
   // 初始化用的 _val->forwarding
   
-  __main_block_impl_0(void *fp, struct __main_block_desc_0 *desc, const char *_fmt, __Block_byref_val_0 *_val, int flags=0) : fmt(_fmt), val(_val->__forwarding) {
+  __main_block_impl_0(void *fp,
+                      struct __main_block_desc_0 *desc,
+                      const char *_fmt,
+                      __Block_byref_val_0 *_val,
+                      int flags=0) : fmt(_fmt), val(_val->__forwarding) {
     impl.isa = &_NSConcreteStackBlock;
     impl.Flags = flags;
     impl.FuncPtr = fp;
@@ -711,33 +772,72 @@ printf(fmt, (val->__forwarding->val));
 
 }
 ```
-继续往下看转换后的 `.cpp` 文件，见到了两个新函数：`__main_block_copy_0` 和 `__main_block_dispose_0`：  （`BLOCK_FIELD_IS_BYREF` 后面会讲） 
+&emsp;刚刚在 `block` 中向静态变量赋值时只是使用了指向该静态变量的指针，而向 `__block` 变量赋值更复杂，`__main_block_impl_0` 结构体实例持有指向 `__block` 变量的 `__Block_byref_val_0` 结构体实例的指针。`__Block_byref_val_0` 结构体实例的成员变量 `__forwarding` 持有指向该实例自身的指针，通过成员变量 `__forwarding` 访问成员变量 `val`。( 成员变量 `val` 是该实例自身持有的变量，它相当于原外部变量。)
 
-目前已发现的有如下情况时会生成下面这一对 `copy` 和 `dispose` 函数：
+&emsp;继续往下看转换后的 `.cpp` 文件，见到了两个新函数：`__main_block_copy_0` 和 `__main_block_dispose_0`：  （`BLOCK_FIELD_IS_BYREF` 后面会讲） ，目前已发现的有如下情况时会生成下面这一对 `copy` 和 `dispose` 函数：
 
-1. 当 `block` 截获对象类型变量时（如：`NSObject` `NSMutableArray`）会有如下的 `copy` 和 `dispose` 函数生成。
-2. 当使用 `__block` 变量时会有如下的 `copy` 和 `dispose` 函数生成。
+1. 当 `block` 截获对象类型变量时（如：`NSObject` `NSMutableArray` 对象）会有如下的 `copy` 和 `dispose` 函数生成。
+2. 当在 `block` 内部使用 `__block` 变量时（即使是基本型如 `__block int a = 10`）会有如下的 `copy` 和 `dispose` 函数生成。
 3. 当函数返回值和参数类型都是 `block` 类型时也会有如下的 `copy` 和 `dispose` 函数
 
 `__main_block_copy_0`
 ```c++
-// _Block_object_assign 用的第一个参数: (void*)&dst->val 第二个参数: (void*)src->val
+// 内部调用的 _Block_object_assign 函数用的第一个参数: (void*)&dst->val 第二个参数: (void*)src->val
 static void __main_block_copy_0(struct __main_block_impl_0*dst,
                                 struct __main_block_impl_0*src) {
-                                
   _Block_object_assign((void*)&dst->val,
-  (void*)src->val, 8/*BLOCK_FIELD_IS_BYREF*/);
-  
+                       (void*)src->val,
+                       8/*BLOCK_FIELD_IS_BYREF*/);
 }
 ```
 `__main_block_dispose_0`
 ```c++
-// 入参: (void*)src->val
+// 内部调用的 _Block_object_dispose 函数入参: (void*)src->val
 static void __main_block_dispose_0(struct __main_block_impl_0*src) {
-
   _Block_object_dispose((void*)src->val, 8/*BLOCK_FIELD_IS_BYREF*/);
 }
 ```
+看到 `__main_block_copy_0` 和 `__main_block_dispose_0` 内部分别调用了 `_Block_object_assign` 和 `_Block_object_dispose` 后面会对该对函数通过源码进行分析，且它们的参数都是使用的 `struct __main_block_impl_0` 的 `val` 成员变量。
+
+这里再延伸一下，当我们使用对象类型的 `__block` 时，例如前面的: `__block NSMutableArray *m_Parray`，它被转换为如下结构体：
+`__Block_byref_m_Parray_1`
+```c++
+struct __Block_byref_m_Parray_1 {
+  void *__isa;
+__Block_byref_m_Parray_1 *__forwarding;
+ int __flags;
+ int __size;
+ 
+ void (*__Block_byref_id_object_copy)(void*, void*);
+ void (*__Block_byref_id_object_dispose)(void*);
+ 
+ NSMutableArray *m_Parray;
+};
+```
+它内部的 `__Block_byref_id_object_copy` 和 `__Block_byref_id_object_dispose` 在结构体初始化时使用了两个全局函数来初始化: `__Block_byref_id_object_copy_131`、`__Block_byref_id_object_dispose_131`。
+```c++
+__attribute__((__blocks__(byref))) __Block_byref_m_Parray_1 m_Parray = {(void*)0,
+                                                                        (__Block_byref_m_Parray_1 *)&m_Parray,
+                                                                        33554432,
+                                                                        sizeof(__Block_byref_m_Parray_1),
+                                                                        __Block_byref_id_object_copy_131,
+                                                                        __Block_byref_id_object_dispose_131,
+                                                                        ((NSMutableArray * _Nonnull (*)(id, SEL))(void *)objc_msgSend)((id)objc_getClass("NSMutableArray"), sel_registerName("array"))};
+```
+在转换后的 `.cpp` 文件中全局搜索 `__Block_byref_id_object_copy_131` 和 `__Block_byref_id_object_dispose_131` 可找到其定义：
+```c++
+// 内部调用的也是 _Block_object_assign
+static void __Block_byref_id_object_copy_131(void *dst, void *src) {
+ _Block_object_assign((char*)dst + 40, *(void * *) ((char*)src + 40), 131);
+}
+
+// 内部调用的也是 _Block_object_dispose
+static void __Block_byref_id_object_dispose_131(void *src) {
+ _Block_object_dispose(*(void * *) ((char*)src + 40), 131);
+}
+```
+&emsp;其中硬编码 `40` 对应的是 `struct __Block_byref_m_Parray_1` 前面 `6` 个成员变量，一共 `40` 个字节的宽度，从偏移 `__Block_byref_m_Parray_1` 实例的起始地址偏移 `40` 字节后刚好是 `NSMutableArray *m_Parray` 的位置，且这里不管是 `NSMutableArray` 还是其它对象类型，都是固定的 `40` 个字节，既所有的对象类型的 `__block` 变量都可以通用 `__Block_byref_id_object_copy_131` 和 `__Block_byref_id_object_dispose_131` 函数。
+
 `__main_block_desc_0` 新增了成员变量：
 ```c++
 static struct __main_block_desc_0 {
@@ -746,11 +846,14 @@ static struct __main_block_desc_0 {
   
   // copy 函数指针
   void (*copy)(struct __main_block_impl_0*, struct __main_block_impl_0*);
-  //  dispose 函数指针
+  // dispose 函数指针
   void (*dispose)(struct __main_block_impl_0*);
   
   // 看到下面的静态全局变量初始化用的是上面两个新增的函数 
-} __main_block_desc_0_DATA = { 0, sizeof(struct __main_block_impl_0), __main_block_copy_0, __main_block_dispose_0};
+} __main_block_desc_0_DATA = { 0,
+                               sizeof(struct __main_block_impl_0),
+                               __main_block_copy_0,
+                               __main_block_dispose_0};
 ```
 `main` 函数内部：
 ```c++
@@ -764,14 +867,28 @@ int main(int argc, const char * argv[]) {
         
         // 由 val 创建 __Block_byref_val_0 结构体实例，
         // 成员变量 __isa、__forwarding、__flags、__size、val
+        
         // 一手 (void*)0，把 0 转成一个 void* 指针
         // __forwarding 用的是该结构体自己的地址
         // size 就是 sizeof(__Block_byref_val_0)
-        // val 是截获的外部自动变量
-        __attribute__((__blocks__(byref))) __Block_byref_val_0 val = {(void*)0,(__Block_byref_val_0 *)&val, 0, sizeof(__Block_byref_val_0), 10};
+        // val 的值是就是初始值 10
+        
+        // __block int val = 10; 一行被转换为如下结构体的初始化
+        __attribute__((__blocks__(byref))) __Block_byref_val_0 val = {(void*)0,
+                                                                      (__Block_byref_val_0 *)&val,
+                                                                      0,
+                                                                      sizeof(__Block_byref_val_0),
+                                                                      10};
         
         // 如前所示的 __main_block_impl_0 结构体实例
-        void (*blk)(void) = ((void (*)())&__main_block_impl_0((void *)__main_block_func_0, &__main_block_desc_0_DATA, fmt, (__Block_byref_val_0 *)&val, 570425344));
+        void (*blk)(void) = ((void (*)())&__main_block_impl_0((void *)__main_block_func_0,
+                                                              &__main_block_desc_0_DATA,
+                                                              fmt,
+                                                              (__Block_byref_val_0 *)&val,
+                                                              570425344));
+                                                              
+        // 此时为 val 赋值，其实操作的都是 __Block_byref_val_0 实例中的 val 成员变量，而完全不再是可能以为的 int val 
+        (val.__forwarding->val) = 30;
         
         // 如前所示 (*blk).impl->FuncPtr 函数执行
         ((void (*)(__block_impl *))((__block_impl *)blk)->FuncPtr)((__block_impl *)blk);
@@ -780,143 +897,404 @@ int main(int argc, const char * argv[]) {
     return 0;
 }
 ```
-`__block int val = 0;`  
-```
-__attribute__((__blocks__(byref))) __Block_byref_val_0 val =
-{
-    (void*)0,
-    (__Block_byref_val_0 *)&val,
-    0,
-    sizeof(__Block_byref_val_0),
-    10
-};
-```
-发现竟然变为了结构体实例。`__block 变量`也同 `Block` 一样变成 `__Block_byref_val_0` 结构体类型的自动变量，即栈上生成的 `__Block_byref_val_0` 结构体实例。该变量初始化为 10，这个值也出现在结构体实例的初始化中，**这意味着该结构体持有相当于原自动变量的成员变量。**
-```
-struct __Block_byref_val_0 {
-    void* isa;
-    __Block_byref_val_0* __forwarding;
-    int __flags;
-    int __size;
-    int val;
-};
-```
-**如同初始化时的源代码，该结构体中最后的成员变量 val 是相当于原自动变量的成员变量。**
-赋值的情况:
-```
-static void __main_block_func_0(struct __main_block_impl_0 *__cself) {
-    __Block_byref_val_0 *val = __cself->val; // bound by ref
-    const char *fmt = __cself->fmt; // bound by copy
+`__block` 变量转化为 `__Block_byref_val_0` 结构体类型的自动变量，即栈上生成的 `struct __Block_byref_val_0` 结构体实例。`__block` 变量初始化为 `10`，这个值也出现在结构体实例的初始化中，**这意味着该结构体持有相当于原外部变量值的成员变量。**
 
-    (val->__forwarding->val) = 20;
-    printf(fmt, (val->__forwarding->val));
+对象类型的 `__block` 变量的情况单独拿出来说一下:
+```c++
+// __block NSObject *object = [[NSObject alloc] init];
+
+__attribute__((__blocks__(byref))) __Block_byref_object_4 object = {(void*)0,(__Block_byref_object_4 *)&object, 33554432, sizeof(__Block_byref_object_4), __Block_byref_id_object_copy_131, __Block_byref_id_object_dispose_131, ((NSObject *(*)(id, SEL))(void *)objc_msgSend)((id)((NSObject *(*)(id, SEL))(void *)objc_msgSend)((id)objc_getClass("NSObject"), sel_registerName("alloc")), sel_registerName("init"))};
+
+// 简化后
+__Block_byref_object_4 object = {
+                                 (void*)0, // isa
+                                 (__Block_byref_object_4 *)&object, // __forwarding
+                                 33554432, // __flags
+                                 sizeof(__Block_byref_object_4), // __size
+                                 __Block_byref_id_object_copy_131, // __Block_byref_id_object_copy
+                                 __Block_byref_id_object_dispose_131, // __Block_byref_id_object_dispose
+                                 
+                                 ((NSObject *(*)(id, SEL))(void *)objc_msgSend)((id)((NSObject *(*)(id, SEL))(void *)objc_msgSend)
+                                 ((id)objc_getClass("NSObject"), sel_registerName("alloc")), sel_registerName("init")) // obj
+                                 }
+```
+&emsp;其中 `__flags = 33554432` 即 `1 << 25`，`BLOCK_HAS_COPY_DISPOSE = (1 << 25)`, 表示 `struct __Block_byref_object_4` 拥有 `copy` 和 `dispose` 函数，基本类型的 `__block` 变量的结构体初始化时 `__flags` 值 `0`。
+
+## `block` 存储域
+&emsp;通过前面的学习可知，`block` 转换为 `block` 的结构体实例，`__block` 变量转换为 `__block` 变量结构体实例。
+&emsp;**`block` 也可作为 `OC` 对象**。将 `block` 当作 `OC` 对象来看时，该 `block` 的类为 `_NSConcreteStackBlock`，同时还有 `_NSConcreteGlobalBlock`、`_NSConcreteMallocBlock`。 由名称中含有 `stack` 可知，该类的对象 `block` 设置在栈上，同样由 `global` 可知，与全局变量一样，设置在程序的数据区域（`.data` 区）中，`malloc` 设置在由 `malloc` 函数分配的内存块（即堆）中。
+
+|类|设置对象的存储域|
+|---|---|
+|_NSConcreteStackBlock|栈|
+|_NSConcreteGlobalBlock|程序的数据区域(.data 区)|
+|_NSConcreteMallocBlock|堆|
+
+**在记述全局变量的地方使用 `block` 语法** 时，生成的 `block` 为 `_NSConcreteGlobalBlock` 类对象。
+**`block` 具体属于哪种类型，不能通过 `clang` 转换代码看出, `block` 的实际的 `isa` 是通过 `runtime` 来动态确定的。**
+
+如下 `_NSConcreteGlobalBlock` 类型的 `block`：
+```c++
+void (^blk)(void) = ^{ printf("全局区的 _NSConcreteGlobalBlock Block！\n"); };
+
+int main(int argc, const char * argv[]) {
+    @autoreleasepool {
+        // insert code here...
+        NSLog(@"🎉🎉🎉 Hello, World!");
+        
+        blk();
+        
+        NSLog(@"❄️❄️❄️ block isa: %@", blk);
+    }
 }
-```
-刚刚在 Block 中向静态变量赋值时只是使用了指向该静态变量的指针。而向 __block 变量赋值更复杂。`__main_block_impl_0` 结构体实例持有指向 __block 变量的 `__Block_byref_val_0` 结构体实例的指针。
-`__Block_byref_val_0` 结构体实例的成员变量 `__forwarding` 持有指向该实例自身的指针。通过成员变量 `__forwarding` 访问成员变量 `val`。( 成员变量 val 是该实例自身持有的变量，它相当于原自动变量。)
 
-且 `__Block_byref_val_0` 单独拿出来的定义，这样是为了在多个 Block 中重用。
+// 打印:
+全局区的 _NSConcreteGlobalBlock Block！
+❄️❄️❄️ block isa: <__NSGlobalBlock__: 0x100002068>
 ```
-// 示例 1:
-        const char* fmt = "val = %d\n";
-        __block int val = 10;
-        void (^blk)(void) = ^{
-//            val = 20;
-            printf(fmt, val);
-        };
-        
-        void (^blk2)(void) = ^{
-            val = 50;
-            printf(fmt, val);
-        };
-        
-        blk2();
-        blk();
-        // 执行结果:
-        val = 50
-        val = 50
-        
-        // blk 和 blk2 定义时截获 __block val 变量，val 只有一份，
-        // 不管是被谁修改以后，
-        // 当 blk 和 blk2 执行时，取到的都是内存内当前保存的值
-// 示例 2:
-        const char* fmt = "val = %d\n";
-        __block int val = 10;
-        void (^blk)(void) = ^{
-//            val = 20;
-            printf(fmt, val);
-        };
-        
-        void (^blk2)(void) = ^{
-            val = 50;
-            printf(fmt, val);
-        };
-        
-        blk2();
-        val = 60;
-        blk();
-        // 执行结果:
-        val = 50
-        val = 60
-        
-        const char* fmt = "val = %d\n";
-        __attribute__((__blocks__(byref))) __Block_byref_val_0 val = {(void*)0,(__Block_byref_val_0 *)&val, 0, sizeof(__Block_byref_val_0), 10};
-        
-        void (*blk)(void) = ((void (*)())&__main_block_impl_0((void *)__main_block_func_0, &__main_block_desc_0_DATA, fmt, (__Block_byref_val_0 *)&val, 570425344));
+&emsp;此 `block` 即该 `block` 结构体实例存储在程序的数据区域中，因为在使用全局变量的地方不能使用自动变量，所以不存在对自动变量进行截获。由此 `block` 用结构体实例的内容不依赖于执行时的状态，所以整个程序中只需要一个实例。因此将 `block` 用结构体实例设置在与全局变量相同的数据区域中即可。
 
-        void (*blk2)(void) = ((void (*)())&__main_block_impl_1((void *)__main_block_func_1, &__main_block_desc_1_DATA, fmt, (__Block_byref_val_0 *)&val, 570425344));
-```
-当 Block 内部使用多个 __block 变量时:
-```
-// char*
-struct __Block_byref_fmt_0 {
-  void *__isa;
-__Block_byref_fmt_0 *__forwarding;
- int __flags;
- int __size;
- char *fmt;
+&ensp;只在截获自动变量时，`block` 结构体实例截获的值才会根据执行时的状态变化。
+**即使在函数内而不在记述全局变量的地方定义 `block` 表达式，只要 `block` 不截获自动变量，就可以将 `block` 用结构体实例设置在程序的数据区域，即为全局 `block`。**
+
+如下 `block` 定义在 `main` 函数内，但是没有截获外部变量：
+```c++
+// 当前在 main 函数内，不捕获外部自动变量
+void (^globalBlock)(void) = ^{
+    NSLog(@"❄️❄️❄️ 测试 block isa");
 };
 
-// int 
-struct __Block_byref_val_1 {
-  void *__isa;
-__Block_byref_val_1 *__forwarding;
- int __flags;
- int __size;
- int val;
+globalBlock();
+NSLog(@"❄️❄️❄️ block isa: %@", globalBlock);
+
+// 打印结果:
+❄️❄️❄️ 测试 block isa
+❄️❄️❄️ block isa: <__NSGlobalBlock__: 0x100002088> // 全局 block
+```
+
+**对于没有要截获自动变量的 `block`，我们不需要依赖于其运行时的状态--捕获的变量，这样我们就不涉及到 `block` 的 `copy` 情况，因此是放在数据区。**
+
+**此外要注意的是，通过 `clang` 编译出来的 `isa` 在第二种情况下会显示成 `stackblock`，这是因为 `OC` 是一门动态语言，真正的元类还是在运行的情况下确定的，这种情况下可以使用 `lldb` 调试器查看。**
+
+**虽然通过 `clang` 转换的源代码通常是 `_NSConcreteStackBlock` 类对象，但实现上却有不同。总结如下:**
+
++ 记述全局变量的地方有 `block` 语法时
++ `block` 语法的表达式中不使用截获的自动变量时
+
+以上情况下，`block` 为 `_NSConcreteGlobalBlock` 类对象，即 `block` 配置在程序的数据区域中。除此之外 `block` 语法生成的 `block` 为 `_NSConcreteStackBlock` 类对象，且设置在栈上。
+
+```c++
+// 不捕获外部自动变量是 global
+void (^globalBlock)(void) = ^{
+    NSLog(@"❄️❄️❄️ 测试 block isa");
 };
 
-// int 
-struct __Block_byref_temp_2 {
-  void *__isa;
-__Block_byref_temp_2 *__forwarding;
- int __flags;
- int __size;
- int temp;
+int a = 2;
+// ARC 下会被复制到堆区，MRC 下不会进行复制
+// 右边栈区 block 赋值给左侧 block 时，会被复制到堆区
+void (^mallocBlock)(void) = ^{
+    NSLog(@"❄️❄️❄️ 测试 block isa a = %d", a);
 };
 
-// NSMutableArray *
-struct __Block_byref_array_3 {
-  void *__isa;
-__Block_byref_array_3 *__forwarding;
- int __flags;
- int __size;
- 
- // 看到对象类型的多了两个成员变量
+globalBlock();
+mallocBlock();
 
- // 该结构体使用的 copy 和 dispose 函数指针
- void (*__Block_byref_id_object_copy)(void*, void*);
- void (*__Block_byref_id_object_dispose)(void*);
- 
- NSMutableArray *array;
-};
+NSLog(@"❄️❄️❄️ globalBlock isa: %@", globalBlock);
+NSLog(@"❄️❄️❄️ mallocBlock isa: %@", mallocBlock);
 
-// NSObject *
-struct __Block_byref_object_4 {
-  void *__isa;
-__Block_byref_object_4 *__forwarding;
- int __flags;
- int __size;
+// 栈区 block
+NSLog(@"❄️❄️❄️ stackBlock isa: %@", ^{ NSLog(@"❄️❄️❄️ a = %d", a); });
+
+// 打印：
+❄️❄️❄️ 测试 block isa
+❄️❄️❄️ 测试 block isa a = 2
+❄️❄️❄️ globalBlock isa: <__NSGlobalBlock__: 0x100002088>
+❄️❄️❄️ mallocBlock isa: <__NSMallocBlock__: 0x100540fa0>
+❄️❄️❄️ stackBlock isa: <__NSStackBlock__: 0x7ffeefbff4e0>
+```
+&emsp;配置在全局变量区的 `block`，从变量作用域外也可以通过指针安全的使用，但设置在栈上的 `block`，如果其所属的变量作用域结束，该 `block` 就被废弃，由于 `__Block` 变量也配置在栈上，同样的，如果其所属的变量作用域结束，则该 `__block` 变量也会被废弃。
  
- // 看到对象类型的多了两个成员变量
+&ensp;`block` 提供了将 `block` 和 `__block` 结构体实例从栈上复制到堆上的方法来解决这个问题。将配置在栈上的 `block` 复制到堆上，这样即使 `block` 语法记述的变量作用域结束，堆上的 `block` 还可以继续存在。
+
+ + 不会有任何一个 `block` 一上来就被存在堆区，请牢记这一点！
+ + `_NSConcreteMallocBlock` 存在的意义和 `autorelease` 一样，就是为了能延长 block 的作用域。
+ + 我们将 `block` 和 `__blcok` 结构体实例从栈区复制到堆区，这样就算栈上的 `block` 被废弃了，还是可以使用堆上那一个。
+ + 可以联想我们在 `ARC` 是如何处理返回值中的 `__strong` 的，大概同理。
+
+ **在这里要思考一个问题：在栈上和堆上同时有一个 `block` 的情况下，我们的赋值，修改，废弃操作应该怎样管理？**
+
+ 复制到堆上的 `block` `isa` 会指向 `_NSConcreteMallocBlock`，即 `impl.isa = &_NSConcreteMallocBlock`;
+
+ **栈上的 `__block` 结构体实例成员变量 `__forwarding` 指向堆上 `__block` 结构体实例，堆上的 `__block` 结构体实例成员变量 `__forwarding` 指向它自己，那么不管是从栈上的 `__block` 变量还是从堆上的 `__block` 变量都能够访问同一块 `__block` 实例内容。**
+
+ 代码示例：
+ ```c++
+ // 这个 a 是位于栈区的 __Block_byref_a_0 结构体实例，已经不是 int 类型
+ __block int a = 2;
+
+ // 下面 block 被复制到堆区，a 也同时被复制到 堆区
+ void (^mallocBlock)(void) = ^{
+     // 堆上 a 的 __forwarding 指向自己
+     // a->__forwarding->a 自增
+     ++a;
+     NSLog(@"❄️❄️❄️ 测试 block isa a = %d", a);
+ };
+
+ // 下面的 a 还是在栈区的 __Block_byref_a_0 结构体实例，
+ // 但是它的 __forwrding 指针是指向上面被复制堆区的 a 的，
+ // 这样不管是栈区 a 还是 堆区 a，当操作 int a = 2 时，这个数值 a 都是同一个。
+ ++a;
+ ```
  
+ `block` 提供的复制方法究竟是什么呢？实际上在 `ARC`  下，大多数情形下编译器会恰当的进行判断，自动生成将 `block` 从栈复制到堆上的代码。
+
+ > 赋值时 `block` 自动从栈区复制到堆区的两个场景：
+
+ ```c++
+ // 场景一：
+ // 用 clang -rewrite-objc 能转换成功
+ typedef int(^BLK)(int);
+
+ BLK func(int rate) {
+     // 右边栈区 block 复制到堆区，并被 temp 持有
+     BLK temp = ^(int count){ return rate * count; };
+     return temp;
+ }
+
+ // 用 clang -rewrite-objc 转换失败，改成上面就会成功，（用中间变量接收一下）
+ typedef int(^BLK)(int);
+
+ BLK func(int rate) {
+     // 此时直接返回栈区 block 不行 
+     return ^(int count){ return rate * count; };
+ }
+
+ // 失败描述，用 clang 转换失败，但是直接执行该函数是正常的
+ // clang 转换错误描述说返回一个位于栈区的 block，
+ // 栈区 block 出了下面花括号就被释放了，所以不能返回，
+ // 同时也说明了 clang 不能动态的把栈区 block 复制到堆区，
+ // 而上面有临时变量赋值时，则已经把等号右边的 block 复制到堆区，并赋值给了 temp。
+ 
+ // 而执行时正常，是编译器能动态的把栈区 block 复制到堆区。
+ 
+ returning block that lives on the local stack
+ return ^(int count){ return rate * count; };
+            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ 64 warnings and 1 error generated.
+
+ // 场景二:
+ BLK __weak blk;
+ {
+     NSObject *object = [[NSObject alloc] init];
+     
+     // NSObject * __weak object2 = object;
+     
+     void (^strongBlk)(void) = ^{
+         NSLog(@"object = %@", object);
+     };
+     
+     // blk 是一个弱引用变量，用一个 strong 赋值给他，
+     // 它不持有该 strong 变量
+     blk = strongBlk;
+ }
+
+ // blk();
+ printf("blk = %p\n", blk);
+ 
+ // 打印正常，出了花括号，block 结构体实例已经释放了:
+ blk = 0x0
+
+ BLK __weak blk;
+ {
+     NSObject *object = [[NSObject alloc] init];
+     // NSObject * __weak object2 = object;
+     // void (^strongBlk)(void) = ^{
+     // NSLog(@"object = %@", object);
+     // };
+
+     // 这里给了警告: 
+     // Assigning block literal to a weak variable; object will be released after assignment
+     blk = ^{
+         NSLog(@"object = %@", object);
+     };
+     
+     printf("内部 blk = %p\n", blk);
+ }
+
+ // blk();
+ printf("blk = %p\n", blk);
+ 
+ // 打印：出了花括号，打印了 blk 不为 0x0，还是栈区 block 的地址
+ // 打印了一个栈区 block 地址（即等号右边的栈区 block 地址）
+ 内部 blk = 0x7ffeefbff538
+ blk = 0x7ffeefbff538
+ 
+ ```
+ 看一下下面这个返回 `block` 的函数:
+ ```c++
+ typedef int (^blk_t)(int);
+ blk_t func(int rate) {
+     return ^(int count) {
+         return rate * count;
+     };
+ }
+ ```
+ 源代码为返回配置在栈上的 `block` 的函数。即程序执行中从 **该函数** 返回 **函数调用方** 时变量作用域结束，因此栈上的 `block` 也被废弃。虽然看似有这样的问题，但是该源代码通过对应 `ARC` 的编译器可转换为如下:
+ ```c++
+ blk_t func(int rate) {
+ blk_t tmp = &__func_block_impl_0(__func_block_func_0, &__func_block_desc_0_DATA, rate);
+
+ // 引用 +1
+ tmp = objc_retainBlock(tmp);
+
+ // 又被放进自动释放池
+ return objc_autoreleaseReturnValue(tmp);
+ }
+ ```
+ 另外，因为 `ARC` 处于有效状态，所以 `blk_t tmp` 实际上与附有 `__strong` 修饰符的 `blk_t __strong tmp` 相同。
+ 在 `objc4` 找到  `objc_retainBlock` 函数实际上就是 `Block_copy` 函数:
+ ```c++
+ // 在 NSObject.mm 文件 31 行
+ //
+ // The -fobjc-arc flag causes the compiler to issue calls to objc_{retain/release/autorelease/retain_block}
+ //
+ 
+ id objc_retainBlock(id x) {
+     return (id)_Block_copy(x);
+ }
+
+ // usr/include/Block.h 中找到
+ // Create a heap based copy of a Block or simply add a reference to an existing one.
+ // 创建基于堆的 Block 副本，或仅添加对现有 Block 的引用。（已经在堆上的 block 调用 copy 函数，引用计数增加）
+ // This must be paired with Block_release to recover memory, even when running under Objective-C Garbage Collection.
+ // 如果在 OC 的垃圾回收机制下使用时必须与 "Block_release" 配对使用。
+
+ BLOCK_EXPORT void *_Block_copy(const void *aBlock)
+     __OSX_AVAILABLE_STARTING(__MAC_10_6, __IPHONE_3_2);
+ ```
+ 即:
+ ```c++
+ tmp = _Block_copy(tmp);
+ return objc_autoreleaseReturnValue(tmp);
+ ```
+ 分析:
+ ```c++
+ // 第一步，__func_block_impl_0 结构体实例生成
+ // 将通过 Block 语法生成的 Block， 
+ // 即配置在栈上的 Block 用结构体实例赋值给相当于 Block 类型的变量 tmp 中
+ blk_t tmp = &__func_block_impl_0(__func_block_func_0, &__func_block_desc_0_DATA, rate);
+
+ // 第二步，_Block_copy 函数执行
+ // _Block_copy 函数，将栈上的 Block 复制到堆上。
+ // 复制后，将堆上的地址作为指针赋值给变量 tmp。
+ // (_Block_copy 函数源码在后面进行解析)
+ tmp = _Block_copy(tmp);
+
+ // 第三步，将堆上的 Block 作为 OC 对象，
+ // 注册到 autoreleasepool 中，然后返回该对象
+ return objc_autoreleaseReturnValue(tmp);
+ ```
+ **将 `block` 作为函数返回值返回时，编译器会自动生成复制到堆上的代码。**
+
+&emsp;前面说大部分情况下编译器会适当的进行判断，不过在此之外的情况下需要 **手动**生成代码（自己调用 `copy` 函数），将 `block` 从栈上复制到 **堆**上（`_Block_copy` 函数的注释已经说了，它是创建基于堆的 `block` 副本），即我们自己主动调用 `copy` 实例方法。
+
+**编译器不能进行判断时是什么样的状况呢？**
+
++ 向方法或函数的参数中传递 `block` 时。但是如果在方法或函数 **中** 适当的复制了传递过来的参数，那么就不必在调用该方法或函数前手动复制了。
+
+以下方法或函数不用手动复制，编译器会给进行自动复制:
+
++ `Cocoa` 框架的方法且方法名中含有 `usingBlock` 等时
++ `Grand Central Dispatch` 的 `API`
++ 将 `block` 赋值给类的附有 `__strong` 修饰符的 `id` 类型或 `block` 类型成员变量时【当然这种情况就是最多的，只要赋值一个 `block` 变量就会自动进行复制】
+
+
+**`NSArray` 的 `enumerateObjectsUsingBlock` 以及 `dispatch_async` 函数就不用手动复制。`NSArray` 的 `initWithObjects` 上传递 `block` 时需要手动复制。**
+
+下面是个 🌰：
+```c++
+id obj = [Son getBlockArray];
+void (^blk)(void) = [obj objectAtIndex:0];
+blk();
+
+// 对 block 主动调用 copy 函数，能正常运行 
++ (id)getBlockArray {
+    int val = 10;
+    return [[NSArray alloc] initWithObjects:[^{NSLog(@"blk0: %d", val);} copy], [^{NSLog(@"blk1: %d", val);} copy], nil];
+}
+
+// 如下如果不加 copy 函数，则运行崩溃
++ (id)getBlockArray {
+    int val = 10;
+    return [[NSArray alloc] initWithObjects:^{NSLog(@"blk0: %d", val);}, ^{NSLog(@"blk1: %d", val);}, nil];
+}
+
+// 崩溃原因: 不主动调用 copy 时，getBlockArray 函数执行结束后，栈上的 block 被废弃了，
+// 编译器对此种情况不能判断是否需要复制。
+// 也可以不判断全部情况都复制，但是将 Block 从栈复制到堆是相当消耗 CPU 的。
+// 当 block 在栈上也能使用时，从栈上复制到堆上，就只是浪费 CPU 资源。
+// 此时需要我们判断，自行手动复制。
+```
+|Block 的类|副本源的配置存储域|复制效果|
+|---|---|---|
+|_NSConcreteStackBlock|栈|从栈复制到堆|
+|_NSConcreteGlobalBlock|程序的数据区域|什么也不做|
+|_NSConcreteMallocBlock|堆|引用计数增加|
+不管 `Block` 配置在何处，用 `copy` 方法复制都不会引起任何问题，在不确定时调用 `copy` 方法即可。
+
+## `__block` 变量存储域
+&emsp;使用 `__block` 变量的 `block` 从栈复制到堆上时，`__block` 变量也会受到影响。
+|__block 变量的配置存储域|Block 从栈复制到堆时的影响|
+|---|---|
+|栈|从栈复制到堆并被 Block 持有|
+|堆|被 Block 持有|
+
+&emsp;若在一个 `block` 中使用 `__block` 变量，使用的 `__block` 变量也配置在栈上，当该 `block` 从栈复制到堆时，这些 `__block` 变量也全部被从栈复制到堆，此时，`block` 持有 `__block` 变量，即使在该 `block` 已复制到堆的情形下，复制 `block` 也对所使用的 `__block` 变量没有任何影响。
+
+**使用 `__block` 变量的 `block` 持有 `__block` 变量。如果 `block` 被废弃，它所持有的 `__block` 变量也会被释放。**
+
+回顾 `__block` 变量用结构体成员变量 `__forwarding` 的原因：**不管 `__block` 变量配置在栈上还是在堆上，都能够正确的访问该变量。**
+通过 `block` 的复制，`__block` 变量也从栈上复制到堆上。此时可同时访问栈上的 `__block` 变量和堆上的 `__block` 变量。
+
+示例代码：
+```c++
+__block int val = 0;
+
+// 使用 copy 方法复制了使用 __block 变量的 Block 语法
+// Block 和 __block 变量两者均从栈复制到堆 
+// 在 Block 语法的表达式中使用初始化后的 __block 变量，做了自增运算
+void (^blk)(void) = [^{++val;} copy];
+
+// 在 Block 语法之后使用与 Block 无关的变量，
+// 此时的 val 是第一行生成的 __block 变量，
+// Block 语法表达式中使用的 val 是 Block 结构体自己的成员变量 val
+// 两者之间毫无瓜葛，硬要说有关系的话，大概就是 Block 表达式里面的 val（指针）成员变量
+// 在 Block 结构体初始化时初始化列表里面 val 初始化是用的:val(_val->__forwarding) { }
+
+++val;
+
+// 通过 clang 转换，看到两次自增运算均转换为如下形式:
+
+// Block 表达式内部：
+// 首先找到 Block 结构体实例的成员变量 val 
+__Block_byref_val_0 *val = __cself->val; // bound by ref
+// val 是结构体 __Block_byref_val_0 指针
+++(val->__forwarding->val);
+
+// 外部：
+++(val.__forwarding->val);
+
+blk();
+// 且此行打印语句也是用的 val.__forwarding->val
+NSLog(@"val = %d", val);
+```
+
+在变换 Block 语法的函数中，该变量 val 为复制到堆上的 __block 变量用结构体实例，而使用的与 Block 无关的变量 val，为复制前栈上的 __block 变量用结构体实例。
+
+**超级重要的一句：**
+**但是栈上的 __block 变量用结构体实例在 __block 变量从栈复制到堆上时，会将成员变量 __forwarding 的值替换为复制目标堆上的 __block 变量用结构体实例的地址**。
+
+至此，无论是在 Block 语法中、Block 语法外使用 __block 变量，还是 __block 变量配置在栈上或堆上，都可以顺利的访问到同一个 __block 变量。
+
+**所有使用 val 的地方实际都转化为了: val->__forwarding->val（block 内部）或者 val.__forwarding->val（外部，是结构体实例可以直接使用 .）。**
+
