@@ -1260,23 +1260,23 @@ blk();
 ```c++
 __block int val = 0;
 
-// 使用 copy 方法复制了使用 __block 变量的 Block 语法
-// Block 和 __block 变量两者均从栈复制到堆 
-// 在 Block 语法的表达式中使用初始化后的 __block 变量，做了自增运算
+// 使用 copy 方法复制使用 __block 变量的 block，
+// block 和 __block 变量两者均从栈复制到堆， 
+// 在 block 语法的表达式中使用初始化后的 __block 变量，做了自增运算
+
 void (^blk)(void) = [^{++val;} copy];
 
-// 在 Block 语法之后使用与 Block 无关的变量，
-// 此时的 val 是第一行生成的 __block 变量，
-// Block 语法表达式中使用的 val 是 Block 结构体自己的成员变量 val
-// 两者之间毫无瓜葛，硬要说有关系的话，大概就是 Block 表达式里面的 val（指针）成员变量
-// 在 Block 结构体初始化时初始化列表里面 val 初始化是用的:val(_val->__forwarding) { }
+// 在 block 语法之后使用与 block 无关的变量，
+// 此时的 val 是第一行生成的 __block 结构体实例，
+// block 语法表达式中使用的 val 是 block 结构体自己的成员变量 val，
+// 在 block 结构体初始化时初始化列表里面 val 初始化是用的:val(_val->__forwarding) { }
 
 ++val;
 
 // 通过 clang 转换，看到两次自增运算均转换为如下形式:
 
-// Block 表达式内部：
-// 首先找到 Block 结构体实例的成员变量 val 
+// block 表达式内部：
+// 首先找到 block 结构体实例的成员变量 val 
 __Block_byref_val_0 *val = __cself->val; // bound by ref
 // val 是结构体 __Block_byref_val_0 指针
 ++(val->__forwarding->val);
@@ -1285,16 +1285,274 @@ __Block_byref_val_0 *val = __cself->val; // bound by ref
 ++(val.__forwarding->val);
 
 blk();
+
 // 且此行打印语句也是用的 val.__forwarding->val
 NSLog(@"val = %d", val);
 ```
-
-在变换 Block 语法的函数中，该变量 val 为复制到堆上的 __block 变量用结构体实例，而使用的与 Block 无关的变量 val，为复制前栈上的 __block 变量用结构体实例。
+在变换后的 `block` 语法的函数中（`__main_block_func_0`），`val` 为复制到堆上的 `__block` 变量用结构体实例，而 `block` 语法之外的 `val`，为复制前栈上的 `__block` 变量用结构体实例。
 
 **超级重要的一句：**
-**但是栈上的 __block 变量用结构体实例在 __block 变量从栈复制到堆上时，会将成员变量 __forwarding 的值替换为复制目标堆上的 __block 变量用结构体实例的地址**。
+**但是栈上的 `__block` 变量用结构体实例在 `__block` 变量从栈复制到堆上时，会将成员变量 `__forwarding` 的值替换为复制目标堆上的 `__block` 变量用结构体实例的地址**。
 
-至此，无论是在 Block 语法中、Block 语法外使用 __block 变量，还是 __block 变量配置在栈上或堆上，都可以顺利的访问到同一个 __block 变量。
+至此，无论是在 `Block` 语法中、`Block` 语法外使用 `__block` 变量，还是 `__block` 变量配置在栈上或堆上，都可以顺利的访问到同一个 `__block` 变量。
 
-**所有使用 val 的地方实际都转化为了: val->__forwarding->val（block 内部）或者 val.__forwarding->val（外部，是结构体实例可以直接使用 .）。**
+**所有使用 `val` 的地方实际都转化为了: `val->__forwarding->val`（`block` 内部）或者 `val.__forwarding->val`（外部，是结构体实例可以直接使用 ）。**
+
+## `block` 持有截获的对象
+&emsp;在 `OC` 中，`C` 语言结构体不能含有附有 `__strong` 修饰符的变量，因为编译器不知道应何时进行 `C` 语言结构体的初始化和废弃操作，不能很好地管理内存。但是 `OC`  运行时库能准确的把握 `block` 从栈复制到堆以及堆上的 `block` 被废弃的时机，因此 `block` 用结构体中即使含有附有 `__strong` 修饰符或者 `__weak` 修饰符的变量，也可以恰当的进行初始化和废弃。为此需要 `__main_block_copy_0` 和 `__main_block_dispose_0` 函数，并把他们放在了 `__main_block_desc_0` 结构体的成员变量 `copy` 和 `dispose` 中。
+
+`__main_block_copy_0` 函数使用 `_Block_object_assign` 函数将对象类型对象赋值给 `block` 用结构体的成员变量中并持有该对象。
+
+`_Block_object_assign` 函数调用相当于 `retain` 实例方法的函数，将对象赋值在对象类型的结构体成员变量中。
+`__main_block_dispose_0` 调用 `_Block_object_dispose`，释放赋值在 `block` 用结构体成员变量中的对象。
+`_Block_object_dispose` 函数调用相当于 `release` 实例方法的函数，释放赋值在对象类型的结构体成员变量中的对象。
+
+转换代码中 `__main_block_desc_0` 中的 `copy` 和 `dispose` 从没使用过，那什么时候会使用呢？
+
+（这些方法都是编译器自己去调用的，我们不会主动调用它们。）
+
+|函数|调用时机|
+|---|---|
+|copy 函数|栈上的 block 复制到堆时|
+|dispose 函数|堆上的 block 被废弃时|
+
+栈上 `block` 复制到堆上时的情况:
+
++ 调用 `block` 的 `copy` 实例方法时
++ `block` 作为函数返回值返回时
++ 将 `block` 赋值给附有 `__strong` 修饰符 `id` 类型的变量或 `block` 类型成员变量时
++ 在方法名中含有 `usingBlock` 的 `Cocoa` 框架方法或 `Grand Central Dispatch` 的 `API` 中传递 `block` 时
+
+&emsp;这些情况下，编译器自动的将对象的 `block` 作为参数并调用 `_Block_copy` 函数，这与手动调用 `block` 的 `copy` 实例方法的效果相同。`usingBlock` 和 `GCD` 中传递 `block` 时，在该方法或函数内部对传递过来的 `block` 调用 `block` 的 `copy` 实例方法或者 `_Block_copy` 函数。
+
+看似从栈复制到堆上，其实可归结为 `_Block_copy` 函数被调用时 `block` 从栈复制到堆。
+
+相对，释放复制到堆上的 `block` 后，谁都不持有 `block` 而使其被废弃时调用 `dispose` 函数，这相当于对象的 `dealloc` 实例方法。
+
+有了这些构造，通过使用附有 `__strong` 修饰符的自动变量，`block` 中截获的对象就能够超出其作用域而存在。
+
+在使用 `__block` 变量时，已经用到 `copy` 和 `dispose` 函数：
+
+`_Block_object_assign` 和 `_Block_object_dispose` 最后的参数有所不同:
+
+截获对象时和使用 `__block` 变量时的不同：
+
+| 对象 | BLOCK_FIELD_IS_OBJECT |
+| __block 对象 | BLOCK_FIELD_IS_BYREF |
+
+通过 `BLOCK_FIELD_IS_OBJECT`  和 `BLOCK_FIELD_IS_BYREF` 区分 `copy` 函数和 `dispose` 函数的对象类型是对象还是 `__block` 变量。
+
+`copy` 函数持有截获的对象、`dispose` 函数释放截获的对象
+`copy` 函数持有所使用的 `__block` 变量、`dispose` 函数释放所使用的 `__block` 变量
+
+**`block` 中使用的赋值给附有 `__strong` 修饰符的自动变量的对象和复制到堆上的 `__block` 变量由于被堆上的 `block` 所持有，因而可超出其变量作用域而存在。**
+
+## Block 循环引用
+&emsp;如果在 `block` 中使用附有 `strong` 修饰符的对象类型自动变量，那么当 `block` 从栈复制到堆时，该对象为 `block` 所持有，不复制也会持有的，`block` 结构体初始化的时候已经将其捕获。
+
+示例代码：
+```c++
+// 🌰 1. 
+id array = [[NSMutableArray alloc] init];
+{
+    NSLog(@"⛈⛈⛈ array retainCount = %lu", (unsigned long)[array arcDebugRetainCount]);
+    
+    ^(id obj) {
+        [array addObject:obj];
+        NSLog(@"⛈⛈⛈ array retainCount = %lu", (unsigned long)[array arcDebugRetainCount]);
+    };
+    
+    NSLog(@"⛈⛈⛈ array retainCount = %lu", (unsigned long)[array arcDebugRetainCount]);
+}
+NSLog(@"⛈⛈⛈ array retainCount = %lu", (unsigned long)[array arcDebugRetainCount]);
+
+// 打印：
+⛈⛈⛈ array retainCount = 1 // array 持有
+⛈⛈⛈ array retainCount = 2 // array 和 栈上 block 同时持有
+⛈⛈⛈ array retainCount = 1 // 出了花括号，栈上 block 释放，只剩下 array 持有
+
+// 🌰 2.
+id array = [[NSMutableArray alloc] init];
+{
+    NSLog(@"⛈⛈⛈ array retainCount = %lu", (unsigned long)[array arcDebugRetainCount]);
+    
+    blk = ^(id obj) {
+        [array addObject:obj];
+        NSLog(@"⛈⛈⛈  Block array retainCount = %lu", (unsigned long)[array arcDebugRetainCount]);
+    };
+    
+    NSLog(@"⛈⛈⛈ array retainCount = %lu", (unsigned long)[array arcDebugRetainCount]);
+}
+NSLog(@"⛈⛈⛈ array retainCount = %lu", (unsigned long)[array arcDebugRetainCount]);
+
+if (blk != nil) {
+    blk([[NSObject alloc] init]);
+    blk([[NSObject alloc] init]);
+    blk([[NSObject alloc] init]);
+}
+// 打印：
+⛈⛈⛈ array retainCount = 1 // array 持有
+⛈⛈⛈ array retainCount = 3 // 花括号内，栈上 block 持有、复制到堆的 block 持有、array 持有，总共是 3
+⛈⛈⛈ array retainCount = 2 // 这里减 1 是栈上 block 出了花括号后释放，同时也释放了 array，所以这里减 1
+⛈⛈⛈  Block array retainCount = 2 // 这里 block 执行 3 次打印都是 2，此时 array 持有和堆上的 block blk 持有
+⛈⛈⛈  Block array retainCount = 2
+⛈⛈⛈  Block array retainCount = 2
+
+// 🌰 3.
+id array = [[NSMutableArray alloc] init];
+{
+    NSLog(@"⛈⛈⛈ array retainCount = %lu", (unsigned long)[array arcDebugRetainCount]);
+    
+    blk = ^(id obj) {
+        [array addObject:obj];
+        NSLog(@"⛈⛈⛈  Block array retainCount = %lu", (unsigned long)[array arcDebugRetainCount]);
+    };
+    
+    NSLog(@"⛈⛈⛈ array retainCount = %lu", (unsigned long)[array arcDebugRetainCount]);
+}
+
+NSLog(@"⛈⛈⛈ array retainCount = %lu", (unsigned long)[array arcDebugRetainCount]);
+
+if (blk != nil) {
+    blk([[NSObject alloc] init]);
+    blk([[NSObject alloc] init]);
+    blk([[NSObject alloc] init]);
+}
+
+blk = nil;
+
+NSLog(@"⛈⛈⛈ array retainCount = %lu", (unsigned long)[array arcDebugRetainCount]);
+// 打印：
+⛈⛈⛈ array retainCount = 1
+⛈⛈⛈ array retainCount = 3
+⛈⛈⛈ array retainCount = 2
+⛈⛈⛈  Block array retainCount = 2
+⛈⛈⛈  Block array retainCount = 2
+⛈⛈⛈  Block array retainCount = 2 // 上面的打印完全同 2
+⛈⛈⛈ array retainCount = 1 // 只有这里，blk 三次执行完毕后，blk 赋值 空，blk 释放，同时释放 array，所以还剩下 array 持有，retainCount 为 1
+
+// 🌰 4.
+{
+    id array = [[NSMutableArray alloc] init];
+    NSLog(@"⛈⛈⛈ array retainCount = %lu", (unsigned long)[array arcDebugRetainCount]);
+    
+    blk = ^(id obj) {
+        [array addObject:obj];
+        NSLog(@"⛈⛈⛈  Block array retainCount = %lu", (unsigned long)[array arcDebugRetainCount]);
+    };
+    
+    NSLog(@"⛈⛈⛈ array retainCount = %lu", (unsigned long)[array arcDebugRetainCount]);
+}
+
+// NSLog(@"⛈⛈⛈ array retainCount = %lu", (unsigned long)[array arcDebugRetainCount]);
+
+if (blk != nil) {
+    blk([[NSObject alloc] init]);
+    blk([[NSObject alloc] init]);
+    blk([[NSObject alloc] init]);
+}
+// 打印：
+⛈⛈⛈ array retainCount = 1 // 对象创建时为 1
+⛈⛈⛈ array retainCount = 3 // 栈上 block 持有和复制到堆时堆上 block 持有 
+                             // 出了花括号以后，栈上 block 释放，array 局部变量释放
+                             // 剩下的 1 是堆上的 block 持有的
+                             // 所以下面 block 指向时，打印都是 1
+⛈⛈⛈  Block array retainCount = 1 // 出了花括号以后变量 array 释放，还剩下 block blk 自己持有，所以打印 1
+⛈⛈⛈  Block array retainCount = 1
+⛈⛈⛈  Block array retainCount = 1
+```
+```
+- (id)init {
+    self = [super init];
+    blk_ = ^{ NSLog(@"self = %@", self);};
+    return self;
+}
+
+// 依然会捕获 self,对编译器而言，obj_ 只不过是对象用结构体的成员变量。
+// blk_ = ^{ NSLog(@"obj_ = %@", self->obj_); };
+
+- (id)init {
+    self = [super init];
+    blk_ = ^{
+        NSLog(@"obj_ = %@", obj_);
+        };
+        
+    return self;    
+}
+
+// 除了 __weak self 也可用:
+id __weak obj = obj_;
+blk_ = ^{ NSLog(@"obj_ = %@", obj); };
+```
+该源代码中，由于 `block` 存在时，持有该 `block` 的 `Object` 对象即赋值在变量 `tmp` 中的 `self` 必定存在，因此不需要判断变量 `tmp` 的值是否为 `nil`。
+在 `iOS 4` 和 `OS X 10.6` 中，可以用 `_unsafe_unretained` 代替 `__weak` 修饰符，此处即可代替，且不必担心悬垂指针。
+
+**由于 `block` 语法赋值在了成员变量 `blk_` 中，因此通过 `block` 语法生成在栈上的 `block` 此时由栈复制到堆上，并持有所使用的 `self`。**
+
+在为避免循环引用而使用 `__weak` 修饰符时，虽说可以确认使用附有 `__weak` 修饰符的变量时，是否为 `nil`，但更有必要使之生存，以使用赋值给附有 `__weak` 修饰符变量的对象。（意思就比如上面，`block` 表达式开始执行时，首先判断 `self` 是否是 `nil`，如果不是 `nil` 才有必要继续往下执行，在往下执行的过程中并且希望 `self` 一直存在，不要正在使用时，竟被释放了，如果是单线程则无需考虑，但是在多线程开发时一定要考虑到这一点。）
+
+**在 `Block` 里面加 `__strong` 修饰 `weakSelf` 取得 `strongSelf`，防止 `block` 结构体实例的 `self` 成员变量过早释放。`block` 从外界所捕获的对象和在 `block` 内部使用 `__strong` 强引用的对象，差别就在于一个是在定义的时候就会影响对象的引用计数, 一个是在 `block` 运行的时候才强引用对象，且 `block` 表达式执行完毕还是会 `-1`。**
+
+**`__weak` 修饰的对象被 `block` 引用，不会影响对象的释放，而 `__strong` 在 `block` 内部修饰的对象，会保证，在使用这个对象在 `scope` 内，这个对象都不会被释放，出了 `scope`，引用计数就会 `-1`，且 `__strong` 主要是用在多线程运用中，如果只使用单线程，则只需要使用 `__weak` 即可。**
+
+用 `__block` 变量来避免循环引用，原理是在 `block` 内部对捕获的变量赋值为 `nil`，硬性破除引用环。
+```c++
+- (id)init {
+    self = [super init];
+    __block id tmp = self;
+    blk_ = ^{
+        NSLog(@"self = %@", tmp);
+        tmp = nil;
+    };
+}
+```
+
+**对使用 `__block` 变量避免循环引用的方法和使用 `__weak` 修饰符及 `__unsafe_unretained` 修饰符避免循环引用的方法做比较:**
+
+`__block` 优点：
++ 通过 `__block` 变量可控制对象的持有期间。
++ 在不能使用 `__weak` 修饰符的环境中不使用 `__unsafe_unretained` 修饰符即可（不必担心访问悬垂指针）
++ 在执行 `block` 时可动态决定是否将 `nil` 或其他对象赋值在 `__block` 变量中。
+
+`__block` 缺点：
++ 为避免循环引用必须执行 `block`。
+
+## `copy/release`
+`ARC` 无效时，一般需要手动将 `block` 从栈复制到堆，另外，由于 `ARC` 无效，所以肯定要手动释放复制的 `block`。此时可用 `copy` 实例方法来复制，用 `release` 实例方法来释放。
+
+```c++
+void (^blk_on_heap)(void) = [blk_on_stack copy];
+[blk_on_heap release];
+```
+
+只要 `block` 有一次 **复制并配置在堆上**，就可通过 **`retain` 实例方法** 持有。
+
+```c++
+[blk_on_heap retain];
+```
+但是对于 **配置在栈上的 `block`  调用 `retain` 实例方法则不起作用**。
+```c++
+[blk_on_stack retain];
+```
+该源代码中，虽然对赋值给 `blk_on_stack` 的栈上的 `block` 调用了 `retain` 实例方法，**但实际上对此源代码不起任何作用**。因此**推荐使用 `copy` 实例方法来持有 `block`**。
+
+另外，由于 `block` 是 `C` 语言的扩展，所以在 `C` 语言中也可以使用 `block` 语法。此时使用 “`Block_copy` 函数” 和 “`Block_release` 函数” 代替 `copy/release` 实例方法。使用方法以及引用计数的思考方式与 `OC` 中的 `copy/release` 实例方法相同。
+```c++
+// 把栈上的 block 复制到堆上
+void (^blk_on_heap)(void) = Block_copy(blk_on_stack);
+// 释放堆上的 block
+Block_release(blk_on_heap);
+```
+`Block_copy` 函数就是之前出现过的 `_Block_copy` 函数，即 `OC` 运行时库所使用的为 `C` 语言而准备的函数。释放堆上的 `block` 时也同样调用 `OC` 运行时库的 `Block_release` 函数。
+
+另外极其重要的一个知识点:
+另外极其重要的一个知识点:
+另外极其重要的一个知识点:
+
+**`ARC` 无效时，`__block` 说明符被用来避免 `block` 中的循环引用，这是由于当 `block` 从栈复制到堆时，若 `block` 使用的变量为附有 `__block` 说明符的 `id` 类型或对象类型的自动变量，不会被 `retain`；若 `block` 使用变量为没有 `__block` 说明符的 `id` 类型或对象类型的自动变量，则被 `retain`。**
+
+由于 `ARC` 有效时和无效时 `__block` 说明符的用途有很大区别，因此编写源代码时，必须知道源代码是在 `ARC` 有效情况下编译还是无效情况下编译。
+
+# Block 部分 完结撒花 🎉🎉🎉 感谢陪伴 🎉🎉🎉
+
 
