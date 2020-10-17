@@ -9,17 +9,11 @@
 何谓匿名，下面的示例代码可解释：
 ```c++
 typedef void(^Blk_T)(int);
-typedef int(^Ret_T)(void);
-
 int i = 10;
+
 // 注意等号右边的 block 定义(匿名)
 Blk_T a = ^void (int event) {
     printf("i = %d event = %d\n", i, event);
-};
-
-// 等号右边的 block 省略了返回值类型
-Ret_T b = ^{
-    return 5;
 };
 
 // 函数定义
@@ -28,31 +22,28 @@ void Func(int event) {
 };
 void (*funcPtr)(int) = &Func;
 ```
-&emsp;匿名是针对有名而言的，如上代码 `Blk_T a` 等号后面的 `block` 定义是不需要取名的，而下面的 `Func` 函数定义必须给它一个函数名。
-> `block` 可以省略返回值类型的，省略返回值类型时，如果表达式中有 `return` 语句就使用该返回值的类型，如果表达式没有 `return` 语句就使用 `void` 类型。表达式中含有多个 `return` 语句时，所有的 `return` 的返回值类型必须相同。
-（以前一直忽略了 `block` 是可以省略返回值类型的，以为是直到 `swift` 的闭包才支持省略返回值类型。）
+匿名是针对有名而言的，如上代码 `Blk_T a` 等号后面的 `block` 定义是不需要取名的，而下面的 `Func` 函数定义必须给它一个函数名。
 
 完整形式的 `block` 语法与一般的 `C` 语言函数定义相比，仅有两点不同：
-
 1. 没有函数名。
 2. 带有 `^`。
 
-`block` 定义范式如下:
+`Block` 定义范式如下:
 **^ 返回值类型 参数列表 表达式**
 “返回值类型” 同 `C` 语言函数的返回值类型，“参数列表” 同 `C` 语言函数的参数列表，“表达式” 同 `C` 语言函数中允许使用的表达式。
 
-&emsp;在 `block` 语法下，可将 `block` 语法赋值给声明为 `block` 类型的变量中。即源代码中一旦使用 `block` 语法就相当于生成了可赋值给 `block` 类型变量的 “值”。`Blocks` 中由 `Block` 语法生成的值也称为 `block`。`block` 既指源代码中的 `block` 语法，也指由 `block` 语法所生成的值。
-使用 `block` 语法将 `block` 赋值为 `block` 类型变量。
+&emsp;在 `Block` 语法下，可将 `block` 语法赋值给声明为 `Block` 类型的变量中。即源代码中一旦使用 `Block` 语法就相当于生成了可赋值给 `Block` 类型变量的 “值”。`Blocks` 中由 `Block` 语法生成的值也称为 `block`。`block` 既指源代码中的 `Block` 语法，也指由 `Block` 语法所生成的值。
+使用 `Block` 语法将 `block` 赋值为 `Block` 类型变量：
 ```c++
 int (^blk)(int) = ^(int count) { return count + 1; };
 
-// 返回值是 block 类型的函数
+// 返回值是 Block 类型的函数
 // func() 和 { } 之外是描述返回类型的
 void (^ func() )(int) {
     return ^(int count) { return count + 1; }; 
 }
 ```
-`block` 类型变量可完全像通常的 `C` 语言变量一样使用，因此也可以使用指向 `block` 类型变量的指针，即 `block` 的指针类型变量。
+`Block` 类型变量可完全像通常的 `C` 语言变量一样使用，因此也可以使用指向 `Block` 类型变量的指针，即 `block` 的指针类型变量。
 ```c++
 typedef int (^blk_t)(int);
 blk_t blk = ^(int count) { return count + 1; };
@@ -63,14 +54,14 @@ blk_t* blkPtr = &blk;
 // 执行 block
 (*blkPrt)(10);
 ```
-`block` 类型变量与一般的 `C` 语言变量完全相同，可作为以下用途使用：
+`Block` 类型变量与一般的 `C` 语言变量完全相同，可作为以下用途使用：
 + 自动变量
 + 函数参数
 + 静态变量
 + 静态全局变量
 + 全局变量
 
-通过 `block` 类型变量调用 `block` 与 `C` 语言通常的函数调用没有区别。
+通过 `Block` 类型变量调用 `block` 与 `C` 语言通常的函数调用没有区别。
 
 ## 截获外部变量值
 &emsp;`block` 是带有自动变量（局部变量）的匿名函数，**带有自动变量** 在 `block` 中表现为 **截获外部变量值**。
@@ -140,7 +131,7 @@ void (^blk)(void) = ^{
 };
 
 // val 用 __block 修饰后，类型已经不是 int，它已转变为结构体类型，具体细节会在下面展开
-// val 已转换为一个结构体实例，且该实例被 block 持有
+// val 已转换为一个结构体实例
 val = 2;
 fmt = "These values were changed. val = %d\n";
 
@@ -149,27 +140,6 @@ blk();
 // val = 2
 
 // 示例 🌰 5:
-int a = 10;
-__block int b = a;
-void (^blk)(void) = ^{
-    NSLog(@"⛈⛈⛈ block 内部 b 修改前: b = %d", b);
-    b = 20; // 修改后外部 b 也是 20
-};
-
-a = 30; // 此处 a 修改了与 b 无关，b 还是原始值
-NSLog(@"⛈⛈⛈ b = %d", b);
-
-blk();
-
-NSLog(@"⛈⛈⛈ b = %d", b);
-NSLog(@"⛈⛈⛈ a = %d", a);
-// 打印结果：
-⛈⛈⛈ b = 10
-⛈⛈⛈ block 内部 b 修改前: b = 10
-⛈⛈⛈ b = 20
-⛈⛈⛈ a = 30
-
-// 示例 🌰 6:
 // 从上到下操作的一直都是 a 变量地址空间里的内容
 int a = 10;
 __block int* b = &a;
@@ -194,10 +164,11 @@ NSLog(@"⛈⛈⛈ a = %d", a);
 ⛈⛈⛈ a = 20
 ```
 
-> **无论 `block` 定义在哪，啥时候执行。当 `block` 执行时，用的值都是它之前截获（可以理解为拿外部变量赋值给 `block` 结构体的成员变量）的基本变量或者是截获的内存地址，如果是内存地址的话，从定义到执行这段时间，不管里面保存的值有没有被修改了， `block` 执行时，都是读出来的当时内存里保存的值。** 
+> **无论 `block` 定义在哪，啥时候执行。当 `block` 执行时，用的值都是它定义时截获的基本变量值或者是截获的内存地址，如果是内存地址的话，从定义到执行这段时间，不管里面保存的值有没有被修改， `block` 执行时，使用的都是当时内存里保存的值。（定义可理解为生成 `block` 结构体实例，截获可理解为拿外部变量初始化 `block` 结构体实例的成员变量）** 
 
 ### `__block` 说明符
-&emsp;`block` 截获外部变量值，截获的是 `block` 语法定义时此外部变量瞬间的值，保存后就不能改写该值。这个不能改写该值是 `block` 的语法规定（实际在 `block` 花括号内使用的值早已不再是外部的同名的值，虽然它们的变量名完全一样），如果截获的是指针变量的话，可以通过指针来修改内存空间里面的值。比如传入 `NSMutableArray` 变量，可以往里面添加对象，但是不能对该 `NSMutableArray` 变量进行赋值。传入 `int* val` 也可以直接用 `*val = 20` 来修改 `val` 指针指向的内存里面保存的值，并且如果截获的是指针变量的话，在 `block` 内部修改其指向内存里面的内容后，在 `block` 外部读取该指针指向的值时也与 `block` 内部的修改都是同步的。**因为本身它们操作的就是同一块内存地址**。
+&emsp;`block` 截获外部变量值，截获的是 `block` 语法定义时此外部变量瞬间的值，保存后就不能改写该值。这个不能改写该值是 `block` 的语法规定，如果截获的是指针变量的话，可以通过指针来修改内存空间里面的值。比如传入 `NSMutableArray` 变量，可以往里面添加对象，但是不能对该 `NSMutableArray` 变量进行赋值。传入 `int* val` 也可以直接用 `*val = 20` 来修改 `val` 指针指向的内存里面保存的值，并且如果截获的是指针变量的话，在 `block` 内部修改其指向内存里面的内容后，在 `block` 外部读取该指针指向的值时也与 `block` 内部的修改都是同步的。**因为本身它们操作的就是同一块内存地址**。
+
 这里之所以语法定为不能修改，可能的原因是因为修改了值以后是无法传出去的，只是在 `block` 内部使用，是没有意义的。就比如 `block` 定义里面截获了变量 `val`，你看着这时用的是 `val` 这个变量，其实只是把 `val` 变量的值赋值给了 `block` 结构体的 `val` 成员变量。这时在 `block` 内部修改 `val` 的值，可以理解为只是修改 `block` 结构体 `val` 成员变量的值，与 `block` 外部的 `val` 已经完全无瓜葛了，然后截获指针变量也是一样的，其实截获的只是指针变量所指向的地址，在 `block` 内部修改的只是 `block` 结构体成员变量的指向，这种修改针对外部变量而言都是毫无瓜葛的。
 ```c++
 // 示例 🌰：
@@ -1061,7 +1032,7 @@ NSLog(@"❄️❄️❄️ stackBlock isa: %@", ^{ NSLog(@"❄️❄️❄️ a 
      return temp;
  }
 
- // 用 clang -rewrite-objc 转换失败，改成上面就会成功，（用中间变量接收一下）
+ // 下面的代码用 clang -rewrite-objc 转换失败，改成上面就会成功，（用中间变量接收一下，（ARC 自动调用一次 copy 函数））
  typedef int(^BLK)(int);
 
  BLK func(int rate) {
@@ -1126,6 +1097,9 @@ NSLog(@"❄️❄️❄️ stackBlock isa: %@", ^{ NSLog(@"❄️❄️❄️ a 
  
  // 打印：出了花括号，打印了 blk 不为 0x0，还是栈区 block 的地址
  // 打印了一个栈区 block 地址（即等号右边的栈区 block 地址）
+ 
+ // 这里的原因是 拿一个栈区的 block 结构体实例去给一个 weak 变量赋值，并没有走真正的 weak 流程
+ 
  内部 blk = 0x7ffeefbff538
  blk = 0x7ffeefbff538
  
@@ -1187,14 +1161,13 @@ NSLog(@"❄️❄️❄️ stackBlock isa: %@", ^{ NSLog(@"❄️❄️❄️ a 
  // 第二步，_Block_copy 函数执行
  // _Block_copy 函数，将栈上的 Block 复制到堆上。
  // 复制后，将堆上的地址作为指针赋值给变量 tmp。
- // (_Block_copy 函数源码在后面进行解析)
  tmp = _Block_copy(tmp);
 
  // 第三步，将堆上的 Block 作为 OC 对象，
  // 注册到 autoreleasepool 中，然后返回该对象
  return objc_autoreleaseReturnValue(tmp);
  ```
- **将 `block` 作为函数返回值返回时，编译器会自动生成复制到堆上的代码。**
+ **在 `ARC` 下，将 `block` 作为函数返回值返回时，编译器会自动生成复制到堆上的代码。**
 
 &emsp;前面说大部分情况下编译器会适当的进行判断，不过在此之外的情况下需要 **手动**生成代码（自己调用 `copy` 函数），将 `block` 从栈上复制到 **堆**上（`_Block_copy` 函数的注释已经说了，它是创建基于堆的 `block` 副本），即我们自己主动调用 `copy` 实例方法。
 
@@ -1207,7 +1180,6 @@ NSLog(@"❄️❄️❄️ stackBlock isa: %@", ^{ NSLog(@"❄️❄️❄️ a 
 + `Cocoa` 框架的方法且方法名中含有 `usingBlock` 等时
 + `Grand Central Dispatch` 的 `API`
 + 将 `block` 赋值给类的附有 `__strong` 修饰符的 `id` 类型或 `block` 类型成员变量时【当然这种情况就是最多的，只要赋值一个 `block` 变量就会自动进行复制】
-
 
 **`NSArray` 的 `enumerateObjectsUsingBlock` 以及 `dispatch_async` 函数就不用手动复制。`NSArray` 的 `initWithObjects` 上传递 `block` 时需要手动复制。**
 
@@ -1249,7 +1221,7 @@ blk();
 |栈|从栈复制到堆并被 Block 持有|
 |堆|被 Block 持有|
 
-&emsp;若在一个 `block` 中使用 `__block` 变量，使用的 `__block` 变量也配置在栈上，当该 `block` 从栈复制到堆时，这些 `__block` 变量也全部被从栈复制到堆，此时，`block` 持有 `__block` 变量，即使在该 `block` 已复制到堆的情形下，复制 `block` 也对所使用的 `__block` 变量没有任何影响。
+&emsp;若在一个栈上 `block` 中使用 `__block` 变量，使用的 `__block` 变量也配置在栈上，当该 `block` 从栈复制到堆时，这些 `__block` 变量也全部被从栈复制到堆，此时，`block` 持有 `__block` 变量，即使在该 `block` 已复制到堆的情形下，复制 `block` 也对所使用的 `__block` 变量没有任何影响。
 
 **使用 `__block` 变量的 `block` 持有 `__block` 变量。如果 `block` 被废弃，它所持有的 `__block` 变量也会被释放。**
 
@@ -1270,6 +1242,11 @@ void (^blk)(void) = [^{++val;} copy];
 // 此时的 val 是第一行生成的 __block 结构体实例，
 // block 语法表达式中使用的 val 是 block 结构体自己的成员变量 val，
 // 在 block 结构体初始化时初始化列表里面 val 初始化是用的:val(_val->__forwarding) { }
+
+// 且此时在 block 内部通过 val 找到的 val 和外部 __block 结构体实例的 val 找到的 val 是同一个
+// 在 block 表达式内 val 是一个 struct __Block_byref_val_0 的指针，在外面 __block int val = 0; 则是
+// 一个 struct __Block_byref_val_0 的实例，然后 Block 结构体初始化时会使用该实例，即做到了内外统一。
+// 而 __forwarding 指针用的很巧妙它是为了统一栈区 和 堆区的 __block 结构体指向统一来使用的
 
 ++val;
 
@@ -1549,10 +1526,11 @@ Block_release(blk_on_heap);
 另外极其重要的一个知识点:
 另外极其重要的一个知识点:
 
+不管是 ARC 还是 MRC block 都不会持有 __block 对象
 **`ARC` 无效时，`__block` 说明符被用来避免 `block` 中的循环引用，这是由于当 `block` 从栈复制到堆时，若 `block` 使用的变量为附有 `__block` 说明符的 `id` 类型或对象类型的自动变量，不会被 `retain`；若 `block` 使用变量为没有 `__block` 说明符的 `id` 类型或对象类型的自动变量，则被 `retain`。**
 
 由于 `ARC` 有效时和无效时 `__block` 说明符的用途有很大区别，因此编写源代码时，必须知道源代码是在 `ARC` 有效情况下编译还是无效情况下编译。
 
-# Block 部分 完结撒花 🎉🎉🎉 感谢陪伴 🎉🎉🎉
+
 
 
