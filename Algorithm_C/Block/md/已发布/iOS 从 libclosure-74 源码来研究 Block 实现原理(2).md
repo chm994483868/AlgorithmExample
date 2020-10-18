@@ -339,7 +339,90 @@ struct Block_byref_2 {
     BlockByrefDestroyFunction byref_destroy;
 };
 ```
+### `struct Block_byref_3`
+&emsp;包含有布局扩展，当 `__block` 修饰不同类型的变量时，对应类型的成员变量会追加在 `struct Block_byref` 中。
+```c++
+struct Block_byref_3 {
+    // requires BLOCK_BYREF_LAYOUT_EXTENDED
+    // Block_byref->flags & BLOCK_BYREF_LAYOUT_EXTENDED == 1
+    
+    const char *layout;
+};
+```
+### `Block 截获的外部变量类型`
+&emsp;以下枚举值标识 `Block` 截获不同类型的外部变量。
+```c++
+// Runtime support functions used by compiler when generating copy/dispose helpers.
+// 当编译器生成 copy/dispose helpers 时 Runtime 支持的函数.
 
+// Values for _Block_object_assign() and _Block_object_dispose() parameters
+// 作为 _Block_object_assign() 和 _Block_object_dispose() 函数的参数.
+
+enum {
+    // see function implementation for a more complete description of these fields and combinations.
+    // 有关这些字段及其组合的更完整说明，请参见函数实现。
+    
+    // 0b11
+    // 对象类型 
+    BLOCK_FIELD_IS_OBJECT   =  3,  // id, NSObject, __attribute__((NSObject)), block, ...
+    
+    // 0b111
+    // block 变量 
+    BLOCK_FIELD_IS_BLOCK    =  7,  // a block variable
+    
+    // 0b1000
+    // __block 说明符生成的结构体，持有 __block 变量的堆栈结构 
+    BLOCK_FIELD_IS_BYREF    =  8,  // the on stack structure holding the __block variable
+    
+    // 0b10000
+    // 被 __weak 修饰过的弱引用，只在 Block_byref 管理内部对象内存时使用
+    // 也就是 __block __weak id; 仅使用 __weak 时，还是 BLOCK_FIELD_IS_OBJECT，
+    // 即如果是对象类型，有没有添加 __weak 修饰都是一样的，都会生成 copy 助手
+    BLOCK_FIELD_IS_WEAK     = 16,  // declared __weak, only used in byref copy helpers
+    
+    // 0b1000 0000
+    // 在处理 Block_byref 内部对象内存的时候会加一个额外标记，配合上面的枚举一起使用
+    BLOCK_BYREF_CALLER      = 128, // called from __block (byref) copy/dispose support routines.
+};
+
+enum {
+    // 上述情况的整合，以下的任一中情况下编译器都会生成 copy_dispose 助手（即 copy 和 dispose 函数）
+    
+    BLOCK_ALL_COPY_DISPOSE_FLAGS = 
+        BLOCK_FIELD_IS_OBJECT | BLOCK_FIELD_IS_BLOCK | BLOCK_FIELD_IS_BYREF |
+        BLOCK_FIELD_IS_WEAK | BLOCK_BYREF_CALLER
+};
+```
+## `runtime.cpp`
+&emsp;`Block` 的核心内容的实现。
+### `latching_incr_int`
+```c++
+// 传实参 &aBlock->flags 过来，
+// 增加 Block 的引用计数
+static int32_t latching_incr_int(volatile int32_t *where) {
+    while (1) {
+        int32_t old_value = *where;
+        // 如果 flags 含有 BLOCK_REFCOUNT_MASK 证明其引用计数达到最大，
+        // 直接返回，需要三万多个指针指向，正常情况下不会出现。
+        // BLOCK_REFCOUNT_MASK =     (0xfffe)
+        // 0x1111 1111 1111 1110 // 10 进制 == 65534 // 以 2 为单位，每次递增 2
+        if ((old_value & BLOCK_REFCOUNT_MASK) == BLOCK_REFCOUNT_MASK) {
+            return BLOCK_REFCOUNT_MASK;
+        }
+        
+        // 做一次原子性判断其值当前是否被其他线程改动，
+        // 如果被改动就进入下一次循环直到改动结束后赋值。
+        // OSAtomicCompareAndSwapInt 的作用就是在 where 取值与 old_value 相同时，
+        // 将 old_value + 2 赋给 where
+        // 注: Block 的引用计数以 flags 的后 16 位代表，
+        // 以 2 为单位，每次递增 2，1 为 BLOCK_DEALLOCATING，表示正在释放占用。
+        // 2 二进制表示是 0x10
+        if (OSAtomicCompareAndSwapInt(old_value, old_value+2, where)) {
+            return old_value+2;
+        }
+    }
+}
+```
 
 
 ## 参考链接
