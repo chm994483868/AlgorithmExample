@@ -149,13 +149,13 @@ int main(int argc, const char * argv[]) {
 //    printf("🎉🎉🎉 后：%s\n", s);
     
     // 1. 冒泡排序
-    BubbleSort::Test();
+//    BubbleSort::Test();
     // 2. 插入排序
 //    InsertSort::Test();
     // 3. 希尔排序
 //    ShellSort::Test();
     // 4. 选择排序
-//    SelectSort::Test();
+    SelectSort::Test();
     // 5. 快速排序
 //    QuickSort::Test();
     // 6. 归并排序
