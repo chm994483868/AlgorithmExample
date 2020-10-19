@@ -21,8 +21,10 @@ dispatch_async(globalQueue_DEFAULT, ^{
     // 保证在下面的执行过程中 self 不会被释放，执行结束后 self 会被释放
     __strong typeof(_self) self = _self;
     if (!self) return;
+    
     // do something
     // ...
+    
     dispatch_async(dispatch_get_main_queue(), ^{
         // 此时如果能进来，表示此时 self 是存在的
         self.view.backgroundColor = [UIColor redColor];
