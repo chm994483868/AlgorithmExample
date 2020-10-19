@@ -334,6 +334,7 @@
 		D2C74CF62531A79C0051B89F /* iOS 从源码解析Runtime (十三)：聚焦 objc_class(objc_class函数相关内容篇).md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 从源码解析Runtime (十三)：聚焦 objc_class(objc_class函数相关内容篇).md"; sourceTree = "<group>"; };
 		D2C74CF7253457C10051B89F /* iOS 从源码解析Runtime (十四)：由源码解读属性&成员变量的修饰符.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 从源码解析Runtime (十四)：由源码解读属性&成员变量的修饰符.md"; sourceTree = "<group>"; };
 		D2C74D042537F2100051B89F /* block_Temp.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = block_Temp.md; sourceTree = "<group>"; };
+		D2C74D05253D9C2E0051B89F /* 数据结构与算法-七大经典排序算法.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "数据结构与算法-七大经典排序算法.md"; sourceTree = "<group>"; };
 		D2E0674D2506118F008BF0E9 /* iOS Category 底层实现原理(二)：函数分析与加载流程.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS Category 底层实现原理(二)：函数分析与加载流程.md"; sourceTree = "<group>"; };
 		D2E067692508E82E008BF0E9 /* iOS Category 底层实现原理(三)：附加+load函数超详细解析.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS Category 底层实现原理(三)：附加+load函数超详细解析.md"; sourceTree = "<group>"; };
 		D2E0676C2509A8A2008BF0E9 /* iOS 从源码解析Runtime (二)：聚焦 isa、objc_object(ISA_BITFIELD相关内容篇).md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 从源码解析Runtime (二)：聚焦 isa、objc_object(ISA_BITFIELD相关内容篇).md"; sourceTree = "<group>"; };
@@ -905,6 +906,7 @@
 				D2C74CF5253046AE0051B89F /* iOS 从源码解析Runtime (十二)：聚焦 objc_class(class_rw_t、class_rw_ext_t相关内容篇).md */,
 				D2C74CF62531A79C0051B89F /* iOS 从源码解析Runtime (十三)：聚焦 objc_class(objc_class函数相关内容篇).md */,
 				D2C74CF7253457C10051B89F /* iOS 从源码解析Runtime (十四)：由源码解读属性&成员变量的修饰符.md */,
+				D2C74D05253D9C2E0051B89F /* 数据结构与算法-七大经典排序算法.md */,
 			);
 			path = "已发布";
 			sourceTree = "<group>";

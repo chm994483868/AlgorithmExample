@@ -480,7 +480,6 @@ NSLog(@"⛈⛈⛈ object retainCount = %lu ---%p---%p", (unsigned long)[object a
 
 **此 Block 是为栈 Block_NSConcreteStackBlock，不过在 ARC 中，因为赋值给 aBlock，会执行一次 copy，将其中栈中 copy 到堆中，所以在 MRC 中 aBlock 为 _NSConcreteStackBlock，在 ARC 中就是 _NSConcreteMallocBlock。**
 
-
 +++++++++++++++++++++++++++++++++++++
 
 
