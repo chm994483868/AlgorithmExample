@@ -21,7 +21,7 @@ class BubbleSort {
                 if array[j] > array[j + 1] {
                     array.swapAt(j, j + 1)
                     noExchange = false // 记录本次循环是否发生过交换，如果没有，则表示当前数组已经是有序的了
-                    minIndex = j // 用于记录本次循环发生交换时的最小下标
+                    minIndex = j // 用于记录本次循环发生最后一次交换时的最小下标
                 }
             }
             if noExchange { break }

@@ -139,17 +139,17 @@ int main(int argc, const char * argv[]) {
 //    (*funcPtr2)(us);
 //    (*funcPtr2)(ds);
     
-    char s[] = "Golden Global view";
-    char m[19];
-    printf("🎉🎉🎉 前：%s\n", s);
-    memmove(m, s, strlen(s) + 1);
-    printf("🎉🎉🎉 m：%s\n", m);
-    memmove(s, s + 7, strlen(s) + 1 - 7);
-    
-    printf("🎉🎉🎉 后：%s\n", s);
+//    char s[] = "Golden Global view";
+//    char m[19];
+//    printf("🎉🎉🎉 前：%s\n", s);
+//    memmove(m, s, strlen(s) + 1);
+//    printf("🎉🎉🎉 m：%s\n", m);
+//    memmove(s, s + 7, strlen(s) + 1 - 7);
+//
+//    printf("🎉🎉🎉 后：%s\n", s);
     
     // 1. 冒泡排序
-//    BubbleSort::Test();
+    BubbleSort::Test();
     // 2. 插入排序
 //    InsertSort::Test();
     // 3. 希尔排序
