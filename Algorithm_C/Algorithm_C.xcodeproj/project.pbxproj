@@ -207,7 +207,6 @@
 		D2164F0624EE113B0000A6AA /* 学习统计.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "学习统计.md"; sourceTree = "<group>"; };
 		D2164F0724EE28500000A6AA /* noexcept关键字学习.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "noexcept关键字学习.md"; sourceTree = "<group>"; };
 		D2164F0824EE45A60000A6AA /* iOS_os_unfair_lock.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = iOS_os_unfair_lock.md; sourceTree = "<group>"; };
-		D2164F0924EF67410000A6AA /* dispatch_async的block中是否该使用_weak self的思考.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "dispatch_async的block中是否该使用_weak self的思考.md"; sourceTree = "<group>"; };
 		D2164F0D24EFD9710000A6AA /* iOS_pthread_mutex_t.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = iOS_pthread_mutex_t.md; sourceTree = "<group>"; };
 		D2164F0E24F118060000A6AA /* iOS_NSLock.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = iOS_NSLock.md; sourceTree = "<group>"; };
 		D2164F0F24F2053A0000A6AA /* iOS_NSRecursiveLock.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = iOS_NSRecursiveLock.md; sourceTree = "<group>"; };
@@ -335,6 +334,7 @@
 		D2C74CF7253457C10051B89F /* iOS 从源码解析Runtime (十四)：由源码解读属性&成员变量的修饰符.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 从源码解析Runtime (十四)：由源码解读属性&成员变量的修饰符.md"; sourceTree = "<group>"; };
 		D2C74D042537F2100051B89F /* block_Temp.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = block_Temp.md; sourceTree = "<group>"; };
 		D2C74D05253D9C2E0051B89F /* 数据结构与算法-七大经典排序算法.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "数据结构与算法-七大经典排序算法.md"; sourceTree = "<group>"; };
+		D2C74D06253ED8CC0051B89F /* iOS 中各种锁的介绍与运用.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 中各种锁的介绍与运用.md"; sourceTree = "<group>"; };
 		D2E0674D2506118F008BF0E9 /* iOS Category 底层实现原理(二)：函数分析与加载流程.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS Category 底层实现原理(二)：函数分析与加载流程.md"; sourceTree = "<group>"; };
 		D2E067692508E82E008BF0E9 /* iOS Category 底层实现原理(三)：附加+load函数超详细解析.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS Category 底层实现原理(三)：附加+load函数超详细解析.md"; sourceTree = "<group>"; };
 		D2E0676C2509A8A2008BF0E9 /* iOS 从源码解析Runtime (二)：聚焦 isa、objc_object(ISA_BITFIELD相关内容篇).md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 从源码解析Runtime (二)：聚焦 isa、objc_object(ISA_BITFIELD相关内容篇).md"; sourceTree = "<group>"; };
@@ -907,6 +907,7 @@
 				D2C74CF62531A79C0051B89F /* iOS 从源码解析Runtime (十三)：聚焦 objc_class(objc_class函数相关内容篇).md */,
 				D2C74CF7253457C10051B89F /* iOS 从源码解析Runtime (十四)：由源码解读属性&成员变量的修饰符.md */,
 				D2C74D05253D9C2E0051B89F /* 数据结构与算法-七大经典排序算法.md */,
+				D2C74D06253ED8CC0051B89F /* iOS 中各种锁的介绍与运用.md */,
 			);
 			path = "已发布";
 			sourceTree = "<group>";
@@ -1564,7 +1565,6 @@
 				D2164F1324F25E070000A6AA /* iOS_dispatch_semaphore.md */,
 				D2164F1424F2654F0000A6AA /* iOS_pthread_rwlock_t.md */,
 				D2164F1524F33A9A0000A6AA /* iOS_Lock总结.md */,
-				D2164F0924EF67410000A6AA /* dispatch_async的block中是否该使用_weak self的思考.md */,
 			);
 			path = md;
 			sourceTree = "<group>";

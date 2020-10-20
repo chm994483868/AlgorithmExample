@@ -159,9 +159,9 @@ int main(int argc, const char * argv[]) {
     // 5. 快速排序
 //    QuickSort::Test();
     // 6. 归并排序
-    MergeSort::Test();
+//    MergeSort::Test();
     // 7. 堆排序
-//    HeapSort::Test();
+    HeapSort::Test();
     
     // 1. 赋值运算符函数
 //    AssignmentOperator::Test();
