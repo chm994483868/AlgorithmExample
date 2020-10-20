@@ -94,8 +94,11 @@ static inline bool operator != (DisguisedPtr<objc_object> lhs, id rhs) {
 > &emsp;StripedMap 是 void *-> T 的映射，其大小适合于 **缓存友好** 的 lock striping。例如，它可用作 StripedMap<spinlock_t> 或 StripedMap<SomeStruct>，其中 SomeStruct 存储 spin lock。**cache-friendly:** 那么按照高速缓存的工作原理，可以发现局部性良好的程序，缓存命中的概率更高，从这个意义上来讲，程序也会更快。我们称这样的程序，是高速缓存友好（cache-friendly）的程序。
 
 &emsp;`template<typename T> class StripedMap` 从数据结构角度看的话，它是作为一个 `Key` 是 `void *` `Value` 是 `T` 的 `hash` 表来用的。在 `objc4-781` 中全局搜索 `StripedMap` 发现 `T` 作为 `SideTable` 和 `spinlock_t` 类型使用。
-&emsp;`SideTables` 的类型正是 `StripedMap<SideTable>`。`SideTables` 的使用：`SideTable *table = &SideTables()[obj]` 它的作用正是根据 `objc_object` 的指针计算出哈希值，然后从 `SideTables` 这张全局哈希表中找到 `obj` 所对应的 `SideTable`。
+
+&emsp;`SideTables` 类型：`StripedMap<SideTable>`。`SideTables` 的使用：`SideTable *table = &SideTables()[obj]` 它的作用正是根据 `objc_object` 的指针计算出哈希值，然后从 `SideTables` 这张全局哈希表中找到 `obj` 所对应的 `SideTable`。
+
 &emsp;`StripedMap<spinlock_t> PropertyLocks`：当使用 `atomic` 属性时，`objc_getProperty` 时会从通过 `PropertyLocks[slot]` 获得一把锁并夹锁保证 `id value = objc_retain(*slot)` 线程安全。`StripedMap<spinlock_t> StructLocks`：用于提供锁保证 `objc_copyStruct` 函数调用时 `atomic` 参数为 `true` 时的线程安全。`StripedMap<spinlock_t> CppObjectLocks`：保证 `objc_copyCppObjectAtomic` 函数调用时的线程安全。
+
 &emsp;根据下面的源码实现 `Lock` 的部分，发现抽象类型 `T` 必须支持 `lock`、`unlock`、`forceReset`、`lockdebug_lock_precedes_lock` 函数接口。已知 `struct SideTable` 都有提供。
 
 ```c++
@@ -122,10 +125,11 @@ class StripedMap {
     // hash 函数
     static unsigned int indexForPointer(const void *p) {
         // 把 p 指针强转为 unsigned long
+        // reinterpret_cast<new_type> (expression) C++ 里的强制类型转换符
         uintptr_t addr = reinterpret_cast<uintptr_t>(p);
         
         // addr 右移 4 位的值与 addr 右移 9 位的值做异或操作，
-        // 然后对 StripeCount 取模，防止越界。
+        // 然后对 StripeCount 取模，防止越界
         return ((addr >> 4) ^ (addr >> 9)) % StripeCount;
     }
 
@@ -143,8 +147,7 @@ class StripedMap {
     // 2. 常量引用被转换成非常量的引用，并且仍然指向原来的对象；
     // 3. const_cast一般用于修改底指针。如const char *p形式。
     
-    // 调用上面的 []，得到 T&
-    // 然后转为 StripedMap<T>
+    // 把 this 转化为 StripedMap<T>，然后调用上面的 []，得到 T&
     const T& operator[] (const void *p) const {
         // 这里 const_cast<StripedMap<T>>(this) 有必要吗，本来就是读取值，并不会修改 StripedMap 的内容鸭
         return const_cast<StripedMap<T>>(this)[p]; 
@@ -153,21 +156,22 @@ class StripedMap {
     // Shortcuts for StripedMaps of locks.
     
     // 循环给 array 中的元素的 value 加锁
+    // 以 iPhone 下 SideTables 为例的话，循环对 8 张 SideTable 加锁，
+    // struct SideTable 成员变量: spinlock_t slock，lock 函数实现是： void lock() { slock.lock(); }
     void lockAll() {
         for (unsigned int i = 0; i < StripeCount; i++) {
             array[i].value.lock();
         }
     }
     
-    // 循环给 array 中的元素的 value 解锁
+    // 同上，解锁
     void unlockAll() {
         for (unsigned int i = 0; i < StripeCount; i++) {
             array[i].value.unlock();
         }
     }
     
-    // 循环 array 中的元素的 value 执行 forceReset
-    // 强制重置吗？
+    // 同上，重置 Lock
     void forceResetAll() {
         for (unsigned int i = 0; i < StripeCount; i++) {
             array[i].value.forceReset();
@@ -184,24 +188,28 @@ class StripedMap {
     void precedeLock(const void *newlock) {
         // assumes defineLockOrder is also called
         // 假定 defineLockOrder 函数已经被调用过
+        
         lockdebug_lock_precedes_lock(&array[StripeCount-1].value, newlock);
     }
 
     void succeedLock(const void *oldlock) {
         // assumes defineLockOrder is also called
         // 假定 defineLockOrder 函数已经被调用过
+        
         lockdebug_lock_precedes_lock(oldlock, &array[0].value);
     }
 
+    // T 是 spinlock_t 时，根据指定下标从 StripedMap<spinlock_t> -> array 中取得 spinlock_t  
     const void *getLock(int i) {
         if (i < StripeCount) return &array[i].value;
         else return nil;
     }
     
+    // 构造函数，在 DEBUG 模式下会验证 T 是否是 64 内存对齐的
 #if DEBUG
     StripedMap() {
         // Verify alignment expectations.
-        // 验证是不是按 CacheLineSize（值为 64）个字节内存对齐的
+        // 验证 value（T）是不是按 CacheLineSize（值为 64）内存对齐的
         
         uintptr_t base = (uintptr_t)&array[0].value;
         uintptr_t delta = (uintptr_t)&array[1].value - base;
@@ -213,63 +221,180 @@ class StripedMap {
 #endif
 };
 ```
-## `reinterpret_cast`
-延展: `reinterpret_cast` 是 `C++` 里的强制类型转换符。此处的用法是把指针转化为一个整数。
+## 
+> 定义位于: `Project Headers/objc-weak.h` Line 80，此文件只有 144 行，基本所有的内容都是围绕 `struct weak_entry_t` 和 `struct weak_table_t`。
+
+## `weak_referrer_t`
+`weak_referrer_t` 定义，可以看到它是一个 `DisguisedPtr` 模版类，且它的 T 是 `objc_object *`：
 ```c++
-reinterpret_cast<new_type> (expression)
+// The address of a __weak variable.
+// __weak 变量的地址（指针的指针）
+
+// These pointers are stored disguised so memory analysis tools 
+// don't see lots of interior pointers from the weak table into objects.
+// 这些指针是伪装的，因此内存分析工具看不到从 weak table 到对象的大量内部指针。
+// 这里 T 是 objc_object *，那么 DisguisedPtr 里的 T* 就是 objc_object**，即为指针的指针
+
+typedef DisguisedPtr<objc_object *> weak_referrer_t;
 ```
-## `hash` 函数
-`hash` 定位的算法，把 `void *` 指针转化为整数，然后右移 4 位和右移 9 位的值做异或操作，然后对 `StripedMap`(值为 8/64) 取模，防止 `index` 越界，保证返回值在 `[0, 7]/[0, 63]` 区间之间。
+
+## `PTR_MINUS_2`
+`PTR_MINUS_2` 宏定义，用于标记 `num_refs` 位域长度。
 ```c++
-// 该方法以 void * 作为 key 来获取 void * 
-// 对应在 StripedMap 的 array 中的索引
-static unsigned int indexForPointer(const void *p) {
-    // typedef unsigned long uintptr_t;
-    // 把 void * 指针转化为 unsigned long
-    uintptr_t addr = reinterpret_cast<uintptr_t>(p);
+#if __LP64__
+#define PTR_MINUS_2 62 // 当前是 __LP64__
+#else
+#define PTR_MINUS_2 30
+#endif
+```
+
+## `WEAK_INLINE_COUNT`
+`WEAK_INLINE_COUNT` 宏定义，
+```c++
+/**
+ * The internal structure stored in the weak references table. 
+ * internal structure(内部结构) 存储在弱引用表中。
+ 
+ * It maintains and stores a hash set of weak
+ * references pointing to an object.
+ *
+ * 它维护并存储了指向对象的弱引用的哈希表。
+ *（对象只有一个，指向该对象的 __weak 变量可以有多个, 
+ * 这些 __weak 变量统一放在一个数组里面）
+ 
+ * If out_of_line_ness != REFERRERS_OUT_OF_LINE then
+ * the set is instead a small inline array.
+ *
+ * 如果 out_of_line_ness != REFERRERS_OUT_OF_LINE(0x10)的话，
+ * 数据用一个长度为 4 的内部数组存放，否则用 hash 数组存放 
+ * 数组里存放的和哈希表 value 值的类型都是上面的 weak_referrer_t 
+ */
+ 
+#define WEAK_INLINE_COUNT 4 // 这个值固定为 4 表示内部小数组的长度是 4
+```
+
+## `REFERRERS_OUT_OF_LINE`
+`REFERRERS_OUT_OF_LINE` 宏定义（0x10），这个值是用来标记在 `weak_entry_t` 中是用那个长度为 4 的定长数组存放 `weak_referrer_t（__weak 变量的指针）`，还是用 `hash` 数组来存放数据。
+```c++
+// out_of_line_ness field overlaps with the
+// low two bits of inline_referrers[1].
+// 
+// out_of_line_ness 字段与 inline_referrers[1] 
+// 的低两位内存空间重叠，下面会详细分析。
+// 它们共用 32 字节内存空间。
+
+// inline_referrers[1] is a DisguisedPtr of a pointer-aligned address.
+// inline_referrers[1] 是一个遵循指针对齐的 DisguisedPtr。
+
+// The low two bits of a pointer-aligned DisguisedPtr will
+// always be 0b00 (disguised nil or 0x80..00) or 0b11 (any other address).
+// 且指针对齐的 DisguisedPtr 的低两位将始终为
+// 0b00(如 disguised nil or 0x80..00) 或 0b11（任何其他地址）
+
+// Therefore out_of_line_ness == 0b10 is used to mark the out-of-line state.
+// 因此我们可以使用 out_of_line_ness == 0b10 用于标记
+// out-of-line 状态，表示使用的是定长数组还是动态数组。
+
+#define REFERRERS_OUT_OF_LINE 2 
+```
+
+## `struct weak_entry_t`
+下面正式进入 `weak_entry_t` ⛽️，`weak_entry_t` 的结构和 `weak_table_t` 很像，同样是一个 `hash` 表。`weak_entry_t` 的 `hash` 数组存储的数据是 `weak_referrer_t`，实质上是弱引用该对象的指针的指针，即 `objc_object **new_referrer`，通过操作指针的指针，就可以使得 `weak` 引用的指针在对象析构后，指向 `nil`。
+`struct weak_entry_t` 定义:
+```c++
+struct weak_entry_t {
+    // T 为 objc_object 的 DisguisedPtr
+    // 那么 Disguised 中存放的就是化身为整数的 objc_object 实例的地址
+    // 被 __weak 变量弱引用的对象
+    DisguisedPtr<objc_object> referent;
     
-    // addr 右移 4 位的值与 addr 右移 9 位的值做异或操作，然后对 StripeCount 取模 
-    return ((addr >> 4) ^ (addr >> 9)) % StripeCount; // 最后取余，防止 index 越界
-}
-```
-## 数据封装 `PaddedT`
-`StripedMap` 中的 `T` 类型数据作为结构体仅有的成员变量 `T value` 放在了 `struct PaddedT` 中，且指明 `value` 遵循 64 字节内存对齐，即为每张 `SideTable` 分配 64 字节内存。
-```c++
-struct PaddedT {
-    // CacheLineSize 值为定值 64
-    // T value 64 字节对齐
-    // 表示结构体只有一个 T 类型的 value 成员变量
-    // 且指明这个 value 是遵循 64 字节内存对齐原则
-    T value alignas(CacheLineSize);
+    // 引用该对象的 __weak 变量的指针列表
+    // 当引用该对象的 weak 变量个数小于等于 4 时用
+    // weak_referrer_t inline_referrers[WEAK_INLINE_COUNT] 数组，
+    // 大于 4 时用 hash 数组 weak_referrer_t *referrers
+    union {
+        // 两个结构体占用内存都是 32 个字节
+        struct {
+            weak_referrer_t *referrers; // 弱引用该对象的对象指针地址的 hash 数组
+            
+            // out_of_line_ness 和 num_refs 构成位域存储，共占 64 位
+            // 标记是否使用动态 hash 数组
+            uintptr_t        out_of_line_ness : 2;
+            // PTR_MINUS_2 值为 30/62
+            uintptr_t        num_refs : PTR_MINUS_2;
+            
+            // hash 数组长度减 1，会参与 hash 函数计算
+            uintptr_t        mask;
+            
+            // 当发生 hash 冲突时，采用了开放寻址法
+            // 可能会发生 hash 冲突的最大次数，用于判断是否出现了逻辑错误
+            //（hash 表中的冲突次数绝对不会超过该值）
+            // 该值在新建 entry 和插入新的 weak_referrer_t 时会被更新，
+            // 它一直记录的都是最大偏移值
+            uintptr_t        max_hash_displacement;
+        };
+        struct {
+            // out_of_line_ness field is low bits of inline_referrers[1]
+            // out_of_line_ness 字段是 inline_referrers[1] 的低位
+            // 长度为 4 的 weak_referrer_t（Dsiguised<objc_object *>）数组
+            // 存放的就是那些 __weak 变量的指针（__weak 变量实质是指向原始对象类型的指针）
+            weak_referrer_t  inline_referrers[WEAK_INLINE_COUNT];
+        };
+    };
+    
+    // 返回 true 表示用 hash 数组存放 __weak 变量的指针
+    // 返回 false 表示用那个长度为 4 的小数组存 __weak 变量的指针
+    bool out_of_line() {
+        return (out_of_line_ness == REFERRERS_OUT_OF_LINE);
+    }
+    
+    // 赋值操作，直接使用 memcpy 拷贝内存地址里面的内容，并返回 *this
+    weak_entry_t& operator=(const weak_entry_t& other) {
+        memcpy(this, &other, sizeof(other));
+        return *this;
+    }
+
+    // struct weak_entry_t 的构造函数
+    // newReferent，是我们的原始对象的指针
+    // newReferrer，则是我们的 __weak 变量的指针，即 objc_object 的指针的指针
+    //（这里总是觉的说 __weak 变量，好像缺点什么，其实只要谨记它本质也是一个 objc_object 指针就好了）
+    // 初始化列表直接把 newReferent 赋值给 referent
+    // 此时会调用: DisguisedPtr(T* ptr) : value(disguise(ptr)) { } 构造函数
+    // 调用 disguise 函数把 newReferent 地址转化为一个整数赋值给 value
+    weak_entry_t(objc_object *newReferent, objc_object **newReferrer)
+        : referent(newReferent)
+    {
+        // newReferrer 放在数组 0 位，并把其他位置为 nil
+        inline_referrers[0] = newReferrer;
+        for (int i = 1; i < WEAK_INLINE_COUNT; i++) {
+            inline_referrers[i] = nil;
+        }
+    }
 };
 ```
-之所以再次封装数据到 `PaddedT` 中，是为了字节对齐，估计是存取 `hash` 值时的效率考虑。
-接下来 `struct PaddedT` 被放在数组 `array` 中：
+`weak_entry_t` 的结构比较清晰:
++ `DisguisedPtr<objc_object> referent;` 弱引用对象的地址转为整数并取负。
++ `union` 有两种形式，长度为 4 的固定数组：`weak_referrer_t  inline_referrers[WEAK_INLINE_COUNT]` 和 动态数组 `weak_referrer_t *referrers` ，这两个数组用来存储弱引用该对象弱引用指针的指针，同样使用 `DisguisedPtry` 的形式存储。当弱引用该对象的 `weak` 变量的数目小于等于 `WEAK_INLINE_COUNT` 时，使用 `inline_referrers`，否则使用动态数组，并且把定长数组中的元素都转移到动态数组中，并之后都是使用动态数组存储。
++ `bool out_of_line()` 该方法用来判断当前的 `weak_entry_t` 是使用定长数组还是动态数组。返回 `true` 是动态数组，返回 `false` 是定长数组，而且看到 `out_of_line_ness` 的内存地址是和 `inline_referrers` 数组的第二个元素低两位内存地址是重合的（`inline_referrers[1]` 低两位正由此来），这里涉及到了位域的概念。
++ `weak_entry_t& operator=(const weak_entry_t& other)` 赋值函数则直接调用了 `memcpy` 对内存空间直接拷贝。
++ `weak_entry_t(objc_object *newReferent, objc_object **newReferrer)` 构造函数，则把定长数组空位初始化位 `nil`。
+
+**之所以使用定长/动态数组的切换，应该是考虑到某对象弱引用的个数一般不会超过 `WEAK_INLINE_COUNT` 个，这时候使用定长数组不需要动态的申请内存空间，（`union` 中两个结构体共用 32  个字节内存）而是一次分配一块连续的内存空间，这会得到运行效率上的提升。**
+
+## `out_of_line`
+关于 `weak_entry_t` 是使用定长数组还是动态 `hash` 数组:
 ```c++
-// 所有 struct PaddedT 类型数据被存储在 array 数组中
-// TARGET_OS_IPHONE 设备且非模拟器的情况下 StripeCount == 8
-// 长度为 8 的 PaddedT 数组
-PaddedT array[StripeCount];
-```
-## `array` 中取数据（`SideTable`）
-接下来是从 `array` 数组公共的取值方法，（此处是很奇怪的，只是定义了取值函数，并没有定义构造函数。）主要调用 `indexForPointer` 函数，使得外部传入的 **对象地址指针** 通过 `hash` 函数得到其在 `array` 数组中的索引，然后返回该索引元素的 `value` 值，即返回对应的 `SideTable`：
-```c++
-// 根据指针 p 得出 index，返回 array 数组 index 
-// 处的 PaddedT 的 value 成员变量
-T& operator[] (const void *p) { 
-    return array[indexForPointer(p)].value; 
-}
-const T& operator[] (const void *p) const { 
-    return const_cast<StripedMap<T>>(this)[p]; 
+bool out_of_line() {
+    // #define REFERRERS_OUT_OF_LINE 2
+    return (out_of_line_ness == REFERRERS_OUT_OF_LINE);
 }
 ```
-## `Lock` 操作
-接下来是一系列锁的操作，循环加锁、循环解锁、定义锁定顺序等等，由于 `SideTables` 是一个全局的 `hash` 表，因此必须要带锁访问。通过源码看到所有的 `StripedMap` 锁操作，最终调用的都是 `array[i].value` 的相关操作，而 `value` 是模版的抽象数据 `T` 类型，因此 `T` 必须具备相关的 `lock` 操作接口。在讲 《iOS weak 底层实现原理(四)：SideTables和SideTable》一节中我们都能看到对应的实现。
 
-因此，要用 `StripedMap` 作为模版 `hash` 表，对于 `T` 类型是有要求的，而在 `SideTables` 中 `T` 即为 `SideTable` 类型，等下我们会看 `SideTable` 是怎么符合 `StripedMap` 的数据类型要求的。
+## 赋值和构造函数
+赋值操作，直接使用 `memcpy` 拷贝内存地址里面的内容，并返回 `*this`，而不是用复制构造函数什么的形式实现，应该也是为了提高效率考虑。
+构造函数则是 `referent(newReferent)` 初始化 `referent`，并把第一个 `weak` 变量地址放在`inline_referrers` 首位，然后一个循环把 `inline_referrers` 后三个元素置为 `nil`。
 
-## 结尾
-分析完 `StripedMap` 就分析完了 `SideTables` 这个全局的大 `hash` 表，下面我们继续来分析 `SideTables` 中存储的数据: `SideTable`。
+
 
 **参考链接:🔗**
 + [使用intptr_t和uintptr_t](https://www.jianshu.com/p/03b7d56bf80f)
