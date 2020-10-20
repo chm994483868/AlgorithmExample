@@ -14,14 +14,14 @@ void SelectSort::selectSort(int nums[], int count) {
     }
     
     for (int i = 0; i < count; ++i) {
-        int minIndex = i;
+        int minIndex = i; // 用于记录一趟下来找到的最小元素的下标，默认 i 位置是最小元素
         for (int j = i + 1; j < count; ++j) {
             if (nums[j] < nums[minIndex]) {
-                minIndex = j;
+                minIndex = j; // 发现更小的元素，更新 minIndex
             }
         }
         
-        swap(&nums[i], &nums[minIndex]);
+        swap(&nums[i], &nums[minIndex]); // 一趟循环下来把最小的元素放在数列的头部
     }
 }
 
