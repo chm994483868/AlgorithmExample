@@ -1540,6 +1540,13 @@ Block_release(blk_on_heap);
 4. 在 `block` 内部使用 `__strong`。
 ...
 
-
-
-
+## 参考链接
+**参考链接:🔗**
++ [libclosure-74](https://opensource.apple.com/source/libclosure/libclosure-74/)
++ [深入理解Block之Block的类型](https://www.jianshu.com/p/0855b68d1c1d)
++ [深入研究Block捕获外部变量和__block实现原理](https://www.jianshu.com/p/ee9756f3d5f6)
++ [【iOS】Block Hook概念+BlockHook第三方库分析（基本原理已完结，补充libffi方法解释）](https://blog.csdn.net/qq_32792839/article/details/99842250)
++ [最详细的block底层](https://www.cnblogs.com/MrTao/archive/2004/01/13/6824967.html)
++ [dispatch_async的block中是否该使用_weak self](https://www.jianshu.com/p/c374b7727d79)
++ [dispatch_async的block里面需要__weak self 吗？ #41](https://github.com/ibireme/YYKit/issues/41)
++ [线程安全类的设计](https://objccn.io/issue-2-4/)

@@ -89,95 +89,69 @@ static inline bool operator != (DisguisedPtr<objc_object> lhs, id rhs) {
 ```
 ## template <typename T> class StripedMap
 
-> StripedMap<T> is a map of void* -> T, sized appropriately for cache-friendly lock striping. For example, this may be used as StripedMap<spinlock_t> or as StripedMap<SomeStruct> where SomeStruct stores a spin lock.
+> &emsp;StripedMap<T> is a map of void* -> T, sized appropriately for cache-friendly lock striping. For example, this may be used as StripedMap<spinlock_t> or as StripedMap<SomeStruct> where SomeStruct stores a spin lock.
 
-> StripedMap 是 void *-> T 的映射，其大小适合于 **缓存友好** 的 lock striping。例如，它可用作 StripedMap<spinlock_t> 或 StripedMap<SomeStruct>，其中 SomeStruct 存储 spin lock。**cache-friendly:** 那么按照高速缓存的工作原理，可以发现局部性良好的程序，缓存命中的概率更高，从这个意义上来讲，程序也会更快。我们称这样的程序，是高速缓存友好（cache-friendly）的程序。
+> &emsp;StripedMap 是 void *-> T 的映射，其大小适合于 **缓存友好** 的 lock striping。例如，它可用作 StripedMap<spinlock_t> 或 StripedMap<SomeStruct>，其中 SomeStruct 存储 spin lock。**cache-friendly:** 那么按照高速缓存的工作原理，可以发现局部性良好的程序，缓存命中的概率更高，从这个意义上来讲，程序也会更快。我们称这样的程序，是高速缓存友好（cache-friendly）的程序。
 
 &emsp;`template<typename T> class StripedMap` 从数据结构角度看的话，它是作为一个 `Key` 是 `void *` `Value` 是 `T` 的 `hash` 表来用的。在 `objc4-781` 中全局搜索 `StripedMap` 发现 `T` 作为 `SideTable` 和 `spinlock_t` 类型使用。
 &emsp;`SideTables` 的类型正是 `StripedMap<SideTable>`。`SideTables` 的使用：`SideTable *table = &SideTables()[obj]` 它的作用正是根据 `objc_object` 的指针计算出哈希值，然后从 `SideTables` 这张全局哈希表中找到 `obj` 所对应的 `SideTable`。
 &emsp;`StripedMap<spinlock_t> PropertyLocks`：当使用 `atomic` 属性时，`objc_getProperty` 时会从通过 `PropertyLocks[slot]` 获得一把锁并夹锁保证 `id value = objc_retain(*slot)` 线程安全。`StripedMap<spinlock_t> StructLocks`：用于提供锁保证 `objc_copyStruct` 函数调用时 `atomic` 参数为 `true` 时的线程安全。`StripedMap<spinlock_t> CppObjectLocks`：保证 `objc_copyCppObjectAtomic` 函数调用时的线程安全。
+&emsp;根据下面的源码实现 `Lock` 的部分，发现抽象类型 `T` 必须支持 `lock`、`unlock`、`forceReset`、`lockdebug_lock_precedes_lock` 函数接口。已知 `struct SideTable` 都有提供。
 
 ```c++
-// StripedMap<T> is a map of void* -> T, 
-// sized appropriately for cache-friendly lock striping. 
-// StripedMap<T> 是一个 void * -> T 的 map，
-// 即 Key 为 void *，value 是 T 的 hash 表。
-
-// For example, this may be used as StripedMap<spinlock_t> 
-// or as StripedMap<SomeStruct> where SomeStruct stores a spin lock.
-// 例如，它可能用作 StripedMap<spinlock_t> 或者 StripedMap<SomeStruct>，
-// 此时 SomeStruct 保存了一个 spin lock.
-
-// 它的主要功能就是把自旋锁的锁操作从类中分离出来，
-// 而且类中必须要有一个自旋锁属性。（？）
-// StripMap 内部实质是一个开放寻址法生成哈希键值的哈希表.
-
 enum { CacheLineSize = 64 };
 
 template<typename T>
 class StripedMap {
-// 针对程序运行不同平台，定义下面 array 的长度
+
 #if TARGET_OS_IPHONE && !TARGET_OS_SIMULATOR
-    enum { StripeCount = 8 };
+    enum { StripeCount = 8 }; // iPhone，同时也表明了 SideTables 中只有 8 张 SideTable
 #else
-    enum { StripeCount = 64 };
+    enum { StripeCount = 64 }; // mac/simulators，有 64 张 SideTable
 #endif
 
     struct PaddedT {
         // CacheLineSize 值为定值 64
-        // T value 64 字节对齐
-        // 结构体只有一个 T 类型的 value 成员变量
-        // 且这个 value 是遵循 64 字节内存对齐原则
-        // 这个是保证每个 SideTable 64 个字节内存占用 
+        // T value 64 字节对齐，（表示一张表至少 64 个字节吗？）
         T value alignas(CacheLineSize);
     };
     
-    // 所有 PaddedT struct 类型数据被存储在 array 数组中
-    // StripeCount == 8/64
-    // 长度为 8/64 的 PaddedT 数组
-    // 其实是 hash 表数据，正是我们的 8/64 张 SideTable 
+    // 长度是 8/64 的 PaddedT 数组
     PaddedT array[StripeCount];
     
-    // 该方法以 void * 作为 key 来
-    // 获取 void * 对应在 StripedMap 的 array 中的位置
     // hash 函数
     static unsigned int indexForPointer(const void *p) {
-        // typedef unsigned long uintptr_t;
+        // 把 p 指针强转为 unsigned long
         uintptr_t addr = reinterpret_cast<uintptr_t>(p);
         
         // addr 右移 4 位的值与 addr 右移 9 位的值做异或操作，
-        // 然后对 StripeCount 取模 
-        // 最后取模，防止 index 越界
-        // 保证返回值在 [0, 7] 或 [0, 63] 区间内
+        // 然后对 StripeCount 取模，防止越界。
         return ((addr >> 4) ^ (addr >> 9)) % StripeCount;
     }
 
  public:
-    // 根据指针 p 得出 index，返回 array 数组 index 
-    // 处的 PaddedT 的 value 成员变量
-    // 操作符重载
-    // 即可以使用 StripMap<xxx>[objcPtr] 访问 
-    // 即可以使用 SideTables[p] 得到我们的对象所在 SideTable
+    // hash 取值
     T& operator[] (const void *p) { 
         return array[indexForPointer(p)].value; 
     }
     
-    // const_cast 该运算符用来修改类型的 const 或volatile属性。
-    // 除了 const 或volatile 修饰之外， 
-    // type_id 和 expression的类型是一样的。
-    // 一、常量指针被转化成非常量的指针，并且仍然指向原来的对象；
-    // 二、常量引用被转换成非常量的引用，并且仍然指向原来的对象；
-    // 三、const_cast一般用于修改底指针。如const char *p形式。
-    // -- 以上来自百度百科
+    // 原型：const_cast<type_id> (expression)
+    // const_cast 该运算符用来修改类型的 const 或 volatile 属性。
+    // 除了 const 或 volatile 修饰之外，type_id 和 expression的类型是一样的。
+    // 即把一个不可变类型转化为可变类型（const int b => int b1）
+    // 1. 常量指针被转化成非常量的指针，并且仍然指向原来的对象；
+    // 2. 常量引用被转换成非常量的引用，并且仍然指向原来的对象；
+    // 3. const_cast一般用于修改底指针。如const char *p形式。
     
     // 调用上面的 []，得到 T&
     // 然后转为 StripedMap<T>
-    const T& operator[] (const void *p) const { 
+    const T& operator[] (const void *p) const {
+        // 这里 const_cast<StripedMap<T>>(this) 有必要吗，本来就是读取值，并不会修改 StripedMap 的内容鸭
         return const_cast<StripedMap<T>>(this)[p]; 
     }
 
     // Shortcuts for StripedMaps of locks.
-    // StripedMaps 中锁的便捷操作：
+    
     // 循环给 array 中的元素的 value 加锁
     void lockAll() {
         for (unsigned int i = 0; i < StripeCount; i++) {
