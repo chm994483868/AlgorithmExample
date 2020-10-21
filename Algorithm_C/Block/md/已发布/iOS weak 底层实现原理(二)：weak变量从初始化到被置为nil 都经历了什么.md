@@ -1,180 +1,133 @@
-# iOS weak 底层实现原理(七)：weak变量从初始化到被置为 nil
+# iOS weak 底层实现原理(二)：weak变量从初始化到被置为nil 都经历了什么
 
-## `NSObject.mm` 中 `weak` 相关函数
-&emsp;首先找到 `NSObject.mm` 文件，下面先列出与 `weak` 相关的函数，先混个脸熟，接下我们一步一步分析每个函数的调用时机:
+> &emsp;所有 `weak` 相关函数调用我们都通过在 `main` 函数里面写代码打断点，并打开汇编模式：`debug->debug workflow->alway show disassembly` 的方式来验证。
 
-+ `template <HaveOld haveOld, HaveNew haveNew, CrashIfDeallocating crashIfDeallocating> static id storeWeak(id *location, objc_object *newObj);`
-
-+ `id objc_storeWeak(id *location, id newObj);` 
-+ `id objc_storeWeakOrNil(id *location, id newObj);`
-
-+ `id objc_initWeak(id *location, id newObj);`
-+ `id objc_initWeakOrNil(id *location, id newObj);`
-
-+ `void objc_destroyWeak(id *location);`
-
-下面 4 个函数涉及内容较多，准备再开一篇
-+ `id objc_loadWeakRetained(id *location);`
-+ `id objc_loadWeak(id *location);`
-
-+ `void objc_copyWeak(id *dst, id *src);`
-+ `void objc_moveWeak(id *dst, id *src);`
-
-## 寻找 `weak` 相关函数调用时机
-
-&emsp;所有 `weak` 相关函数调用我们都通过在 main 函数里面写代码打断点，并打开汇编模式：`debug -> debug workflow -> alway show disassembly` 的方式来验证。
-
-### `objc_initWeak`
-&emsp;首先是我们最常见的 `weak` 变量的使用方式。我们在 `main.m` 中编写如下代码:
-```objective-c
+## 寻找 weak 变量初始化入口
+&emsp;在 `main.m` 中编写如下代码:
+```c++
 #import <Foundation/Foundation.h>
 int main(int argc, const char * argv[]) {
     @autoreleasepool {
         // insert code here...
-        
-        printf("Start tag");
         id obj = [NSObject new];
+        id obj2 = [NSObject new];
+        printf("Start tag\n");
         {
-            __weak id weakPtr = obj; // 初始化调用: objc_initWeak
-        } // 出了这个右边花括号 weakPtr 会销毁，调用: objc_destroyWeak
-        printf("End tag"); // ⬅️ 断点打在这里
+            __weak id weakPtr = obj; // 调用 objc_initWeak 进行 weak 变量初始化
+            weakPtr = obj2; // 修改 weak 变量指向
+        } 
+        // 出了这个右边花括号调用 objc_destroyWeak 函数进行 weak 变量销毁
+        //（注意这里是 weak 变量的销毁，并不是 weak 变量指向的对象销毁）
+        
+        printf("End tag\n"); // ⬅️ 断点打在这里
     }
     return 0;
 }
 ```
-运行后会进入断点，这里我们只关注`Start tag` 和 `End tag` 中间的部分，能捕捉出下面的信息：
+&emsp;`command + R` 运行后会进入断点，这里我们只关注`Start tag` 和 `End tag` 中间的部分，能捕捉到下面的内容：
 ```c++
-    0x100000e4f <+31>:  leaq   0x112(%rip), %rdi         ; "Start tag"
-    0x100000e56 <+38>:  movb   $0x0, %al
-    0x100000e58 <+40>:  callq  0x100000f02               ; symbol stub for: printf
-    0x100000e5d <+45>:  movq   0x128c(%rip), %rdi        ; (void *)0x00007fff9cf00118: NSObject
-    0x100000e64 <+52>:  callq  0x100000ef6               ; symbol stub for: objc_opt_new
-    0x100000e69 <+57>:  movq   %rax, -0x10(%rbp)
-    0x100000e6d <+61>:  movq   -0x10(%rbp), %rsi
-    0x100000e71 <+65>:  leaq   -0x18(%rbp), %rdi
-    0x100000e75 <+69>:  callq  0x100000ef0               ; symbol stub for: objc_initWeak // ❗️❗️
-    0x100000e7a <+74>:  leaq   -0x18(%rbp), %rdi
-    0x100000e7e <+78>:  callq  0x100000eea               ; symbol stub for: objc_destroyWeak // ❗️❗️
-->  0x100000e83 <+83>:  leaq   0xe8(%rip), %rdi          ; "End tag"
-    0x100000e8a <+90>:  movb   $0x0, %al
-    0x100000e8c <+92>:  callq  0x100000f02               ; symbol stub for: printf
+...
+0x100000c97 <+87>:  callq  0x100000e06               ; symbol stub for: objc_initWeak ⬅️ weak 变量初始化
+0x100000c9c <+92>:  movq   -0x20(%rbp), %rsi
+0x100000ca0 <+96>:  leaq   -0x18(%rbp), %rdi
+0x100000ca4 <+100>: callq  0x100000e1e               ; symbol stub for: objc_storeWeak ⬅️ 修改 weak 变量的指向
+0x100000ca9 <+105>: leaq   -0x18(%rbp), %rdi
+0x100000cad <+109>: callq  0x100000e00               ; symbol stub for: objc_destroyWeak ⬅️ weak 变量销毁
+...
 ```
-`callq` 指令表示函数调用，看到与 `weak` 变量相关的是: `objc_initWeak` 和 `objc_destroyWeak`，它们分别表示初始化 `weak` 变量和销毁 `weak` 变量：
+&emsp;`callq` 指令表示函数调用，看到与 `weak` 变量相关函数是: `objc_initWeak`、`objc_storeWeak`、`objc_destroyWeak`，它们分别表示初始化 `weak` 变量、`weak` 变量赋值（修改指向）、销毁 `weak` 变量。
 
-在 `objc4-781` 中全局搜索 `objc_initWeak`:
-在 `Private Headers/objc-internal.h` P771 看到 `objc_initWeak` 函数声明:
+&emsp;下面首先分析下 `weak` 变量初始化函数，在 `objc4-781` 中全局搜索 `objc_initWeak`，在 `objc-internal.h` 文件中，看到 `objc_initWeak` 函数声明。
 ```c++
 OBJC_EXPORT id _Nullable 
 objc_initWeak(id _Nullable * _Nonnull location, id _Nullable val)
     OBJC_AVAILABLE(10.7, 5.0, 9.0, 1.0, 2.0);
 ```
-看到是 iOS 5.0 后出现的，这里联想到 `ARC`、`weak` 关键字等都是 iOS 5.0 后推出的。
+&emsp;看到是 `iOS 5.0` 后出现的，这里联想到 `ARC`、`weak` 关键字等都是 `iOS 5.0` 后推出的。在 `NSObject.mm` 文件中找到了 `objc_initWeak` 函数实现。
 
-在 `Source/NSObject.mm` P415  是 `objc_initWeak` 函数实现:
+## objc_initWeak
+> &emsp;Initialize a fresh weak pointer to some object location. It would be used for code like: 
+  ```c++
+  (The nil case) 
+  __weak id weakPtr; 
+  (The non-nil case) 
+  NSObject *o = ...; 
+  __weak id weakPtr = o; 
+  ```
+  This function IS NOT thread-safe with respect to concurrent modifications to the weak variable. (Concurrent weak clear is safe.)
+>
+> &emsp;初始化指向某个对象位置的新的 weak pointer（旧的 weak pointer 赋值时要执行清理工作）。对于 weak 变量的并发修改，此函数不是线程安全的。（并发进行 weak clear 是线程安全的。）
 
 ```c++
-/** 
- * Initialize a fresh weak pointer to some object location.
- * 初始化一个新的 weak pointer 指向某个对象的位置。
- * It would be used for code like:
- * 如以下代码的使用：
- *
- * (The nil case) // nil 的情况
- * __weak id weakPtr;
- * (The non-nil case) // 非 nil 的情况
- * NSObject *o = ...;
- * __weak id weakPtr = o; // 把 o 赋给一个 weak 变量
- * 
- * This function IS NOT thread-safe with respect to concurrent
- *  modifications to the weak variable. (Concurrent weak clear is safe.)
- * 对于 weak 变量的并发修改，不是线程安全的。（并发的 weak 清除是安全的）
- 
- * // __weak 变量的指针指针 (ptr 是 pointer 的缩写，id 是 struct objc_object *)
- * @param location Address of __weak ptr. 
- * @param newObj Object ptr. // 对象指针
+
+// Template parameters. 模版参数
+// 牢记这几个枚举值，
+// HaveOld 如果是 true，表示 __weak 变量目前有指向一个对象，否则没有，可表示是新创建的 __weak 变量
+// HaveNew 如果是 true，表示给 __weak 变量赋值的右侧对象是有值的，否则 __weak 变量会被指向 nil
+enum HaveOld { DontHaveOld = false, DoHaveOld = true }; // 是否有旧值
+enum HaveNew { DontHaveNew = false, DoHaveNew = true }; // 是否有新值
+
+/**
+ * @param location Address of __weak ptr. // __weak 变量的地址 (objc_object **) (ptr 是 pointer 的缩写，id 是 struct objc_object *)
+ * @param newObj Object ptr. // 对象实例指针
  */
 id
 objc_initWeak(id *location, id newObj)
 {
-    if (!newObj) { // 如果对象不存在
-        // 看到这个赋值用的是 *location = nil; 
-        // 表示把 __weak 变量指向 nil
+    // 如果对象不存在
+    if (!newObj) {
+        // 看到这个赋值用的是 *location = nil，表示把 __weak 变量指向 nil
         *location = nil; 
         return nil;
     }
     
-    // storeWeak 是一个模版函数 DontHaveOld 表示没有旧值，
-    //（这是一个新初始化的 __weak 变量）
+    // storeWeak 是一个模版函数，DontHaveOld 表示没有旧值，表示这里是新初始化 __weak 变量。
     // DoHaveNew 表示有新值，新值即为 newObj
-    // DoCrashIfDeallocating 表示如果在下面的函数执行过程中 newObj 释放了就 crash
-    
+    // DoCrashIfDeallocating 表示如果在下面的函数执行过程中 newObj 中途释放了就 crash
+
     return storeWeak<DontHaveOld, DoHaveNew, DoCrashIfDeallocating>
         (location, (objc_object*)newObj);
-        
-    // storeWeak 是一个模版参数是 enum 的模版函数，
-    // template <HaveOld haveOld, HaveNew haveNew, CrashIfDeallocating crashIfDeallocating>
-    
-    // HaveOld/HaveNew/CrashIfDeallocating 三个枚举值
-    // 这里 storeWeak 传入的分别是
-    // DontHaveOld = false（表示初始化新的 __weak 变量） 
-    // DoHaveNew = true 
-    // DoCrashIfDeallocating = true   
 }
 ```
-该方法接受两个参数:
-1. `id *location`：`weak` 指针的地址，即示例代码中 `weak` 指针取地址: `&weakPtr`，它是一个指针的指针，之所以要存储指针的地址，是因为引用对象释放后 `weak` 指针指向的内容要置为 nil，如果仅存储指针（即指针所指向的地址值）的话，是不能够完成这个设置的。
+&emsp;`objc_initWeak` 函数接收两个参数:
+1. `id *location`：`__weak` 变量的地址，即示例代码中 `weak` 变量取地址: `&weakPtr`，它是一个指针的指针，之所以要存储指针的地址，是因为 `weak` 变量指向的对象释放后，要把 `weak` 变量指向置为 nil，如果仅存储指针（即 `weak` 变量所指向的地址值）的话，是不能够完成这个设置的。
 
-  > 这里联想到了对链表做一些操作时，我们的函数入参会是链表头指针的指针。
-    这里头脑好像转不过来，为什么用指针的指针，我们直接在函数内修改参数的指向时，不是同样也修改了外部指针的指向吗？其实非然！
-    一定要理清，当函数形参是指针时，实参传入的是一个地址，然后在函数内部创建一个指针变量这个指针变量指向的地址是实参传入的地址，此时如果你修改指向的话，修改的只是函数内部的临时的一个指针变量。外部的指针变量是与它无关的，有关的只是它们两个指向的地址是一样的。而我们对这个地址里面内容的所有操作，都是可反应到指向该地址的指针变量那里的。这个地址是指针指向的地址，如果没有 `const` 限制，我们可以对该地址里面的内容做任何操作即使把内容置空放0，这些操作都是对这个地址的内存做的，不管怎样这块内存都是存在的，它地址一直都在这里，而我们的原始指针一直就是指向它，此时我们需要的是修改原始指针的指向，那我们只有知道指针自身的地址才行，我们把指针自身的地址的内存空间里面放 `0x0`, 才能表示把我们的指针指向置为 `nil` 了！
+  > 这里联想到了对链表做一些操作时，函数入参会是链表头指针的指针。
+    这里如果对指针不是特别熟悉的话，可能会有一些迷糊，为什么用指针的指针，我们直接在函数内修改参数的指向时，不是同样也修改了外部指针的指向吗？其实非然！
+    一定要理清，当函数形参是指针时，实参传入的是一个地址，然后在函数内部创建一个临时指针变量这个临时指针变量指向的地址是实参传入的地址，此时如果你修改指向的话，修改的只是函数内部的临时指针变量的指向。外部的指针变量是与它无关的，有关的只是初始时它们两个指向的地址是一样的。而我们对这个地址里面内容的所有操作，都是可反应到指向该地址的指针变量那里的。这个地址是指针指向的地址，如果没有 `const` 限制，我们可以对该地址里面的内容做任何操作即使把内容置空放0，这些操作都是对这个地址的内存做的，不管怎样这块内存都是存在的，它地址一直都在这里，而我们的原始指针一直就是指向它，此时我们需要的是修改原始指针的指向，那我们只有知道指针自身的地址才行，我们把指针自身的地址的内存空间里面放 `0x0`, 才能表示把我们的指针指向置为了 `nil`！
 
-2. `id newObj`: 所用的对象，即示例代码中的 `obj`
+2. `id newObj`: 所用的对象，即示例代码中的 `obj`。
 该方法有一个返回值，返回的是 `storeWeak` 函数的返回值：
-返回的其实还是 `obj`, 但是已经对 `obj` 的 `isa（isa_t）` 的 `weakly_referenced` 位设置为 1，标志该引用对象有弱引用指向，当该对象销毁时，要处理之前指向它的那些弱引用，`weak` 变量被置为 `nil` 的机制就是从这里实现的。 
+返回的其实还是 `obj`, 但是已经对 `obj` 的 `isa（isa_t）` 的 `weakly_referenced` 位设置为 `1`，标识该对象有弱引用存在，当该对象销毁时，要处理之前指向它的那些弱引用，`weak` 变量被置为 `nil` 的机制就是从这里实现的。 
 
-看 `objc_initWeak` 函数实现可知，它内部全靠 `storeWeak` 来执行，且执行时的模版参数：`DontHaveOld` 没有旧值，这里是指 `weakPtr` 之前没有指向任何对象，我们的 `weakPtr` 是刚刚初始化的，自然没有指向旧值，这里涉及到的是，当 `weak` 变量改变指向时，要把它从之前指向的对象的 `weak_entry_t` 的哈希数组中移除。`DoHaveNew` 表示有新值。
+&emsp;看 `objc_initWeak` 函数实现可知，它内部是调用 `storeWeak` 函数，且执行时的模版参数是 `DontHaveOld`（没有旧值），这里是指 `weakPtr` 之前没有指向任何对象，我们的 `weakPtr` 是刚刚初始化的，自然没有指向旧值。这里涉及到的是，当 `weak` 变量改变指向时，要把该 `weak` 变量地址从它之前指向的对象的 `weak_entry_t` 的哈希数组中移除。`DoHaveNew` 表示有新值。
 
-`storeWeak` 函数实现的核心功能:
-+ 将 `weak` 指针的地址 `location` 存入 `obj` 对应的 `weak_entry_t` 的哈希数组（或定长为 4 的数组）中，用于在 `obj` 析构时，通过该哈希数组找到其所有的 `weak` 引用，将指针指向的地址（`*location`）置为 `nil`。
-+ 如果启用了 `isa` 优化，则将 `obj` 的 `isa_t` 的 `weakly_referenced` 位置为 1，置为 1 的作用主要标记 `obj` 被 `weak` 引用了，当 `dealloc` 时，`runtime` 会根据 `weakly_referenced` 标志位来判断是否需要查找 `obj` 对应的 `weak_entry_t`，并将所有的弱引用置为 `nil`。
+&emsp;`storeWeak` 函数实现的核心功能:
++ 将 `weak` 变量的地址 `location` 存入 `obj` 对应的 `weak_entry_t` 的哈希数组（或定长为 `4` 的数组）中，用于在 `obj` 析构时，通过该哈希数组找到其所有的 `weak` 变量的地址，将 `weak` 变量指向的地址（`*location`）置为 `nil`。
++ 如果启用了 `isa` 优化，则将 `obj` 的 `isa_t` 的 `weakly_referenced` 位置为 1，置为 1 的作用是标识 `obj` 存在 `weak` 引用。当对象 `dealloc` 时，`runtime` 会根据 `weakly_referenced` 标志位来判断是否需要查找 `obj` 对应的 `weak_entry_t`，并将它的所有的弱引用置为 `nil`。
 
 从 `storeWeak` 函数实现就要和我们前几篇的内容联系起来啦，想想还有些激动 😊。
 
-### `objc_storeWeak`
-下面分析 `storeWeak` 函数源码实现：
+## objc_storeWeak
+&emsp;分析 `storeWeak` 函数源码实现：
+> &emsp;Update a weak variable. If HaveOld is true, the variable has an existing value that needs to be cleaned up. This value might be nil. If HaveNew is true, there is a new value that needs to be assigned into the variable. This value might be nil. If CrashIfDeallocating is true, the process is halted if newObj is deallocating or newObj's class does not support weak references. If CrashIfDeallocating is false, nil is stored instead.
+>
+> &emsp;更新一个 weak 变量。如果 HaveOld 为 true，则该 weak 变量具有需要清除的现有值。该值可能为 nil。如果 HaveNew 为 true，则需要将一个新值分配给 weak 变量。该值可能为 nil。如果 CrashIfDeallocating 为 true，则在 storeWeak 函数执行过程中  newObj 释放了或 newObj 的类不支持弱引用时，程序将 crash。如果 CrashIfDeallocating 为 false，则发生以上问题时只是在 weak 变量中存入 nil。
+
 ```c++
-// Template parameters. 模版参数
-// 是否有旧值
-enum HaveOld { DontHaveOld = false, DoHaveOld = true };
-// 是否有新值
-enum HaveNew { DontHaveNew = false, DoHaveNew = true };
-
-// Update a weak variable. 更新一个 weak 变量。
-
-// If HaveOld is true, the variable has an existing value
-// that needs to be cleaned up. This value might be nil.
-// 如果 HaveOld 为 true，则该变量具有需要清除的现有值。该值可能为 nil。
-
-// If HaveNew is true, there is a new value that needs to 
-// be assigned into the variable. This value might be nil.
-// 如果 HaveNew 为 true，则需要将一个新值分配给变量。该值可能为 nil。
-
-// If CrashIfDeallocating is true, the process is halted if newObj
-// is deallocating or newObj's class does not support weak references.
-// 如果 CrashIfDeallocating 为 true，
-// 则在 newObj 释放了或 newObj 的类不支持弱引用时，该函数将 crash。
-
-// If CrashIfDeallocating is false, nil is stored instead.
-// 如果 CrashIfDeallocating 为 false，则发生以上问题时只是存入 nil。
-
-// 模版参数，如果要赋值的对象释放了，那函数执行会 crash
+// DoCrashIfDeallocating：如果在 storeWeak 函数执行过程中 newObj 被释放了，那函数执行会 crash，
+// DontCrashIfDeallocating：不 crash，并把 *location = nil
 enum CrashIfDeallocating {
     DontCrashIfDeallocating = false, DoCrashIfDeallocating = true
 };
 
+// Template parameters.
+enum HaveOld { DontHaveOld = false, DoHaveOld = true }; // 是否有旧值
+enum HaveNew { DontHaveNew = false, DoHaveNew = true }; // 是否有新值
+
 // ASSERT(haveOld || haveNew) 断言的宏定义，当括号里的条件不满足时则执行断言，
-// 即括号里面为假时则执行断言，如果为真函数就接着往下执行。
-// 类似 Swift 的 guard 语句，为真时执行接下来的函数，为假时执行 return
+// 即括号里面为假时则执行断言，如果为真函数就接着往下执行，
+// 类似 Swift 的 guard 语句，为真时执行接下来的函数，为假时执行 return。
 
 template <HaveOld haveOld, HaveNew haveNew,
           CrashIfDeallocating crashIfDeallocating>
@@ -183,86 +136,85 @@ storeWeak(id *location, objc_object *newObj)
 {
     // 如果 haveOld 为假且 haveNew 为假，表示既没有新值也没有旧值，则执行断言
     ASSERT(haveOld || haveNew);
-    // 这里是表示，如果你开始就标识没有新值且你的 newObj == nil 确实没有新值，
-    // 则能正常执行函数，否则直接断言 crash
+    
+    // 这里是表示，如果你开始就标识没有新值且你的 newObj == nil 确实没有新值，则能正常执行函数，否则直接断言 crash。
     if (!haveNew) ASSERT(newObj == nil);
 
-    // 指向 objc_class 的指针，指向 newObj 的 Class
-    // 标记 newObj 的 Class 已经完成初始化
+    // 指向 objc_class 的指针，指向 newObj 的 Class，标记 newObj 的 Class 已经完成初始化
     Class previouslyInitializedClass = nil;
+    
     // __weak 变量之前指向的旧对象
     id oldObj;
-    // 旧值对象所处的 SideTable
-    SideTable *oldTable;
-    // 新值对象所处的 SideTable 
     
     // 这里一直很好奇对象是在什么时候放进 SideTable 里面的？
     
+    // 旧值对象所处的 SideTable
+    SideTable *oldTable;
+    
+    // 新值对象所处的 SideTable 
     SideTable *newTable;
 
-    // SideTable 的 slock
     // Acquire locks for old and new values.
     // Order by lock address to prevent lock ordering problems.
-    // 根据锁地址排序，以防止出现 锁排序 问题。
     // Retry if the old value changes underneath us. 
-    // 重试，如果旧值在下面改变.
+    
+    // 取得旧值和新值所处的 SideTable 里面的 spinlock_t。（SideTable->slock）
+    // 根据上面两个锁的锁地址进行排序，以防止出现加锁时出现锁排序问题。
+    // 重试，如果旧值在下面函数执行过程中发生了改变。
     // 这里用到 C 语言的 goto 语句，goto 语句可以直接跳到指定的位置执行（直接修改函数执行顺序）
  retry:
     if (haveOld) { 
-        // 如果有旧值，这个旧值表示是传进来的 weak 变量，之前指向的值
-        // 把（*location）赋给 oldObj，
+        // 如果有旧值，这个旧值表示是传进来的 weak 变量目前指向的对象，解引用把（*location）赋给 oldObj
         oldObj = *location;
-        // 如果 weak ptr 之前弱引用过一个 obj，
-        // 则将这个 obj 在全局的 SideTables 中对应的 SideTable 取出
-        // 赋值给 oldTable
+        
+        // 如果 weak ptr 目前有指向其它的对象，则取出这个对象的 SideTable 并赋值给 oldTable
         oldTable = &SideTables()[oldObj];
     } else {
-        // 如果 weak prt 之前没有弱引用过一个 obj，则 oldTable = nil
+        // 如果 weak prt 目前没有指向其它对象，则 oldTable = nil
         oldTable = nil;
     }
     
     if (haveNew) {
-        // 新对象所处的 SideTable
+        // newObj 所处的 SideTable
         newTable = &SideTables()[newObj];
     } else {
-        // newObj 为 nil
+        // newObj 为 nil，则 newTable 也赋值为 nil
         newTable = nil;
     }
 
-    // 这里是根据 haveOld 和 haveNew 两个值，
-    // 判断是否对 oldTable 和 newTable 这两个 SideTable 加锁
+    // 这里是根据 haveOld 和 haveNew 两个值，判断是否对 oldTable 和 newTable 这两个 SideTable 加锁
     
     // 加锁操作，防止多线程中竞争冲突
     SideTable::lockTwo<haveOld, haveNew>(oldTable, newTable);
 
-    // location 应该与 oldObj 保持一致，如果不同，
-    // 说明可能在加锁之前 location 被其他线程修改了
+    // 此处 *location 应该与 oldObj 保持一致，如果不同，说明在加锁之前 *location 已被其他线程修改
     if (haveOld  &&  *location != oldObj) {
-        // 解锁，跳转到 retry 处再执行函数
+        // 解锁，跳转到 retry 处再重新执行函数
         SideTable::unlockTwo<haveOld, haveNew>(oldTable, newTable);
         goto retry;
     }
 
     // Prevent a deadlock between the weak reference machinery
-    // and the +initialize machinery by ensuring that
+    // and the +initialize machinery by ensuring that 
     // no weakly-referenced object has an un-+initialized isa.
     
-    // 确保没有弱引用的对象的 Class 已经初始化，
-    // 防止 weak reference machinery 和 +initialize machinery 之间出现死锁
+    // 确保没有弱引用的对象具有未初始化的isa。
+    // 防止 weak reference machinery 和 +initialize machinery 之间出现死锁。
     
-    // 有新值 haveNew 并且 newObj 不为 nil，
-    // 判断类有没有初始化，如果没有初始化就进行初始化
-    // 这个没有初始化的情况在什么时候会遇到呢？一直没找到相关的说明
+    // 有新值 haveNew 并且 newObj 不为 nil，判断 newObj 所属的类有没有初始化，如果没有初始化就进行初始化，
     if (haveNew  &&  newObj) {
+        // newObj 所属的类
         Class cls = newObj->getIsa();
+        
+        // previouslyInitializedClass 记录正在进行初始化的类防止重复进入
         if (cls != previouslyInitializedClass  &&
             !((objc_class *)cls)->isInitialized())
         { 
-            // 如果 cls 还没有初始化，先初始化，再尝试设置 weak
-            // 解锁
-            SideTable::unlockTwo<haveOld, haveNew>(oldTable, newTable);
-            // 调用对象所在类的(不是元类)初始化方法，
-            // 即 调用的是 [newObjClass initialize] 类方法
+            // 如果 cls 还没有初始化，先初始化，再尝试设置 weak，
+            
+            SideTable::unlockTwo<haveOld, haveNew>(oldTable, newTable); // 解锁
+            
+            // 调用对象所在类的(不是元类)初始化方法，即调用的是 [newObjClass initialize] 类方法
             class_initialize(cls, (id)newObj);
 
             // If this class is finished with +initialize then we're good.
@@ -287,34 +239,40 @@ storeWeak(id *location, objc_object *newObj)
     }
 
     // Clean up old value, if any.
-    // 如果有旧值，则进行 weak_unregister_no_lock 操作
+    // 清理旧值，如果有旧值，则进行 weak_unregister_no_lock 操作。
+    
     if (haveOld) {
-        // 把 location 从 oldObj 对应的 weak_entry_t 的 hash 数组中移除
+        // 把 location 从 oldObj 的 weak_entry_t 的 hash 数组中移除
         weak_unregister_no_lock(&oldTable->weak_table, oldObj, location);
     }
 
     // Assign new value, if any.
-    // 如果有新值，则进行 weak_register_no_lock 操作
+    // 如果有新值，则进行 weak_register_no_lock 操作。
+    
     if (haveNew) { 
-        // 调用 weak_register_no_lock 方法
-        // 将 weak ptr 的地址记录到 newObj 对应的 weak_entry_t 的哈希数组中
+        // 调用 weak_register_no_lock 方法把 weak ptr 的地址记录到 newObj 的 weak_entry_t 的哈希数组中
         newObj = (objc_object *)
             weak_register_no_lock(&newTable->weak_table, (id)newObj, location,
                                   crashIfDeallocating);
+                                  
         // weak_register_no_lock returns nil if weak store should be rejected
         // Set is-weakly-referenced bit in refcount table.
-        // 在 refcount 表中设置 weakly_referenced 位，
-        // 表示该对象被弱引用了，当该对象被释放时就是通过这个标志位
-        // 来清理 weak 变量，把它们设置为 nil 的
-        // 更新 newObj 的 isa 的 weakly_referenced bit 标志位
+        
+        // 设置一个对象有弱引用分为两种情况：
+        // 1): 当对象的 isa 是优化的 isa 时，更新 newObj 的 isa 的 weakly_referenced bit 标识位。
+        // 2): 另外如果对象的 isa 是原始的 class 指针时，它的引用计数和弱引用标识位等信息都是在 refcount 中的引用计数值内。（不同的位表示不同的信息）
+        //     需要从 refcount 中找到对象的引用计数值(类型是 size_t)，该引用计数值的第一位标识该对象有弱引用（SIDE_TABLE_WEAKLY_REFERENCED）。
+
         if (newObj  &&  !newObj->isTaggedPointer()) {
             // 终于找到了，设置 struct objc_objcet 的 isa（isa_t）中的 uintptr_t weakly_referenced : 1;
+            //（isa 是原始指针时，设置 isa 最后一位是 1）
             newObj->setWeaklyReferenced_nolock();
         }
 
         // Do not set *location anywhere else. That would introduce a race.
-        // 请勿在其他地方设置 *location，可能会引起竟态
-        // *location 赋值，weak ptr直接指向 newObj，可以看到，这里并没有将newObj的引用计数 +1
+        // 请勿在其他地方设置 *location，可能会引起竟态。
+        // *location 赋值，weak ptr 直接指向 newObj，可以看到，这里并没有将 newObj 的引用计数 +1
+        
         *location = (id)newObj;
     }
     else {
@@ -322,24 +280,25 @@ storeWeak(id *location, objc_object *newObj)
         // 没有新值，则不发生改变
     }
     
-    // 解锁，其他线程可以访问oldTable, newTable了
+    // 解锁，其他线程可以访问 oldTable, newTable 了
     SideTable::unlockTwo<haveOld, haveNew>(oldTable, newTable);
+    
     // 返回 newObj，此时的 newObj 与刚传入时相比，weakly_referenced bit 位为 1
     return (id)newObj;
 }
 ```
-`storeWeak` 方法实质上接受5个参数，其中 `HaveOld haveOld, HaveNew haveNew, CrashIfDeallocating crashIfDeallocating` 这三个参数是以模板枚举的方式传入的，其实这是三个 `bool` 参数，分别表示：
-+ `HaveOld`: `weak ptr` 之前是否已经指向了一个弱引用，
-+ `HaveNew`: `weak ptr` 是否需要指向一个新引用 
-+ `CrashIfDeallocating`: 如果被弱引用的对象正在析构，此时再弱引用该对象，是否应该 `crash`。
-具体到 `objc_initWeak`，这三个参数的值分别为 `false，true，true`，因为是初始化 `weak` 变量必然要有新值，没有旧值。
+
+`storeWeak` 函数流程图:
+![storeWeak 流程图](https://p9-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/07f3cce0e53f43f591e5869d73ab5868~tplv-k3u1fbpfcp-zoom-1.image)
+
+&emsp;`storeWeak` 函数实质上接受5个参数，其中 `HaveOld haveOld, HaveNew haveNew, CrashIfDeallocating crashIfDeallocating` 这三个参数是以模板枚举的方式传入的，其实这是三个 `bool` 参数，具体到 `objc_initWeak` 函数，这三个参数的值分别为 `false，true，true`，因为是初始化 `weak` 变量必然要有新值，没有旧值。
 
 那 `storeWeak` 大概分析到这里，下面我们来看另外一个函数。
 
-### `objc_destroyWeak`
-&emsp;示例代码中 `weak` 变量出来右边花括号必然要进行释放销毁，汇编代码中我们看到了 `objc_destroyWeak` 函数，它正是 `weak` 变量销毁时调用的函数。在分析销毁函数之前我们先看一个问题：
+## objc_destroyWeak
+&emsp;示例代码中作为局部变量的 `weak` 变量出来右边花括号就表示它的作用域结束了，必然会进行释放销毁，汇编代码中我们看到了 `objc_destroyWeak` 函数被调用，它正是 `weak` 变量销毁时调用的函数。在分析销毁函数之前我们先看一个问题：
 
-> 如果 `weak` 变量比它所指向的对象提前销毁了，那 `weak_entry_t` 中存放弱引用的指针的哈希数组是怎么处理的 ？
+> 如果 `weak` 变量比它所指向的对象提前销毁了，那 `weak_entry_t` 中存放弱引用的地址的哈希数组是怎么处理的 ？
   对于这个问题，因为是关于弱引用的指针怎么处理的，那我们首先想到的应该是 `weak_register_no_lock` 和 `weak_unregister_no_lock` 函数，因为是跟销毁相关的，那我们盲猜应该是和 `weak_unregister_no_lock` 有关，那接下来我们进行验证这个盲猜。
 
 首先我们看下 `objc_destroyWeak` 函数的实现:
