@@ -3,11 +3,11 @@
 > 为了全面透彻的理解 `weak` 关键字的工作原理，现在从最底层的数据结构开始挖掘，力求构建一个完整的认知体系。
 
 ## template <typename T> class DisguisedPtr
-&emsp;`template <typename T> class DisguisedPtr` 是在 `Project Headers/objc-private.h` 中定义的一个模版工具类，主要的功能是把 `T` 指针指向的地址直接转化为一个 `unsigned long`，实现**指针到整数的相互映射**，起到把**指针伪装**起来的作用，使指针隐藏于系统工具（如 `leaks` 工具）。在 `objc4-781` 全局搜索 `DisguisedPtr` 发现 `T` 仅作为 `objc_object` 类型使用。
+&emsp;`template <typename T> class DisguisedPtr` 是在 `Project Headers/objc-private.h` 中定义的一个模版工具类，主要的功能是把 `T` 指针（`T` 类型变量的地址）转化为一个 `unsigned long`，实现**指针到整数的相互映射**，起到**指针伪装**的作用，使指针隐藏于系统工具（如 `leaks` 工具）。在 `objc4-781` 全局搜索 `DisguisedPtr` 发现 `T` 仅作为 `objc_object` 和 `objc_object *` 类型使用。而 `T` 类型是 `objc_object *` 时，用于隐藏 `__weak` 变量的地址。
  
 > &emsp;DisguisedPtr<T> acts like pointer type T*, except the stored value is disguised to hide it from tools like `leaks`. nil is disguised as itself so zero-filled memory works as expected, which means 0x80..00 is also disguised as itself but we don't care. Note that weak_entry_t knows about this encoding.
-   
-> &emsp;DisguisedPtr 的作用类似于指针类型 T *，只是存储的值被伪装成对诸如 “leaks” 之类的工具隐藏。nil 本身是伪装的，因此 0 值的内存可以按预期工作，让  nil 指针像 non-nil 指针那样正常运行它的操作，而不会让程序崩溃。这意味着 0x80..00 本身也伪装了，但我们不在乎。请注意，weak_entry_t 知道此编码。
+> 
+> &emsp;DisguisedPtr<T> 类似于指针类型 T *，只是存储的值被伪装成对诸如 “leaks” 之类的工具隐藏。nil 本身是伪装的，因此 0 值的内存可以按预期工作，让 nil 指针像 non-nil 指针那样正常运行它的操作，而不会让程序崩溃。这意味着 0x80..00 本身也伪装了，但我们不在乎。请注意，weak_entry_t 知道此编码。
 
 ```c++
 template <typename T>
@@ -16,12 +16,12 @@ class DisguisedPtr {
     uintptr_t value;
 
     static uintptr_t disguise(T* ptr) {
-        // 相当于直接把 T 指针指向的地址转化为 unsigned long 并取负值
+        // 把 T 的地址转化为 unsigned long 并取负值
         return -(uintptr_t)ptr;
     }
 
     static T* undisguise(uintptr_t val) {
-        // 把 unsigned long 类型的 val 转为指针地址，对应上面的 disguise 函数
+        // 把 unsigned long 类型的 val 转为指针，对应上面的 disguise 函数
         return (T*)-val;
     }
 
@@ -87,10 +87,11 @@ static inline bool operator != (DisguisedPtr<objc_object> lhs, id rhs) {
     return lhs != (objc_object *)rhs;
 }
 ```
+
 ## template <typename T> class StripedMap
 
 > &emsp;StripedMap<T> is a map of void* -> T, sized appropriately for cache-friendly lock striping. For example, this may be used as StripedMap<spinlock_t> or as StripedMap<SomeStruct> where SomeStruct stores a spin lock.
-
+> 
 > &emsp;StripedMap 是 void *-> T 的映射，其大小适合于 **缓存友好** 的 lock striping。例如，它可用作 StripedMap<spinlock_t> 或 StripedMap<SomeStruct>，其中 SomeStruct 存储 spin lock。**cache-friendly:** 那么按照高速缓存的工作原理，可以发现局部性良好的程序，缓存命中的概率更高，从这个意义上来讲，程序也会更快。我们称这样的程序，是高速缓存友好（cache-friendly）的程序。
 
 &emsp;`template<typename T> class StripedMap` 从数据结构角度看的话，它是作为一个 `Key` 是 `void *` `Value` 是 `T` 的 `hash` 表来用的。在 `objc4-781` 中全局搜索 `StripedMap` 发现 `T` 作为 `SideTable` 和 `spinlock_t` 类型使用。
@@ -221,181 +222,581 @@ class StripedMap {
 #endif
 };
 ```
-## 
-> 定义位于: `Project Headers/objc-weak.h` Line 80，此文件只有 144 行，基本所有的内容都是围绕 `struct weak_entry_t` 和 `struct weak_table_t`。
 
-## `weak_referrer_t`
-`weak_referrer_t` 定义，可以看到它是一个 `DisguisedPtr` 模版类，且它的 T 是 `objc_object *`：
+## weak_referrer_t
+&emsp;用于伪装 `__weak` 变量的地址，即用于伪装 `objc_object *` 的地址。
+
+> &emsp;The address of a __weak variable.These pointers are stored disguised so memory analysis tools don't see lots of interior pointers from the weak table into objects.
+> 
+> &emsp;__weak 变量的地址（objc_object **）。这些指针是伪装存储的，因此内存分析工具不会看到从 weak table 到 objects 的大量内部指针。
+
 ```c++
-// The address of a __weak variable.
-// __weak 变量的地址（指针的指针）
-
-// These pointers are stored disguised so memory analysis tools 
-// don't see lots of interior pointers from the weak table into objects.
-// 这些指针是伪装的，因此内存分析工具看不到从 weak table 到对象的大量内部指针。
 // 这里 T 是 objc_object *，那么 DisguisedPtr 里的 T* 就是 objc_object**，即为指针的指针
-
 typedef DisguisedPtr<objc_object *> weak_referrer_t;
 ```
 
-## `PTR_MINUS_2`
-`PTR_MINUS_2` 宏定义，用于标记 `num_refs` 位域长度。
+## PTR_MINUS_2
+&emsp;用于在不同的平台下标识位域长度。这里是用于 `struct weak_entry_t` 中的 `num_refs` 的位域长度。 
+```c++
+// out_of_line_ness 和 num_refs 共用 64 位内存空间
+uintptr_t        out_of_line_ness : 2; 
+uintptr_t        num_refs : PTR_MINUS_2; // 针对不同的平台 num_refs 是高 62 位或者高 30 位
+```
 ```c++
 #if __LP64__
-#define PTR_MINUS_2 62 // 当前是 __LP64__
+#define PTR_MINUS_2 62
 #else
 #define PTR_MINUS_2 30
 #endif
 ```
 
-## `WEAK_INLINE_COUNT`
-`WEAK_INLINE_COUNT` 宏定义，
+## WEAK_INLINE_COUNT
+> &emsp;The internal structure stored in the weak references table. It maintains and stores a hash set of weak references pointing to an object.
+If out_of_line_ness != REFERRERS_OUT_OF_LINE then the set is instead a small inline array.
+> 
+> &emsp;内部结构存储在弱引用表中。它维护并存储指向对象的弱引用的哈希集。(weak_referrer_t)
+如果 out_of_line_ness != REFERRERS_OUT_OF_LINE(0b10)，则该集合为小型内联数组（长度为 4 的 weak_referrer_t 数组）。
+
 ```c++
-/**
- * The internal structure stored in the weak references table. 
- * internal structure(内部结构) 存储在弱引用表中。
- 
- * It maintains and stores a hash set of weak
- * references pointing to an object.
- *
- * 它维护并存储了指向对象的弱引用的哈希表。
- *（对象只有一个，指向该对象的 __weak 变量可以有多个, 
- * 这些 __weak 变量统一放在一个数组里面）
- 
- * If out_of_line_ness != REFERRERS_OUT_OF_LINE then
- * the set is instead a small inline array.
- *
- * 如果 out_of_line_ness != REFERRERS_OUT_OF_LINE(0x10)的话，
- * 数据用一个长度为 4 的内部数组存放，否则用 hash 数组存放 
- * 数组里存放的和哈希表 value 值的类型都是上面的 weak_referrer_t 
- */
- 
-#define WEAK_INLINE_COUNT 4 // 这个值固定为 4 表示内部小数组的长度是 4
+#define WEAK_INLINE_COUNT 4
 ```
 
-## `REFERRERS_OUT_OF_LINE`
-`REFERRERS_OUT_OF_LINE` 宏定义（0x10），这个值是用来标记在 `weak_entry_t` 中是用那个长度为 4 的定长数组存放 `weak_referrer_t（__weak 变量的指针）`，还是用 `hash` 数组来存放数据。
+## REFERRERS_OUT_OF_LINE
+> &emsp;out_of_line_ness field overlaps with the low two bits of inline_referrers[1]. inline_referrers[1] is a DisguisedPtr of a pointer-aligned address. The low two bits of a pointer-aligned DisguisedPtr will always be 0b00 (disguised nil or 0x80..00) or 0b11 (any other address). Therefore out_of_line_ness == 0b10 is used to mark the out-of-line state.
+>
+> &emsp;out_of_line_ness 字段与 inline_referrers [1] 的低两位内存空间重叠。inline_referrers [1] 是指针对齐地址的 DisguisedPtr。指针对齐的 DisguisedPtr 的低两位始终为 0b00（伪装为 nil 或 0x80..00）或 0b11（任何其他地址）。因此，out_of_line_ness == 0b10 可用于标记 out-of-line 状态，即 struct weak_entry_t 内部是使用哈希表存储 weak_referrer_t 而不再使用那个长度为 4 的 weak_referrer_t 数组。
+
 ```c++
-// out_of_line_ness field overlaps with the
-// low two bits of inline_referrers[1].
-// 
-// out_of_line_ness 字段与 inline_referrers[1] 
-// 的低两位内存空间重叠，下面会详细分析。
-// 它们共用 32 字节内存空间。
-
-// inline_referrers[1] is a DisguisedPtr of a pointer-aligned address.
-// inline_referrers[1] 是一个遵循指针对齐的 DisguisedPtr。
-
-// The low two bits of a pointer-aligned DisguisedPtr will
-// always be 0b00 (disguised nil or 0x80..00) or 0b11 (any other address).
-// 且指针对齐的 DisguisedPtr 的低两位将始终为
-// 0b00(如 disguised nil or 0x80..00) 或 0b11（任何其他地址）
-
-// Therefore out_of_line_ness == 0b10 is used to mark the out-of-line state.
-// 因此我们可以使用 out_of_line_ness == 0b10 用于标记
-// out-of-line 状态，表示使用的是定长数组还是动态数组。
-
-#define REFERRERS_OUT_OF_LINE 2 
+#define REFERRERS_OUT_OF_LINE 2 // 二进制表示是 0b10
 ```
 
-## `struct weak_entry_t`
-下面正式进入 `weak_entry_t` ⛽️，`weak_entry_t` 的结构和 `weak_table_t` 很像，同样是一个 `hash` 表。`weak_entry_t` 的 `hash` 数组存储的数据是 `weak_referrer_t`，实质上是弱引用该对象的指针的指针，即 `objc_object **new_referrer`，通过操作指针的指针，就可以使得 `weak` 引用的指针在对象析构后，指向 `nil`。
-`struct weak_entry_t` 定义:
+## struct weak_entry_t
+&emsp;`weak_entry_t` 整体的功能是保存一个对象，然后保存一组该对象的弱引用。
+
+&emsp;`weak_entry_t` 的哈希表存储的数据是 `weak_referrer_t`，实质上是弱引用变量的地址，即 `objc_object **new_referrer`，通过操作指针的指针，就可以使得弱引用变量在对象析构后指向 `nil`。这里必须保存弱引用变量的地址，才能把它的指向置为 `nil`。
 ```c++
 struct weak_entry_t {
-    // T 为 objc_object 的 DisguisedPtr
-    // 那么 Disguised 中存放的就是化身为整数的 objc_object 实例的地址
-    // 被 __weak 变量弱引用的对象
+    // referent 中存放的是化身为整数的 objc_object 实例的地址，下面保存的一众弱引用变量都指向这个 objc_object 实例
     DisguisedPtr<objc_object> referent;
     
-    // 引用该对象的 __weak 变量的指针列表
-    // 当引用该对象的 weak 变量个数小于等于 4 时用
-    // weak_referrer_t inline_referrers[WEAK_INLINE_COUNT] 数组，
-    // 大于 4 时用 hash 数组 weak_referrer_t *referrers
+    // 当指向 referent 的弱引用个数小于等于 4 时使用 inline_referrers 数组保存这些弱引用变量的地址，
+    // 大于 4 以后用 referrers 这个哈希数组保存。
+    
+    // 共用 32 个字节内存空间的联合体
     union {
-        // 两个结构体占用内存都是 32 个字节
         struct {
-            weak_referrer_t *referrers; // 弱引用该对象的对象指针地址的 hash 数组
+            weak_referrer_t *referrers; // 保存 weak_referrer_t 的哈希数组
             
             // out_of_line_ness 和 num_refs 构成位域存储，共占 64 位
-            // 标记是否使用动态 hash 数组
-            uintptr_t        out_of_line_ness : 2;
-            // PTR_MINUS_2 值为 30/62
-            uintptr_t        num_refs : PTR_MINUS_2;
+            uintptr_t        out_of_line_ness : 2; // 标记使用哈希数组还是 inline_referrers 保存 weak_referrer_t
+            uintptr_t        num_refs : PTR_MINUS_2; // 当前 referrers 内保存的 weak_referrer_t 的数量
+            uintptr_t        mask; // referrers 哈希数组总长度减 1，会参与哈希函数计算
             
-            // hash 数组长度减 1，会参与 hash 函数计算
-            uintptr_t        mask;
-            
-            // 当发生 hash 冲突时，采用了开放寻址法
-            // 可能会发生 hash 冲突的最大次数，用于判断是否出现了逻辑错误
-            //（hash 表中的冲突次数绝对不会超过该值）
-            // 该值在新建 entry 和插入新的 weak_referrer_t 时会被更新，
-            // 它一直记录的都是最大偏移值
+            // 可能会发生 hash 冲突的最大次数，用于判断是否出现了逻辑错误，（hash 表中的冲突次数绝对不会超过该值）
+            // 该值在新建 weak_entry_t 和插入新的 weak_referrer_t 时会被更新，它一直记录的都是最大偏移值
             uintptr_t        max_hash_displacement;
         };
         struct {
-            // out_of_line_ness field is low bits of inline_referrers[1]
-            // out_of_line_ness 字段是 inline_referrers[1] 的低位
+            // out_of_line_ness 和 inline_referrers[1] 的低两位的内存空间重合
             // 长度为 4 的 weak_referrer_t（Dsiguised<objc_object *>）数组
-            // 存放的就是那些 __weak 变量的指针（__weak 变量实质是指向原始对象类型的指针）
             weak_referrer_t  inline_referrers[WEAK_INLINE_COUNT];
         };
     };
     
-    // 返回 true 表示用 hash 数组存放 __weak 变量的指针
-    // 返回 false 表示用那个长度为 4 的小数组存 __weak 变量的指针
+    // 返回 true 表示使用 referrers 哈希数组 false 表示使用 inline_referrers 数组保存 weak_referrer_t
     bool out_of_line() {
         return (out_of_line_ness == REFERRERS_OUT_OF_LINE);
     }
     
-    // 赋值操作，直接使用 memcpy 拷贝内存地址里面的内容，并返回 *this
+    // 重载操作符
+    // 赋值操作，直接使用 memcpy 函数拷贝 other 内存里面的内容到 this 中，
+    // 而不是用复制构造函数什么的形式实现，应该也是为了提高效率考虑的...
     weak_entry_t& operator=(const weak_entry_t& other) {
         memcpy(this, &other, sizeof(other));
         return *this;
     }
 
-    // struct weak_entry_t 的构造函数
-    // newReferent，是我们的原始对象的指针
-    // newReferrer，则是我们的 __weak 变量的指针，即 objc_object 的指针的指针
-    //（这里总是觉的说 __weak 变量，好像缺点什么，其实只要谨记它本质也是一个 objc_object 指针就好了）
-    // 初始化列表直接把 newReferent 赋值给 referent
-    // 此时会调用: DisguisedPtr(T* ptr) : value(disguise(ptr)) { } 构造函数
-    // 调用 disguise 函数把 newReferent 地址转化为一个整数赋值给 value
+    // weak_entry_t 的构造函数
+    
+    // newReferent 是原始对象的指针
+    // newReferrer 是指向 newReferent 的弱引用变量的地址
+    
+    // 初始化列表 referent(newReferent) 会调用: DisguisedPtr(T* ptr) : value(disguise(ptr)) { } 构造函数，
+    // 调用 disguise 函数把 newReferent 转化为一个整数赋值给 value
     weak_entry_t(objc_object *newReferent, objc_object **newReferrer)
         : referent(newReferent)
     {
-        // newReferrer 放在数组 0 位，并把其他位置为 nil
+        // 把 newReferrer 放在数组 0 位，也会调用 DisguisedPtr 构造函数，把 newReferrer 转化为整数保存
         inline_referrers[0] = newReferrer;
+        // 循环把 inline_referrers 数组的剩余 3 位都置为 nil
         for (int i = 1; i < WEAK_INLINE_COUNT; i++) {
             inline_referrers[i] = nil;
         }
     }
 };
 ```
-`weak_entry_t` 的结构比较清晰:
-+ `DisguisedPtr<objc_object> referent;` 弱引用对象的地址转为整数并取负。
-+ `union` 有两种形式，长度为 4 的固定数组：`weak_referrer_t  inline_referrers[WEAK_INLINE_COUNT]` 和 动态数组 `weak_referrer_t *referrers` ，这两个数组用来存储弱引用该对象弱引用指针的指针，同样使用 `DisguisedPtry` 的形式存储。当弱引用该对象的 `weak` 变量的数目小于等于 `WEAK_INLINE_COUNT` 时，使用 `inline_referrers`，否则使用动态数组，并且把定长数组中的元素都转移到动态数组中，并之后都是使用动态数组存储。
-+ `bool out_of_line()` 该方法用来判断当前的 `weak_entry_t` 是使用定长数组还是动态数组。返回 `true` 是动态数组，返回 `false` 是定长数组，而且看到 `out_of_line_ness` 的内存地址是和 `inline_referrers` 数组的第二个元素低两位内存地址是重合的（`inline_referrers[1]` 低两位正由此来），这里涉及到了位域的概念。
-+ `weak_entry_t& operator=(const weak_entry_t& other)` 赋值函数则直接调用了 `memcpy` 对内存空间直接拷贝。
-+ `weak_entry_t(objc_object *newReferent, objc_object **newReferrer)` 构造函数，则把定长数组空位初始化位 `nil`。
+&emsp;之所以使用定长/哈希数组的切换，应该是考虑到实例对象的弱引用变量个数一般比较少，这时候使用定长数组不需要再动态的申请内存空间（`union` 中两个结构体共用 `32`  个字节内存）而是使用 `weak_entry_t` 初始化时一次分配的一块连续的内存空间，这会得到运行效率上的提升。
 
-**之所以使用定长/动态数组的切换，应该是考虑到某对象弱引用的个数一般不会超过 `WEAK_INLINE_COUNT` 个，这时候使用定长数组不需要动态的申请内存空间，（`union` 中两个结构体共用 32  个字节内存）而是一次分配一块连续的内存空间，这会得到运行效率上的提升。**
+## struct weak_table_t
+> &emsp;The global weak references table. Stores object ids as keys, and weak_entry_t structs as their values.
+>
+> &emsp;`weak_table_t` 是全局的保存弱引用的哈希表。以 `object ids` 为 `keys`，以 `weak_entry_t` 为 `values`。
 
-## `out_of_line`
-关于 `weak_entry_t` 是使用定长数组还是动态 `hash` 数组:
 ```c++
-bool out_of_line() {
-    // #define REFERRERS_OUT_OF_LINE 2
-    return (out_of_line_ness == REFERRERS_OUT_OF_LINE);
+struct weak_table_t {
+    weak_entry_t *weak_entries; // 存储 weak_entry_t 的哈希数组
+    size_t    num_entries; // 当前 weak_entries 内保存的 weak_entry_t 的数量，哈希数组内保存的元素个数
+    
+    uintptr_t mask; // 哈希数组的总长度减 1，会参与 hash 函数计算
+    
+    // 记录所有项的最大偏移量，即发生 hash 冲突的最大次数
+    // 用于判断是否出现了逻辑错误，hash 表中的冲突次数绝对不会超过这个值，
+    // 下面关于 weak_entry_t 的操作函数中会看到这个成员变量的使用，这里先对它有一些了解即可，
+    // 因为会有 hash 碰撞的情况，而 weak_table_t 采用了开放寻址法来解决，
+    // 所以某个 weak_entry_t 实际存储的位置并不一定是 hash 函数计算出来的位置
+    
+    uintptr_t max_hash_displacement;
+};
+```
+
+## struct SideTable
+&emsp;`struct SideTable` 定义位于 `NSObject.mm` 文件中。它管理了两块对我们而言超级重要的内容，一块是 `RefcountMap refcnts` 管理对象的引用计数，一块是 `weak_table_t weak_table` 管理对象的弱引用变量。`refcnts` 涉及的内容本篇先不关注，后面学习 `objc_object` 的时候再深入学习。本篇我们着重学习 `weak_table` 涉及的内容。
+
+```c++
+// Template parameters. 模版参数
+enum HaveOld { DontHaveOld = false, DoHaveOld = true }; // 是否有旧值
+enum HaveNew { DontHaveNew = false, DoHaveNew = true }; // 是否有新值
+
+struct SideTable {
+    spinlock_t slock; // 每张 SideTable 都自带一把锁，而这把锁也对应了上面 T 必须为 StripedMap 提到的一些锁的接口函数
+    RefcountMap refcnts; // 管理对象的引用计数
+    weak_table_t weak_table; // 以 object ids 为 keys，以 weak_entry_t 为 values 的哈希表，从中找到的对象的 weak_entry_t
+    
+    // 构造函数，只做了一件事把 weak_table 的空间置为 0
+    SideTable() {
+        // 把从 &weak_table 位置开始的长度为 sizeof(weak_table) 的内存空间置为 0
+        memset(&weak_table, 0, sizeof(weak_table));
+    }
+
+    // 析构函数（不能进行析构）
+    ~SideTable() {
+        // 看到 SidetTable 是不能析构的，如果进行析构则会直接终止运行
+        _objc_fatal("Do not delete SideTable.");
+    }
+    
+    // 三个函数正对应了 StripedMap 中模版抽象类型 T 的接口要求，三个函数的内部都是直接调用 slock 的对应函数
+    void lock() { slock.lock(); }
+    void unlock() { slock.unlock(); }
+    void forceReset() { slock.forceReset(); }
+
+    // Address-ordered lock discipline for a pair of side tables.
+    
+    // HaveOld 和 HaveNew 分别表示 lock1 和 lock2 是否存在，
+    // 表示 __weak 变量是否指向有旧值和目前要指向的新值。
+    
+    // lock1 代表旧值对象所处的 SideTable 
+    // lock2 代表新值对象所处的 SideTable
+    
+    // lockTwo 是根据谁有值就调谁的锁，触发加锁 (C++ 方法重载)，
+    // 如果两个都有值，那么两个都加锁，并且根据谁低，先给谁加锁，然后另一个后加锁
+    template<HaveOld, HaveNew>
+    static void lockTwo(SideTable *lock1, SideTable *lock2);
+    
+    // 同上，对 slock 解锁
+    template<HaveOld, HaveNew>
+    static void unlockTwo(SideTable *lock1, SideTable *lock2);
+};
+
+// 源文件中下面是 lockTwo 和 unlockTwo 函数根据模版参数的重载，很清晰，这里就不再贴代码了。
+```
+&emsp;`struct SideTable` 结构很清晰，3 个成员变量:
+1. `spinlock_t slock;`: 自旋锁，保证操作 `SideTable` 时的线程安全。看前面的两大块 `weak_table_t` 和 `weak_entry_t` 的时候，看到它们所有的操作函数都没有提及加解锁的事情，如果你仔细观察的话会发现它们的函数名后面都有一个 `no_lock` 的小尾巴，正是用来提醒我们，它们的操作完全并没有涉及加锁。其实它们是把保证它们线程安全的任务交给了 `SideTable`，下面可以看到 `SideTable` 提供的函数都是线程安全的，而这都是由 `slock` 来完成的。
+2. `RefcountMap refcnts`: 以 `DisguisedPtr<objc_object>` 为 `key`，以 `size_t` 为 `value` 的哈希表，用来存储对象的引用计数（仅在未使用 `isa` 优化或者 `isa` 优化情况下 `isa_t` 中保存的引用计数溢出时才会用到，这里涉及到 `isa_t` 里的 `uintptr_t has_sidetable_rc` 和 `uintptr_t extra_rc` 两个字段，以前只是单纯的看 `isa` 的结构，到这里终于被用到了，还有这时候终于知道 `rc` 其实是 `refcount`(引用计数) 的缩写）。作为哈希表，它使用的是平方探测法从哈希表中取值，而 `weak_table_t` 则是线性探测（开放寻址法）。（`RefcountMap` 留在引用计数相关文章中来详细分析。）
+3. `weak_table_t weak_table` 存储对象弱引用的哈希表，是 `weak` 功能实现的核心数据结构。
+
+## using spinlock_t = mutex_tt<LOCKDEBUG>
+&emsp;`spinlock_t` 的最终定义实际上是一个 `uint32_t` 类型的 **非公平的自旋锁**，（目前底层实现已由互斥锁 `os_unfair_lock` 所替换）。所谓非公平是指，获得锁的顺序和申请锁的顺序无关，也就是说，第一个申请锁的线程有可能会是最后一个获得该锁，或者是刚获得锁的线程会再次立刻获得该锁，造成其它线程忙等（`busy-wait`）。同时，`os_unfair_lock` 在 `_os_unfair_lock_opaque` 记录了获取它的线程信息，只有获得该锁的线程才能够解开这把锁。
+```c++
+OS_UNFAIR_LOCK_AVAILABILITY
+typedef struct os_unfair_lock_s {
+    uint32_t _os_unfair_lock_opaque;
+} os_unfair_lock, *os_unfair_lock_t;
+```
+&emsp;`os_unfair_lock` 的实现，`apple` 并未公开，大体上应该是操作 `_os_unfair_lock_opaque` 这个 `uint32_t` 的值，当大于 `0` 时，锁可用，当等于或小于 `0` 时，表示锁已经被其它线程获取且还没有解锁，当前线程再获取这把锁，就要被等待（或者直接阻塞，直到能获取到锁）。
+
+## template <typename Type> class ExplicitInit
+> &emsp;We cannot use a C++ static initializer to initialize certain globals because libc calls us before our C++ initializers run. We also don't want a global pointer to some globals because of the extra indirection. ExplicitInit / LazyInit wrap doing it the hard way.
+>
+> &emsp;我们不能使用 C++ static initializer 去初始化某些全局变量，因为 libc 在 C++ static initializer 调用之前会调用我们。由于额外的间接性，我们也不需要全局指针指向某些全局变量。 ExplicitInit / LazyInit wrap 很难做到。
+
+```c++
+template <typename Type>
+class ExplicitInit {
+    // typedef unsigned char uint8_t;
+    // alignas(Type) 表示 _storage 内存对齐同 Type，
+    // _storage 是长度为 sizeof(Type) 的 unsigned char 类型数组
+    alignas(Type) uint8_t _storage[sizeof(Type)];
+
+public:
+    // c++11 新增加了变长模板，Ts 是 T 的复数形式，
+    // 如果我们要避免这种转换呢？ 
+    // 我们需要一种方法能按照参数原来的类型转发到另一个函数中，这才完美，我们称之为完美转发。
+    // std::forward 就可以保存参数的左值或右值特性。
+    
+    // 初始化
+    template <typename... Ts>
+    void init(Ts &&... Args) {
+        new (_storage) Type(std::forward<Ts>(Args)...);
+    }
+
+    Type &get() {
+        // 把 _storage 数组起始地址强制转化为 Type *
+        return *reinterpret_cast<Type *>(_storage);
+    }
+};
+```
+
+## static StripedMap<SideTable>& SideTables()
+&emsp;`SideTables` 是一个类型是 `StripedMap<SideTable>` 的静态全局哈希表。通过上面 `StripedMap` 的学习，已知在 `iPhone` 下它是固定长度为 `8` 的哈希数组，在 `mac` 下是固定长度为 `64` 的哈希数组，自带一个简单的哈希函数，根据 `void *` 入参计算哈希值，然后取得哈希数组中对应的 `T`。`SideTables` 中则是取得 `SideTable`。
+```c++
+// Map: NSObject * (key) -- SideTable& (value)
+static StripedMap<SideTable>& SideTables() {
+    return SideTablesMap.get();
+}
+
+static objc::ExplicitInit<StripedMap<SideTable>> SideTablesMap;
+
+static StripedMap<SideTable>& SideTables() {
+    return SideTablesMap.get();
 }
 ```
 
-## 赋值和构造函数
-赋值操作，直接使用 `memcpy` 拷贝内存地址里面的内容，并返回 `*this`，而不是用复制构造函数什么的形式实现，应该也是为了提高效率考虑。
-构造函数则是 `referent(newReferent)` 初始化 `referent`，并把第一个 `weak` 变量地址放在`inline_referrers` 首位，然后一个循环把 `inline_referrers` 后三个元素置为 `nil`。
+
+
+## `SideTables()`  锁相关的全局函数
+`SideTables()` 下面定义了多个与锁相关的全局函数，内部实现是调用 `StripedMap` 的模版抽象类型 `T` 所支持的函数接口，对应 `SideTables` 的 `T` 类型是 `SideTable`，而 `SideTable` 执行对应的函数时正是调用了它的 `spinlock_t slock` 成员变量的函数。
+这里采用了分离锁的机制，即一张 `SideTable` 一把锁，减轻并行处理多个对象时的阻塞压力。
+```c++
+// 循环 8/64 次给 SideTable 加锁
+void SideTableLockAll() {
+    SideTables().lockAll();
+}
+
+// 循环 8/64 次给 SideTable 解锁
+void SideTableUnlockAll() {
+    SideTables().unlockAll();
+}
+
+void SideTableForceResetAll() {
+    SideTables().forceResetAll();
+}
+
+void SideTableDefineLockOrder() {
+    SideTables().defineLockOrder();
+}
+
+void SideTableLocksPrecedeLock(const void *newlock) {
+    SideTables().precedeLock(newlock);
+}
+
+void SideTableLocksSucceedLock(const void *oldlock) {
+    SideTables().succeedLock(oldlock);
+}
+
+void SideTableLocksPrecedeLocks(StripedMap<spinlock_t>& newlocks) {
+    int i = 0;
+    const void *newlock;
+    while ((newlock = newlocks.getLock(i++))) {
+        SideTables().precedeLock(newlock);
+    }
+}
+
+void SideTableLocksSucceedLocks(StripedMap<spinlock_t>& oldlocks) {
+    int i = 0;
+    const void *oldlock;
+    while ((oldlock = oldlocks.getLock(i++))) {
+        SideTables().succeedLock(oldlock);
+    }
+}
+```
+
+## `SideTablesMap`
+`SideTableMap` 是一个类型为 `objc::ExplicitInit<StripedMap<SideTable>>` 的静态全局变量。`SideTablesMap` 定义如下：
+```c++
+static objc::ExplicitInit<StripedMap<SideTable>> SideTablesMap;
+```
+那接下来我们详细分析一下 `ExplicitInit` 类型。
 
 
 
+## `weak_entry_for_referent` 函数定位 `weak_entry_t`
+下面拓展一下，找到 `Source/objc-weak.mm` 文件，我们来看一下 `weak_table` 的 `hash` 定位操作 `weak_entry_for_referent` 函数： 
+```c++
+/** 
+ * Return the weak reference table entry for the given referent. 
+ * 返回给定的 referent 在弱引用表中的 entry. 
+ * 即从 weak_table_t 的 weak_entries 数组中返回对应的 weak_entry_t
+ * If there is no entry for referent, return NULL. 
+ * 如果不存在则返回 NULL
+ * Performs a lookup.
+ *
+ * @param weak_table 入参是 weak_table，通过 "weak_able = &SideTables()[referent];"
+ * 从全局的 SideTables 中找到 referent 所处的 weak_table_t
+ * @param referent The object. Must not be nil.
+ * 
+ * @return The table of weak referrers to this object. 
+ */
+static weak_entry_t *
+weak_entry_for_referent(weak_table_t *weak_table, objc_object *referent)
+{
+    // 如果 referent 为空则执行断言
+    ASSERT(referent);
+    
+    // 取得 hash 数组的入口
+    weak_entry_t *weak_entries = weak_table->weak_entries;
+    
+    // 判空
+    if (!weak_entries) return nil;
+    
+    // hash 函数：hash_pointer 函数返回值与 mask 做与操作，防止 index 越界
+    // 这里的与操作很巧妙，下面会进行详细分析
+    size_t begin = hash_pointer(referent) & weak_table->mask;
+    size_t index = begin;
+    size_t hash_displacement = 0;
+    while (weak_table->weak_entries[index].referent != referent) {
+        index = (index+1) & weak_table->mask;
+        
+        // 触发 bad_weak_table
+        if (index == begin) bad_weak_table(weak_table->weak_entries);
+        hash_displacement++;
+        
+        // 当 hash 冲突超过了 weak_table 的 max_hash_displacement 时，
+        // 说明 referent 在 hash 表中没有对应的 weak_entry_t，返回 nil
+        if (hash_displacement > weak_table->max_hash_displacement) {
+            return nil;
+        }
+    }
+
+    return &weak_table->weak_entries[index];
+}
+```
+### `hash_pointer`_`hash` 函数
+```c++
+// hash 函数，与 mask 做与操作，防止 index 越界
+size_t begin = hash_pointer(referent) & weak_table->mask;
+```
+ `hash_pointer` 尝试确定 `referent` 的初始位置，后面的 `& weak_table->mask;` 位操作来确保得到的 `begin` 不会越界，同我们使用的取模操作是一样的功能，只是改为了位操作，提升了效率。
+ 
+ #### `mask` & 操作确保 `index` 不越界
+> 这里的与运算其实很巧妙，首先是 `mask` 的值一直是 2 的 N 次方减 1 ，根据 `weak_grow_maybe` 函数，我们会看到 `hash` 数组（`weak_entry_t *weak_entries;`）长度最小是 64，即 2 的 6 次方（N >= 6），以后的每次扩容是之前的容量乘以 2，即总容量永远是 2 的 N 次方，然后 `mask` 是 2 的 N 次方减 1，转为二进制的话：`mask`一直是: `0x0111111(64 - 1，N = 6)`、`0x01111111(128 -1，N = 7)....`, 即 `mask` 的二进制表示中后 N 位总是 1，之前的位总是 0，所以任何数与 `mask` 做与操作的结果总是在 [0, mask] 这个区间内，例如任何数与 `0x0111111(64 - 1，N = 6)` 做与操作的话结果总是在 `[0, 63]` 这个区间内。而这个正是 `weak_entry_t *weak_entries` 数组的合理下标范围。
+
+然后，从 `begin` 开始对比 `hash` 表中的数据是否与 `referent` 相等，如果不相等则 `index + 1`，直到 `index == begin`（绕了一圈）或超过了可能的**hash 冲突最大值**。
+以上就是 `weak_table_t` 如何进行 `hash` 定位的相关操作。
+这里看一下 `hash` 函数 `hash_pointer(referent)`:
+```c++
+/** 
+ * Unique hash function for object pointers only.
+ * 
+ * @param key The object pointer
+ * 
+ * @return Size unrestricted hash of pointer.
+ */
+static inline uintptr_t hash_pointer(objc_object *key) {
+    // typedef unsigned long uintptr_t;
+    return ptr_hash((uintptr_t)key);
+}
+
+// 连续的函数调用
+#if __LP64__
+static inline uint32_t ptr_hash(uint64_t key)
+{
+    key ^= key >> 4; // key 右移 4 位，然后与原始 key 做异或位操作
+    
+    key *= 0x8a970be7488fda55; // 定值 与 key 做乘运算
+    
+    key ^= __builtin_bswap64(key); // 翻转64位数各字节
+    
+    return (uint32_t)key;
+}
+#else
+static inline uint32_t ptr_hash(uint32_t key)
+{
+    key ^= key >> 4;
+    key *= 0x5052acdb;
+    key ^= __builtin_bswap32(key);
+    
+    return key;
+}
+#endif
+```
+## 添加、移除 `referrer` 到 `weak_entry_t` 及 `weak` 变量置 `nil` 函数定义
+`weak_table_t` 下面是三个函数定义，这里我们只要看下它们的作用就好，具体实现过程参考 `weak` 原理那篇。
+
+### `weak_register_no_lock` 
+```
+/// Adds an (object, weak pointer) pair to the weak table.
+/// 添加一对（object, weak pointer）到弱引用表里
+id weak_register_no_lock(weak_table_t *weak_table, id referent, 
+                         id *referrer, bool crashIfDeallocating);
+```
+### `weak_unregister_no_lock`
+```
+/// Removes an (object, weak pointer) pair from the weak table.
+/// 从弱引用表里移除一对（object, weak pointer）
+void weak_unregister_no_lock(weak_table_t *weak_table, id referent, id *referrer);
+```
+### `weak_is_registered_no_lock`
+```
+#if DEBUG
+/// Returns true if an object is weakly referenced somewhere.
+/// 如果一个对象在弱引用表的到某处，即该对象被保存在弱引用表里，则返回 true.
+bool weak_is_registered_no_lock(weak_table_t *weak_table, id referent);
+#endif
+```
+### `weak_clear_no_lock`
+```
+/// Called on object destruction. Sets all remaining weak pointers to nil.
+/// 当对象销毁的时候该函数被调用。设置所有剩余的 __weak 指针为 nil.
+/// 此处正对应了，__weak 变量在它指向的对象销毁后它会被置为 nil 的机制
+void weak_clear_no_lock(weak_table_t *weak_table, id referent);
+```
+## `weak_table_t` 调整大小
+`weak_table_t` 调用 `weak_grow_maybe` 和 `weak_compact_maybe` 这两个函数，用来在 `weak_table_t` 过满或者过空的情况下及时的调整其大小，优化内存的使用效率，并提高效率。
+这两个函数都通过调用 `weak_resize` 函数来调整 `weak_table_t` 的大小。
+
+### `weak_grow_maybe`
+此函数会在创建 `weak_entry_t` 和把 `new_entry` 添加到 `weak_table_t` 之间调用，下面看下它的实现: 
+```c++
+// Grow the given zone's table of weak references if it is full.
+// 如果给定区域的弱引用表已满，则对其进行扩展。
+static void weak_grow_maybe(weak_table_t *weak_table)
+{
+    // #define TABLE_SIZE(entry) (entry->mask ? entry->mask + 1 : 0)
+    // mask + 1 表示当前 weak_table 总容量
+    // old_size = mask + 1;
+    size_t old_size = TABLE_SIZE(weak_table);
+
+    // Grow if at least 3/4 full.
+    // 如果目前存储的 entry 数量超过了总容量的 3/4，则进行扩容
+    if (weak_table->num_entries >= old_size * 3 / 4) {
+        // 如果是 weak_table 是空的，则初始长度为 64
+        // 如果是非空，则扩容为之前的两倍
+        weak_resize(weak_table, old_size ? old_size*2 : 64);
+    }
+}
+```
+该函数用于扩充 `weak_table_t` 的 `weak_entry_t *weak_entries` 的空间，扩充条件是 `num_entries` 超过了 `mask + 1` 的 3/4。看到 `weak_entries` 的初始化长度是 `64`，每次扩充的长度则是 `mask + 1` 的 2 倍，扩容完毕后会把原 `weak_entry_t` 重新通过 `hash` 函数计算索引插入到新空间内，并更新 `weak_tabl_t` 各成员变量。占据的内存空间的总容量则是: `(mask + 1) * sizeof(weak_entry_t)`。
+综上 `mask + 1` 总是 2 的 `N` 次方。（`N >= 6`）
+
+### `weak_compact_maybe`
+此函数会在 `weak_entry_remove` 函数中调用，旨在 `weak_entry_t` 从 `weak_table_t` 中移除后，缩小 `weak_entry_t *weak_entries` 的空间，下面看下它的实现：
+```c++
+// Shrink the table if it is mostly empty.
+// 即当 weak_table_t 的 `weak_entry_t *weak_entries;` 数组大部分为空的情况下，缩小 weak_entries
+static void weak_compact_maybe(weak_table_t *weak_table)
+{
+    // #define TABLE_SIZE(entry) (entry->mask ? entry->mask + 1 : 0)
+    // old_size = mask + 1;
+    size_t old_size = TABLE_SIZE(weak_table);
+
+    // Shrink if larger than 1024 buckets and at most 1/16 full.
+    // old_size 超过了 1024 并且 低于 1/16 的空间占用则进行缩小
+    
+    if (old_size >= 1024  && old_size / 16 >= weak_table->num_entries) {
+        // 缩小容量为 ols_size 的 1/8
+        weak_resize(weak_table, old_size / 8);
+        
+        // 缩小为 1/8 和上面的空间占用少于 1/16，两个条件合并在一起，保证缩小后的容量占用少于 1/2
+        // leaves new table no more than 1/2 full
+    }
+}
+```
+缩小 `weak_entry_t *weak_entries` 容量的条件是目前的总长度**超过了 1024** 并且容量**占用小于 1/16**，缩小后的空间为当前空间的 **1/8**。
+
+### `weak_resize`
+下面看一下扩大和缩小空间都会调用的 `weak_resize` 函数，下面是它的函数定义:
+```c++
+static void weak_resize(weak_table_t *weak_table, size_t new_size)
+{
+    // old_size = mask + 1; 表示原容量
+    size_t old_size = TABLE_SIZE(weak_table);
+    
+    // 旧的 weak_entries 数组起始地址
+    weak_entry_t *old_entries = weak_table->weak_entries;
+    
+    // 新的 weak_entries 数组起始地址
+    // 内存空间总容量为: new_size * sizeof(weak_entry_t)
+    weak_entry_t *new_entries = (weak_entry_t *)
+        calloc(new_size, sizeof(weak_entry_t));
+        
+    // mask 仍是总容量减 1
+    weak_table->mask = new_size - 1;
+    // 更新 hash 数组起始地址
+    weak_table->weak_entries = new_entries;
+    
+    // 以下两个成员变量会在下面的 weak_entry_insert 函数中得到更新
+    // hash 冲突偏移
+    weak_table->max_hash_displacement = 0;
+    // 当前容量占用
+    weak_table->num_entries = 0;  // restored by weak_entry_insert below
+    
+    // 如果有旧 weak_entry_t 需要放到新空间内 
+    if (old_entries) {
+        weak_entry_t *entry;
+        weak_entry_t *end = old_entries + old_size;
+        // 循环调用 weak_entry_insert 把 weak_entry_t 插入到新空间内
+        for (entry = old_entries; entry < end; entry++) {
+            if (entry->referent) {
+                weak_entry_insert(weak_table, entry);
+            }
+        }
+        
+        // 最后释放旧空间
+        free(old_entries);
+    }
+}
+```
+### `weak_entry_insert`
+```c++
+/** 
+ * Add new_entry to the object's table of weak references.
+ * 添加 new_entry 到对象的弱引用表中。
+ * Does not check whether the referent is already in the table.
+ * 不检查引用对象是否已在表中。
+ */
+static void weak_entry_insert(weak_table_t *weak_table, weak_entry_t *new_entry)
+{
+    weak_entry_t *weak_entries = weak_table->weak_entries;
+    ASSERT(weak_entries != nil);
+    
+    // 调用 hash 函数找到 new_entry 在 weak_table_t 的 hash 数组中的位置
+    // 可能会发生 hash 冲突
+    size_t begin = hash_pointer(new_entry->referent) & (weak_table->mask);
+    size_t index = begin;
+    size_t hash_displacement = 0;
+    while (weak_entries[index].referent != nil) {
+        index = (index+1) & weak_table->mask;
+        if (index == begin) bad_weak_table(weak_entries);
+        hash_displacement++;
+    }
+
+    weak_entries[index] = *new_entry;
+    weak_table->num_entries++;
+    
+    // 此步操作正记录了 weak_table_t 的最大偏移值
+    if (hash_displacement > weak_table->max_hash_displacement) {
+        weak_table->max_hash_displacement = hash_displacement;
+    }
+}
+```
+综合 `weak_entry_insert` 函数可知  `weak_resize` 函数的整体作用，该函数具体执行了 `hash` 数组的扩大和缩小，首先根据`new_size`申请相应大小的内存，`new_entries`指针指向这块新申请的内存。设置`weak_table`的`mask`为`new_size - 1`。此处`mask`的作用是记录`weak_table`实际占用的内存边界，此外`mask`还用在 `hash` 函数中保证不会造成 `hash` 数组越界。
+`HashTable`可能会有`hash碰撞`，而`weak_table_t`使用了**开放寻址法**来处理碰撞。如果发生碰撞的话，将寻找相邻（如果已经到最尾端的话，则从头开始）的下一个空位。`max_hash_displacement`记录当前`weak_table`最大的偏移值，即`hash`函数计算的位置和实际存储位置的最大偏差。此值会在其他地方用到，例如：`weak_entry_for_referent`函数，寻找给定的 `referent` 的在弱引用表中的 `entry`时，如果在循环过程中 `hash_displacement` 的值超过了 `weak_table->max_hash_displacement` 则表示，不存在要找的 `weak_entry_t`。
+
+## 尾声
+其他后续的与 `weak_table_t` 相关的函数放在 `weak` 原理那篇。
+
+
+## 参考链接 
 **参考链接:🔗**
 + [使用intptr_t和uintptr_t](https://www.jianshu.com/p/03b7d56bf80f)
 + [Object Runtime -- Weak](https://cloud.tencent.com/developer/article/1408976)
