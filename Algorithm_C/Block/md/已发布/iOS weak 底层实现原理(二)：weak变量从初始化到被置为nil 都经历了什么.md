@@ -296,34 +296,26 @@ storeWeak(id *location, objc_object *newObj)
 那 `storeWeak` 大概分析到这里，下面我们来看另外一个函数。
 
 ## objc_destroyWeak
-&emsp;示例代码中作为局部变量的 `weak` 变量出来右边花括号就表示它的作用域结束了，必然会进行释放销毁，汇编代码中我们看到了 `objc_destroyWeak` 函数被调用，它正是 `weak` 变量销毁时调用的函数。在分析销毁函数之前我们先看一个问题：
+&emsp;示例代码中作为局部变量的 `__weak` 变量出了右边花括号它的作用域就结束了，必然会进行释放销毁，汇编代码中我们看到了 `objc_destroyWeak` 函数被调用，看名字它应该是 `__weak` 变量销毁时所调用的函数。如果 `__weak` 变量比它所指向的对象更早销毁，那么它所指向的对象的 `weak_entry_t` 的哈希数组中存放该 `__weak` 变量的地址要怎么处理呢？那么一探 `objc_destroyWeak` 函数的究竟应该你能找到答案。
 
-> 如果 `weak` 变量比它所指向的对象提前销毁了，那 `weak_entry_t` 中存放弱引用的地址的哈希数组是怎么处理的 ？
-  对于这个问题，因为是关于弱引用的指针怎么处理的，那我们首先想到的应该是 `weak_register_no_lock` 和 `weak_unregister_no_lock` 函数，因为是跟销毁相关的，那我们盲猜应该是和 `weak_unregister_no_lock` 有关，那接下来我们进行验证这个盲猜。
+> &emsp;Destroys the relationship between a weak pointer and the object it is referencing in the internal weak table. If the weak pointer is not referencing anything, there is no need to edit the weak table. This function IS NOT thread-safe with respect to concurrent modifications to the weak variable. (Concurrent weak clear is safe.)
+>
+> &emsp;销毁 weak pointer 和其所指向的对象的弱引用表中的关系。（对象的 weak_entry_t 的哈希数组中保存着该对象的所有弱引用的地址，这里意思是把指定的弱引用的地址从 weak_entr_t 的哈希数组中移除。）如果 weak pointer 未指向任何内容，则无需编辑 weak_entry_t 的哈希数组。对于弱引用的并发修改，此函数不是线程安全的。 （并发进行 weak clear 是线程安全的）
 
-首先我们看下 `objc_destroyWeak` 函数的实现:
+
 ```c++
 /** 
- * Destroys the relationship between a weak pointer and the object
- * it is referencing in the internal weak table. 
- 
- * 销毁 weak pointer 和它指向的对象在 weak_table_t 中的关系。
- 
- * If the weak pointer is not referencing anything, 
- * there is no need to edit the weak table. 
- 
- * 如果 weak pointer 没有指向任何变量，那就不需要编辑 weak_table_t。
- 
- * This function IS NOT thread-safe with respect to concurrent
- * modifications to the weak variable. (Concurrent weak clear is safe.)
- 
- * 此函数对 weak 变量的并发修改不是线程安全的。
- * 
- * @param location The weak pointer address. 
+ * @param location The weak pointer address. // location 是 __weak 变量的地址（objc_object **）
  */
 void
 objc_destroyWeak(id *location)
 {
+    // 看到内部是直接调用了 storeWeak 函数，参数的话这里我们要细看一下，
+    // DoHaveOld 
+    // DontHaveNew
+    // DontCrashIfDeallocating
+    // location
+    // nil 
     (void)storeWeak<DoHaveOld, DontHaveNew, DontCrashIfDeallocating>
         (location, nil);
 }
