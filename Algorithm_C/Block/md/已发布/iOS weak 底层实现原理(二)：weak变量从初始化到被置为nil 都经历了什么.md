@@ -56,7 +56,7 @@ objc_initWeak(id _Nullable * _Nonnull location, id _Nullable val)
   ```
   This function IS NOT thread-safe with respect to concurrent modifications to the weak variable. (Concurrent weak clear is safe.)
 >
-> &emsp;初始化指向某个对象位置的新的 weak pointer（旧的 weak pointer 赋值时要执行清理工作）。对于 weak 变量的并发修改，此函数不是线程安全的。（并发进行 weak clear 是线程安全的。）
+> &emsp;初始化指向某个对象位置的新的 weak pointer（旧的 weak pointer 发生赋值时要首先对当前的指向进行清理工作）。对于 weak 变量的并发修改，此函数不是线程安全的。（并发进行 weak clear 是线程安全的。）
 
 ```c++
 
@@ -83,7 +83,7 @@ objc_initWeak(id *location, id newObj)
     
     // storeWeak 是一个模版函数，DontHaveOld 表示没有旧值，表示这里是新初始化 __weak 变量。
     // DoHaveNew 表示有新值，新值即为 newObj
-    // DoCrashIfDeallocating 表示如果在下面的函数执行过程中 newObj 中途释放了就 crash
+    // DoCrashIfDeallocating 如果 newObj 的 isa 已经被标记为 deallocating 或 newObj 所属的类不支持弱引用，则 crash
 
     return storeWeak<DontHaveOld, DoHaveNew, DoCrashIfDeallocating>
         (location, (objc_object*)newObj);
@@ -98,7 +98,7 @@ objc_initWeak(id *location, id newObj)
 
 2. `id newObj`: 所用的对象，即示例代码中的 `obj`。
 该方法有一个返回值，返回的是 `storeWeak` 函数的返回值：
-返回的其实还是 `obj`, 但是已经对 `obj` 的 `isa（isa_t）` 的 `weakly_referenced` 位设置为 `1`，标识该对象有弱引用存在，当该对象销毁时，要处理之前指向它的那些弱引用，`weak` 变量被置为 `nil` 的机制就是从这里实现的。 
+返回的其实还是 `obj`, 但是已经对 `obj` 的 `isa（isa_t）` 的 `weakly_referenced` 位设置为 `1`，标识该对象有弱引用存在，当该对象销毁时，要处理指向它的那些弱引用，`weak` 变量被置为 `nil` 的机制就是从这里实现的。 
 
 &emsp;看 `objc_initWeak` 函数实现可知，它内部是调用 `storeWeak` 函数，且执行时的模版参数是 `DontHaveOld`（没有旧值），这里是指 `weakPtr` 之前没有指向任何对象，我们的 `weakPtr` 是刚刚初始化的，自然没有指向旧值。这里涉及到的是，当 `weak` 变量改变指向时，要把该 `weak` 变量地址从它之前指向的对象的 `weak_entry_t` 的哈希数组中移除。`DoHaveNew` 表示有新值。
 
@@ -108,14 +108,14 @@ objc_initWeak(id *location, id newObj)
 
 从 `storeWeak` 函数实现就要和我们前几篇的内容联系起来啦，想想还有些激动 😊。
 
-## objc_storeWeak
+## storeWeak
 &emsp;分析 `storeWeak` 函数源码实现：
 > &emsp;Update a weak variable. If HaveOld is true, the variable has an existing value that needs to be cleaned up. This value might be nil. If HaveNew is true, there is a new value that needs to be assigned into the variable. This value might be nil. If CrashIfDeallocating is true, the process is halted if newObj is deallocating or newObj's class does not support weak references. If CrashIfDeallocating is false, nil is stored instead.
 >
-> &emsp;更新一个 weak 变量。如果 HaveOld 为 true，则该 weak 变量具有需要清除的现有值。该值可能为 nil。如果 HaveNew 为 true，则需要将一个新值分配给 weak 变量。该值可能为 nil。如果 CrashIfDeallocating 为 true，则在 storeWeak 函数执行过程中  newObj 释放了或 newObj 的类不支持弱引用时，程序将 crash。如果 CrashIfDeallocating 为 false，则发生以上问题时只是在 weak 变量中存入 nil。
+> &emsp;更新一个 weak 变量。如果 HaveOld 为 true，则该 weak 变量具有需要清除的现有值。该值可能为 nil。如果 HaveNew 为 true，则需要将一个新值分配给 weak 变量。该值可能为 nil。如果 CrashIfDeallocating 为 true，如果 newObj 的 isa 已经被标记为 deallocating 或 newObj 所属的类不支持弱引用，程序将 crash。如果 CrashIfDeallocating 为 false，则发生以上问题时只是在 weak 变量中存入 nil。
 
 ```c++
-// DoCrashIfDeallocating：如果在 storeWeak 函数执行过程中 newObj 被释放了，那函数执行会 crash，
+// DoCrashIfDeallocating：如果 newObj 的 isa 已经被标记为 deallocating 或 newObj 所属的类不支持弱引用，函数执行时会 crash，
 // DontCrashIfDeallocating：不 crash，并把 *location = nil
 enum CrashIfDeallocating {
     DontCrashIfDeallocating = false, DoCrashIfDeallocating = true
@@ -251,6 +251,7 @@ storeWeak(id *location, objc_object *newObj)
     
     if (haveNew) { 
         // 调用 weak_register_no_lock 方法把 weak ptr 的地址记录到 newObj 的 weak_entry_t 的哈希数组中
+        // 如果 newObj 的 isa 已经被标记为 deallocating 或 newObj 所属的类不支持弱引用，则 weak_register_no_lock 函数中会 crash
         newObj = (objc_object *)
             weak_register_no_lock(&newTable->weak_table, (id)newObj, location,
                                   crashIfDeallocating);
@@ -293,7 +294,25 @@ storeWeak(id *location, objc_object *newObj)
 
 &emsp;`storeWeak` 函数实质上接受5个参数，其中 `HaveOld haveOld, HaveNew haveNew, CrashIfDeallocating crashIfDeallocating` 这三个参数是以模板枚举的方式传入的，其实这是三个 `bool` 参数，具体到 `objc_initWeak` 函数，这三个参数的值分别为 `false，true，true`，因为是初始化 `weak` 变量必然要有新值，没有旧值。
 
-那 `storeWeak` 大概分析到这里，下面我们来看另外一个函数。
+## objc_storeWeak
+&emsp;示例代码中当我们对 `__weak` 变量赋一个新值时，调用了 `objc_storeWeak`，那么看一下 `objc_storeWeak` 函数的源码吧。
+> &emsp;This function stores a new value into a __weak variable. It would be used anywhere a __weak variable is the target of an assignment.
+>
+> &emsp;此函数将新值存储到 __weak 变量中。__weak 变量是赋值目标的任何地方都可以使用它。
+
+```c++
+id
+objc_storeWeak(id *location, id newObj)
+{
+   // DoHaveOld true 有旧值
+   // DoHaveNew true 有新值
+   return storeWeak<DoHaveOld, DoHaveNew, DoCrashIfDeallocating>
+       (location, (objc_object *)newObj);
+}
+```
+&emsp;内部也是直接对 `storeWeak` 的调用，`DoHaveOld` 和 `DoHaveNew` 都为 `true`，表示这次我们要先处理 `__weak` 变量当前的指向（`weak_unregister_no_lock`），然后 `__weak` 变量指向新的对象（`weak_register_no_lock`）。
+
+&emsp;到这里我们就已经很清晰了 `objc_initWeak` 用于 `__weak` 变量的初始化，内部只需要 `weak_register_no_lock` 相关的调用，然后当对 `__weak` 变量赋值时，则是先处理它对旧指向 `weak_unregister_no_lock`，然后处理它的新指向 `weak_register_no_lock`。
 
 ## objc_destroyWeak
 &emsp;示例代码中作为局部变量的 `__weak` 变量出了右边花括号它的作用域就结束了，必然会进行释放销毁，汇编代码中我们看到了 `objc_destroyWeak` 函数被调用，看名字它应该是 `__weak` 变量销毁时所调用的函数。如果 `__weak` 变量比它所指向的对象更早销毁，那么它所指向的对象的 `weak_entry_t` 的哈希数组中存放该 `__weak` 变量的地址要怎么处理呢？那么一探 `objc_destroyWeak` 函数的究竟应该你能找到答案。
@@ -301,7 +320,6 @@ storeWeak(id *location, objc_object *newObj)
 > &emsp;Destroys the relationship between a weak pointer and the object it is referencing in the internal weak table. If the weak pointer is not referencing anything, there is no need to edit the weak table. This function IS NOT thread-safe with respect to concurrent modifications to the weak variable. (Concurrent weak clear is safe.)
 >
 > &emsp;销毁 weak pointer 和其所指向的对象的弱引用表中的关系。（对象的 weak_entry_t 的哈希数组中保存着该对象的所有弱引用的地址，这里意思是把指定的弱引用的地址从 weak_entr_t 的哈希数组中移除。）如果 weak pointer 未指向任何内容，则无需编辑 weak_entry_t 的哈希数组。对于弱引用的并发修改，此函数不是线程安全的。 （并发进行 weak clear 是线程安全的）
-
 
 ```c++
 /** 
@@ -311,29 +329,32 @@ void
 objc_destroyWeak(id *location)
 {
     // 看到内部是直接调用了 storeWeak 函数，参数的话这里我们要细看一下，
-    // DoHaveOld 
-    // DontHaveNew
-    // DontCrashIfDeallocating
-    // location
-    // nil 
+    // DoHaveOld true 有旧值
+    // DontHaveNew false 没有新值
+    // DontCrashIfDeallocating false
+    // location weak 变量的地址
+    // nil newObjc 是 nil 
     (void)storeWeak<DoHaveOld, DontHaveNew, DontCrashIfDeallocating>
         (location, nil);
 }
 ```
-&emsp;我们看到函数内部只有一行对 `storeWeak` 函数的调用，且模版参数直接表明 `DoHaveOld` 有旧值、 `DontHaveNew` 没有新值、`DontCrashIfDeallocating` 不需要 crash，`newObj` 为 `nil`，参数只有 `location` 即要销毁的弱引用的指针，回忆我们上面详细分析的 `storeWeak` 函数：
+&emsp;我们看到函数内部是直接对 `storeWeak` 函数的调用，且模版参数直接表明 `DoHaveOld` 有旧值、 `DontHaveNew` 没有新值、`DontCrashIfDeallocating` 不需要 crash，`newObj` 为 `nil`，参数只有 `location` 要销毁的弱引用的地址，回忆我们上面详细分析的 `storeWeak` 函数：
 ```c++
 ...
 // Clean up old value, if any.
 // 如果有旧值，则进行 weak_unregister_no_lock 操作
 if (haveOld) {
-    // 把 location 从 oldObj 对应的 weak_entry_t 的 hash 数组中移除
+    // 把 location 从 oldObj 对应的 weak_entry_t 的哈希数组中移除
     weak_unregister_no_lock(&oldTable->weak_table, oldObj, location);
 }
 ...
 ```
-正验证了我们上面的盲猜，直接调用 `weak_unregister_no_lock` 函数，这也是 `objc_destroyWeak` 函数唯一的功能。
+&emsp;到这里也很清晰了，和上面 `__weak` 变量的初始化和赋值操作对比，这里是做销毁操作，只需处理旧值，调用 `weak_unregister_no_lock` 函数就好了。
+&emsp;`weak_unregister_no_lock` 函数的详细分析放在了 `objc-weak.mm` 函数整体分析那篇。
 
-### `objc_initWeakOrNil`
+&emsp;顺着 `NSObject.mm` 文件的 `storeWeak` 函数往下浏览，发现了几个只是参数不同内部完全调用 `storeWeak` 的工厂函数。
+
+## objc_initWeakOrNil
 ```c++
 id
 objc_initWeakOrNil(id *location, id newObj)
@@ -347,9 +368,13 @@ objc_initWeakOrNil(id *location, id newObj)
         (location, (objc_object*)newObj);
 }
 ```
-与 `objc_initWeak` 区别就是 `DontCrashIfDeallocating`，如果 `newObj` 析构不会 `crash`。
+&emsp;与 `objc_initWeak` 区别就是 `DontCrashIfDeallocating`，如果 `newObj` 析构不会 `crash`，`*location` 指向 `nil`。
 
-### `objc_storeWeakOrNil`
+## objc_storeWeakOrNil
+> &emsp;This function stores a new value into a __weak variable. If the new object is deallocating or the new object's class does not support weak references, stores nil instead.
+>
+> &emsp;此函数将新值存储到 __weak 变量中。如果 newObj 的 isa 已经被标记为 deallocating 或 newObj 所属的类不支持弱引用，则 __weak 变量指向 nil。
+
 ```c++
 id
 objc_storeWeakOrNil(id *location, id newObj)
@@ -358,7 +383,14 @@ objc_storeWeakOrNil(id *location, id newObj)
         (location, (objc_object *)newObj);
 }
 ```
-与 `objc_storeWeak` 区别也只是 `DontCrashIfDeallocating`，如果 `newObj` 析构不会 `crash`。
+&emsp;与 `objc_storeWeak` 区别只是 `DontCrashIfDeallocating`，如果 `newObj` 的 `isa` 已经被标记为 `deallocating` 或 `newObj` 所属的类不支持弱引用，则 `__weak` 变量指向 `nil`，不发生 `crash`。
+
+
+
+
+
+
+
 
 ## `weak` 变量被置为 `nil`
 &emsp;当对象引用计数为 0 的时候会执行 `dealloc` 函数，我们可以在 `dealloc` 中去看具体的销毁过程：
