@@ -9,11 +9,23 @@
 #include "HeapSort.hpp"
 
 void HeapSort::heapSort(int nums[], int count) {
-
+    if (nums == nullptr || count <= 0) {
+        return;
+    }
+    
+    int i = (count - 1 - 1) / 2;
+    for (; i >= 0; --i) {
+        maxHeapFixdown(nums, i, count);
+    }
+    
+    for (i = count - 1; i >= 1; --i) {
+        swap(&nums[0], &nums[i]);
+        maxHeapFixdown(nums, 0, <#int n#>)
+    }
 }
 
 void HeapSort::maxHeapFixdown(int nums[], int i, int n) {
-
+    
 }
 
 // 测试代码

@@ -9,8 +9,7 @@
 #include "InsertSort.hpp"
 
 void InsertSort::insertSort(int nums[], int count) {
-    //
-    
+    // 
 }
 
 // 测试代码
