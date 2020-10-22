@@ -1,37 +1,39 @@
-# iOS 从源码解析Runtime (一)：由 isTaggedPointer 函数引发的解读 Tagged Pointer
+# iOS 从源码解析Runtime (一)：Tagged Pointer知识点解读
 
-> 本来第一篇是 《iOS 从源码解析Runtime (二)：聚焦 objc_object、objc_class、isa》，但是当分析到 `struct objc_object` 的第一个函数 `Class ISA()` 的第一行实现代码时又看到了 `ASSERT(!isTaggedPointer())` 觉的还是有必要再深入总结一下 `Tagged Pointer` 了。
+> &emsp;本来第一篇是 《iOS 从源码解析Runtime (二)：聚焦 objc_object、objc_class、isa》，但是当分析到 struct objc_object 的第一个函数 Class ISA() 的第一行实现代码时又看到了 ASSERT(!isTaggedPointer())，而且前面分析 weak 工作原理的时候也无数次看到 Tagged Pointer，觉的还是有必要再深入学习一下 Tagged Pointer。
 
-## `Tagged Pointer` 介绍
-> `Tagged Pointer` 是苹果为了在 `64` 位架构的处理器下节省内存占用和提高运行效率而提出的概念。它的本质是把一些占用内存较小的对象直接放在指针内部，不再为对象在堆区开辟空间。
+## Tagged Pointer 由来
+> &emsp;Tagged Pointer 是苹果为了在 64 位架构的处理器下节省内存占用和提高运行效率而提出的概念。它的本质是把一些占用内存较小的对象的数据直接放在指针的内存空间内，然后把这个指针直接作为对象使用，直接省去了为对象在堆区开辟空间的过程。
 
-&emsp;2013 年 9 月，苹果首次在 `iOS` 平台推出了搭载 `64` 位架构处理器的 `iPhone`（`iPhone 5s`），为了节省内存和提高运行效率，提出了 `Tagged Pointer` 概念。下面我们逐步分析 `Tagged Pointer` 的优点以及结合源码分析它的实现。在 `objc4-781: Private Headers/objc-internal.h Line 245` 定义了 `OBJC_HAVE_TAGGED_POINTERS` 宏，表示在 `__LP64__` 环境中支持 `Tagged Pointer`。
+> &emsp;这里引出了一个疑问，“对象的内存都是位于堆区吗？” 是的。下面是我自己的推测：默认这里说的对象都是 NSObject 的子类，当深入看 + (id)alloc 函数时，可看到最后面开辟空间都是使用的 malloc（calloc 函数内部是调用 malloc 后再调用 bzero 置 0）函数，而 malloc 是 C 的运行库函数，向它申请的内存都是 C 运行库管理，采用堆的内存管理方式。该函数实际上会向操作系统申请内存，然后分配给请求者，同时其内部维护有它申请的内存的分配情况，以便管理其拥有的内存。
+
+&emsp;2013 年 9 月，苹果首次在 `iOS` 平台推出了搭载 `64` 位架构处理器的 `iPhone`（`iPhone 5s`），为了节省内存和提高运行效率，提出了 `Tagged Pointer` 概念。下面我们逐步分析 `Tagged Pointer` 的优点以及结合源码分析它的实现。在 `objc-internal.h` 定义了 `OBJC_HAVE_TAGGED_POINTERS` 宏，表示在 `__LP64__` 环境中支持 `Tagged Pointer`。
 ```c++
 // Tagged pointer objects.
 #if __LP64__
 #define OBJC_HAVE_TAGGED_POINTERS 1
 #endif
 ```
+&emsp;指针变量的长度与地址总线有关。从 `32` 位系统架构切换到 `64` 位系统架构后，指针变量的长度也会由 `32` 位增加到 `64` 位。如果不考虑其它因素，`64` 位指针可表示的地址长度可达到 `2^64` 字节即 `2^34 TB`，以目前的设备的内存来看，使用 `8` 个字节存储一个地址数据，其实有很多位都是空余的，而 `Tagged Pointer` 正是为了把这些空余的空间利用起来。（例如，在 `iPhone` 真机下，在堆区创建一个 `NSObject` 对象，打印的它的地址，看到只占用了 `36` 位，剩下 `28` 位都是零。） 
 
-> 指针变量的长度与地址总线有关。从 `32` 位系统架构切换到 `64` 位系统架构后，指针变量的长度也会由 `32` 位增加到 `64` 位。如果不考虑其它因素，`64` 位指针可表示的地址长度可达到 `2^64` 字节即 `2^34 TB`，以目前的设备的内存来看，使用 `8` 个字节存储一个地址数据，其实有很多位都是空余的。（例如，在 `iPhone` 真机下，在堆区创建一个 `NSObject` 对象，打印的它的地址，看到只占用了 `36` 位，剩下 `28` 位都是零。） 
-
-## `Tagged Pointer` 内存占用
+## Tagged Pointer 内存占用
+&emsp;明确一点，`NSInteger/NSUInteger` 是来自基本类型 `long/int`，`NSNumber`、`NSString`、`NSDate` 等都是继承自 `NSObject` 的子类。
 ```c++
 #if __LP64__ || 0 || NS_BUILD_32_LIKE_64
-// 在 64 位环境中，
-// NSInteger 和 NSUInteger 占 8 个字节
+
+// 在 64 位环境中，NSInteger 和 NSUInteger 占 8 个字节
 typedef long NSInteger;
 typedef unsigned long NSUInteger;
 #else
-// 在 32 位环境中，
-// NSInteger 和 NSUInteger 占 4 个字节
+
+// 在 32 位环境中，NSInteger 和 NSUInteger 占 4 个字节
 typedef int NSInteger;
 typedef unsigned int NSUInteger;
 #endif
 ```
 ```objective-c
-// NSValue 继承自 NSObject
-// NSNumber 继承自 NSValue
+// NSNumber 继承自 NSObject，
+// NSValue 继承自 NSObject，NSNumber 继承自 NSValue。
 @interface NSNumber : NSValue
 ...
 @end
@@ -44,8 +46,13 @@ typedef unsigned int NSUInteger;
 @interface NSString : NSObject <NSCopying, NSMutableCopying, NSSecureCoding>
 ...
 @end
+
+// NSDate 继承自 NSObject
+@interface NSDate : NSObject <NSCopying, NSSecureCoding>
+...
+@end
 ```
-在 `Project Headers/objc-runtime-new.h Line 1651`，`CF` 要求所有对象至少为 `16` 个字节。
+&emsp;在 `objc-runtime-new.h`，`CF` 要求所有对象至少为 `16` 个字节。（对象内部成员变量多为 `8` 字节对齐，但是最后对象整体内存大小是 `16` 字节对齐。）
 ```c++
 size_t instanceSize(size_t extraBytes) const {
     if (fastpath(cache.hasFastInstanceSize(extraBytes))) {
@@ -53,8 +60,10 @@ size_t instanceSize(size_t extraBytes) const {
     }
 
     size_t size = alignedInstanceSize() + extraBytes;
+    
     // CF requires all objects be at least 16 bytes.
     if (size < 16) size = 16;
+    
     return size;
 }
 ```
@@ -130,7 +139,7 @@ _objc_isTaggedPointer(const void * _Nullable ptr)
 #   define OBJC_MSB_TAGGED_POINTERS 1
 #endif
 ```
-### `_OBJC_TAG_MASK`
+### `_OBJC_TAG_MASK`q
 &emsp;`_OBJC_TAG_MASK` 表示在 `字符串高位优先排序的平台下` 指针变量的第 `64` 位标记该指针为 `Tagged Pointer`，在 `字符串低位优先排序的平台下` 指针变量的第 `1` 位标记该指针为 `Tagged Pointer`。
 在 `iOS` 真机上判断是否是 `Tagged Pointer` 直接看指针的第 `64` 个比特位是否是 `1`，在 `x86_64` 架构的 `Mac` 下看指针的第 `1` 个比特位是否是 `1`。
 ```c++
@@ -567,6 +576,7 @@ number 0x21a60cf72f053d4b __NSCFNumber 0
 
 ## 参考链接
 **参考链接:🔗**
++ [malloc和calloc的差别](https://www.cnblogs.com/mfrbuaa/p/5383026.html)
 + [Objective-C 的 Tagged Pointer 实现](https://www.jianshu.com/p/58d00e910b1e)
 + [译】采用Tagged Pointer的字符串](http://www.cocoachina.com/articles/13449)
 + [TaggedPointer](https://www.jianshu.com/p/01153d2b28eb?utm_campaign=maleskine&utm_content=note&utm_medium=seo_notes&utm_source=recommendation)

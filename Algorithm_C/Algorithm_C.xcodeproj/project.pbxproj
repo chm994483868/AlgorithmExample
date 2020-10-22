@@ -334,7 +334,7 @@
 		D2E0674D2506118F008BF0E9 /* iOS Category 底层实现原理(二)：函数分析与加载流程.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS Category 底层实现原理(二)：函数分析与加载流程.md"; sourceTree = "<group>"; };
 		D2E067692508E82E008BF0E9 /* iOS Category 底层实现原理(三)：附加+load函数超详细解析.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS Category 底层实现原理(三)：附加+load函数超详细解析.md"; sourceTree = "<group>"; };
 		D2E0676C2509A8A2008BF0E9 /* iOS 从源码解析Runtime (二)：聚焦 isa、objc_object(ISA_BITFIELD相关内容篇).md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 从源码解析Runtime (二)：聚焦 isa、objc_object(ISA_BITFIELD相关内容篇).md"; sourceTree = "<group>"; };
-		D2E0676E250B5BCA008BF0E9 /* iOS 从源码解析Runtime (一)：由 isTaggedPointer 函数引发的解读 Tagged Pointer.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 从源码解析Runtime (一)：由 isTaggedPointer 函数引发的解读 Tagged Pointer.md"; sourceTree = "<group>"; };
+		D2E0676E250B5BCA008BF0E9 /* iOS 从源码解析Runtime (一)：Tagged Pointer知识点解读.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 从源码解析Runtime (一)：Tagged Pointer知识点解读.md"; sourceTree = "<group>"; };
 		D2E526C724E3CEA600ACD06F /* using关键字使用.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "using关键字使用.md"; sourceTree = "<group>"; };
 		D2E526C824E3CECA00ACD06F /* memmove函数使用.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "memmove函数使用.md"; sourceTree = "<group>"; };
 		D2E526CA24E3E5E300ACD06F /* LP64等数据模型.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "LP64等数据模型.md"; sourceTree = "<group>"; };
@@ -880,11 +880,11 @@
 				D2164F1E24F899FA0000A6AA /* iOS weak 底层实现原理(二)：objc-weak 函数列表全解析.md */,
 				D20B5C8024EBCEFE0077EF6D /* iOS weak 底层实现原理(三)：weak变量从初始化到被置为nil 都经历了什么.md */,
 				D2164F1F24FDFDC30000A6AA /* iOS weak 底层实现原理(四)：ARC 和 MRC 下 weak 变量的访问过程.md */,
+				D2E0676E250B5BCA008BF0E9 /* iOS 从源码解析Runtime (一)：Tagged Pointer知识点解读.md */,
 				D2164F2124FF10F10000A6AA /* iOS AssociatedObject 底层实现原理.md */,
 				D2164F442501E8880000A6AA /* iOS Category 底层实现原理(一)：概念与数据结构.md */,
 				D2E0674D2506118F008BF0E9 /* iOS Category 底层实现原理(二)：函数分析与加载流程.md */,
 				D2E067692508E82E008BF0E9 /* iOS Category 底层实现原理(三)：附加+load函数超详细解析.md */,
-				D2E0676E250B5BCA008BF0E9 /* iOS 从源码解析Runtime (一)：由 isTaggedPointer 函数引发的解读 Tagged Pointer.md */,
 				D2E0676C2509A8A2008BF0E9 /* iOS 从源码解析Runtime (二)：聚焦 isa、objc_object(ISA_BITFIELD相关内容篇).md */,
 				D24C82232512140800E3BF5E /* iOS 从源码解析Runtime (三)：由 sidetable_retain 函数引发的解读 RefcountMap(DenseMap篇).md */,
 				D23730582514A96E00274FBA /* iOS 从源码解析Runtime (四)：由 sidetable_retain 函数引发的解读 RefcountMap(DenseMapBase篇).md */,
