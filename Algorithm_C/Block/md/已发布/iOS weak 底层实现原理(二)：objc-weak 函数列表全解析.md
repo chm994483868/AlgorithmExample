@@ -1,42 +1,42 @@
-# iOS weak 底层实现原理(六)：objc-weak.mm函数分析
+# iOS weak 底层实现原理(二)：objc-weak 函数列表全解析
 
 ## 前言
-&emsp;为了全面透彻的分析 `weak`，前面几篇已经连续分析了所有要用到的数据结构，偶有提及相关操作函数。本篇则直接把 `objc-weak.mm` 中的函数全部分析一遍，从开始往下把一行一行代码都嚼碎了。等把这些函数分析完毕，然后加上前面的几篇数据结构的理解，相信对 `weak` 的大致实现原理能立即浮现于脑中，最后再开新篇完整的对 `weak` 进行总结和验证。⛽️⛽️
+&emsp;为了全面透彻的分析 `weak` 的实现原理，前面 [iOS weak 底层实现原理(一)：SideTable|s、weak_table_t、weak_entry_t 等数据结构](https://juejin.im/post/6865468675940417550) 分析了所有要用到的数据结构，偶有提及相关操作函数。本篇则直接把 `objc-weak.mm` 中的函数全部分析一遍，从开始往下把一行一行代码都嚼碎了。等把这些函数分析完毕，相信 `weak` 的大致实现原理能立即浮现于脑中，由于本篇篇幅已经较长了，后面再开新篇完整的对 `weak` 进行总结和验证。⛽️⛽️
 
 ## 流程图
-&emsp;下面列出 `objc-weak.h` 中三个公开函数的流程图:
-+ `weak_register_no_lock` 函数流程图:
-![weak_register_no_lock 流程图](https://p6-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/daadcd917f5349009d983832c77e7f5c~tplv-k3u1fbpfcp-zoom-1.image)
-
+&emsp;下面列出两个公开函数的流程图:
 + `weak_unregister_no_lock` 函数流程图:
 ![weak_unregister_no_lock 流程图](https://p9-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/777fa131da9b4011a3bce30263813ce8~tplv-k3u1fbpfcp-zoom-1.image)
 
 + `weak_clear_no_lock` 函数流程图:
 ![weak_clear_no_lock 流程图](https://p9-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/02bf8d94652c4c3893d4c326f6e81b58~tplv-k3u1fbpfcp-zoom-1.image)
 
-## `TABLE_SIZE` 宏定义
+## TABLE_SIZE 宏定义
 ```c++
 #define TABLE_SIZE(entry) (entry->mask ? entry->mask + 1 : 0)
 ```
-&emsp;用于获取 `weak_entry_t` 或 `weak_table_t` 当前分配的总容量。
-+ 在 `weak_entry_t` 中当对象的弱引用不超过 4 的时候是使用 `weak_referrer_t inline_referrers[WEAK_INLINE_COUNT]` 这个长度为 4 的固定数组存放 `weak_referrer_t` 数据。
-当长度大于 4 以后使用 `weak_referrer_t *referrers` 这个数组作为哈希数组来存放 `weak_referrer_t` 数据。
+&emsp;用于获取 `weak_entry_t` 或 `weak_table_t` 的哈希数组当前分配的总容量。
++ 在 `weak_entry_t` 中当对象的弱引用数量不超过 4 的时候是使用 `weak_referrer_t inline_referrers[WEAK_INLINE_COUNT]` 这个固定长度为 4 的数组存放 `weak_referrer_t`。当长度大于 4 以后使用 `weak_referrer_t *referrers` 这个哈希数组存放 `weak_referrer_t` 数据。
+
 + ~~其实这句话也不全对，还包括一种情况：`hash` 数组的长度是动态调整的，它的长度可能存在从大缩小到 4 以下的情况。（缩小操作只在哈希数组总容量超过 1024 且已使用部分少于总容量 1/16 时，缩小为总容量的 1/8） 三目运算符则正是针对使用 `hash` 数组的情况，`mask` 的值则一直保持为总长度减 1 并参与 `hash` 函数计算。~~
-+ 上述的一句被搞混了😫，下述才是正确的。
+
++ 上述的一句被搞混了，下述才是正确的。
+
 + `weak_table_t` 的哈希数组初始长度是 64，当存储占比超过 3/4 后，哈希数组会扩容为总容量的 2 倍，然后会把之前的数据重新哈希化放在新空间内。当一些数据从哈希数组中移除后，为了提高查找效率势必要对哈希数组总长度做缩小操作，规则是当哈希数组总容量超过 1024 且已使用部分少于总容量 1/16 时，缩小为总容量的 1/8，缩小后同样会把原始数据重新哈希化放在新空间。（缩小和扩展都是使用 `calloc` 函数开辟新空间，`cache_t` 扩容后是直接忽略旧数据，这里可以比较记忆。）。牢记以上只是针对 `weak_table_t` 的哈希数组而言的。
-+ `weak_entry_t` 则是首先用定长的为 4 的固定数组，当有新的弱引用进来时，会首先判断当前是使用的 定长数组还是哈希数组，如果此时使用的还是定长数组的话先判断定长数组还有没有空位，如果没有空位的话会为哈希数组申请长度为 4 的并用一个循环把定长数组中的数据放在哈希数组，这里看似是按下标循环存放，其实下面会重新进行哈希化，然后是判断对哈希数组进行扩容，也是如果超过总占比的 3/4 进行扩容为总容量的 2 倍，所以 `weak_entry_t` 的哈希数组第一次扩容后是 8。然后下面区别就来了 `weak_entry_t` 的哈希数组是没有缩小机制的，移除弱引用的操作其实只是把弱引用的指针置为 `nil`，做移除操作时判断如果定长数组为空或者哈希数组为空，则会把 `weak_table_t` 哈希数组中的 `weak_entry_t` 移除，然后就是对 `weak_table_t` 做一些缩小容量的操作。
+
++ `weak_entry_t` 则是首先用固定长度为 4 的数组，当有新的弱引用进来时，会首先判断当前是使用的 定长数组还是哈希数组，如果此时使用的还是定长数组的话先判断定长数组还有没有空位，如果没有空位的话会为哈希数组申请长度为 4 的并用一个循环把定长数组中的数据放在哈希数组，这里看似是按下标循环存放，其实下面会重新进行哈希化，然后是判断对哈希数组进行扩容，也是如果超过总占比的 3/4 进行扩容为总容量的 2 倍，所以 `weak_entry_t` 的哈希数组第一次扩容后是 8。然后下面区别就来了 `weak_entry_t` 的哈希数组是没有缩小机制的，移除弱引用的操作其实只是把弱引用的指向置为 `nil`，做移除操作是判断如果定长数组为空或者哈希数组为空，则会把 `weak_table_t` 哈希数组中的 `weak_entry_t` 移除，然后就是对 `weak_table_t` 做一些缩小容量的操作。
 
 + `weak_entry_t` 和 `weak_table_t` 可以共用 `TABLE_SIZE` 因为是它们对 `mask` 的使用机制是完全一样的。这里 `weak_entry_t` 之所以不缩小，且起始用定长数组，都是对其的优化，因为本来一个对象的弱引用数量就不会太多。
 
-现在想来依然觉得 `mask` 的值用的很巧妙。（前文已经讲了 `mask` 的全部作用，其实脱离 `weak` 相关的源码，`objc4` 其他很多部分也有采用这种做法）
+现在想来依然觉得 `mask` 的值用的很巧妙。（前文已经讲了 `mask` 的全部作用，其实脱离 `weak` 相关的源码，`objc4` 其他很多地方也有采用这种做法）
 
 ⬇️
 ```c++
 static void append_referrer(weak_entry_t *entry, objc_object **new_referrer);
 ```
-往指定的 `entry` 里面添加 `new_referrer`(`weak 变量的指针`)。这里只是声明，具体实现在下面，这个声明只是为了给下面的其他函数的提前调用作的声明。
+&emsp;函数功能如其名，往指定的 `weak_entry_t` 里面添加 `new_referrer`( `weak` 变量的地址)。这里只是声明，具体实现在后面，这个声明只是为了给下面的其他函数的提前调用作的声明。
 
-## `objc_weak_error`
+## objc_weak_error
 ```c++
 // BREAKPOINT_FUNCTION
 /* Use this for functions that are intended to be breakpoint hooks.
@@ -52,7 +52,7 @@ BREAKPOINT_FUNCTION(
 ```
 参考链接:[GCC扩展 __attribute__ ((visibility("hidden")))](https://www.cnblogs.com/lixiaofei1987/p/3198665.html)
 
-## `bad_weak_table`
+## bad_weak_table
 ```c++
 static void bad_weak_table(weak_entry_t *entries)
 {
@@ -61,12 +61,12 @@ static void bad_weak_table(weak_entry_t *entries)
 }
 ```
 &emsp;`_objc_fatal` 用来退出程序或者中止运行并打印原因。 
-&emsp;这里表示在 `weak_table_t` 中的的某个 `weak_entry_t` 发生了内存错误，全局搜索发现该函数只会在发生 `hash` 冲突时 `index` 持续增加直到和 `begin` 相等时被调用。
-
-## `hash_pointer` 和 `w_hash_pointer`
+&emsp;这里表示 `weak_table_t` 中的的某个 `weak_entry_t` 发生了内存错误，全局搜索发现该函数只会在发生 `hash` 冲突时 `index` 持续增加直到和 `begin` 相等时被调用。
+## hash_pointer 和 w_hash_pointer
 ```C++
 /** 
  * Unique hash function for object pointers only.
+ * 唯一的哈希函数仅适用于对象指针。
  * @param key The object pointer
  * @return Size unrestricted hash of pointer.
  */
@@ -74,7 +74,7 @@ static inline uintptr_t hash_pointer(objc_object *key) {
     return ptr_hash((uintptr_t)key);
 }
 ```
-对一个 `objc_object` 对象的指针求 `hash` `key`，用于从 `weak_table_t` 哈希表中取得对象对应的 `weak_entry_t`。
+&emsp;对一个 `objc_object` 对象的指针求哈希值，用于从 `weak_table_t` 哈希表中取得对象对应的 `weak_entry_t`。
 ```c++
 /** 
  * Unique hash function for weak object pointers only.
@@ -85,17 +85,13 @@ static inline uintptr_t w_hash_pointer(objc_object **key) {
     return ptr_hash((uintptr_t)key);
 }
 ```
-对一个 `objc_object` 对象的指针的指针（此处指 `weak` 引用的地址），求 `hash` `key`，用于从 `weak_entry_t` 哈希表中取得 `weak_referrer_t` 把其置为 `nil` 或者从哈希表中移除等。
+&emsp;对一个 `objc_object` 对象的指针的指针（此处指 `weak` 变量的地址）求哈希值，用于从 `weak_entry_t` 哈希表中取得 `weak_referrer_t` 把其保存的弱引用变量的指向置为 `nil` 或者从哈希表中移除等。
+## ptr_hash
+> &emsp;// Pointer hash function. This is not a terrific hash, but it is fast and not outrageously flawed for our purposes.
+>
+> &emsp;指针哈希函数。这不是一个了不起的哈希，但是它很快，并且没有为了我们的目的而有过分的缺陷。
 
-### `ptr_hash`
 ```c++
-// Pointer hash function.
-// 指针哈希函数
-// This is not a terrific hash, but it is fast 
-// and not outrageously flawed for our purposes.
-// 这不是一个了不起的哈希，但是它很快
-// 并且没有为了我们的目的而有过分的缺陷。
-
 // Based on principles from http://locklessinc.com/articles/fast_hash/
 // and evaluation ideas from http://floodyberry.com/noncryptohashzoo/
 #if __LP64__
@@ -116,18 +112,18 @@ static inline uint32_t ptr_hash(uint32_t key)
 }
 #endif
 ```
-`__LP64__` 指 `long` 和 `pointer` 都占 64 位的环境。
+&emsp;`__LP64__` 指 `long` 和 `pointer` 都占 64 位的环境。
 
-`ptr_hash` 是指针哈希函数，看到 `objc4` 中多处都用到了它。
-1. key 右移 4 位的值做异或操作。
+&emsp;`ptr_hash` 是指针哈希函数，看到 `objc4-781` 中多处都用到了它。
+
+1. `key` 右移 4 位的值做异或操作。
 2. 与 `0x8a970be7488fda55` 这个值做乘法。（这个 `hardcode` 可能是苹果觉的最优值。）
 3. `__builtin_bswap64` 翻转64位数各字节然后再做一次异或。
 
-### `__builtin_bswap64`
-可参考[gcc的__builtin_函数介绍](https://blog.csdn.net/acmdream/article/details/60962021)
+`__builtin_bswap64` 可参考[gcc的__builtin_函数介绍](https://blog.csdn.net/acmdream/article/details/60962021)
 
-## `grow_refs_and_insert`
-&ensp;对 `weak_entry_t` 的哈希数组进行扩容，并且对原有数据进行哈希化放在新空间内。
+## grow_refs_and_insert
+&ensp;对 `weak_entry_t` 的哈希数组进行扩容，并插入一个新的 `new_referrer`，原有数据重新哈希化放在新空间内。
 ```c++
 /** 
  * Grow the entry's hash table of referrers.
@@ -139,7 +135,7 @@ __attribute__((noinline, used))
 static void grow_refs_and_insert(weak_entry_t *entry, 
                                  objc_object **new_referrer)
 {
-    // 断言，保证当前 weak_entry_t 使用的是 hash 数组模式
+    // DEBUG 下的断言，确保当前 weak_entry_t 使用的是 hash 数组模式
     ASSERT(entry->out_of_line());
     
     // 新容量为旧容量的 2 倍
@@ -150,14 +146,15 @@ static void grow_refs_and_insert(weak_entry_t *entry,
     size_t num_refs = entry->num_refs;
     // 记录旧哈希数组起始地址，在最后要进行释放
     weak_referrer_t *old_refs = entry->referrers;
-    // mask 为总容量减 1
+    // mask 依然是总容量减 1
     entry->mask = new_size - 1;
     
     // 为新 hash 数组申请空间
     // 长度为：总容量 * sizeof(weak_referrer_t)（8）个字节
     entry->referrers = (weak_referrer_t *)
         calloc(TABLE_SIZE(entry), sizeof(weak_referrer_t));
-        
+       
+    // 默认为 0
     entry->num_refs = 0;
     entry->max_hash_displacement = 0;
     
@@ -171,17 +168,14 @@ static void grow_refs_and_insert(weak_entry_t *entry,
         }
     }
     
-    // 然后把入参传入的 new_referrer，插入新哈希数组
-    // 前面的铺垫都是在做 "数据转移"
+    // 然后把入参传入的 new_referrer，插入新哈希数组，前面的铺垫都是在做 "数据转移"
     append_referrer(entry, new_referrer);
     
     // 把旧哈希数据释放
     if (old_refs) free(old_refs);
 }
 ```
-&emsp;分析都在注释里了。
-
-## `append_referrer`
+## append_referrer
 &emsp;添加给定的 `referrer` 到 `weak_entry_t` 的哈希数组（或定长为 4 的内部数组）。
 ```c++
 /** 
@@ -218,6 +212,7 @@ static void append_referrer(weak_entry_t *entry, objc_object **new_referrer)
         // 此构造的 table 无效，grow_refs_and_insert 将修复它并重新哈希
         
         // 把 inline_referrers 内部的数据放进 hash 数组
+        // 这里看似是直接循环按下标放的，其实后面会进行扩容和哈希化
         for (size_t i = 0; i < WEAK_INLINE_COUNT; i++) {
             new_referrers[i] = entry->inline_referrers[i];
         }
@@ -239,7 +234,6 @@ static void append_referrer(weak_entry_t *entry, objc_object **new_referrer)
     }
 
     // 对于动态数组的扩容处理
-    
     // 断言： 此时一定使用的动态数组
     ASSERT(entry->out_of_line());
 
@@ -255,12 +249,12 @@ static void append_referrer(weak_entry_t *entry, objc_object **new_referrer)
     size_t begin = w_hash_pointer(new_referrer) & (entry->mask);
     size_t index = begin;
     size_t hash_displacement = 0;
+    
     while (entry->referrers[index] != nil) {
         hash_displacement++;
         index = (index+1) & entry->mask;
         
-        // 在 index == begin 之前一定能找到空位置，因为前面已经
-        // 有一个超过 3/4 占用后的扩容机制，
+        // 在 index == begin 之前一定能找到空位置，因为前面已经有一个超过 3/4 占用后的扩容机制，
         if (index == begin) bad_weak_table(entry);
     }
     
@@ -269,16 +263,16 @@ static void append_referrer(weak_entry_t *entry, objc_object **new_referrer)
         entry->max_hash_displacement = hash_displacement;
     }
     
-    // 找到空位置例如放入弱引用的指针
+    // 找到空位置放入弱引用的指针
     weak_referrer_t &ref = entry->referrers[index];
     ref = new_referrer;
+    
     // 自增
     entry->num_refs++;
 }
 ```
-
-## `remove_referrer`
-&emsp;从 `weak_entry_t` 的哈希数组（或定长为 4 的内部数组）中删除弱引用的指针。
+## remove_referrer
+&emsp;从 `weak_entry_t` 的哈希数组（或定长为 4 的内部数组）中删除弱引用的地址。
 ```c++
 /** 
  * Remove old_referrer from set of referrers, if it's present.
@@ -293,13 +287,14 @@ static void remove_referrer(weak_entry_t *entry, objc_object **old_referrer)
 {
     // 如果目前使用的是定长为 4 的内部数组
     if (! entry->out_of_line()) {
-        // 循环找到 old_referrer，并把它的指向置为 nil
+        // 循环找到 old_referrer 的位置，把它的原位置放置 nil，表示把 old_referrer 从数组中移除了
         for (size_t i = 0; i < WEAK_INLINE_COUNT; i++) {
             if (entry->inline_referrers[i] == old_referrer) {
                 entry->inline_referrers[i] = nil;
                 return;
             }
         }
+        
         // 如果当前 weak_entry_t 不包含传入的 old_referrer
         // 则明显发生了错误，执行 objc_weak_error 函数
         _objc_inform("Attempted to unregister unknown __weak variable "
@@ -311,10 +306,11 @@ static void remove_referrer(weak_entry_t *entry, objc_object **old_referrer)
         return;
     }
 
-    // 从 hash 数组中找到 old_referrer 并置为 nil
+    // 从 hash 数组中找到 old_referrer 并置为 nil（移除 old_referrer）
     size_t begin = w_hash_pointer(old_referrer) & (entry->mask);
     size_t index = begin;
     size_t hash_displacement = 0;
+    
     while (entry->referrers[index] != old_referrer) {
         index = (index+1) & entry->mask;
         
@@ -332,15 +328,15 @@ static void remove_referrer(weak_entry_t *entry, objc_object **old_referrer)
             return;
         }
     }
-    // 置空，num_refs 自减
+    
+    // 把 old_referrer 所在的位置置为 nil，num_refs 自减
     entry->referrers[index] = nil;
+    
     entry->num_refs--;
 }
 ```
-&emsp;解析同注释。
-
-## `weak_entry_insert`
-&emsp;添加一个新的 `weak_entry_t` 到给定的 `weak_table_t`.
+## weak_entry_insert
+&emsp;添加一个新的 `weak_entry_t` 到给定的 `weak_table_t` 的哈希数组中.
 ```c++
 /** 
  * Add new_entry to the object's table of weak references.
@@ -350,8 +346,11 @@ static void remove_referrer(weak_entry_t *entry, objc_object **old_referrer)
  */
 static void weak_entry_insert(weak_table_t *weak_table, weak_entry_t *new_entry)
 {
+    // 哈希数组的起始地址
     weak_entry_t *weak_entries = weak_table->weak_entries;
+    
     ASSERT(weak_entries != nil);
+    
     size_t begin = hash_pointer(new_entry->referent) & (weak_table->mask);
     size_t index = begin;
     size_t hash_displacement = 0;
@@ -369,6 +368,7 @@ static void weak_entry_insert(weak_table_t *weak_table, weak_entry_t *new_entry)
     
     // 直接插入 hash 数组
     weak_entries[index] = *new_entry;
+    
     // num_entries 自增
     weak_table->num_entries++;
 
@@ -379,12 +379,14 @@ static void weak_entry_insert(weak_table_t *weak_table, weak_entry_t *new_entry)
 }
 ```
 &emsp;因为此函数内部不存在函数嵌套调用，所以实现也是也比较简单的。首先解释一下为什么不检查 `referent` 是否已在 `weak_table_t` 中，全局搜索可以发现只有两个地方调用了此函数：
-1.  `weak_table_t` 调整了哈希数组的大小以后，要进行重新哈希化。此时 `weak_table_t` 是一定不在哈希数组里的。
-2. `weak_register_no_lock` 函数内部在调用 `weak_entry_insert` 之前已经调用 `weak_entry_for_referent` 判断没有对应的 `weak_entry_t` 存在，则新建一个 `weak_entry_t` 添加到 `weak_table_t` 的哈希数组。
-&emsp;还有一个点需要注意的，在函数最后会更新 `weak_table_t` 的 `max_hash_displacement`，保证其一直是最大偏移值。
 
-## `weak_resize`
-&emsp;调整 `weak_table_t` 哈希数组的容量大小，并把原始哈希数组里面的 `weak_entry_t` 插入新的哈希数组。
+1. `weak_table_t` 调整了哈希数组的大小以后，要进行重新哈希化，此时 `weak_entry_t` 是一定不在哈希数组里的。
+2. `weak_register_no_lock` 函数内部在调用 `weak_entry_insert` 之前已经调用 `weak_entry_for_referent` 判断没有对应的 `weak_entry_t` 存在，所以 `weak_entry_insert` 函数中不需要再重复判断。（新建一个 `weak_entry_t` 添加到 `weak_table_t` 的哈希数组。）
+
+&emsp;还有一个点需要注意的，在函数最后会更新 `weak_table_t` 的 `max_hash_displacement`，记录哈希冲突时的最大偏移值。
+
+## weak_resize
+&emsp;调整 `weak_table_t` 哈希数组的容量大小，并把原始哈希数组里面的 `weak_entry_t` 重新哈希化放进新空间内。
 ```c++
 static void weak_resize(weak_table_t *weak_table, size_t new_size)
 {
@@ -393,21 +395,21 @@ static void weak_resize(weak_table_t *weak_table, size_t new_size)
     // 原始哈希数组入口
     weak_entry_t *old_entries = weak_table->weak_entries;
     
-    // 为新的哈希数组申请 new_size * sizeof(weak_entry_t) 个字节的空间
-    // 置为 0，并返回起始地址给 new_entries
+    // 为新的哈希数组申请 new_size * sizeof(weak_entry_t) 个字节的空间，置为 0，并返回起始地址给 new_entries
     weak_entry_t *new_entries = (weak_entry_t *)
         calloc(new_size, sizeof(weak_entry_t));
     
     // mask 更新为 new_size 减 1
     weak_table->mask = new_size - 1;
+    
     // weak_entries 起始地址更新为 new_entries
     weak_table->weak_entries = new_entries;
     
-    // max_hash_displacement 和 num_entries
-    // 在下面的插入操作中进行对应的更新
+    // max_hash_displacement 和 num_entries 默认是 0，会在下面的插入操作中进行对应的更新
     weak_table->max_hash_displacement = 0;
     weak_table->num_entries = 0;  // restored by weak_entry_insert below
     
+    // 如果旧哈希数组里面有数据
     if (old_entries) {
         weak_entry_t *entry;
         // 指针偏移，找到 hash 数组的末尾
@@ -425,9 +427,7 @@ static void weak_resize(weak_table_t *weak_table, size_t new_size)
     }
 }
 ```
-&emsp;觉的注释已经足够说明所有流程。
-
-## `weak_grow_maybe`
+## weak_grow_maybe
 &emsp;对 `weak_table_t` 的哈希数组进行容量扩展。
 ```c++
 // Grow the given zone's table of weak references if it is full.
@@ -436,9 +436,9 @@ static void weak_grow_maybe(weak_table_t *weak_table)
     size_t old_size = TABLE_SIZE(weak_table);
 
     // Grow if at least 3/4 full.
-    // 如果超过了总容量的 3/4 则进行扩容 
+    // 如果占比超过了总容量的 3/4 则进行扩容。 
     if (weak_table->num_entries >= old_size * 3 / 4) {
-        // 第二个参数是用来指定容量扩充值的
+        // 第二个参数是用来指定容量扩充值的，
         // 可确定，如果是初始状态，则总容量是 64，
         // 如果不是初始化状态则扩展为之前容量的 2 倍
         weak_resize(weak_table, old_size ? old_size*2 : 64);
@@ -446,12 +446,14 @@ static void weak_grow_maybe(weak_table_t *weak_table)
 }
 ```
 &emsp;此函数也比较清晰，明确了 3 点：
-1. 当 `weak_table_t` 哈希数组元素总数超过了总容量的 3/4 时进行扩容。
-2. `weak_table_t` 哈希数组初始化容量是 64.
+
+1. 当 `weak_table_t` 哈希数组已占用元素总数超过了总容量的 3/4 则进行扩容。
+2. `weak_table_t` 哈希数组初始化容量是 64。
 3. `weak_table_t` 扩容时，容量直接扩充为之前的 2 倍。
+
 &emsp;最后调用的 `weak_resize` 下面进行解析。
 
-## `weak_compact_maybe`
+## weak_compact_maybe
 &emsp;如果 `weak_table_t` 哈希数组大部分空间是空着的，则缩小哈希数组。
 ```c++
 // Shrink the table if it is mostly empty.
@@ -461,17 +463,19 @@ static void weak_compact_maybe(weak_table_t *weak_table)
 
     // Shrink if larger than 1024 buckets and at most 1/16 full.
     // 当总容量超过了 1024 且占用量少于总容量的 1/16，则缩小容量
+    
     if (old_size >= 1024  && old_size / 16 >= weak_table->num_entries) {
         // 缩小为总容量的 1/8
         weak_resize(weak_table, old_size / 8);
+        
         // leaves new table no more than 1/2 full
-        // 结合上面的 1/16，保证占用容量不超过 1/2
+        // 结合上面的 1/16，保证即使缩小后占用容量仍然不超过 1/2
     }
 }
 ```
-&emsp;当总容量超过了 1024 且占用量少于总容量的 1/16，则缩小容量为总容量的 1/8，保证缩小后占用量不超过总量的 1/2。
+&emsp;当总容量超过了 1024 且占用量少于总容量的 1/16，则缩小容量为总容量的 1/8，缩小后占用量仍不超过总量的 1/2。
 
-## `weak_entry_remove`
+## weak_entry_remove
 &emsp;从 `weak_table_t` 的哈希数组中删除指定的 `weak_entry_t`。
 ```c++
 /**
@@ -493,16 +497,12 @@ static void weak_entry_remove(weak_table_t *weak_table, weak_entry_t *entry)
     weak_compact_maybe(weak_table);
 }
 ```
-&emsp;过程清晰明了简单，解析包含在注释。
-
-## `weak_entry_for_referent`
-&emsp;从 weak_table_t 的 hash 表中返回 referent 对应的 weak_entry_t。
+## weak_entry_for_referent
+&emsp;从 `weak_table_t` 的哈希数组中找到 `referent` 的 `weak_entry_t`，如果未找到则返回 `NULL`。
 ```c++
 /** 
  * Return the weak reference table entry for the given referent. 
- * 从 weak_table_t 的 hash 表中返回 referent 对应的 weak_entry_t。
  * If there is no entry for referent, return NULL. 
- * 如果未找到则返回 NULL。
  * Performs a lookup.
  * 
  * @param weak_table 
@@ -515,13 +515,14 @@ weak_entry_for_referent(weak_table_t *weak_table, objc_object *referent)
 {
     // 如果 referent 为 NULL，则直接执行断言
     ASSERT(referent);
+    
     // hash 数组入口
     weak_entry_t *weak_entries = weak_table->weak_entries;
+    
     // 判空
     if (!weak_entries) return nil;
     
-    // 取得 referent 对应的 hash key。
-    // 与 mask 与操作保证 begin 在 [0, mask] 区间内
+    // 取得 referent 对应的 hash key，与 mask & 操作保证 begin 在 [0, mask] 区间内
     size_t begin = hash_pointer(referent) & weak_table->mask;
     
     // begin 用于记录起点，index 用于控制循环条件
@@ -531,21 +532,18 @@ weak_entry_for_referent(weak_table_t *weak_table, objc_object *referent)
     size_t hash_displacement = 0;
     
     while (weak_table->weak_entries[index].referent != referent) {
-        // 如果发生 hash 冲突，index 加 1，
-        // 与 mask 与操作防止越界
+        // 如果发生 hash 冲突，index 加 1，与 mask 与操作防止越界
         index = (index+1) & weak_table->mask;
         
-        // 如果 index 与 begin 重叠了，
-        // 则表明 weak_entries 存在内存错误。
+        // 如果 index 与 begin 重叠了，则表明 weak_entries 存在内存错误。
         
-        // 正常情况下，执行到下面的大于了最大偏移值后一定会返回的
-        // 如果存在 index == begin，则会超过最大偏移值
+        // 正常情况下，执行到下面的大于了最大偏移值后一定会返回的，如果存在 index == begin，则会超过最大偏移值
         if (index == begin) bad_weak_table(weak_table->weak_entries);
         
         // 记录偏移
         hash_displacement++;
-        // 如果偏移大于了最大偏移值，说明不存在对应的 weak_entry_t
-        // 返回 nil
+        
+        // 如果偏移大于了最大偏移值，说明不存在对应的 weak_entry_t，返回 nil
         if (hash_displacement > weak_table->max_hash_displacement) {
             return nil;
         }
@@ -555,9 +553,7 @@ weak_entry_for_referent(weak_table_t *weak_table, objc_object *referent)
     return &weak_table->weak_entries[index];
 }
 ```
-&emsp;此函数实现从 `weak_table_t` 的 `hash` 表中返回 `referent` 对应的 `weak_entry_t`，实现过程很简单，重点都在注释里了。
-
-## `weak_unregister_no_lock`
+## weak_unregister_no_lock
 &emsp;从 `referent` 对应的 `weak_entry_t` 的哈希数组（或定长为 4 的内部数组）中注销指定的弱引用。
 ```c++
 /** 

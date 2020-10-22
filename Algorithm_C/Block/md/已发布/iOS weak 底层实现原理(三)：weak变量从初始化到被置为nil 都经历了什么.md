@@ -1,9 +1,7 @@
-# iOS weak 底层实现原理(二)：weak变量从初始化到被置为nil 都经历了什么
-
-> &emsp;所有 `weak` 相关函数调用我们都通过在 `main` 函数里面写代码打断点，并打开汇编模式：`debug->debug workflow->alway show disassembly` 的方式来验证。
+# iOS weak 底层实现原理(三)：weak变量从初始化到被置为nil 都经历了什么
 
 ## 寻找 weak 变量初始化入口
-&emsp;在 `main.m` 中编写如下代码:
+&emsp;在 `main.m` 中编写如下代码，在函数最后打断点，并打开汇编模式：`debug->debug workflow->alway show disassembly`。
 ```c++
 #import <Foundation/Foundation.h>
 int main(int argc, const char * argv[]) {
@@ -105,6 +103,8 @@ objc_initWeak(id *location, id newObj)
 &emsp;`storeWeak` 函数实现的核心功能:
 + 将 `weak` 变量的地址 `location` 存入 `obj` 对应的 `weak_entry_t` 的哈希数组（或定长为 `4` 的数组）中，用于在 `obj` 析构时，通过该哈希数组找到其所有的 `weak` 变量的地址，将 `weak` 变量指向的地址（`*location`）置为 `nil`。
 + 如果启用了 `isa` 优化，则将 `obj` 的 `isa_t` 的 `weakly_referenced` 位置为 1，置为 1 的作用是标识 `obj` 存在 `weak` 引用。当对象 `dealloc` 时，`runtime` 会根据 `weakly_referenced` 标志位来判断是否需要查找 `obj` 对应的 `weak_entry_t`，并将它的所有的弱引用置为 `nil`。
+
+&emsp;`__weak id weakPtr = obj` 一句完整的白话理解就是：拿着 `weakPtr` 的地址和 `obj`，调用 `objc_initWeak` 函数，把 `weakPtr` 的地址添加到 `objc` 的弱引用哈希表 `weak_entry_t` 的哈希数组中，并把 `obj` 的地址赋给 `*location`（`*location = (id)newObj`），然后把 `obj` 的 `isa` 的 `weakly_referenced` 字段置为 `1`，最后返回 `obj`。
 
 从 `storeWeak` 函数实现就要和我们前几篇的内容联系起来啦，想想还有些激动 😊。
 
@@ -312,7 +312,7 @@ objc_storeWeak(id *location, id newObj)
 ```
 &emsp;内部也是直接对 `storeWeak` 的调用，`DoHaveOld` 和 `DoHaveNew` 都为 `true`，表示这次我们要先处理 `__weak` 变量当前的指向（`weak_unregister_no_lock`），然后 `__weak` 变量指向新的对象（`weak_register_no_lock`）。
 
-&emsp;到这里我们就已经很清晰了 `objc_initWeak` 用于 `__weak` 变量的初始化，内部只需要 `weak_register_no_lock` 相关的调用，然后当对 `__weak` 变量赋值时，则是先处理它对旧指向 `weak_unregister_no_lock`，然后处理它的新指向 `weak_register_no_lock`。
+&emsp;到这里我们就已经很清晰了 `objc_initWeak` 用于 `__weak` 变量的初始化，内部只需要 `weak_register_no_lock` 相关的调用，然后当对 `__weak` 变量赋值时，则是先处理它对旧值的指向（`weak_unregister_no_lock`），然后处理它的新指向。（`weak_register_no_lock`）
 
 ## objc_destroyWeak
 &emsp;示例代码中作为局部变量的 `__weak` 变量出了右边花括号它的作用域就结束了，必然会进行释放销毁，汇编代码中我们看到了 `objc_destroyWeak` 函数被调用，看名字它应该是 `__weak` 变量销毁时所调用的函数。如果 `__weak` 变量比它所指向的对象更早销毁，那么它所指向的对象的 `weak_entry_t` 的哈希数组中存放该 `__weak` 变量的地址要怎么处理呢？那么一探 `objc_destroyWeak` 函数的究竟应该你能找到答案。
@@ -352,23 +352,7 @@ if (haveOld) {
 &emsp;到这里也很清晰了，和上面 `__weak` 变量的初始化和赋值操作对比，这里是做销毁操作，只需处理旧值，调用 `weak_unregister_no_lock` 函数就好了。
 &emsp;`weak_unregister_no_lock` 函数的详细分析放在了 `objc-weak.mm` 函数整体分析那篇。
 
-&emsp;顺着 `NSObject.mm` 文件的 `storeWeak` 函数往下浏览，发现了几个只是参数不同内部完全调用 `storeWeak` 的工厂函数。
-
-## objc_initWeakOrNil
-```c++
-id
-objc_initWeakOrNil(id *location, id newObj)
-{
-    if (!newObj) {
-        *location = nil;
-        return nil;
-    }
-
-    return storeWeak<DontHaveOld, DoHaveNew, DontCrashIfDeallocating>
-        (location, (objc_object*)newObj);
-}
-```
-&emsp;与 `objc_initWeak` 区别就是 `DontCrashIfDeallocating`，如果 `newObj` 析构不会 `crash`，`*location` 指向 `nil`。
+&emsp;顺着 `NSObject.mm` 文件的 `storeWeak` 函数往下浏览，发现两个只是参数不同内部完全调用 `storeWeak` 的工厂函数。
 
 ## objc_storeWeakOrNil
 > &emsp;This function stores a new value into a __weak variable. If the new object is deallocating or the new object's class does not support weak references, stores nil instead.
@@ -385,54 +369,71 @@ objc_storeWeakOrNil(id *location, id newObj)
 ```
 &emsp;与 `objc_storeWeak` 区别只是 `DontCrashIfDeallocating`，如果 `newObj` 的 `isa` 已经被标记为 `deallocating` 或 `newObj` 所属的类不支持弱引用，则 `__weak` 变量指向 `nil`，不发生 `crash`。
 
-
-
-
-
-
-
-
-## `weak` 变量被置为 `nil`
-&emsp;当对象引用计数为 0 的时候会执行 `dealloc` 函数，我们可以在 `dealloc` 中去看具体的销毁过程：
-`dealloc -> _objc_rootDealloc -> rootDealloc -> object_dispose -> objc_destructInstance -> clearDeallocating -> clearDeallocating_slow`。
-
-### `dealloc`
-`dealloc` 函数：
+## objc_initWeakOrNil
 ```c++
+id
+objc_initWeakOrNil(id *location, id newObj)
+{
+    if (!newObj) {
+        // 如果新值不存在，直接把 __weak 变量指向 nil
+        *location = nil;
+        return nil;
+    }
+    
+    return storeWeak<DontHaveOld, DoHaveNew, DontCrashIfDeallocating>
+        (location, (objc_object*)newObj);
+}
+```
+&emsp;与 `objc_initWeak` 区别就是 `DontCrashIfDeallocating`，如果 `newObj` 的 `isa` 已经被标记为 `deallocating` 或 `newObj` 所属的类不支持弱引用，则 `__weak` 变量指向 `nil`，不发生 `crash`。
+
+## weak 变量被置为 nil
+&emsp;“当对象释放销毁后它的所有弱引用都会被置为 `nil`。” 大概是我们听了无数遍的一句话，那么它的入口在哪呢？应该是在 `dealloc` 函数。
+
+&emsp;当对象引用计数为 `0` 的时候会执行 `dealloc` 函数，我们可以在 `dealloc` 中去看具体的销毁过程：
+`dealloc->_objc_rootDealloc->rootDealloc->object_dispose->objc_destructInstance->clearDeallocating->clearDeallocating_slow`，下面我们顺着源码看下这一路的函数实现。
+## dealloc
+&emsp;`dealloc` 函数：
+```c++
+// Replaced by CF (throws an NSException)
++ (void)dealloc {
+    // 类对象是不能销毁的，它的 dealloc 内部是空的
+}
+
 // Replaced by NSZombies
 - (void)dealloc {
     _objc_rootDealloc(self);
 }
 ```
-
-### `_objc_rootDealloc`
-`_objc_rootDealloc` 函数：
+## _objc_rootDealloc
+&emsp;`_objc_rootDealloc` 函数：
 ```c++
 void
 _objc_rootDealloc(id obj)
 {
-    ASSERT(obj); // 如果 obj 不存在，则 crash
+    ASSERT(obj);
     obj->rootDealloc(); // 调用 objc_object 的 rootDealloc 函数
 }
 ```
-
-###  `rootDealloc`
-`struct objc_object` 的 `rootDealloc` 函数：
+## rootDealloc
+&emsp;`struct objc_object` 的 `rootDealloc` 函数：
 ```c++
 inline void
 objc_object::rootDealloc()
 {
     if (isTaggedPointer()) return;  
-    // fixme necessary? 有必要吗？这里是指 Tagged Pointer 计数的对象是不会析构的。
+    // fixme necessary? 有必要吗？这里是指 Tagged Pointer 的对象析构是不走这个流程的吗？
 
-    // 这一步判断比较多，且符合条件是可直接调用 free 函数
+    // 这一步判断比较多，符合条件的话可直接调用 free 函数快速释放对象
+    
     // 1. isa 是非指针类型，即优化的 ias_t 类型，除了类对象地址包含更多的信息
-    // 2. 没有弱引用对象
+    // 2. 没有弱引用
     // 3. 没有关联对象
-    // 4. 没有 C++ 析构函数 
-    // (在昨天写动态添加属性和成员变量的时候发现了方法列表里自己生成了 C++ 析构函数：name = ".cxx_destruct")，
-    // 那么如果都有这个函数的话，是不是和 if 里面的 fastpath 冲突了？
-    // 5. 引用计数没有超过 10
+    // 4. 没有 C++ 析构函数
+    // 5. SideTable 中不存在引用计数即引用计数全部放在 extra_rc 中
+    
+    // (在昨天写动态添加属性和成员变量的时候发现了方法列表里默认生成了 C++ 析构函数：name = ".cxx_destruct"，
+    // 那么如果都有 cxx_destruct 的话，是不是和 if 里面的 fastpath 冲突了？）
+    
     // 满足以上条件后可以进行快速释放对象
     if (fastpath(isa.nonpointer  &&  
                  !isa.weakly_referenced  &&  
@@ -448,130 +449,128 @@ objc_object::rootDealloc()
     }
 }
 ```
-`rootDealloc` 函数我们来详细分析下:
-1. 判断 `object` 是否采用了 `Tagged Pointer` 计数，如果是，则不进行任何析构操作。关于这一点，我们可以看出，用 `Tagged Pointer` 计数的对象，是不会析构的。 `Tagged Pointer` 计数的对象在内存中应该是类似于**字符串常量**的存在，**多个对象指针其实会指向同一块内存地址**。虽然官方文档中并没有提及，但可以推测，`Tagged Pointer` 计数的对象的内存位置很有可以就位于字符串常量区。
-2. 接下来判断对象是否采用了优化的`isa`计数方式（`isa.nonpointer`）。如果是，则判断是否能够进行快速释放（`free(this)` 用`C`函数释放内存）。可以进行快速释放的前提是：对象没有被 `weak` 引用 `!isa.weakly_referenced`，没有关联对象 `!isa.has_assoc`，没有自定义的 `C++` 析构方法 `!isa.has_cxx_dtor`，没有用到 `sideTable` 来做引用计数 `!isa.has_sidetable_rc`。
-3. 其它情况，则进入 `object_dispose((id)this)` 慢速释放分支。
+&emsp;`rootDealloc` 函数我们来详细分析下:
+1. 判断 `object` 是否采用了 `Tagged Pointer` 计数，如果是，则不进行任何析构操作。关于这一点，我们可以看出，用 `Tagged Pointer` 计数的对象，是不走这个析构流程的。
+2. 接下来判断对象是否能够进行快速释放（`free(this)` 用`C`函数释放内存）。首先判断对象是否采用了优化的`isa`计数方式（`isa.nonpointer`）。如果是接着进行接下来的判断：对象不存在 `weak` 引用（`!isa.weakly_referenced`），没有关联对象（`!isa.has_assoc`），没有自定义的 `C++` 析构方法（`!isa.has_cxx_dtor`），没有用到 `SideTable` 存放引用计数（`!isa.has_sidetable_rc`）。
+3. 其它情况，则进入 `object_dispose((id)this)` 分支进行慢速释放。
 
-### `object_dispose` 
-如果 `obj` 有被弱引用则进入 `object_dispose((id)this)` 分支, 下面是 `object_dispose` 函数：
-  `object_dispose` 方法中，会先调用 `objc_destructInstance(obj)` 来析构 `obj`，再用 `free(obj)` 来释放内存空间:
+## object_dispose 
+&emsp;`obj` 存在弱引用则进入 `object_dispose((id)this)` 分支, 下面是 `object_dispose` 函数，
+  `object_dispose` 方法中，会先调用 `objc_destructInstance(obj)`（可以理解为 `free` 前的清理工作）来析构 `obj`，再用 `free(obj)` 来释放内存空间:
 ```c++
 id 
 object_dispose(id obj) {
     if (!obj) return nil;
+    
     // 可以理解为 free 前的清理工作    
     objc_destructInstance(obj);
+    
     // 这里才是 free 直接释放内存
     free(obj);
+    
     return nil;
 }
 ```
 
-### `objc_destructInstance`
-`objc_destructInstance` 函数：
-```c++
-/***********************************************************************
-* objc_destructInstance
+## objc_destructInstance
+> &emsp;objc_destructInstance Destroys an instance without freeing memory. Calls C++ destructors. Calls ARC ivar cleanup. Removes associative references. Returns `obj`. Does nothing if `obj` is nil.
+>
+> &emsp;销毁实例而不是释放内存，内存释放是下面的 free 函数。调用 C++ 析构函数。调用 ARC ivar 清理。删除关联引用。返回 obj。如果 obj 为 nil，则不执行任何操作。
 
-* Destroys an instance without freeing memory. 
-// 销毁实例而不释放内存，内存释放是上面的下面的 free 函数
-* Calls C++ destructors. // 调用 C++ destructors 函数
-* Calls ARC ivar cleanup. // 清理 ARC 下的 ivar
-* Removes associative references. // 移除关联对象
-* Returns `obj`. Does nothing if `obj` is nil. // 返回 "obj"。如果 "obj" 为 nil，则不执行任何操作
-**********************************************************************/
+```c++
 void *objc_destructInstance(id obj) 
 {
     if (obj) {
         // Read all of the flags at once for performance.
+        // 一次读取所有标志以提高性能。
         bool cxx = obj->hasCxxDtor();
         bool assoc = obj->hasAssociatedObjects();
 
         // This order is important.
-        if (cxx) object_cxxDestruct(obj); // C++ 析构函数
-        // 移除所有的关联对象，并将其自身从 Association Manager 的 map 中移除
-        if (assoc) _object_remove_assocations(obj); // 移除关联对象
+        // 此顺序很重要。
         
-        // 如果该对象被 __weak 变量指向，则要把这些 __weak 变量指向 nil
-        obj->clearDeallocating(); // 弱引用的释放在这里
+        // C++ 析构函数
+        if (cxx) object_cxxDestruct(obj);
+        // 移除所有的关联对象，并将其自身从 Association Manager 的 map 中移除
+        if (assoc) _object_remove_assocations(obj);
+        
+        // 到这里还没有看到对象的弱引用被置为 nil 的操作，应该在下面的 clearDeallocating 函数内，我们继续向下
+        obj->clearDeallocating();
     }
 
     return obj;
 }
 ```
-
-### `clearDeallocating`
-`clearDeallocating`中有两个分支，先判断`obj`是否采用了优化`isa`引用计数。没有，则要清理`obj`存储在 `sideTable` 中的引用计数等信息，这个分支在当前 64 位设备中应该不会进入，不必关心。如果启用了`isa`优化，则判断是否使用了 `sideTable`，使用的原因是因为做了 `weak`引用（`isa.weakly_referenced` ） 或 使用了 `sideTable` 的辅助引用计数（`isa.has_sidetable_rc`）。符合这两种情况之一，则进入慢析构路径。 
-`clearDeallocating` 函数：
+## clearDeallocating
 ```c++
 inline void 
 objc_object::clearDeallocating()
 {
     if (slowpath(!isa.nonpointer)) {
         // Slow path for raw pointer isa.
-        // 原始指针类型的 isa 
+        // 对象的 isa 是原始指针类型时
         sidetable_clearDeallocating();
     }
     else if (slowpath(isa.weakly_referenced  ||  isa.has_sidetable_rc)) {
         // Slow path for non-pointer isa with weak refs and/or side table data.
+        // 对象的 isa 是优化后的 isa_t 时
         clearDeallocating_slow();
     }
 
     assert(!sidetable_present());
 }
 ```
-### `clearDeallocating_slow`
-`clearDeallocating_slow` 函数，从全局的 `SideTables` 中找到对象所处的 `SideTable`，然后调用 `weak_clear_no_lock` 函数。
+## clearDeallocating_slow
+> &emsp;Slow path of clearDeallocating() for objects with nonpointer isa that were ever weakly referenced or whose retain count ever overflowed to the side table.
+>
+> &emsp;clearDeallocating() 函数的慢速路径，用于曾经存在弱引用或保留计数溢出到 SideTable 中且具有非指针 isa 的对象。（这里 ever 其实藏了一个细节，在上面 objc_initWeak 中我们看到当创建指向对象的弱引用时会把对象的 isa 的 weakly_referenced 字段置为 true，然后 weakly_referenced 以后就一直不会再被置为 false 了，即使以后该对象没有任何弱引用了，这里可能是处于性能的考虑。不过当曾经有弱引用的对象的弱引用全部都不存在以后，会把该对象的 weak_entry_t 从 weak_table_t 的哈希数组中移除。）（还有这里把 isa.weakly_referenced || isa.has_sidetable_rc 放在一起，是因为同时也需要把对象从 SideTable->refcnts 的哈希数组中移除。） 
+
 ```c++
-// Slow path of clearDeallocating() 
-// for objects with nonpointer isa
-// that were ever weakly referenced 
-// or whose retain count ever overflowed to the side table.
 NEVER_INLINE void
 objc_object::clearDeallocating_slow()
 {
     ASSERT(isa.nonpointer  &&  (isa.weakly_referenced || isa.has_sidetable_rc));
 
-    SideTable& table = SideTables()[this]; // 在全局的SideTables中，以 this 指针为 key，找到对应的 SideTable
+    // 在全局的SideTables中，以 this 指针为 key，找到对应的 SideTable
+    SideTable& table = SideTables()[this];
     
     // 加锁
     table.lock(); 
     
-    if (isa.weakly_referenced) { // 如果 obj 被弱引用
+    // 如果 obj 被弱引用
+    if (isa.weakly_referenced) {
         // 在 SideTable 的 weak_table 中对 this 进行清理工作
         weak_clear_no_lock(&table.weak_table, (id)this);
     }
     
-    if (isa.has_sidetable_rc) { // 如果采用了 SideTable 做引用计数
-        // 在 SideTable 的引用计数中移除 this
+    // 如果引用计数溢出到 SideTable->refcnts 中保存
+    if (isa.has_sidetable_rc) {
+        // 在 SideTable 的引用计数哈希表中移除 this
         table.refcnts.erase(this);
     }
     
-    // 开锁
+    // 解锁
     table.unlock();
 }
 
 #endif
 ```
-### `weak_clear_no_lock`
-这里调用了 `weak_clear_no_lock` 来做 `weak_table` 的清理工作，将所有该对象的弱引用置为`nil`。
-  `weak_clear_no_lock`:
-  ```c++
-  /** 
-   * Called by dealloc; nils out all weak pointers that point to the provided object so that they can no longer be used.
-   * 由 dealloc 所调用；
-   * 提供的对象的所有弱指针指向 nil，以便它们不能再使用
-   * @param weak_table 
-   * @param referent The object being deallocated. // 要释放的对象
-   */
+## weak_clear_no_lock
+> &emsp;Called by dealloc; nils out all weak pointers that point to the provided object so that they can no longer be used.
+>
+> &emsp;由 dealloc 调用，清除所有指向所提供对象的弱引用，以便不再使用它们。
+
+&emsp;这里调用了 `weak_clear_no_lock` 来做 `weak_table` 的清理工作，将该对象的所有弱引用置为`nil`。
+```c++
   void 
   weak_clear_no_lock(weak_table_t *weak_table, id referent_id) 
   {
+      // referent 待销毁的对象 
       objc_object *referent = (objc_object *)referent_id;
 
-      // 找到 referent 在 weak_table 中对应的 weak_entry_t
+      // 找到 referent 在 weak_table 哈希数组中的 weak_entry_t
       weak_entry_t *entry = weak_entry_for_referent(weak_table, referent);
+      
       if (entry == nil) {
           /// XXX shouldn't happen, but does with mismatched CF/objc
           //printf("XXX no entry for clear deallocating %p\n", referent);
@@ -579,10 +578,11 @@ objc_object::clearDeallocating_slow()
       }
 
       // zero out references
+      // 临时变量，记录 weak_entry_t 的哈希数组的起始地址，（或者是定长 weak_referrer_t 数组的起始地址）
       weak_referrer_t *referrers;
       size_t count;
       
-      // 找出 weak 引用 referent 的 weak 指针地址数组以及数组长度
+      // 找出 referent 的弱引用的地址（weak_referrer_t）数组以及数组长度
       if (entry->out_of_line()) {
           // 哈希数组起始地址
           referrers = entry->referrers;
@@ -592,22 +592,23 @@ objc_object::clearDeallocating_slow()
       else {
           // 内部定长数组起始地址
           referrers = entry->inline_referrers;
+          // 长度是 WEAK_INLINE_COUNT
           count = WEAK_INLINE_COUNT;
       }
       
+      // 遍历 weak_entry_t 的哈希数组把弱引用指向 nil
       for (size_t i = 0; i < count; ++i) {
-          // 取出每个weak ptr的地址
-          // 这里用了两个 **
-          // 先取出指针
-          // 再取出 weak 变量
+          // 取出哈希数组中的弱引用的地址（objc_object **）
           objc_object **referrer = referrers[i];
+          
           if (referrer) {
-              // 如果 weak ptr 确实 weak 引用了 referent，则将 weak ptr 设置为 nil
               if (*referrer == referent) {
+                  // 如果弱引用变量指向了 referent，则把它的指向设置为 nil
                   *referrer = nil;
               }
               else if (*referrer) {
-              // 如果所存储的 weak ptr 没有 weak 引用 referent，这可能是由于 runtime 代码的逻辑错误引起的，报错
+                  // 报错：
+                  // 如果所存储的弱引用没有指向 referent，这可能是由于 runtime 代码的逻辑错误引起的，报错
                   _objc_inform("__weak variable at %p holds %p instead of %p. "
                                "This is probably incorrect use of "
                                "objc_storeWeak() and objc_loadWeak(). "
@@ -617,11 +618,14 @@ objc_object::clearDeallocating_slow()
               }
           }
       }
-      // 由于 referent 要被释放了，因此 referent 的 weak_entry_t 也要从 weak_table 移除 
+      
+      // 由于 referent 要被释放了，因此 referent 的 weak_entry_t 也要从 weak_table 的哈希数组中移除。确保哈希表的性能以及查找效率。 
       weak_entry_remove(weak_table, entry);
   }
-  ```
-  &emsp;将所有弱引用 `obj` 的指针地址都保存在 `obj` 对应的 `weak_entry_t` 中。当 `obj` 要析构时，遍历 `weak_entry_t` 中保存的弱引用指针地址，并将弱引用指针指向 `nil`，最后将 `weak_entry_t` 从 `weak_table` 移除。
+```
+
+## 总结
+&emsp;当第一次创建某个对象的弱引用时，会以该对象的指针和弱引用的地址创建一个 `weak_entry_t`，并放在该对象所处的 `SideTable` 的 `weak_table_t` 中，然后以后所有指向该对象的弱引用的地址都会保存在该对象的 `weak_entry_t` 的哈希数组中，当该对象要析构时，遍历 `weak_entry_t` 中保存的弱引用的地址，将弱引用指向 `nil`，最后将 `weak_entry_t` 从 `weak_table` 中移除。
 
 ## 参考链接
 **参考链接:🔗**
