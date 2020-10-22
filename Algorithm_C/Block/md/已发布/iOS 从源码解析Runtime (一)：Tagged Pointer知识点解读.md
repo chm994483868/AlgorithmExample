@@ -67,10 +67,10 @@ size_t instanceSize(size_t extraBytes) const {
     return size;
 }
 ```
-&emsp;如果没有 `Tagged Pointer`，在 `32` 位环境中存储一个 `NSInteger` 类型的 `NSNumber` 对象的时候，需要系统在堆区为其分配 `8` 个字节（对象的 `isa` 指针 `4` 字节 + 存储的值 `4` 字节）空间，而到了 `64` 位环境，就会变成 `16` 个字节（（理想状态）对象的 `isa` 指针 `8` 字节 + 存储的值 `8` 字节），然后再加上必要的指针变量在栈区的空间（`32` 位占 `4` 字节/ `64` 位占 `8` 字节），而如果此时 `NSNumber` 对象中仅存储了一个较小的数字，从 `32` 位切到  `64` 位环境即使在逻辑上没有任何改变的情况下，`NSNumber` 这类对象的内存占用也会直接翻一倍。
-（在 `64` 位 `iOS` 真机环境下，`NSNumber` 对象中存放 `NSIntegerMax` 时，使用 `malloc_size` 函数，返回 `32`，即系统会为其开辟 `32` 字节的空间，一个 `NSObject` 对象系统会为其开辟 `16` 字节的空间。）
+&emsp;如果没有 `Tagged Pointer`，在 `32` 位环境中存储一个 `NSInteger` 类型的 `NSNumber` 实例对象的时候，需要系统在堆区为其分配 `8` 个字节（（理想状态）对象的 `isa` 指针 `4` 字节 + 存储的值 `4` 字节）空间，而到了 `64` 位环境，就会变成 `16` 个字节（（理想状态）对象的 `isa` 指针 `8` 字节 + 存储的值 `8` 字节），然后再加上指针变量在栈区的空间（`32` 位占 `4` 字节/ `64` 位占 `8` 字节），而如果此时 `NSNumber` 对象中仅存储了一个较小的数字，从 `32` 位切到  `64` 位环境即使在逻辑上没有任何改变的情况下，`NSNumber` 实例对象的内存占用也会直接翻一倍。
+（在 `64` 位 `iOS` 真机环境下，`NSNumber` 实例对象中存放 `NSIntegerMax` 时，使用 `malloc_size` 函数，返回 `32`，即系统会为其开辟 `32` 字节的空间，一个 `NSObject` 实例对象系统会为其开辟 `16` 字节的空间。）
 
-+ 在 `64` 位环境下，非 `Tagged Pointer` 时，`NSNumber` 对象在堆区占用 `16` 字节（ `NSObject` 对象是 `16` 字节，`NSNumber` 对象实际占用 `32` 字节） + 指针变量在栈区占用 `8` 字节空间，一共 `24` 字节空间。
++ 在 `64` 位环境下，非 `Tagged Pointer` 时，`NSNumber` 实例对象在堆区占用 `16` 字节（ `NSObject` 对象是 `16` 字节，`NSNumber` 对象实际占用 `32` 字节）+ 指针变量在栈区占用 `8` 字节空间，一共 `24` 字节空间。
 + 在 `64` 位环境下，使用 `Tagged Pointer` 时，`NSNumber` 对象在堆区占用 `0` 字节 + 指针变量在栈区占用 `8` 字节空间，一共 `8` 字节空间。
 
 **`Tagged Pointer` 减少了至少一半的内存占用。**
@@ -80,18 +80,18 @@ size_t instanceSize(size_t extraBytes) const {
 NSObject *objc = [[NSObject alloc] init];
 NSNumber *number = [[[NSNumber alloc] initWithInt:1] copy];
 // NSNumber *number = [[NSNumber alloc] initWithLong:NSIntegerMax];
+
 NSLog(@"objc pointer: %zu malloc: %zu CLASS: %@ ADDRESS: %p", sizeof(objc), malloc_size(CFBridgingRetain(objc)), object_getClass(objc), objc);
 NSLog(@"number pointer: %zu malloc: %zu CLASS: %@ ADDRESS: %p", sizeof(number), malloc_size(CFBridgingRetain(number)), object_getClass(number), number);
 
 // 控制台打印:
 objc pointer: 8 malloc: 16 CLASS: NSObject ADDRESS: 0x282f2c6e0
-number pointer: 8 malloc: 0 CLASS: __NSCFNumber ADDRESS: 0xddb739a2fdf961f7
-number pointer: 8 malloc: 32 CLASS: __NSCFNumber ADDRESS: 0x282d23da0
+number pointer: 8 malloc: 0 CLASS: __NSCFNumber ADDRESS: 0xddb739a2fdf961f7 // 看这个地址大概是在栈区
+number pointer: 8 malloc: 32 CLASS: __NSCFNumber ADDRESS: 0x282d23da0 // 看这个地址大概是在堆区
 ```
-
-## 如何判断指针变量是 `Tagged Pointer`
-### `isTaggedPointer`
-&emsp;定义于 `Project Headers/objc-object.h Line 100` 的 `isTaggedPointer` 函数，用来判断一个指针变量是否是 `Tagged Pointer` 即判断一个对象是否可使用 `Tagged Pointer` 技术直接保存在指针变量的内存中。
+## 如何判断指针变量是 Tagged Pointer
+### isTaggedPointer
+&emsp;定义于 `objc-object.h` 的 `isTaggedPointer` 函数，用来判断一个指针变量是否是 `Tagged Pointer` 即判断一个对象是否可使用 `Tagged Pointer` 技术直接把数据保存在指针变量的内存中。
 ```c++
 inline bool 
 objc_object::isTaggedPointer() 
@@ -99,7 +99,7 @@ objc_object::isTaggedPointer()
     return _objc_isTaggedPointer(this);
 }
 ```
-### `_objc_isTaggedPointer`
+### _objc_isTaggedPointer
 &emsp;`_objc_isTaggedPointer` 是定义于 `Private Headers/objc-internal.h Line 442` 的一个返回 `bool` 的静态内联函数。
 ```c++
 // Return true if ptr is a tagged pointer object.
@@ -116,7 +116,7 @@ _objc_isTaggedPointer(const void * _Nullable ptr)
     return ((uintptr_t)ptr & _OBJC_TAG_MASK) == _OBJC_TAG_MASK;
 }
 ```
-### `SUPPORT_TAGGED_POINTERS`
+### SUPPORT_TAGGED_POINTERS
 &emsp;定义在 `Project Headers/objc-config.h Line 74`的 `SUPPORT_TAGGED_POINTERS` 表示在 `Objective-C 2.0` 和 `64` 位系统中可用 `Tagged Pointer`。
 ```c++
 // Define SUPPORT_TAGGED_POINTERS=1 to enable tagged pointer objects Be sure to edit tagged pointer SPI in objc-internal.h as well.
@@ -126,7 +126,7 @@ _objc_isTaggedPointer(const void * _Nullable ptr)
 #   define SUPPORT_TAGGED_POINTERS 1
 #endif
 ```
-### `OBJC_MSB_TAGGED_POINTERS`
+### OBJC_MSB_TAGGED_POINTERS
 &emsp;`OBJC_MSB_TAGGED_POINTERS` 表示不同平台下字符串是低位优先排序（`LSD`）还是高位优先排序（`MSD`）。具体细节可参考:[《字符串低位优先排序(LSD)和高位优先排序(MSD)原理及C++实现》](https://blog.csdn.net/weixin_41427400/article/details/79851043)
 ```c++
 #if (TARGET_OS_OSX || TARGET_OS_IOSMAC) && __x86_64__
@@ -139,7 +139,7 @@ _objc_isTaggedPointer(const void * _Nullable ptr)
 #   define OBJC_MSB_TAGGED_POINTERS 1
 #endif
 ```
-### `_OBJC_TAG_MASK`q
+### _OBJC_TAG_MASK
 &emsp;`_OBJC_TAG_MASK` 表示在 `字符串高位优先排序的平台下` 指针变量的第 `64` 位标记该指针为 `Tagged Pointer`，在 `字符串低位优先排序的平台下` 指针变量的第 `1` 位标记该指针为 `Tagged Pointer`。
 在 `iOS` 真机上判断是否是 `Tagged Pointer` 直接看指针的第 `64` 个比特位是否是 `1`，在 `x86_64` 架构的 `Mac` 下看指针的第 `1` 个比特位是否是 `1`。
 ```c++
