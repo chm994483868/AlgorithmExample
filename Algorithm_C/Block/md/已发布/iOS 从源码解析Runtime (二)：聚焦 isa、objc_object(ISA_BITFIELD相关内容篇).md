@@ -1,18 +1,24 @@
 # iOS 从源码解析Runtime (二)：聚焦 isa、objc_object(ISA_BITFIELD相关内容篇)
 
-> `runtime` 是什么？
-在 `C` 语言中，将代码转换为可执行程序，一般要经历三个步骤，即编译、链接、运行。在链接的时候，方法的实现就已经确定好了。而在 `Objective-C` 中，却将一些在编译和链接过程中的工作，放到了运行阶段。也就是说，就算是一个编译好的 `.ipa` 包，在程序没有运行的时候，也不知道调用一个方法会发生什么。因此我们称 `Objective-C` 为一门动态语言。这样的设计使 `Objective-C` 变得灵活，甚至可以让我们在程序运行的时候，去动态修改一个方法的实现，而实现这一切的基础就是 `runtime`。简单来说，`runtime` 是一个库，这个库使我们可以在程序运行时创建对象、检查对象、修改类和对象的方法等等。
+> &emsp;`runtime` 是什么？在 `C` 语言中，将代码转换为可执行程序，一般要经历三个步骤，即编译、链接、运行。在链接的时候，方法的实现就已经确定好了。而在 `Objective-C` 中，却将一些在编译和链接过程中的工作，放到了运行阶段。也就是说，就算是一个编译好的 `.ipa` 包，在程序没有运行的时候，也不知道调用一个方法会发生什么。因此我们称 `Objective-C` 为一门动态语言。这样的设计使 `Objective-C` 变得灵活，甚至可以让我们在程序运行的时候，去动态修改一个方法的实现，而实现这一切的基础就是 `runtime`。简单来说，`runtime` 是一个库，这个库使我们可以在程序运行时创建对象、检查对象、修改类和对象的方法等等。
+> 
+> &emsp;2006 年，苹果发布了全新的 `Objective-C 2.0`，目前我们可以在苹果官网下载最新的 `objc4-781` 源码来阅读和调试。**在 `Obejective-C 2.0` 中类和对象等的实现进行了完全重写。** 虽然对当下而言 `Objective-C 1.0` 已经过时很久了，但是其相关代码对我们学习 `2.0` 还是具有极大的参考价值。（在源码内部 `1.0` 与 `2.0` 主要通过一些宏来作出区分）
 
-> 2006 年，苹果发布了全新的 `Objective-C 2.0`，目前我们可以在苹果官网下载最新的 `objc4-781` 源码来阅读和调试。**在 `Obejective-C 2.0` 中类和对象等的实现进行了完全重写。** 虽然对当下而言 `Objective-C 1.0` 已经过时很久了，但是其相关代码对我们学习 `2.0` 还是具有极大的参考价值。（在源码内部 `1.0` 与 `2.0` 主要通过一些宏来作出区分）
+&emsp;`struct objc_object` 和 `struct objc_class` 是 `iOS(OC)` 编写面向对象代码的基石。那今天我们就来详细的解析这两个结构体吧。
 
-&emsp;`struct objc_object` 和 `struct objc_class` 是 `iOS(OC)` 编写面向对象代码的基石。那今天我们就来超详细的解析这两个结构体吧。
-
-## `objc_object`
-&emsp;`struct objc_object` 的定义位于 `objc4-781/Project Headers/objc-private.h/Line 82`。
-在正式开始看 `objc_object` 之前我们先看下 `objc-private.h` 文件前面大概 50 行左右相关的代码。
+## objc_object
+&emsp;`struct objc_object` 的定义位于 `objc-private.h`。在正式开始看 `objc_object` 之前我们先看下 `objc-private.h` 文件前面大概 50 行左右相关的代码。
 
 + **声明 `objc-privete.h` 头文件必须在其它头文件之前导入。**
-&emsp;这样做是为了避免与其它地方定义的 `id` 和 `Class` 产生冲突。在 `Objective-C 1.0` 和 `2.0` 中，类和对象的结构体定义是不同的，在源码中我们能看到两处不同的 `objc_class` 和 `objc_object` 定义。我们可在 `runtime.h` 文件中看到 `/* Types */` 处的 `objc_class` 定义的那一部分代码被 `#if !OBJC_TYPES_DEFINED ... #endif` 所包裹，然后还有 `objc.h` 文件开头处的 `objc_object` 定义的代码也被 `#if !OBJC_TYPES_DEFINED ... #endif` 所包裹，表示两者只在 `Objective-C 1.0` 中使用。`Objective-C 2.0` 下正在使用的  `objc_object` 和 `objc_class` 定义分别位于 `objc-private.h` 和 `objc-runtime-new.h` 文件下。（2.0 下 `OBJC_TYPES_DEFINED` 的值为 1，且它的定义在 `objc-privete.h` 文件的开头处，因此声明 `objc-privete.h` 头文件必须在其它头文件之前导入。我们不通过源码看到的公开的 `runtime.h` 和 `objc.h` 头文件 里面的 `objc_object` 和 `objc_class` 都是过时的。）
+&emsp;这样做是为了避免与其它地方定义的 `id` 和 `Class` 产生冲突。在 `Objective-C 1.0` 和 `2.0` 中，类和对象的结构体定义是不同的，在源码中我们能看到两处不同的 `objc_class` 和 `objc_object` 定义。
+
+&emsp;我们可在 `runtime.h` 文件中看到 `/* Types */` 处的 `objc_class` 定义的那一部分代码被 `#if !OBJC_TYPES_DEFINED ... #endif` 所包裹，然后还有 `objc.h` 文件开头处的 `objc_object` 定义的代码也被 `#if !OBJC_TYPES_DEFINED ... #endif` 所包裹，表示两者只在 `Objective-C 1.0` 中使用。
+
+&emsp;`Objective-C 2.0` 下正在使用的  `objc_object` 和 `objc_class` 定义分别位于 `objc-private.h` 和 `objc-runtime-new.h` 文件下。
+
+&emsp;（2.0 下 `OBJC_TYPES_DEFINED` 的值为 1，且它的定义在 `objc-privete.h` 文件的开头处，因此声明 `objc-privete.h` 头文件必须在其它头文件之前导入。)
+&emsp;（我们不通过源码看到的公开的 `runtime.h` 和 `objc.h` 头文件 里面的 `objc_object` 和 `objc_class` 都是过时的。）
+
 ```c++
 /* 
  * Isolate ourselves from the definitions of id
@@ -30,7 +36,7 @@
 #undef OBJC_OLD_DISPATCH_PROTOTYPES
 #define OBJC_OLD_DISPATCH_PROTOTYPES 0
 ```
-&emsp;在 `Public Headers/objc-api.h` 文件可看到如下代码，在 `__swift__` 为真的情况下，`OBJC_OLD_DISPATCH_PROTOTYPES` 会定为 1，其它情况下都是 0，在 `objc-privete.h` 文件中 `OBJC_OLD_DISPATCH_PROTOTYPES` 被定为 0。
+&emsp;在 `objc-api.h` 文件可看到如下代码，在 `__swift__` 为真的情况下，`OBJC_OLD_DISPATCH_PROTOTYPES` 会定为 1，其它情况下都是 0，在 `objc-privete.h` 文件中 `OBJC_OLD_DISPATCH_PROTOTYPES` 被定为 0。
 ```c++
 /* OBJC_OLD_DISPATCH_PROTOTYPES == 0 
  * enforces the rule that the dispatch functions must
@@ -40,9 +46,11 @@
 #if !defined(OBJC_OLD_DISPATCH_PROTOTYPES)
 #   if __swift__
         // Existing Swift code expects IMP to be Comparable.
-        // 当前 Swift 代码期望 IMP 是遵守 Comparable，可以进行比较。
         // Variadic IMP is comparable via OpaquePointer; non-variadic IMP isn't.
-        // Variadic IMP 变量可以通过 OpaquePointer 进行比较; non-variadic IMP 不可以。
+        
+        // 当前 Swift 代码期望 IMP 是遵守 Comparable，可以进行比较。
+        // Variadic IMP 变量可以通过 OpaquePointer 进行比较，non-variadic IMP 不可以。
+        
 #       define OBJC_OLD_DISPATCH_PROTOTYPES 1
 #   else
 #       define OBJC_OLD_DISPATCH_PROTOTYPES 0
@@ -69,7 +77,7 @@ extern id _objc_msgForward_impcache(id, SEL, ...);
 ```
 &emsp;看到同名函数，返回值 `void` 和 `id _Nullable (id 可空)` 做了替换，参数 `void` 和 `id, SEL` 做了替换，全局搜索可发现此行为只针对调度函数。
 
-+ `Public Header/runtime.h` 中的 `Objective-C 1.0` 下的 `objc_class` 定义。
++ `runtime.h` 中的 `Objective-C 1.0` 下的 `objc_class` 定义。
 ```c++
 /* Types */
 
@@ -88,7 +96,7 @@ typedef struct objc_category *Category;
 typedef struct objc_property *objc_property_t;
 
 struct objc_class {
-    // 指向该类的元类（metaclass）指针，（元类不可能为空，根元类的 isa 指向自己）
+    // 指向该类的元类（metaclass）指针，（元类永不可能为空，根元类的 isa 指向自己）
     Class _Nonnull isa  OBJC_ISA_AVAILABILITY;
 
 #if !__OBJC2__
@@ -100,7 +108,7 @@ struct objc_class {
     long version                                             OBJC2_UNAVAILABLE;
     // 类信息，供运行时使用的一些标记位
     long info                                                OBJC2_UNAVAILABLE;
-    // 该类的实例对象的大小
+    // 该类的所有实例对象的大小
     long instance_size                                       OBJC2_UNAVAILABLE;
     // 指向该类成员变量列表的指针
     struct objc_ivar_list * _Nullable ivars                  OBJC2_UNAVAILABLE;
@@ -116,7 +124,7 @@ struct objc_class {
 /* Use `Class` instead of `struct objc_class *` */
 ```
 
-+ `Public Headers/objc.h` 中的 `Objective-C 1.0` 下的 `objc_object` 定义
++ `objc.h` 中的 `Objective-C 1.0` 下的 `objc_object` 定义
 ```c++
 #if !OBJC_TYPES_DEFINED
 /// An opaque type that represents an Objective-C class.
@@ -124,7 +132,7 @@ typedef struct objc_class *Class;
 
 /// Represents an instance of a class.
 struct objc_object {
-    Class _Nonnull isa  OBJC_ISA_AVAILABILITY;
+    Class _Nonnull isa  OBJC_ISA_AVAILABILITY; // isa 还是原始的类指针
 };
 
 /// A pointer to an instance of a class.
@@ -133,7 +141,7 @@ typedef struct objc_object *id;
 ```
 &emsp;在面向对象（`oop`）的编程语言中，每一个对象都是某个类的实例。在 `Objective-C` 中，所有对象的本质都是一个 `objc_object` 结构体，且每个实例对象的第一个成员变量都是 `Class isa`，指向该对象对应的类，每一个类描述了一系列它的实例对象的信息，包括对象占用内存大小、成员变量列表、该对象能执行的函数列表...等。
 
-**在一个类的实例对象的内存布局中，第一个成员变量是 `isa`，然后根据该对象所属类的继承体系依次对成员变量排序，排列顺序是: 根类的成员变量、父类的成员变量、最后才是自己的成员变量，且每个类定义中的成员变量（仅包含使用 `@property` 声明属性后由编译器生成的同名的 _成员变量）相互之间的顺序可能会与定义时的顺序不同，编译器会在内存对齐的原则下对类定义时的成员变量的顺序做出优化，保证内存占用最少。（还会涉及到 `.h` 中的成员变量和属性，`.m` 中 `extension` 中添加的成员变量和属性，它们之间的排序顺序）**
+&emsp;**在一个类的实例对象的内存布局中，第一个成员变量是 `isa`，然后根据该对象所属类的继承体系依次对成员变量排序，排列顺序是: 根类的成员变量、父类的成员变量、最后才是自己的成员变量，且每个类定义中的成员变量（仅包含使用 `@property` 声明属性后由编译器生成的同名的 _成员变量）相互之间的顺序可能会与定义时的顺序不同，编译器会在内存对齐的原则下对类定义时的成员变量的顺序做出优化，保证内存占用最少。（还会涉及到 `.h` 中的成员变量和属性，`.m` 中 `extension` 中添加的成员变量和属性，它们之间的排序顺序）**
 
 验证代码:
 ```objective-c
@@ -166,7 +174,7 @@ typedef struct objc_object *id;
   _cus_string = nil
 }
 ```
-&emsp;可看到你 `NSObject` 的 `isa` 在最前面，然后是 `BaseObject` 的成员变量，最后才是 `SubObject` 的成员变量，然后注意 `_cus_int2` 跑到了 `_cus_dou` 前面，而在类定义时 `cus_dou` 属性是在 `cus_int2` 属性前面的。（由于内存对齐时不用再为 `double` 补位，这样至少减少了 4 个字节的内存浪费）
+&emsp;可看到 `NSObject` 的 `isa` 在最前面，然后是 `BaseObject` 的成员变量，最后才是 `SubObject` 的成员变量，然后注意 `_cus_int2` 跑到了 `_cus_dou` 前面，而在类定义时 `cus_dou` 属性是在 `cus_int2` 属性前面的。（由于内存对齐时不用再为 `double` 补位，这样至少减少了 4 个字节的内存浪费）
 
 这里大概又可以引出为什么不能动态的给类添加成员变量却可以添加方法？
 
@@ -174,7 +182,7 @@ typedef struct objc_object *id;
 我们所说的 “类的实例”（对象），指的是一块内存区域，里面存储了 `isa` 指针和所有的成员变量。所以假如允许动态修改类已固定的成员变量的布局，那么那些已经创建出的对象就不符合类的定义了，就变成无效对象了。而方法的定义都是在类对象或元类对象中的，不管如何增删方法，都不会影响对象的内存布局，已经创建出的对象仍然可以正常使用。
 
 + `OBJC_ISA_AVAILABILITY` 
-&emsp;在 `Public Headers/objc-api.h` 中的宏定义。表明在 `Objective-C 1.0` 中类型为 `Class` 的 `isa` 将在 `2.0` 中被弃用，在 `2.0` 中 `isa` 转变为 `union isa_t isa`，下面会详细分析。
+&emsp;在 `objc-api.h` 中的宏定义。表明在 `Objective-C 1.0` 中类型为 `Class` 的 `isa` 将在 `2.0` 中被弃用，在 `2.0` 中 `isa` 转变为 `union isa_t isa`，下面会详细分析。
 ```c++
 /* OBJC_ISA_AVAILABILITY: `isa` will be deprecated or unavailable in the future
 * isa 在未来将被弃用或者不可用。（这里可以理解为不能直接用 . 访问 isa 这个成员变量）
@@ -188,7 +196,7 @@ typedef struct objc_object *id;
 #endif
 ```
 + `OBJC2_UNAVAILABLE`
-&emsp;在 `Public Headers/objc-api.h` 中的宏定义。表明在 `Objective-C 2.0` 中不可用，在 `macOS 10.5 iOS 2.0` 以及 `TVOS/WATCHOS/BRIDGEOS` 不可用。
+&emsp;在 `objc-api.h` 中的宏定义。表明在 `Objective-C 2.0` 中不可用，在 `macOS 10.5 iOS 2.0` 以及 `TVOS/WATCHOS/BRIDGEOS` 不可用。
 ```c++
 /* OBJC2_UNAVAILABLE: unavailable in objc 2.0, deprecated in Leopard */
 #if !defined(OBJC2_UNAVAILABLE)
@@ -204,7 +212,7 @@ typedef struct objc_object *id;
 #endif
 ```
 + `SEL`
-&emsp;在 `Public Headers/objc.h` 文件中定义的一个指向 `struct objc_selector` 的指针。
+&emsp;在 `objc.h` 文件中定义的一个指向 `struct objc_selector` 的指针。
 在 `objc4-781` 中查找不到 `objc_selector` 的具体定义，那这个 `objc_selector` 结构体具体是什么取决与使用 `GNU` 还是苹果的运行时， 在 `macOS` 中 `SEL` 其实被映射为一个 `C` 字符串，一个保存方法名字的字符串，它并不指向一个具体的方法实现（`IMP` 类型才是）。
 `@selector(abc)` 返回的类型是 `SEL`，它作用是找到名字为 `abc` 的方法，对于所有的类，只要方法名是相同的，产生的 `@selector` 都是一样的。简而言之，你可以理解 `@selector()` 就是取指定名字的函数在类中的编号，它的行为基本可以等同 `C` 语言的中函数指针，只不过 `C` 语言中，可以把函数名直接赋给一个函数指针，而 `Objective-C` 的类不能直接应用函数指针，这样只能做一个 `@selector` 语法来取。
 ```c++
@@ -212,7 +220,7 @@ typedef struct objc_object *id;
 typedef struct objc_selector *SEL;
 ```
 + `IMP`
-&emsp;在 `Public Headers/objc.h` 文件中定义的一个函数指针，指向方法调用时对应的函数实现。
+&emsp;在 `objc.h` 文件中定义的一个函数指针，指向方法调用时对应的函数实现。
 ```c++
 // A pointer to the function of a method implementation. 
 // 指向方法实现的指针。
@@ -222,8 +230,7 @@ typedef void (*IMP)(void /* id, SEL, ... */ );
 typedef id _Nullable (*IMP)(id _Nonnull, SEL _Nonnull, ...); 
 #endif
 ```
-`OBJC_OLD_DISPATCH_PROTOTYPES` 默认为 0，在 `__swift__` 为真时是 1，会进行严格的参数匹配。
-`IMP` 指向的函数的前两个参数是默认参数 `id` 和 `SEL`，这对应了函数内部两个隐含参数 `self` 和 `_cmd`，这里的 `SEL` 和 `_cmd` 好理解，就是函数名。而 `id` 和 `self` ，对于实例方法来说， `self` 保存了当前对象的地址，对于类方法来说， `self` 保存了当前对应类对象的地址，后面的省略号即是参数列表。如下代码测试 `_cmd`: 
+&emsp;`OBJC_OLD_DISPATCH_PROTOTYPES` 默认为 0，在 `__swift__` 为真时是 1，会进行严格的参数匹配。`IMP` 指向的函数的前两个参数是默认参数 `id` 和 `SEL`，这对应了函数内部两个隐含参数 `self` 和 `_cmd`，这里的 `SEL` 和 `_cmd` 好理解，就是函数名。而 `id` 和 `self` ，对于实例方法来说， `self` 保存了当前对象的地址，对于类方法来说， `self` 保存了当前对应类对象的地址，后面的省略号即是参数列表。如下代码测试 `_cmd`: 
 ```objective-c
 - (void)testCmd:(NSNumber *)num {
     NSLog(@"%ld", (long)num.integerValue);
@@ -234,10 +241,10 @@ typedef id _Nullable (*IMP)(id _Nonnull, SEL _Nonnull, ...);
     }
 }
 ```
-控制台依次打印 5 4 3 2 1，即我们可以在方法内部用 `_cmd` 来调用方法自身。
+&emsp;控制台依次打印 5 4 3 2 1，即我们可以在方法内部用 `_cmd` 来调用方法自身。
 
 + `Method`
-&emsp;位置在`Public Headers/objc.h` 文件。在 `Objective-C 1.0` 下，`Method` 被定义为一个指向 `struct objc_method` 的指针：
+&emsp;位置在`objc.h` 文件。在 `Objective-C 1.0` 下，`Method` 被定义为一个指向 `struct objc_method` 的指针：
 ```c++
 #if !OBJC_TYPES_DEFINED
 // An opaque type that represents a method in a class definition.
@@ -245,7 +252,7 @@ typedef id _Nullable (*IMP)(id _Nonnull, SEL _Nonnull, ...);
 typedef struct objc_method *Method;
 #endif
 ```
-`struct objc_method` 在 `Objective-C 1.0` 定义如下:
+&emsp;`struct objc_method` 在 `Objective-C 1.0` 定义如下:
 ```c++
 struct objc_method {
     // 方法名称
@@ -260,17 +267,17 @@ struct objc_method {
     IMP _Nonnull method_imp                                  OBJC2_UNAVAILABLE;
 }                                                            OBJC2_UNAVAILABLE;
 ```
-`Method` 的作用，相当于在 `SEL` 和 `IMP` 之间做了一个映射，当对一个对象发送消息时，通过 `SEL` 方法名找到其对应的函数实现 `IMP`，然后执行。
+&emsp;`Method` 的作用，相当于在 `SEL` 和 `IMP` 之间做了一个映射，当对一个对象发送消息时，通过 `SEL` 方法名找到其对应的函数实现 `IMP`，然后执行。
 
 注意:
 &emsp;由于在类中查找方法时只是根据方法名（不包含参数和返回值）来查找的，因此在 `OC` 中同一块定义区域内，不能同时定义两个同名方法。（在分类中可以添加与类已有的方法同名的方法，会造成 "覆盖"）
 如下代码则不能同时定义：（在 `C/C++` 中只要参数或者返回值类型不同就表示是不同的函数）
-```objective-c
+```c++
 - (void)setWidth:(int)width;
 - (void)setWidth:(double)width; // Duplicate declaration of method 'setWidth:'
 ```
 + `objc_method_list`
-`objc_method_list` 在 `Objective-C 1.0` 下的定义：
+&emsp;`objc_method_list` 在 `Objective-C 1.0` 下的定义：
 ```c++
 struct objc_method_list {
     struct objc_method_list * _Nullable obsolete             OBJC2_UNAVAILABLE;
@@ -283,9 +290,10 @@ struct objc_method_list {
     struct objc_method method_list[1]                        OBJC2_UNAVAILABLE;
 }                                                            OBJC2_UNAVAILABLE;
 ```
-`__LP64__` 表示当前平台（或者说运行环境）下 `long` 和 `poniter` 都是 64，表示当前操作系统是 `64` 位。在 `Mac` 终端直接执行 `cpp -dM /dev/null` 会打印出一大组当前设备的一些宏定义的值，我看到在我的机器下: `#define __LP64__ 1`、`#define __POINTER_WIDTH__ 64`、等等，列表很长，大家可以在终端执行一下试试。
+&emsp;`__LP64__` 表示当前平台（或者说运行环境）下 `long` 和 `poniter` 都是 64，表示当前操作系统是 `64` 位。在 `Mac` 终端直接执行 `cpp -dM /dev/null` 会打印出一大组当前设备的一些宏定义的值，我看到在我的机器下: `#define __LP64__ 1`、`#define __POINTER_WIDTH__ 64`、等等，列表很长，大家可以在终端执行一下试试。
 
-在上面 `Objective-C 1.0` 下 `objc_class` 定义中 `methodLists` 是一个 `struct objc_method_list` 类型的二级指针，其中每一个元素是一个数组，数组中的每一个元素是 `struct objc_method`。
+&emsp;在上面 `Objective-C 1.0` 下 `objc_class` 定义中 `methodLists` 是一个 `struct objc_method_list` 类型的二级指针，其中每一个元素是一个数组，数组中的每一个元素是 `struct objc_method`。
+
 + `Ivar`
 &emsp;在 `Objective-C 1.0` 下，`Ivar` 被定义为一个指向 `struct objc_ivar` 的指针：
 ```c++
@@ -295,7 +303,7 @@ typedef struct objc_ivar *Ivar;
 #endif
 ```
 + `objc_ivar`
-`objc_ivar` 在 `Objective-C 1.0` 下的定义：
+&emsp;`objc_ivar` 在 `Objective-C 1.0` 下的定义：
 ```c++
 struct objc_ivar {
     char * _Nullable ivar_name                               OBJC2_UNAVAILABLE;
@@ -308,7 +316,7 @@ struct objc_ivar {
 }                                                            OBJC2_UNAVAILABLE;
 ```
 + `objc_ivar_list`
-`objc_ivar_list` 在 `Objective-C 1.0` 下的定义：
+&emsp;`objc_ivar_list` 在 `Objective-C 1.0` 下的定义：
 ```c++
 struct objc_ivar_list {
     int ivar_count                                           OBJC2_UNAVAILABLE;
@@ -319,7 +327,7 @@ struct objc_ivar_list {
     struct objc_ivar ivar_list[1]                            OBJC2_UNAVAILABLE;
 }                                                            OBJC2_UNAVAILABLE;
 ```
-在上面 `Objective-C 1.0` 下 `objc_class` 定义中 `ivars` 是一个 `struct objc_ivar_list` 类型的指针。
+&emsp;在上面 `Objective-C 1.0` 下 `objc_class` 定义中 `ivars` 是一个 `struct objc_ivar_list` 类型的指针。
 `ivars` 中有一个数组，数组中每个元素是一个 `struct objc_ivar`。
 
 + `objc_property_t`
@@ -330,7 +338,7 @@ struct objc_ivar_list {
 typedef struct objc_property *objc_property_t;
 #endif
 ```
-在 `objc4-781` 中未找到 `struct objc_property` 定义，倒是可以找一个与 `property` 相关的属性描述。
+&emsp;在 `objc4-781` 中未找到 `struct objc_property` 定义，倒是可以找一个与 `property` 相关的属性描述。
 
 + `objc_property_attribute_t`
 ```c++
@@ -342,7 +350,8 @@ typedef struct {
     const char * _Nonnull value;          /**< The value of the attribute (usually empty) */
 } objc_property_attribute_t;
 ```
-`objc_property_attribute_t` 定义了属性的特性。
+&emsp;`objc_property_attribute_t` 定义了属性的特性。
+
 + `Category`
 &emsp;在 `Objective-C 1.0` 下，`Category` 被定义为一个指向 `struct objc_category` 的指针：
 ```c++
@@ -352,7 +361,7 @@ typedef struct objc_category *Category;
 #endif
 ```
 + `objc_category`
-`objc_category` 在 `Objective-C 1.0` 下的定义：
+&emsp;`objc_category` 在 `Objective-C 1.0` 下的定义：
 ```c++
 struct objc_category {
     char * _Nonnull category_name                            OBJC2_UNAVAILABLE;
@@ -362,13 +371,13 @@ struct objc_category {
     struct objc_protocol_list * _Nullable protocols          OBJC2_UNAVAILABLE;
 }                                                            OBJC2_UNAVAILABLE;
 ```
-`objc_category` 包含分类中定义的实例方法和类方法，在程序启动时会由 `runtime` 动态追加到对应的类和元类中。
+&emsp;`objc_category` 包含分类中定义的实例方法和类方法，在程序启动时会由 `runtime` 动态追加到对应的类和元类中。
 在 `objc_category` 中包含对象方法列表、类方法列表、协议列表。从这里我们也可以看出， `Category` 支持添加对象方法、类方法、协议，但不能保存成员变量。
 
 注意:
-在 `Category` 中是可以添加属性的，但不会生成对应的成员变量、 `getter` 和 `setter` 。因此，调用 `Category` 中声明的属性时会报错。
+&emsp;在 `Category` 中是可以添加属性的，但不会生成对应的成员变量、 `getter` 和 `setter` 。因此，调用 `Category` 中声明的属性时会报错。
 
-`Category` 在 `2.0` 和 `1.0` 中的差别还挺大的，后面我们会详细分析 `2.0` 下的 `Category`。
+&emsp;`Category` 在 `2.0` 和 `1.0` 中的差别还挺大的，后面我们会详细分析 `2.0` 下的 `Category`。
 
 + `Cache`
 &emsp;在 `Objective-C 1.0` 下，`Cache` 被定义为一个指向 `struct objc_cache` 的指针：
@@ -376,7 +385,7 @@ struct objc_category {
 typedef struct objc_cache *Cache                             OBJC2_UNAVAILABLE;
 ```
 + `objc_cache`
-`objc_cache` 在 `Objective-C 1.0` 下的定义：
+&emsp;`objc_cache` 在 `Objective-C 1.0` 下的定义：
 ```c++
 #define CACHE_BUCKET_NAME(B)  ((B)->method_name)
 #define CACHE_BUCKET_IMP(B)   ((B)->method_imp)
@@ -403,6 +412,7 @@ struct objc_cache {
 #ifdef __OBJC__
 @class Protocol;
 #else
+// Protocol 直接被定义为 objc_object ？
 typedef struct objc_object Protocol;
 #endif
 
@@ -413,11 +423,14 @@ typedef struct objc_object Protocol;
 ```c++
 struct objc_protocol_list {
     struct objc_protocol_list * _Nullable next;
+    // 长度
     long count;
+    // Protocol 指针数组
     __unsafe_unretained Protocol * _Nullable list[1];
 };
 ```
-**到这里由 `OBJC_TYPES_DEFINED` 宏定义涉及的 `Objective-C 1.0` 下的一些类型定义已经基本看了一遍，大致在脑中也有了一个脉络，下面继续看 `objc-private.h` 文件和接下的来 `Objective-C 2.0` 下类和对象的结构所做出的改变。**
+&emsp;**到这里由 `OBJC_TYPES_DEFINED` 宏定义涉及的 `Objective-C 1.0` 下的一些类型定义已经基本看了一遍，大致在脑中也有了一个脉络，下面继续看 `objc-private.h` 文件和接下的来 `Objective-C 2.0` 下类和对象的结构所做出的改变。**
+
 + `ASSERT(x)`
 &emsp;在 `release` 模式下不会执行断言，同时也保证 `ASSERT(x)` 可正常编译。
 ```c++
@@ -448,7 +461,7 @@ typedef struct objc_object *id;
 &emsp;`__OBJC__` 在 `Objective-C` 编译器中被预定义为 1，我们可以使用该宏来判断头文件是通过 `C` 编译器还是 `Objective-C` 编译器进行编译。
 
 + `__OBJC2__`
-&emsp;定义在 `Project Headers/objc-config.h` 中：
+&emsp;定义在 `objc-config.h` 中：
 ```c++
 // Define __OBJC2__ for the benefit of our asm files.
 #ifndef __OBJC2__
@@ -470,7 +483,7 @@ public:
 };
 ```
 
-## `isa`
+## isa
 ```c++
 #include "isa.h"
 union isa_t {
@@ -479,9 +492,11 @@ union isa_t {
     // 初始化列表，初始 bits 的值
     isa_t(uintptr_t value) : bits(value) { }
     
-    // Class 兼容以前的 isa，在 isa 中只存放一个指向 objc_class 的指针
-    Class cls;
+    // cls 和 bits 共同使用一块 8 字节空间，
+    // 当使用 bits 时，会使用位域，不同的位表示不同的内容 ISA_BITFIELD
     
+    // 兼容以前的 isa，在 isa 中只存放一个指向 objc_class 的指针
+    Class cls;
     // typedef unsigned long uintptr_t;
     uintptr_t bits;
     
@@ -493,7 +508,7 @@ union isa_t {
 #endif
 };
 ```
-&emsp;`isa` 的类型是 `union isa_t`，它有两个成员变量 `Class cls` 和 `uintptr_t bits` 共用同一块内存空间，其中 `bits` 采用位域的机制来保存当前对象所属类之外的更多信息。`ISA_BITFIELD` 宏定义位于 `isa.h` 文件，一起来看下。
+&emsp;`isa` 的类型是 `union isa_t`，它有两个成员变量 `Class cls` 和 `uintptr_t bits` 共用同一块 8 字节的内存空间，其中 `bits` 采用位域的机制来保存当前对象所属类之外的更多信息。`ISA_BITFIELD` 宏定义位于 `isa.h` 文件，一起来看下。
 
 ### 苹果设备架构梳理
 &emsp;在学习 `isa.h` 之前我们首先对 `iPhone` 和 `Mac` 的架构做一下梳理。
@@ -505,29 +520,30 @@ union isa_t {
   `armv6/armv7/armv7s` 架构是 `32` 位处理器。
   `arm64(armv8)/arm64e(armv8)` 架构是 `64` 位处理器。（ `iPhone 5s` 开始全部转向 `64` 位（`__LP64__`））
 
-### `isa.h` 文件
+### isa.h 文件
 &emsp; `isa.h` - `C` 和 `assembly` 代码的 `isa` 字段的定义。
 
-#### `SUPPORT_PACKED_ISA`
+#### SUPPORT_PACKED_ISA
 ```c++
 // Define SUPPORT_PACKED_ISA=1 on platforms that store the class in
 the isa field as a maskable pointer with other data around it.
 // SUPPORT_PACKED_ISA = 1 的平台将类信息与其他数据一起存储在 isa 的字段中，
 // 把 isa 作为一个 maskable pointer。（并通过掩码的方式读取 isa 保存的不同的内容）
+
 #if (!__LP64__  ||  TARGET_OS_WIN32  || (TARGET_OS_SIMULATOR && !TARGET_OS_IOSMAC))
 #   define SUPPORT_PACKED_ISA 0
 #else
 #   define SUPPORT_PACKED_ISA 1
 #endif
 ```
-&emsp;表示平台是否支持在 `isa` 指针中插入 `Class` 之外的信息，可以理解为把类信息和其它的一些信息打包放在 `isa` 中。如果支持会将 `Class` 信息放入 `isa_t` 中定义的 `bits` 位域的 `shiftcls` 中，读取 `Class` 信息的话则是以掩码的方式。其它位中则放一些其它信息。如果不支持的话，那么 `union isa_t` 中的 `bits/cls` 两个成员变量共用的内存空间就保存一个 `Class` 指针。
+&emsp;表示平台是否支持在 `isa` 指针中插入 `Class` 指针之外的信息，可以理解为把类信息和其它的一些信息打包放在 `isa` 中。如果支持会将 `Class` 信息放入 `isa_t` 中定义的 `bits` 位域的 `shiftcls` 中，读取 `Class` 信息的话则是以掩码的方式。其它位中则放一些其它信息。如果不支持的话，那么 `union isa_t` 中的 `bits/cls` 两个成员变量共用的内存空间就只是保存一个 `Class` 指针。
 
 下列平台下不支持：
 1. 32 位处理器。（它使用的是 `SUPPORT_INDEXED_ISA`）
 2. `os` 是 `win32`。
 3. 在模拟器中且 `!TARGET_OS_IOSMAC`。（ `TARGET_OS_IOSMAC` 不知道是什么平台）
 
-#### `SUPPORT_INDEXED_ISA`
+#### SUPPORT_INDEXED_ISA
 ```c++
 // Define SUPPORT_INDEXED_ISA = 1 on platforms that store the
 // class in the isa field as an index into a class table.
@@ -544,14 +560,16 @@ the isa field as a maskable pointer with other data around it.
 #   define SUPPORT_INDEXED_ISA 0
 #endif
 ```
-&emsp;和上面的 `SUPPORT_PACKED_IA` 基本完全相同，不同的是它保存的是 `Class` 在全局 `class table` 中的索引，它位域名是 `indexcls`。它支持的平台仅限于 `armv7k` 或 `arm64_32`。已知自 `iPhone 5s` 以后苹果手机全部转向 `64` 位处理器 `arm64` 架构。（也就是说我们再也不会再遇到它了，然后全部转向了 `SUPPORT_PACKED_ISA` 阵营）
+&emsp;和上面的 `SUPPORT_PACKED_IA` 基本完全相同，不同的是它保存的是 `Class` 在全局 `class table` 中的索引，位域名是 `indexcls`，它支持的平台仅限于 `armv7k` 或 `arm64_32`，目前的话会在 `watchOS` 下会使用。
 
-#### `SUPPORT_NONPOINTER_ISA`
+#### SUPPORT_NONPOINTER_ISA
 ```c++
 // Define SUPPORT_NONPOINTER_ISA = 1 on any platform that may
 // store something in the isa field that is not a raw pointer.
-// SUPPORT_NONPOINTER_ISA = 1 的平台表示可以在 isa 的字段中保存非原始指针的内容。
+
+// SUPPORT_NONPOINTER_ISA = 1 的平台表示在 isa 的字段中保存非原始指针的内容。
 // (优化后的 isa （union isa_t 类型）)
+
 #if !SUPPORT_INDEXED_ISA  &&  !SUPPORT_PACKED_ISA
 #   define SUPPORT_NONPOINTER_ISA 0
 #else
@@ -561,17 +579,17 @@ the isa field as a maskable pointer with other data around it.
 &emsp;标记是否支持优化的 `isa` 指针（`isa` 中除 `Class` 指针外，可以保存更多信息）。那如何判断是否支持优化的 `isa` 指针呢？
 1. 首先只要支持 `SUPPORT_PACKED_ISA` 或 `SUPPORT_INDEXED_ISA` 任何一个的情况下都是支持 `SUPPORT_NONPOINTER_ISA` 的。
 2. 已知在自 `iPhone 5s` `arm64` 架构以后的 `iPhone` 中 `SUPPORT_PACKED_ISA` 都为 1，`SUPPORT_INDEXED_ISA` 为 0，则其 `SUPPORT_NONPOINTER_ISA` 为 1。
-3. 在 `Edit Scheme... -> Run -> Environment Variables` 中添加 `OBJC_DISABLE_NONPOINTER_ISA`，(在 `objc-env.h` 文件我们可以看到 `OPTION( DisableNonpointerIsa, OBJC_DISABLE_NONPOINTER_ISA, "disable non-pointer isa fields")` ) 可关闭指针优化。
+3. 在 `Edit Scheme... -> Run -> Environment Variables` 中添加 `OBJC_DISABLE_NONPOINTER_ISA` 值为 `NO` (在 `objc-env.h` 文件我们可以看到 `OPTION( DisableNonpointerIsa, OBJC_DISABLE_NONPOINTER_ISA, "disable non-pointer isa fields")` ) 可关闭指针优化。
 
 &emsp;那怎么判断一个 `isa` 是优化的 `isa`（也就是 `nonpointer`）呢？
 也是极其简单的，在 `SUPPORT_PACKED_ISA` 或 `SUPPORT_INDEXED_ISA` 平台下，只需要判断 `isa` 的第一位就可以了，如果是 `1` 则表示是优化的 `isa` 否则就不是。
 
-那么看完以上 3 个宏定义，`isa.h` 文件中的宏定义我们就自然理解分为 3 大块了（由于我们的 `objc4-781` 是在 `Mac` 下运行的，那自然我们会更关注 `x84_64` 一些）。
+&emsp;那么看完以上 3 个宏定义，`isa.h` 文件中的宏定义我们就自然理解分为 3 大块了（由于我们的 `objc4-781` 是在 `Mac` 下运行的，那自然我们会更关注 `x84_64` 一些）。
 
-#### `ISA_BITFIELD`
+#### ISA_BITFIELD
 &emsp;`isa_t isa` 不同位段下保存的信息不同。
 
-##### `__arm64__` 下
+##### __arm64__ 下
 ```c++
 #   define ISA_MASK        0x0000000ffffffff8ULL
 #   define ISA_MAGIC_MASK  0x000003f000000001ULL
@@ -585,25 +603,25 @@ the isa field as a maskable pointer with other data around it.
       // 标记该对象所属类是否有 C++ 析构函数，如果没有的话对象能更快销毁，
       // 如果有的话对象销毁前会调用 object_cxxDestruct 函数去执行该类的析构函数
       uintptr_t has_cxx_dtor      : 1;                                       \
-      // isa & ISA_MASK 得出该对象所属的类
+      // isa & ISA_MASK 得出该实例对象所属的的类的地址
       uintptr_t shiftcls          : 33; /*MACH_VM_MAX_ADDRESS 0x1000000000*/ \
       // 用于调试器判断当前对象是真的对象还是没有初始化的空间
       uintptr_t magic             : 6;                                       \
       // 标记该对象是否有弱引用，如果没有的话对象能更快销毁，
       // 如果有的话对象销毁前会调用 weak_clear_no_lock 函数把该对象的弱引用置为 nil，
-      // 并调用 weak_entry_remove 把对象的 entry 从 weak_table 移除
+      // 并调用 weak_entry_remove 把对象的 entry 从 weak_table 中移除
       uintptr_t weakly_referenced : 1;                                       \
       // 标记该对象是否正在执行销毁
       uintptr_t deallocating      : 1;                                       \
-      // 标记该对象的引用计数是否保存在 refcnts 中
+      // 标记 refcnts 中是否也有保存实例对象的引用计数，当 extra_rc 溢出时会把一部分引用计数保存到 refcnts 中去，
       uintptr_t has_sidetable_rc  : 1;                                       \
-      // 保存该对象的引用计数 -1 的值
+      // 保存该对象的引用计数 -1 的值（未溢出之前）
       uintptr_t extra_rc          : 19 // 最大保存 2^20 - 1，觉得这个值很大呀,  mac 下是 2^8 - 1 = 255
 #   define RC_ONE   (1ULL<<45)
 #   define RC_HALF  (1ULL<<18)
 ```
 
-##### `__x86_64__` 下
+##### __x86_64__ 下
 ```c++
 #   define ISA_MASK        0x00007ffffffffff8ULL
 #   define ISA_MAGIC_MASK  0x001f800000000001ULL
@@ -622,7 +640,7 @@ the isa field as a maskable pointer with other data around it.
 #   define RC_HALF  (1ULL<<7)
 ```
 
-##### `armv7k or arm64_32` 下
+##### armv7k or arm64_32 下
 ```c++
 #   define ISA_INDEX_IS_NPI_BIT  0
 #   define ISA_INDEX_IS_NPI_MASK 0x00000001
@@ -646,10 +664,10 @@ the isa field as a maskable pointer with other data around it.
 #   define RC_HALF  (1ULL<<6)
 ```
 
-## `struct objc_object` 中关于 `ISA_BITFIELD` 的函数
+## struct objc_object 中关于 ISA_BITFIELD 的函数
 &emsp;`struct objc_object` 中定义的函数过多，由于篇幅限制，这里先解析一部分，剩下的会再开新篇介绍。
 
-### `Class ISA()`
+### Class ISA()
 ```c++
 // ISA() assumes this is NOT a tagged pointer object
 // 假定不是 tagged pointer 对象时调用该函数
@@ -659,11 +677,11 @@ objc_object::ISA()
     // 如果是 tagged pointer 则直接执行断言
     ASSERT(!isTaggedPointer()); 
 #if SUPPORT_INDEXED_ISA
-    // Class 存在与 类表中
-    // 此时包含指针优化和非优化
+    // 支持在 isa 中保存类的索引的情况下
     
     if (isa.nonpointer) {
         uintptr_t slot = isa.indexcls;
+        
         // 根据索引返回 class table 中的 Class
         return classForIndex((unsigned)slot);
     }
@@ -677,7 +695,7 @@ objc_object::ISA()
 #endif
 }
 ```
-### `Class rawISA()`
+### Class rawISA()
 ```c++
 // rawISA() assumes this is NOT a tagged pointer object or a non pointer ISA
 // 返回原始 isa 中的类指针
@@ -689,7 +707,7 @@ objc_object::rawISA()
     return (Class)isa.bits;
 }
 ```
-### `Class getIsa()`
+### Class getIsa()
 ```c++
 // getIsa() allows this to be a tagged pointer object
 // 允许 tagged pointer 对象调用的获取 isa 的函数
@@ -705,6 +723,8 @@ objc_object::getIsa()
     Class cls;
 
     slot = (ptr >> _OBJC_TAG_SLOT_SHIFT) & _OBJC_TAG_SLOT_MASK;
+    
+    // Tagged Pointer 从指针中提出 tag，然后从 objc_tag_classes 取出对应的类
     cls = objc_tag_classes[slot];
     if (slowpath(cls == (Class)&OBJC_CLASS_$___NSUnrecognizedTaggedPointer)) {
         slot = (ptr >> _OBJC_TAG_EXT_SLOT_SHIFT) & _OBJC_TAG_EXT_SLOT_MASK;
@@ -713,7 +733,7 @@ objc_object::getIsa()
     return cls;
 }
 ```
-### `uintptr_t isaBits() const`
+### uintptr_t isaBits() const
 ```c++
 inline uintptr_t
 objc_object::isaBits() const
@@ -722,11 +742,12 @@ objc_object::isaBits() const
     return isa.bits;
 }
 ```
-### `initIsa`
+### initIsa
 ```c++
 // initIsa() should be used to init the isa of new objects only.
-// initIsa() 应该仅仅用于初始化一个新对象的 isa.
 // If this object already has an isa, use changeIsa() for correctness.
+
+// initIsa() 应该仅仅用于初始化一个新对象的 isa.
 // 如果该对象已经有了 isa，应该使用 changeIsa() 来保持正确性。
 
 // initInstanceIsa(): objects with no custom RR/AWZ
@@ -761,8 +782,10 @@ objc_object::initClassIsa(Class cls)
 {
     // OPTION( DisableNonpointerIsa, OBJC_DISABLE_NONPOINTER_ISA, "disable non-pointer isa fields")
     // 环境变量开启了禁用非指针 isa 字段
+    
     // cache.getBit(FAST_CACHE_REQUIRES_RAW_ISA);
     // 从 cache 获取原始指针
+    
     if (DisableNonpointerIsa  ||  cls->instancesRequireRawIsa()) {
         initIsa(cls, false/*not nonpointer*/, false);
     } else {
@@ -783,6 +806,7 @@ objc_object::initInstanceIsa(Class cls, bool hasCxxDtor)
 {
     // 不需要原始 isa
     ASSERT(!cls->instancesRequireRawIsa());
+    
     // 是否包含 C++ 析构函数 调用的 objc_class 中的函数，保存在 cache 成员变量下 
     ASSERT(hasCxxDtor == cls->hasCxxDtor());
 
@@ -812,14 +836,20 @@ objc_object::initIsa(Class cls, bool nonpointer, bool hasCxxDtor)
 #if SUPPORT_INDEXED_ISA
         // class 保存在 class table 中忽略
         ASSERT(cls->classArrayIndex() > 0);
+        
+        // 初始化
         newisa.bits = ISA_INDEX_MAGIC_VALUE;
+        
         // isa.magic is part of ISA_MAGIC_VALUE
         // isa.nonpointer is part of ISA_MAGIC_VALUE
+        
         newisa.has_cxx_dtor = hasCxxDtor;
+        // index 来自 class_data_bits_t 中
         newisa.indexcls = (uintptr_t)cls->classArrayIndex();
 #else
         // __x86_64__: # define ISA_MAGIC_VALUE 0x001d800000000001ULL
         // __arm64__: # define ISA_MAGIC_VALUE 0x000001a000000001ULL
+        
         // 初始化 bits 
         newisa.bits = ISA_MAGIC_VALUE;
         
@@ -829,11 +859,13 @@ objc_object::initIsa(Class cls, bool nonpointer, bool hasCxxDtor)
         
         // 是否有 C++ 析构函数
         newisa.has_cxx_dtor = hasCxxDtor;
-        // shiftcls 赋值为 cls 左移 3 位，为前面 nonpointer has_assoc has_cxx_dtor 撇开位置
+        
+        // shiftcls 赋值为 cls 左移 3 位，为前面 nonpointer has_assoc has_cxx_dtor 三个字段撇开位置
         newisa.shiftcls = (uintptr_t)cls >> 3;
 #endif
         // This write must be performed in a single store in some cases
         // 在某些情况下，此写操作必须在单个存储中执行
+        
         // (for example when realizing a class because other
         // threads may simultaneously try to use the class).
         // (例如在实现一个类时，因为其他线程可能同时尝试使用该类). (指实现类对象时，不是指创建实例对象时)
@@ -842,13 +874,14 @@ objc_object::initIsa(Class cls, bool nonpointer, bool hasCxxDtor)
         // but not too atomic because we don't want to hurt instantiation
         // 在这里使用原子来保证单存储并保证存储器顺序w.r.t.类索引表...但是不要太原子，因为我们不想伤害实例化
         // 把 newisa 赋值给 isa
+        
         isa = newisa;
     }
 }
 ```
 &emsp;以上用于初始化类对象或者实例对象的 `isa`。实例对象的话大概率在 `callalloc` 函数中，为对象开辟完空间后，要对对象的 `isa` 进行初始化。
 
-### `changeIsa`
+### changeIsa
 ```c++
 inline Class 
 objc_object::changeIsa(Class newCls)
@@ -931,6 +964,7 @@ objc_object::changeIsa(Class newCls)
             
             sideTableLocked = true;
             transcribeToSideTable = true;
+            
             // 赋值 cls （isa_t 内部指保存一个 Class）
             newisa.cls = newCls;
         }
@@ -982,7 +1016,7 @@ objc_object::changeIsa(Class newCls)
 3. 从 `nonpointer` 转换为 `raw Pointer`
 4. 从 `raw Pointer` 转换为 `raw Pointer`
 
-### `sidetable_moveExtraRC_nolock`
+### sidetable_moveExtraRC_nolock
 ```c++
 // Move the entire retain count to the side table, as well as isDeallocating and weaklyReferenced.
 // 将全部引用计数以及 isDeallocating 和 weakReferenced 移到 SideTable。
@@ -991,8 +1025,7 @@ objc_object::sidetable_moveExtraRC_nolock(size_t extra_rc,
                                           bool isDeallocating, 
                                           bool weaklyReferenced)
 {
-    // 如果不是非指针，则执行断言
-    // 应该已经更改为原始指针了
+    // 如果不是非指针，则执行断言，应该已经更改为原始指针了
     ASSERT(!isa.nonpointer);        // should already be changed to raw pointer
     
     // 首先取得对象所处的 SideTable
@@ -1000,6 +1033,7 @@ objc_object::sidetable_moveExtraRC_nolock(size_t extra_rc,
 
     // 从 SideTable 的 refcnts 中取出对象的引用计数
     size_t& refcntStorage = table.refcnts[this];
+    
     // 旧对象的引用计数
     size_t oldRefcnt = refcntStorage;
     
@@ -1022,7 +1056,7 @@ objc_object::sidetable_moveExtraRC_nolock(size_t extra_rc,
 }
 ```
 &emsp;至此，`struct objc_object` 中关于初始化和修改 `isa` 的函数就都看完了，看到针对 `union isa_t` 中的 `bits` 中不同的位域进行赋值。然后下面一组函数，仍然是对位域中不同的值进行读取或者修改，下面一起来看吧。
-### `hasNonpointerIsa`
+### hasNonpointerIsa
 &emsp;读取 `union isa_t` 的 `bits` 中 `ISA_BITFIELD` 中的 `nonpointer`。
 ```c++
 inline bool 
@@ -1031,9 +1065,10 @@ objc_object::hasNonpointerIsa()
     return isa.nonpointer;
 }
 ```
-### `isTaggedPointer`
+### isTaggedPointer
 &emsp;`isTaggedPointer`、`isBasicTaggedPointer`、`isExtTaggedPointer` 三个函数可参考上篇 `Tagged Pointer`。
-### `isClass`
+
+### isClass
 ```c++
 inline bool
 objc_object::isClass()
@@ -1050,6 +1085,7 @@ objc_object::isClass()
         ASSERT(this);
         ASSERT(isRealized());
 #if FAST_CACHE_META
+        // 下篇学习 objc_class 时再详细分析
         return cache.getBit(FAST_CACHE_META);
 #else
         return data()->flags & RW_META;
@@ -1059,7 +1095,8 @@ objc_object::isClass()
 &emsp;所以此函数是判断对象所属的类是否是元类。
 
 **下面是两个特别重要也且常用的与关联对象相关的函数：**
-### `hasAssociatedObjects`
+
+### hasAssociatedObjects
 ```c++
 inline bool
 objc_object::hasAssociatedObjects()
@@ -1069,11 +1106,12 @@ objc_object::hasAssociatedObjects()
     
     // 如果是非指针则读取 has_assoc 位
     if (isa.nonpointer) return isa.has_assoc;
+    
     return true;
 }
 ```
-&emsp;判断对象是否有关联对象，实现很简单，常规对象的标识存储在 `union isa_t` 的 `bits` 的 `has_assoc` 位。 
-### `setHasAssociatedObjects`
+&emsp;判断对象是否有关联对象，实现很简单，非 `Tagged Pointer` 对象的标识存储在 `union isa_t` 的 `bits` 的 `has_assoc` 位。 
+### setHasAssociatedObjects
 ```c++
 inline void
 objc_object::setHasAssociatedObjects()
@@ -1095,12 +1133,12 @@ objc_object::setHasAssociatedObjects()
     // 标记为 true
     newisa.has_assoc = true;
     
-    // 保证修改成功，否值 goto 到 retry
+    // 保证修改成功，否则 goto 到 retry
     if (!StoreExclusive(&isa.bits, oldisa.bits, newisa.bits)) goto retry;
 }
 ```
 &emsp;设置关联对象标志位，如果已经设置为 `true` 则清除，否则设置为 `true`。
-### `ClearExclusive`
+### ClearExclusive
 ```c++
 #if __arm64__ && !__arm64e__
 
@@ -1125,7 +1163,8 @@ ClearExclusive(uintptr_t *dst __unused)
 &emsp;`__arm64e__` 是 `A12` 的标识，这里比较的奇怪的是如果是 `A12` 和 `Mac` 平台下，那 `ClearExclusive` 函数不执行任何操作，如果一个对象曾经有关联对象，当所有关联对象都移除后 `has_assoc` 位置不设置为 `false`，当对象释放时会调用 `_object_remove_assocations` 函数，不会导致性能浪费吗？ 
 
 **下面是两个特别重要也且常用的与弱引用相关的函数：**
-### `isWeaklyReferenced`
+
+### isWeaklyReferenced
 ```c++
 inline bool
 objc_object::isWeaklyReferenced()
@@ -1139,7 +1178,8 @@ objc_object::isWeaklyReferenced()
     else return sidetable_isWeaklyReferenced();
 }
 ```
-### `sidetable_isWeaklyReferenced`
+### sidetable_isWeaklyReferenced
+&emsp;`isa` 是原始类指针的对象的是否有弱引用的标识在 `refcnts` 中。
 ```c++
 bool 
 objc_object::sidetable_isWeaklyReferenced()
@@ -1156,6 +1196,7 @@ objc_object::sidetable_isWeaklyReferenced()
     if (it != table.refcnts.end()) {
         // 如果存在 
         // it->second 是引用计数 与 SIDE_TABLE_WEAKLY_REFERENCED 进行与操作
+        // 引用计数值的第 1 位是弱引用的标识位哦
         result = it->second & SIDE_TABLE_WEAKLY_REFERENCED;
     }
     
@@ -1165,7 +1206,7 @@ objc_object::sidetable_isWeaklyReferenced()
     return result;
 }
 ```
-### `hasCxxDtor`
+### hasCxxDtor
 ```c++
 // object may have -.cxx_destruct implementation?
 inline bool

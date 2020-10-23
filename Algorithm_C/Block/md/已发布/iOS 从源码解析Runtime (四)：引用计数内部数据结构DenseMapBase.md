@@ -16,7 +16,7 @@ DenseMap 整体图
 DenseMapBase 整体图
 ![DenseMapBase 整体图](https://p6-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/5e66cf9cdb43460fa20fc7dd9ec7c6ef~tplv-k3u1fbpfcp-zoom-1.image)
 
-## `DenseMapBase`
+## DenseMapBase
 &emsp;一个拥有 `6` 个抽象参数的模版类。在 `DenseMap` 定义中，`DenseMapBase` 的第一个抽象参数 `DerivedT`（派生类型、衍生类型） 传的是 `DenseMap<KeyT, ValueT, ValueInfoT, KeyInfoT, BucketT>` 本身， 从它的名字里面我们大概可猜到一些信息，需要的是一个它的子类，那接下来的分析中我们潜意识里面就把 `DerivedT`  默认当作 `DenseMap` 来用。
 先看一下 `DenseMapBase` 的定义:
 ```c++
@@ -39,7 +39,7 @@ template <typename DerivedT, typename KeyT, typename ValueT,
           typename ValueInfoT, typename KeyInfoT, typename BucketT>
 class DenseMapBase { ... };
 ```
-### `const_arg_type_t`
+### const_arg_type_t
 &emsp;用于 `const_arg_type_t<KeyT>` 表示不可变的 `DisguisedPtr<objc_object>`。（模版参数 `KeyT` 是 `DisguisedPtr<objc_object>`） 
 ```c++
 template <typename T>
@@ -87,7 +87,7 @@ using const_iterator = DenseMapIterator<KeyT, ValueT, ValueInfoT, KeyInfoT, Buck
 ```
 &emsp;下面我们来分析出现的新类型 `DenseMapIterator`。
 
-### `DenseMapIterator`
+### DenseMapIterator
 &emsp;看到 `DenseMapIterator` 的模版参数几乎和 `DenseMap` 如出一辙，唯一不同的是多了最后一个 `IsConst` 来表示可变和不可变，这里默认值是 `false`。
 ```c++
 // 在 DenseMapBase 上面的一个前向声明，因为 DenseMapBase 中要使用到这个类型，
@@ -223,7 +223,7 @@ private:
   }
 };
 ```
-### `begin、end、empty、size`
+### begin、end、empty、size
 ```c++
 // 内联 构建 BucketT 可变的迭代器
 inline iterator begin() {
@@ -276,7 +276,7 @@ const_iterator makeConstIterator(const BucketT *P, const BucketT *E,
   return const_iterator(P, E, NoAdvance);
 }
 ```
-### `reserve`
+### reserve
 ```c++
 /// Grow the densemap so that it can contain at least
 /// NumEntries items before resizing again.
@@ -291,7 +291,7 @@ void reserve(size_type NumEntries) {
 }
 ```
 &emsp;`getMinBucketToReserveForEntries` 和 `grow` 函数都在上篇详细分析过，这里就不再展开了。
-### `clear`
+### clear
 ```c++
 void clear() {
   // 如果 NumEntries 和 NumTombstones 都为 0，表示是初始状态，可以直接 return
@@ -345,7 +345,7 @@ void clear() {
   setNumTombstones(0);
 }
 ```
-### `count`
+### count
 ```c++
 /// Return 1 if the specified key is in the map, 0 otherwise.
 /// 如果指定的 key 在 map 中，则返回1，否则返回0。
@@ -356,7 +356,7 @@ size_type count(const_arg_type_t<KeyT> Val) const {
   return LookupBucketFor(Val, TheBucket) ? 1 : 0;
 }
 ```
-### `find`
+### find
 ```c++
 // 可变
 iterator find(const_arg_type_t<KeyT> Val) {
@@ -374,7 +374,7 @@ const_iterator find(const_arg_type_t<KeyT> Val) const {
 }
 ```
 &emsp;如果从 `map` 中找到了 `val` 对应的 `BucketT`，则返回以此 `BucketT` 为起点的迭代器，否则返回 `end()`。
-### `find_as`
+### find_as
 ```c++
 /// Alternate version of find() which allows a different, and possibly less expensive, key type.
 /// find（）的替代版本，它允许使用其他且可能 less expensive 的 key 类型。
@@ -398,7 +398,7 @@ const_iterator find_as(const LookupKeyT &Val) const {
   return end();
 }
 ```
-### `lookup`
+### lookup
 ```c++
 /// lookup - Return the entry for the specified key,
 /// or a default constructed value if no such entry exists.
@@ -412,7 +412,7 @@ ValueT lookup(const_arg_type_t<KeyT> Val) const {
   return ValueT();
 }
 ```
-### `insert、try_emplace`
+### insert、try_emplace
 ```c++
 // Inserts key,value pair into the map if the key isn't already in the map.
 // 如果 key 在 map 中尚不存在，则插入 key/value 对到 map 中。
@@ -523,7 +523,7 @@ void insert(InputIt I, InputIt E) {
 }
 ```
 &emsp;在 `C++11` 中，标准库在 `<utility>` 中提供了一个有用的函数 `std::move`，`std::move` 并不能移动任何东西，它唯一的功能是将一个左值强制转化为右值引用，继而可以通过右值引用使用该值，以用于移动语义。从实现上讲，`std::move` 基本等同于一个类型转换：`static_cast<T&&>(lvalue)`;
-### `compact`
+### compact
 ```c++
 // Clear if empty.
 // 如果为空则清除
@@ -545,7 +545,7 @@ void compact() {
   }
 }
 ```
-### `erase`
+### erase
 ```c++
 // 清除指定的 KeyT
 bool erase(const KeyT &Val) {
@@ -584,7 +584,7 @@ void erase(iterator I) {
   compact();
 }
 ```
-### `FindAndConstruct`
+### FindAndConstruct
 ```c++
 // const KeyT &Key
 value_type& FindAndConstruct(const KeyT &Key) {
@@ -615,7 +615,7 @@ ValueT &operator[](KeyT &&Key) {
   return FindAndConstruct(std::move(Key)).second;
 }
 ```
-### `isPointerIntoBucketsArray、getPointerIntoBucketsArray`
+### isPointerIntoBucketsArray、getPointerIntoBucketsArray
 ```c++
 /// isPointerIntoBucketsArray - Return true if the specified pointer points
 /// somewhere into the DenseMap's array of buckets
@@ -641,7 +641,7 @@ protected:
 DenseMapBase() = default;
 ```
 
-### `destroyAll`
+### destroyAll
 ```c++
 // 销毁所有 Buckets 数组中的数据（ DenseMapPair<Disguised<objc_object>, size_t> ）
 void destroyAll() {
@@ -659,7 +659,7 @@ void destroyAll() {
   }
 }
 ```
-### `initEmpty`
+### initEmpty
 ```c++
 // 初始化空状态
 void initEmpty() {
@@ -680,7 +680,7 @@ void initEmpty() {
     ::new (&B->getFirst()) KeyT(EmptyKey);
 }
 ```
-### `getMinBucketToReserveForEntries`
+### getMinBucketToReserveForEntries
 ```c++
 /// Returns the number of buckets to allocate to ensure that the
 /// DenseMap can accommodate NumEntries without need to grow().
@@ -735,7 +735,7 @@ inline uint64_t NextPowerOf2(uint64_t A) {
   return A + 1;
 }
 ```
-### `moveFromOldBuckets`
+### moveFromOldBuckets
 ```c++
 void moveFromOldBuckets(BucketT *OldBucketsBegin, BucketT *OldBucketsEnd) {
   // 初始化空状态
@@ -779,7 +779,7 @@ void moveFromOldBuckets(BucketT *OldBucketsBegin, BucketT *OldBucketsEnd) {
   }
 }
 ```
-### `copyFrom`
+### copyFrom
 ```c++
 template <typename OtherBaseT>
 void copyFrom(
@@ -815,7 +815,7 @@ void copyFrom(
     }
 }
 ```
-### `getHashValue、getEmptyKey、getTombstoneKey`
+### getHashValue、getEmptyKey、getTombstoneKey
 &emsp;下面 3 个函数超级眼熟，在我们的 `DenseMapInfo<KeyT>` 中的 3 个函数，且包含的不同类型的 `KeyT` 的特化实现。
 ```c++
 static unsigned getHashValue(const KeyT &Val) {
@@ -840,7 +840,7 @@ static const KeyT getTombstoneKey() {
 }
 ```
 
-### `InsertIntoBucket、InsertIntoBucketWithLookup、InsertIntoBucketImpl`
+### InsertIntoBucket、InsertIntoBucketWithLookup、InsertIntoBucketImpl
 &emsp; `InsertIntoBucket` 的定义如下，该函数分为如下两步：
 + 调用 `InsertIntoBucketImpl`，根据装载因子（`load factor`），来判断是否需要增加桶的数量，然后返回插入位置。
 + 根据插入位置，使用 `placement new` 在指定的内存位置上创建对象。
@@ -947,7 +947,7 @@ BucketT *InsertIntoBucketImpl(const KeyT &Key, const LookupKeyT &Lookup,
   return TheBucket;
 }
 ```
-### `LookupBucketFor`
+### LookupBucketFor
 ```c++
 /// LookupBucketFor - Lookup the appropriate bucket for Val, returning it in FoundBucket.
 /// If the bucket contains the key and a value, this returns true, 
