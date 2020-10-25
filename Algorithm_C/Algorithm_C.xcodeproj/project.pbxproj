@@ -261,9 +261,9 @@
 		D23152E924E23CCC009A5B4E /* Temp.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = Temp.md; sourceTree = "<group>"; };
 		D2330A2424AF0FD500C6480D /* Algorithm_C */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = Algorithm_C; sourceTree = BUILT_PRODUCTS_DIR; };
 		D2330A2724AF0FD500C6480D /* main.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
-		D23730582514A96E00274FBA /* iOS 从源码解析Runtime (四)：引用计数内部数据结构DenseMapBase.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 从源码解析Runtime (四)：引用计数内部数据结构DenseMapBase.md"; sourceTree = "<group>"; };
+		D23730582514A96E00274FBA /* iOS 从源码解析Runtime (四)：引用计数表内部数据结构DenseMapBase.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 从源码解析Runtime (四)：引用计数表内部数据结构DenseMapBase.md"; sourceTree = "<group>"; };
 		D2373059251C880C00274FBA /* iOS 从源码解析Runtime (七)：聚焦 isa、objc_object(dealloc、autorelease返回值优化篇).md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 从源码解析Runtime (七)：聚焦 isa、objc_object(dealloc、autorelease返回值优化篇).md"; sourceTree = "<group>"; };
-		D237305A251C888D00274FBA /* iOS 从源码解析Runtime (六)：由 rootAutorelease 函数引发的解读 AutoreleasePool.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 从源码解析Runtime (六)：由 rootAutorelease 函数引发的解读 AutoreleasePool.md"; sourceTree = "<group>"; };
+		D237305A251C888D00274FBA /* iOS 从源码解析Runtime (六)：AutoreleasePool实现原理解读.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 从源码解析Runtime (六)：AutoreleasePool实现原理解读.md"; sourceTree = "<group>"; };
 		D237C63D24D24648001E0B21 /* StackWithMin.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = StackWithMin.cpp; sourceTree = "<group>"; };
 		D237C63E24D24648001E0B21 /* StackWithMin.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = StackWithMin.hpp; sourceTree = "<group>"; };
 		D237C64124D25B20001E0B21 /* StackPushPopOrder.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = StackPushPopOrder.cpp; sourceTree = "<group>"; };
@@ -305,7 +305,7 @@
 		D239E78624D4290200DA0BE5 /* LongestSubstringWithoutDup.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = LongestSubstringWithoutDup.cpp; sourceTree = "<group>"; };
 		D239E78724D4290200DA0BE5 /* LongestSubstringWithoutDup.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = LongestSubstringWithoutDup.hpp; sourceTree = "<group>"; };
 		D2407F3D24BD626B0018D876 /* LearnedList.strings */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; path = LearnedList.strings; sourceTree = "<group>"; };
-		D24C822225120D1400E3BF5E /* iOS 从源码解析Runtime (五)：聚焦 isa、objc_object(retain、release、retaincount相关内容篇).md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 从源码解析Runtime (五)：聚焦 isa、objc_object(retain、release、retaincount相关内容篇).md"; sourceTree = "<group>"; };
+		D24C822225120D1400E3BF5E /* iOS 从源码解析Runtime (五)：聚焦objc_object(retain、release、retaincount).md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 从源码解析Runtime (五)：聚焦objc_object(retain、release、retaincount).md"; sourceTree = "<group>"; };
 		D24C82232512140800E3BF5E /* iOS 从源码解析Runtime (三)：引用计数表内部数据结构DenseMap.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 从源码解析Runtime (三)：引用计数表内部数据结构DenseMap.md"; sourceTree = "<group>"; };
 		D28F813824C6E60E00EE7EF3 /* RecursiveSummary.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = RecursiveSummary.cpp; sourceTree = "<group>"; };
 		D28F813924C6E60E00EE7EF3 /* RecursiveSummary.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = RecursiveSummary.hpp; sourceTree = "<group>"; };
@@ -883,13 +883,13 @@
 				D2E0676E250B5BCA008BF0E9 /* iOS 从源码解析Runtime (一)：Tagged Pointer知识点解读.md */,
 				D2E0676C2509A8A2008BF0E9 /* iOS 从源码解析Runtime (二)：聚焦 isa、objc_object(ISA_BITFIELD相关内容篇).md */,
 				D24C82232512140800E3BF5E /* iOS 从源码解析Runtime (三)：引用计数表内部数据结构DenseMap.md */,
-				D23730582514A96E00274FBA /* iOS 从源码解析Runtime (四)：引用计数内部数据结构DenseMapBase.md */,
-				D24C822225120D1400E3BF5E /* iOS 从源码解析Runtime (五)：聚焦 isa、objc_object(retain、release、retaincount相关内容篇).md */,
+				D23730582514A96E00274FBA /* iOS 从源码解析Runtime (四)：引用计数表内部数据结构DenseMapBase.md */,
+				D24C822225120D1400E3BF5E /* iOS 从源码解析Runtime (五)：聚焦objc_object(retain、release、retaincount).md */,
+				D237305A251C888D00274FBA /* iOS 从源码解析Runtime (六)：AutoreleasePool实现原理解读.md */,
 				D2164F2124FF10F10000A6AA /* iOS AssociatedObject 底层实现原理.md */,
 				D2164F442501E8880000A6AA /* iOS Category 底层实现原理(一)：概念与数据结构.md */,
 				D2E0674D2506118F008BF0E9 /* iOS Category 底层实现原理(二)：函数分析与加载流程.md */,
 				D2E067692508E82E008BF0E9 /* iOS Category 底层实现原理(三)：附加+load函数超详细解析.md */,
-				D237305A251C888D00274FBA /* iOS 从源码解析Runtime (六)：由 rootAutorelease 函数引发的解读 AutoreleasePool.md */,
 				D2373059251C880C00274FBA /* iOS 从源码解析Runtime (七)：聚焦 isa、objc_object(dealloc、autorelease返回值优化篇).md */,
 				8E6DFE182523862B00D2830E /* iOS 从源码解析Runtime (八)：聚焦 objc_class(cache_t 及方法缓存实现相关内容篇(1)).md */,
 				8E0E62B22525ECB10076A530 /* iOS 从源码解析Runtime (九)：聚焦 objc_class(cache_t 及方法缓存实现相关内容篇(2)(objc-msg-arm64.s 文件全解析)).md */,

@@ -59,9 +59,9 @@ struct DenseMapValueInfo {
 ### DenseMapInfo
 &emsp;`typename KeyInfoT = DenseMapInfo<KeyT>`。`DenseMapInfo` 是一个模版结构体，其内部只有四个静态函数，分别用于 `empty key`、`tombstone key` 以及哈希值的计算，它定义在 `llvm-DenseMapInfo.h` 中，该文件只有 `200` 行，文件前面的注释 `This file defines DenseMapInfo traits for DenseMap.` (该文件用来定义 `DenseMap` 的 `DenseMapInfo` 特征，取自 `llvmCore-3425.0.31`，（后期会深入学习 `LLVM`）。) 表明其核心作用，文件下面提供了针对常见类型的 `DenseMapInfo` 的特化版本，例如指针类型、整型等，这里我们主要使用 `DenseMapInfo<DisguisedPtr<T>>`。
 
-&emsp;关于模版内部实现，对于 `getEmptyKey` 函数实现，基本上返回的都是模版参数所能表示的最大值，`getTombstoneKey` 都是 `getEmptyKey` 再减 1，哈希的值的计算则都是乘法计算，每个 `hash seed` 都是 `37`，哈希函数中普遍都使用质数作为哈希种子，质数能够有效的避免哈希碰撞的发生，这里选择 `37` 大概是在测试过程中有比较好的性能表现。
+&emsp;关于模版内部实现，对于 `getEmptyKey` 函数实现，基本上返回的都是模版参数所能表示的最大值，`getTombstoneKey` 都是 `getEmptyKey` 再减 1。
 
-&emsp;针对 `DenseMapInfo<T*>` 和 `DenseMapInfo<DisguisedPtr<T>>` 版本，它们的 `getHashValue` 函数内部实现都是直接调用了 `objc4-781` 全局通用的指针哈希函数 `ptr_hash`，其它例如 `DenseMapInfo<long>` 、 `DenseMapInfo<int>` 等它们的 `getHashValue(const long& Val)` 函数都是直接返回 `Val * 37UL` 的值。
+&emsp;针对 `DenseMapInfo<T*>` 和 `DenseMapInfo<DisguisedPtr<T>>` 版本，它们的 `getHashValue` 函数内部实现都是直接调用了 `objc4-781` 全局通用的指针哈希函数 `ptr_hash`。其它例如 `DenseMapInfo<long>` 、 `DenseMapInfo<int>` 等它们的 `getHashValue(const long& Val)` 函数都是直接返回 `Val * 37UL` 的值，哈希的值的计算都是仅用了这个乘法计算，每个 `hash seed` 都是 `37`，哈希函数中普遍都使用质数作为哈希种子，质数能够有效的避免哈希碰撞的发生，这里选择 `37` 大概是在测试过程中有比较好的性能表现。
 
 ```c++
 template<typename T>
@@ -269,7 +269,7 @@ struct _LIBCPP_TEMPLATE_VIS pair {
 ...
 };
 ```
-&emsp;`std::pair` 是一个结构体模板，其可于一个单元内存储两个相异对象，是 `std::tuple` 的拥有两个元素的特殊情况。一般来说，`pair` 可以封装任意类型的对象，可以生成各种不同的 `std::pair<T1, T2>` 对象，可以是数组对象或者包含 `std::pair<T1,T2>` 的 `vector` 容器。`pair` 还可以封装两个序列容器或两个序列容器的指针。具体细节可参考：[STL std::pair基本用法](https://www.cnblogs.com/phillee/p/12099504.html)
+&emsp;`std::pair` 是一个结构体模板，其可于一个单元内存储两个相异对象，是 `std::tuple` 的拥有两个元素的特殊情况。一般来说，`pair` 可以封装任意类型的对象，可以生成各种不同的 `std::pair<T1, T2>` 对象，可以是数组对象或者包含 `std::pair<T1,T2>` 的 `vector` 容器。`pair` 还可以封装两个序列容器或两个序列容器的指针。（想到了 `Swift` 中的元组）具体细节可参考：[STL std::pair基本用法](https://www.cnblogs.com/phillee/p/12099504.html)
 
 ### detail::DenseMapPair<KeyT, ValueT>
 &emsp;第五个模版参数。
@@ -983,8 +983,8 @@ bool LookupBucketFor(const LookupKeyT &Val,
 
     // If we found an empty bucket, the key doesn't exist in the set.
     // Insert it and return the default value.
-    // 如果我们发现一个空存储桶，则该键在集合中不存在，
-    // 插入并返回默认值。
+    // 如果我们发现一个空存储桶，则该键在集合中不存在。
+    // 插入并返回默认值。（这里没看到插入事件呀？）
     
     if (LLVM_LIKELY(KeyInfoT::isEqual(ThisBucket->getFirst(), EmptyKey))) {
       // If we've already seen a tombstone while probing, 

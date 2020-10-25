@@ -1,4 +1,4 @@
-# iOS 从源码解析Runtime (四)：由 sidetable_retain 函数引发的解读 RefcountMap(DenseMapBase篇)
+# iOS 从源码解析Runtime (四)：引用计数表内部数据结构DenseMapBase
 ## 前言
 &emsp;上一节我们从上到下分析了 `DenseMap` 的内容，中间已经涉及到多处 `DenseMapBase` 的使用。`DenseMap` 是 `DenseMapBase` 的子类，而 `DenseMapBase` 是 `DenseMap` 的友元类，所以两者存在多处交织调用。那下面我们就详细分析下 `DenseMapBase` 的实现吧。（这个类实在是太长了，消耗了太多时间，一度想只看下核心实现就不看细枝末节了，但是一想到它涉及到的引用计数以及修饰符相关的内容，再加上强迫症，那就认真看下去吧！⛽️⛽️）
 
@@ -19,22 +19,11 @@ DenseMapBase 整体图
 ## DenseMapBase
 &emsp;一个拥有 `6` 个抽象参数的模版类。在 `DenseMap` 定义中，`DenseMapBase` 的第一个抽象参数 `DerivedT`（派生类型、衍生类型） 传的是 `DenseMap<KeyT, ValueT, ValueInfoT, KeyInfoT, BucketT>` 本身， 从它的名字里面我们大概可猜到一些信息，需要的是一个它的子类，那接下来的分析中我们潜意识里面就把 `DerivedT`  默认当作 `DenseMap` 来用。
 先看一下 `DenseMapBase` 的定义:
+> &emsp;ValueInfoT is used by the refcount table.A key/value pair with value==0 is not required to be stored in the refcount table; it could correctly be erased instead. For performance, we do keep zero values in the table when the true refcount decreases to 1: this makes any future retain faster. For memory size, we allow rehashes and table insertions to remove a zero value as if it were a tombstone.
+>
+> &emsp;refcount table 使用 ValueInfoT。value 等于 0 的 key/value 对是不需要存储在 refcount table 里的，可以正确的擦除它。为了提高性能，当真实引用计数减少到 1 时，我们确实在表中保留了零值，这使得将来的 retain 操作更快进行。为了内存大小，我们允许进行重新哈希化和表插入以删除零值，就像它是一个逻辑删除一样。
+
 ```c++
-// ValueInfoT is used by the refcount table.
-// refcount table 使用 ValueInfoT。
-
-// A key/value pair with value==0 is not required to be stored in the refcount table;
-// it could correctly be erased instead.
-// value 等于 0 的 key/value 对是不需要存储在 refcount table 里的，可以正确的擦除它。
-
-// For performance, we do keep zero values in the table when the true refcount
-// decreases to 1: this makes any future retain faster.
-// 为了提高性能，当真实引用计数减少到 1 时，我们确实在表中保留了零值，这使得将来的 retain 操作更快进行。
-
-// For memory size, we allow rehashes and table insertions to remove
-// a zero value as if it were a tombstone.
-// 为了内存大小，我们允许进行重新哈希化和表插入以删除零值，就像它是一个逻辑删除一样。
-
 template <typename DerivedT, typename KeyT, typename ValueT,
           typename ValueInfoT, typename KeyInfoT, typename BucketT>
 class DenseMapBase { ... };
@@ -73,7 +62,8 @@ struct const_pointer_or_const_ref<
 
 + `key_type` = `KeyT` = `DisguisedPtr<objc_object>`
 + `mapped_type` = `ValueT` = `size_t`
-+ `value_type` = `BucketT` = `detail::DenseMapPair<KeyT, ValueT>` = `detail::DenseMapPair<DisguisedPtr<objc_object>, size_t>`。
++ `value_type` = `BucketT` = `detail::DenseMapPair<KeyT, ValueT>` = `detail::DenseMapPair<DisguisedPtr<objc_object>, size_t>`
+
 ```c++
 using size_type = unsigned;
 using key_type = KeyT;
@@ -271,6 +261,7 @@ iterator makeIterator(BucketT *P, BucketT *E,
 // 对应开局的 using 声明类型，IsConst 的值默认为 true
 // 迭代器（指定 IsConst = true，表示 BucketT 不可变）
 // using const_iterator = DenseMapIterator<KeyT, ValueT, ValueInfoT, KeyInfoT, BucketT, true>;
+
 const_iterator makeConstIterator(const BucketT *P, const BucketT *E,
                                  const bool NoAdvance=false) const {
   return const_iterator(P, E, NoAdvance);
@@ -281,6 +272,7 @@ const_iterator makeConstIterator(const BucketT *P, const BucketT *E,
 /// Grow the densemap so that it can contain at least
 /// NumEntries items before resizing again.
 /// 增加 densemap 容量，使其在重新调整大小之前至少可以包含 NumEntries 项。
+
 void reserve(size_type NumEntries) {
   // 返回大于（NumEntries * 4 / 3 + 1）的最小的 2 的幂
   auto NumBuckets = getMinBucketToReserveForEntries(NumEntries);

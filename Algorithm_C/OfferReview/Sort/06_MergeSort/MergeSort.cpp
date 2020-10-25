@@ -10,11 +10,11 @@
 
 // 将有两个有序数列 a[first...mid] 和 a[mid...last] 合并
 void MergeSort::mergeSort(int nums[], int first, int last, int temp[]) {
-
+    //
 }
 
 void MergeSort::mergeArray(int nums[], int first, int mid, int last, int temp[]) {
-
+    // 
 }
 
 // 测试代码
@@ -80,7 +80,7 @@ void MergeSort::Test() {
 //mergeArray(nums, first, mid, last, temp); // 递归结束开始合并
 
 
-//if (nums[mid] <= nums[mid + 1]) {
+//if (nums[mid] <= nums[mid + 1]) { // 左边序列的最大值小于右边序列的最小值，表示已经是有序的了，直接 return 就好了
 //    return;
 //}
 //

@@ -1,10 +1,10 @@
-# iOS 从源码解析Runtime (五)：聚焦 isa、objc_object(retain、release、retaincount相关内容篇)
+# iOS 从源码解析Runtime (五)：聚焦objc_object(retain、release、retaincount)
 
 > 经过上面两篇 `DenseMap` 和 `DenseMapBase` 的分析，相信对存储 `objc_object` 的引用计数所用的数据结构已经极其清楚了，那么接下来继续分析 `objc_object` 剩下的函数吧。
 
-## `Optimized calls to retain/release methods`
+## Optimized calls to retain/release methods
 
-### `id retain()`
+### id retain()
 ```c++
 // Equivalent to calling [this retain], with shortcuts if there is no override
 // 等效于调用 [this retain]，如果没有重载此函数，则能快捷执行（快速执行）
@@ -24,7 +24,7 @@ objc_object::retain()
     return ((id(*)(objc_object *, SEL))objc_msgSend)(this, @selector(retain));
 }
 ```
-### `void release()`
+### void release()
 ```c++
 // Equivalent to calling [this release], with shortcuts if there is no override
 // 等效于调用 [this release]，如果没有重载此函数，则能快捷执行（快速执行）
@@ -45,7 +45,7 @@ objc_object::release()
     ((void(*)(objc_object *, SEL))objc_msgSend)(this, @selector(release));
 }
 ```
-### `id autorelease()`
+### id autorelease()
 ```c++
 // Equivalent to [this autorelease], with shortcuts if there is no override
 // 等效于调用[this autorelease]，如果没有重载此函数，则能快捷执行（快速执行）
