@@ -1,6 +1,6 @@
-# iOS 从源码解析Runtime (八)：聚焦 objc_class(cache_t 及方法缓存实现相关内容篇(1))
+# iOS 从源码解析Runtime (八)：聚焦cache_t 及方法缓存实现相关内容篇(1)
 
-> 前面连续几篇我们已经详细分析了 `objc_object` 的相关的所有源码，接下来几篇则开始分析定义于 `objc-runtime-new.h` 中的 `objc_class`，本篇先从 `struct objc_class : objc_object` 的 `cache_t cache` 开始，`cache_t` 主要实现方法缓存，帮助我们更快的找到方法地址进行调用。
+> &emsp;前面连续几篇我们已经详细分析了 `objc_object` 的相关的所有源码，接下来几篇则开始分析定义于 `objc-runtime-new.h` 中的 `objc_class`，本篇先从 `struct objc_class : objc_object` 的 `cache_t cache` 开始，`cache_t` 主要实现方法缓存，帮助我们更快的找到方法地址进行调用。
   纵览 `objc-runtime-new.h` 文件真的超长，那我们就分块来学习，一起 ⛽️⛽️ 吧！
 
 ```c++
@@ -11,9 +11,9 @@ cache_t cache; // formerly cache pointer and vtable 以前缓存指针和虚函�
 ...
 };
 ```
-> `typedef uintptr_t SEL;` 在 `Project Headers/objc-runtime-new.h` 的 `198` 行，看到 `SEL`。 
+> &emsp;`typedef uintptr_t SEL;` 在 `objc-runtime-new.h` 的 `198` 行，看到 `SEL`。 
 
-&emsp;`cache` 是 `objc_class` 的第三个成员变量，类型是 `cache_t`。从数据结构角度及使用方法来看 `cache_t` 的话，它是一个 `SEL`  作为 `Key` ，`SEL + IMP(bucket_t)` 作为 `Value` 的散列表。为了对方法缓存先有一个大致的了解，我们首先解读一下 `Source/objc-cache.mm` 文件开头的一大段注释内容。
+&emsp;`cache` 是 `objc_class` 的第三个成员变量，类型是 `cache_t`。从数据结构角度及使用方法来看 `cache_t` 的话，它是一个 `SEL`  作为 `Key` ，`SEL + IMP(bucket_t)` 作为 `Value` 的散列表。为了对方法缓存先有一个大致的了解，我们首先解读一下 `objc-cache.mm` 文件开头的一大段注释内容。
 ```c++
 /*
 objc-cache.m
@@ -93,7 +93,7 @@ _class_printMethodCacheStatistics
 ```
 &emsp;到这里就看完注释了，有点懵，下面还是把源码一行一行看完，然后再回顾上面的内容到底指的是什么。
 
-## `CACHE_IMP_ENCODING/CACHE_MASK_STORAGE`
+## CACHE_IMP_ENCODING/CACHE_MASK_STORAGE
 &emsp;在进入 `cache_t/bucket_t` 内容之前，首先看两个宏定义，`CACHE_IMP_ENCODING` 表示在 `bucket_t` 中 `IMP` 的存储方式，`CACHE_MASK_STORAGE` 表示 `cache_t` 中掩码的位置。`struct bucket_t` 和 `struct cache_t` 里面的不同实现部分正是根据这两个宏来判断的。
 我们最关注的 `x86_64(mac)` 和 `arm64(iphone)` 两个平台下 `bucket_t` 中 `IMP` 都是以 `ISA` 与 `IMP` 异或的值存储。而掩码位置的话 `x86_64` 下是 `CACHE_MASK_STORAGE_OUTLINED` 没有掩码，`buckets` 散列数组和 `_mask` 以两个成员变量分别表示。在 `arm64` 下则是 `CACHE_MASK_STORAGE_HIGH_16` 高 `16` 位为掩码，散列数组和 `mask` 共同保存在 `_maskAndBuckets` 中。 
 ```c++
@@ -122,7 +122,7 @@ _class_printMethodCacheStatistics
 
 #elif defined(__arm__)
 
-// 32-bit ARM uses no encoding. 32位 ARM 下不进行编码，直接使用原始 IMP 
+// 32-bit ARM uses no encoding. 32位 ARM 下不进行编码，直接使用原始 IMP(watchOS 下) 
 #define CACHE_IMP_ENCODING CACHE_IMP_ENCODING_NONE
 
 #else
@@ -143,19 +143,19 @@ _class_printMethodCacheStatistics
 // 掩码存储在高 16 位
 #define CACHE_MASK_STORAGE CACHE_MASK_STORAGE_HIGH_16 
 
-#elif defined(__arm64__) && !__LP64__ // ARM 平台 非 64 位系统架构
+#elif defined(__arm64__) && !__LP64__ // ARM 平台 非 64 位系统架构（watchOS 下）
 
 // 掩码存储在低 4 位
 #define CACHE_MASK_STORAGE CACHE_MASK_STORAGE_LOW_4
 
 #else
 
-// 不使用掩码的方式（_buckets 与 _mask 是两个变量）
+// 不使用掩码的方式（_buckets 与 _mask 是两个变量，上面则是把 buckets 和 mask 合并保存在 _maskAndBuckets 中）
 #define CACHE_MASK_STORAGE CACHE_MASK_STORAGE_OUTLINED
 
 #endif
 ```
-## `bucket_t`
+## bucket_t
 &emsp;看到 `bucket_t` 一下想起了 `RefcountMap refcnts` 中保存对象引用计数时使用的数据结构 `typename BucketT = detail::DenseMapPair<KeyT, ValueT>>` 用于保存对象的地址和对象的引用计数。`bucket_t` 基本也是大致相同的作用，这里是把函数的 `SEL`  和函数的实现地址 `IMP` 保存在 `bucket_t` 这个结构体中。这里先看一下 `bucket_t` 定义的 `private` 部分:
 ```c++
 struct bucket_t {
@@ -172,6 +172,7 @@ private:
     // template <typename T> struct explicit_atomic : public std::atomic<T> { ... };
     // 禁止隐式转换，T 操作为原子操作，避免多线程竞争
     
+    // 类型一模一样，这里是修改一下 _imp 和 _sel 的前后顺序
 #if __arm64__
     explicit_atomic<uintptr_t> _imp;  
     explicit_atomic<SEL> _sel;
@@ -199,17 +200,14 @@ private:
                                     ptrauth_key_function_pointer, 0,
                                     ptrauth_key_process_dependent_code,
                                     modifierForSEL(newSel, cls));
-                                    
 #elif CACHE_IMP_ENCODING == CACHE_IMP_ENCODING_ISA_XOR
 
         // IMP 与 Class 作异或的值
         return (uintptr_t)newImp ^ (uintptr_t)cls;
-        
 #elif CACHE_IMP_ENCODING == CACHE_IMP_ENCODING_NONE
 
         // 直接使用原始 IMP
         return (uintptr_t)newImp;
-        
 #else
 
 #error Unknown method cache IMP encoding. // 未知方式
@@ -219,7 +217,7 @@ private:
 ...
 };
 ```
-`bucket_t` 定义的 `public` 部分:
+&emsp;`bucket_t` 定义的 `public` 部分:
 ```c++
 public:
     // 原子读取 _sel
@@ -244,7 +242,7 @@ public:
                                     ptrauth_key_function_pointer, 0);
 #elif CACHE_IMP_ENCODING == CACHE_IMP_ENCODING_ISA_XOR
 
-        // imp 与 cls 再进行一次异或，返回原值，得到 encodeImp 传入的 newImp
+        // imp 与 cls 再进行一次异或，返回原值，得到 encodeImp 传入的 newImp（之所以是再，是因为 _imp 存储时就已经做过一次异或了）
         return (IMP)(imp ^ (uintptr_t)cls);
         
 #elif CACHE_IMP_ENCODING == CACHE_IMP_ENCODING_NONE
@@ -266,7 +264,7 @@ public:
     void set(SEL newSel, IMP newImp, Class cls);
 };
 ```
-### `set`
+### set
 &emsp;`set` 函数完成的功能是以原子方式完成 `bucket_t` 实例 `_imp` 和 `_sel` 成员变量的设置。 
 
 `memory_order` 的值可参考: [《如何理解 C++11 的六种 memory order？》](https://www.zhihu.com/question/24301047)
@@ -306,6 +304,7 @@ void bucket_t::set(SEL newSel, IMP newImp, Class cls)
         // 首先把 newIMP 存储到 _imp
         _imp.store(newIMP, memory_order::memory_order_relaxed);
         
+        // _sel 是 0 时：
         if (_sel.load(memory_order::memory_order_relaxed) != newSel) {
         // 如果当前 _sel 与 newSel 不同，则根据不同的平台来设置 _sel
         
@@ -330,12 +329,13 @@ void bucket_t::set(SEL newSel, IMP newImp, Class cls)
     }
 }
 ```
-&emsp;首先要把 `newImp` 写入，`__arm64__` 下 `set` 函数的实现涉及一个 `__asm__` 好像涉及到 `ARM` 的内存排序内存屏障啥的看不懂😭。
+&emsp;首先要把 `newImp` 写入，`__arm64__` 下 `set` 函数的实现涉及一个 `__asm__` 好像涉及到 `ARM` 的内存排序内存屏障啥的看不懂。
 `struct bucket_t` 到这里就结束了，主要用来保存函数的 `SEL` 和 `IMP`（`IMP` 根据不同的编码方式来保存）。 
 
-## `cache_t`
+## cache_t
 &emsp;`cache_t` 是作为一个散列数组来缓存方法的。先看下 `cache_t` 定义的 `private` 部分:
-### `mask_t`:
+
+### mask_t:
 ```c++
 #if __LP64__
 
@@ -348,7 +348,7 @@ typedef uint32_t mask_t; // 32 位 4 字节 int
 typedef uint16_t mask_t; // 16 位 2 字节 int
 #endif
 ```
-### `struct cache_t private`
+### struct cache_t private
 ```c++
 struct cache_t {
 #if CACHE_MASK_STORAGE == CACHE_MASK_STORAGE_OUTLINED
@@ -424,11 +424,10 @@ struct cache_t {
 ...
 };
 ```
-### `struct cache_t public`
-`cache_t` 定义的 `public` 部分:
-&emsp;`cache_t` 的实现部分也是涉及到不同的平台下不同的实现，这里只分析 `CACHE_MASK_STORAGE_OUTLINED(x86_64)` 和 `CACHE_MASK_STORAGE_HIGH_16 (__arm64__ && __LP64__)` 两个平台的实现。
+### struct cache_t public
+&emsp;`cache_t` 定义的 `public` 部分: `cache_t` 的实现部分也是涉及到不同的平台下不同的实现，这里只分析 `CACHE_MASK_STORAGE_OUTLINED(x86_64)` 和 `CACHE_MASK_STORAGE_HIGH_16 (__arm64__ && __LP64__)` 两个平台的实现。
 
-#### `emptyBuckets`
+#### emptyBuckets
 &emsp;一个指向 `_objc_empty_cache` 的 `bucket_t` 指针，用来指示当前类的缓存指向空缓存。（`_objc_empty_cache` 是一个外联变量）
 ```c++
 // OBJC2 不可见
@@ -465,7 +464,7 @@ struct bucket_t *cache_t::emptyBuckets()
     return (bucket_t *)&_objc_empty_cache;
 }
 ```
-#### `buckets`
+#### buckets
 &emsp;散列表数组的起始地址。
 ```c++
 // CACHE_MASK_STORAGE_OUTLINED
@@ -487,7 +486,7 @@ struct bucket_t *cache_t::buckets()
     return (bucket_t *)(maskAndBuckets & bucketsMask);
 }
 ```
-#### `mask`
+#### mask
 &emsp;`_buckets` 的数组长度 -1（容量的临界值）。
 ```c++
 // CACHE_MASK_STORAGE_OUTLINED
@@ -516,7 +515,7 @@ typedef uintptr_t SEL;
 ```
 &emsp;这里有一个点，在 `CACHE_MASK_STORAGE_HIGH_16` 时是 `__LP64__` 平台，`mask_t` 在 `__LP64__` 下是 `uint32_t`，多出了 `16` 位空间，`mask` 只需要 `16` 位就足够保存。注释给出的解释是: " `x86_64` 和 `arm64` `asm` 的 `16` 位效率较低。"
 
-#### `occupied/incrementOccupied`
+#### occupied/incrementOccupied
 ```c++
 mask_t cache_t::occupied() 
 {
@@ -528,7 +527,7 @@ void cache_t::incrementOccupied()
     _occupied++; // _occupied 自增
 }
 ```
-#### `setBucketsAndMask`
+#### setBucketsAndMask
 &emsp;设置 `_buckets` 与 `_mask` 的值，`CACHE_MASK_STORAGE_OUTLINED` 模式只需要分别以原子方式设置两个成员变量的值即可，`CACHE_MASK_STORAGE_HIGH_16` 模式需要把两个值做位操作合并在一起然后以原子方式保存在 `_maskAndBuckets` 中。同时以上两种情况都会顺便把 `_occupied` 设置为 `0`。
 ```c++
 // CACHE_MASK_STORAGE_OUTLINED
@@ -604,7 +603,7 @@ void cache_t::setBucketsAndMask(struct bucket_t *newBuckets, mask_t newMask)
     _occupied = 0;
 }
 ```
-#### `initializeToEmpty`
+#### initializeToEmpty
 ```c++
 // bzero
 // 头文件：#include <string.h>
@@ -630,7 +629,7 @@ void cache_t::initializeToEmpty()
 }
 ```
 &emsp;两种模式下都是把 `_objc_empty_cache` 的地址取出用于设置 `_buckets/_maskAndBuckets`，两种模式下也都对应上面的 `emptyBuckets` 函数，取出 `(bucket_t *)&_objc_empty_cache` 返回。  
-#### `canBeFreed`
+#### canBeFreed
 &emsp;`canBeFreed` 函数只有下面一种实现，看名字我们大概也能猜出此函数的作用，正式判断能不能释放 `cache_t`。
 ```c++
 bool cache_t::canBeFreed()
@@ -638,11 +637,11 @@ bool cache_t::canBeFreed()
     // 调用 isConstantEmptyCache 函数，如果它返回 true，
     // 则表明 cache_t 的 buckets 当前正是那些准备的标记 emptyBuckets 的静态值
     //（应该估计都是 cache_t::emptyBuckets() 全局的 (bucket_t *)&_objc_empty_cache 值），则不能进行释放，
-    // 否则是我们自己申请的有效的方法缓存内容，可进行释放。
+    // 否则是我们自己申请的有效的方法缓存内容，才可根据情况进行释放。
     return !isConstantEmptyCache();
 }
 ```
-#### `isConstantEmptyCache`
+#### isConstantEmptyCache
 &emsp;看完下面的 `emptyBucketsForCapacity` 实现才知道 `isConstantEmptyCache` 中 `Constant` 的含义。
 ```c++
 bool cache_t::isConstantEmptyCache()
@@ -652,7 +651,7 @@ bool cache_t::isConstantEmptyCache()
     // 此处要求 occupied() 为 0 并且 buckets() 等于 emptyBucketsForCapacity(capacity(), false)
     // emptyBucketsForCapacity 函数则是根据 capacity() 去找其对应的 emptyBuckets，
     // 且这些 emptyBuckets 地址都是固定的，
-    // 它们是作标记用的静态值，如果此时 buckets 正是这些个静态值，说明此时 cache_t 是一个空缓存
+    // 它们是作标记用的静态值，如果此时 buckets 正是这些个静态值，说明此时 cache_t 是一个空缓存。
     return 
         occupied() == 0  &&  
         buckets() == emptyBucketsForCapacity(capacity(), false); 
@@ -660,7 +659,7 @@ bool cache_t::isConstantEmptyCache()
         // 会直接 if (!allocate) return nil;
 }
 ```
-#### `capacity`
+#### capacity
 ```c++
 // mask 是临界值，加 1 后就是散列表的容量
 unsigned cache_t::capacity()
@@ -668,7 +667,7 @@ unsigned cache_t::capacity()
     return mask() ? mask()+1 : 0; 
 }
 ```
-### `emptyBucketsForCapacity`
+### emptyBucketsForCapacity
 &emsp;根据入参 `capacity`，返回一个指定 `capacity` 容量的空的散列表，返回的这个 `bucket_t *` 是  `static bucket_t **emptyBucketsList` 这个静态变量指定下标的值，当 `capacity` 位于指定的区间时，返回的 `bucket_t *` 都是相同的。
 例如：`capacity` 值在 `[8，15]` 之内时，通过 `index = log2u(capacity)` 计算的 `index` 值都是相同的，那么调用 `emptyBucketsForCapacity` 函数返回的都是相同的 `emptyBucketsList[index]`。由于这里有 `EMPTY_BYTES` 限制，所以至少 `capacity`  大于 `9/1025` 才会使用到 `emptyBucketsList` 相关的逻辑，内部 `index` 是从 `3/10` 开始的。其它的情况则一律返回 `cache_t::emptyBuckets()`。
 ```c++
@@ -695,7 +694,7 @@ bucket_t *emptyBucketsForCapacity(mask_t capacity, bool allocate = true)
     // Use shared empty buckets allocated on the heap.
     // 使用在堆上分配的 shared empty buckets。
     
-    // 静态的 bucket_t **，下次再进入 emptyBucketsForCapacity 函数的话依然依然是保持上次的值
+    // 静态的 bucket_t **，下次再进入 emptyBucketsForCapacity 函数的话依然是保持上次的值
     // 且返回值正是 emptyBucketsList[index]，就是说调用 emptyBucketsForCapacity 获取就是一个静态的定值
     static bucket_t **emptyBucketsList = nil;
     
@@ -721,8 +720,7 @@ bucket_t *emptyBucketsForCapacity(mask_t capacity, bool allocate = true)
         // index + 1 此值还没有看出来是什么意思
         mask_t newListCount = index + 1;
         
-        // 申请 bytes 个字节的容量，并赋值为 1
-        // capacity 大于 9/1026 那么 bytes 大于 9 * 16/1026 * 16，16 Kb也可太大了
+        // capacity 大于 9/1026 那么 bytes 大于 9 * 16/1026 * 16，16 Kb 也可太大了
         // 分配 bytes 个长度为 1 的连续内存空间，且内存初始化为 0
         bucket_t *newBuckets = (bucket_t *)calloc(bytes, 1);
         
@@ -747,7 +745,7 @@ bucket_t *emptyBucketsForCapacity(mask_t capacity, bool allocate = true)
         // The array is therefore always fully populated.
         // 因此，array 始终总是完全填充。
         
-        // 把新扩容的 emptyBucketsList 的 新位置上都放上 newBuckets
+        // 把新扩容的 emptyBucketsList 的新位置上都放上 newBuckets
         for (mask_t i = emptyBucketsListCount; i < newListCount; i++) {
             // 把新扩容的 emptyBucketsList 的 新位置上都放上 newBuckets
             emptyBucketsList[i] = newBuckets;
@@ -768,7 +766,7 @@ bucket_t *emptyBucketsForCapacity(mask_t capacity, bool allocate = true)
     return emptyBucketsList[index];
 }
 ```
-#### `CONFIG_USE_CACHE_LOCK`
+#### CONFIG_USE_CACHE_LOCK
 &emsp;`emptyBucketsForCapacity` 函数的入口就是一个 `CONFIG_USE_CACHE_LOCK` 宏定义，它是用来标志 `emptyBucketsForCapacity` 函数使用 `cacheUpdateLock` 还是 `runtimeLock`，注意这里针对的是 `Objective-C` 的版本，`__OBJC2__` 下使用的是 `runtimeLock` 否则使用 `cacheUpdateLock`。
 ```c++
 // OBJC_INSTRUMENTED controls whether message dispatching is dynamically monitored.
@@ -823,7 +821,7 @@ bucket_t *emptyBucketsForCapacity(mask_t capacity, bool allocate = true)
     runtimeLock.assertLocked(); // 在 __OBJC2__ 下是使用 runtimeLock
 #endif
 ```
-#### `bytesForCapacity`
+#### bytesForCapacity
 &emsp;`bucket_t` 散列数组的总的内存占用（以字节为单位）。
 ```c++
 size_t cache_t::bytesForCapacity(uint32_t cap)
@@ -832,7 +830,7 @@ size_t cache_t::bytesForCapacity(uint32_t cap)
     return sizeof(bucket_t) * cap;
 }
 ```
-#### `EMPTY_BYTES`
+#### EMPTY_BYTES
 ```c++
 // EMPTY_BYTES includes space for a cache end marker bucket.
 // EMPTY_BYTES 是包括 缓存结束标记 bucket 的空间。
@@ -840,12 +838,12 @@ size_t cache_t::bytesForCapacity(uint32_t cap)
 // This end marker doesn't actually have the wrap-around pointer 
 // because cache scans always find an empty bucket before they might wrap.
 // 这个结束标记实际上没有 wrap-around 指针，
-// 因为缓存扫描总是在可能进行换行之前找到一个空的bucket。(因为 buckets 的扩容机制)
+// 因为缓存扫描总是在可能进行换行之前找到一个空的 bucket。(因为 buckets 的扩容机制)
 
 // 1024 buckets is fairly common.
 // 1024 bukcets 很常见。
 
-// 一个 bucket_t 的实例变量的大小应该是 16 字节
+// 一个 bucket_t 的实例变量的大小应该是 16 字节。
 
 #if DEBUG
     // Use a smaller size to exercise heap-allocated empty caches.
@@ -855,7 +853,7 @@ size_t cache_t::bytesForCapacity(uint32_t cap)
 #   define EMPTY_BYTES ((1024+1)*16)
 #endif
 ```
-### `getBit/setBit/clearBit`
+### getBit/setBit/clearBit
 &emsp;针对 `__LP64__` 平台下的 `_flags` 的操作。[atomic_fetch_or/atomic_fetch_and](https://en.cppreference.com/w/cpp/atomic/atomic_fetch_or)
 ```c++
 #if __LP64__
@@ -870,12 +868,12 @@ size_t cache_t::bytesForCapacity(uint32_t cap)
     }
 #endif
 ```
-### `FAST_CACHE_ALLOC_MASK`
+### FAST_CACHE_ALLOC_MASK
 ```c++
 // Fast Alloc fields:
 // This stores the word-aligned size of instances + "ALLOC_DELTA16", 
 // or 0 if the instance size doesn't fit.
-// 它存储实例的字对齐大小 + "ALLOC_DELTA16"，如果实例大小不适合，则存储0。
+// 它存储实例的字对齐大小 + "ALLOC_DELTA16"，如果实例大小不适合，则存储 0。
 
 // These bits occupy the same bits than in the instance size, 
 // so that the size can be extracted with a simple mask operation.
@@ -890,7 +888,7 @@ size_t cache_t::bytesForCapacity(uint32_t cap)
 #define FAST_CACHE_ALLOC_MASK16       0x1ff0 // 0b0001 1111 1111 0000
 #define FAST_CACHE_ALLOC_DELTA16      0x0008 // 0b0000 0000 0000 1000
 ```
-### `hasFastInstanceSize/fastInstanceSize/setFastInstanceSize`
+### hasFastInstanceSize/fastInstanceSize/setFastInstanceSize
 &emsp;在 `__LP64__` 平台下，`cache_t` 多了一个 `uint16_t _flags`。以下函数是根据 `_flags` 中的一些标志位做出不同的处理。
 
 ```c++
@@ -999,8 +997,8 @@ size_t cache_t::bytesForCapacity(uint32_t cap)
     }
 #endif
 ```
-#### `__builtin_constant_p`
-`__builtin_constant_p` 是编译器 `gcc` 内置函数，用于判断一个值是否为编译时常量，如果是常数，函数返回 `1 `，否则返回 `0`。此内置函数的典型用法是在宏中用于手动编译时优化。
+#### __builtin_constant_p
+&emsp;`__builtin_constant_p` 是编译器 `gcc` 内置函数，用于判断一个值是否为编译时常量，如果是常数，函数返回 `1 `，否则返回 `0`。此内置函数的典型用法是在宏中用于手动编译时优化。
 ```c++
 // 在 main.m 中做如下测试：
 printf("😊😊 %d\n", __builtin_constant_p(101)); // 打印: 😊😊 1
@@ -1011,7 +1009,7 @@ printf("😊😊 %d\n", __builtin_constant_p(a)); // 打印: 😊😊 1
 int a = 12 * 13;
 printf("😊😊 %d\n", __builtin_constant_p(a)); // 打印: 😊😊 0
 ```
-### `endMarker`
+### endMarker
 ```c++
 // CACHE_END_MARKER 值为 1 时，定义 endMarker 函数
 bucket_t *cache_t::endMarker(struct bucket_t *b, uint32_t cap)
@@ -1020,7 +1018,7 @@ bucket_t *cache_t::endMarker(struct bucket_t *b, uint32_t cap)
     return (bucket_t *)((uintptr_t)b + bytesForCapacity(cap)) - 1;
 }
 ```
-#### `CACHE_END_MARKER`
+#### CACHE_END_MARKER
 &emsp;标记是否支持 `cache_t` 的 `buckets` 散列数组的内存末尾标记。
 ```c++
 #if __arm__  ||  __x86_64__  ||  __i386__
@@ -1058,7 +1056,7 @@ static inline mask_t cache_next(mask_t i, mask_t mask) {
 
 #endif
 ```
-### `reallocate`
+### reallocate
 ```c++
 ALWAYS_INLINE
 void cache_t::reallocate(mask_t oldCapacity, mask_t newCapacity, bool freeOld)

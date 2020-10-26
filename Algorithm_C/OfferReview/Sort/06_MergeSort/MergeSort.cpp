@@ -10,7 +10,15 @@
 
 // 将有两个有序数列 a[first...mid] 和 a[mid...last] 合并
 void MergeSort::mergeSort(int nums[], int first, int last, int temp[]) {
-    //
+//    if (nums == nullptr) {
+//        return;
+//    }
+//
+//    if (first >= last) {
+//        return;
+//    }
+//
+//    int mid = ()
 }
 
 void MergeSort::mergeArray(int nums[], int first, int mid, int last, int temp[]) {

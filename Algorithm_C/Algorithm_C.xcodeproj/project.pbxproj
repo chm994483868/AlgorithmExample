@@ -140,7 +140,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		8E0E62B22525ECB10076A530 /* iOS 从源码解析Runtime (九)：聚焦 objc_class(cache_t 及方法缓存实现相关内容篇(2)(objc-msg-arm64.s 文件全解析)).md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 从源码解析Runtime (九)：聚焦 objc_class(cache_t 及方法缓存实现相关内容篇(2)(objc-msg-arm64.s 文件全解析)).md"; sourceTree = "<group>"; };
+		8E0E62B22525ECB10076A530 /* iOS 从源码解析Runtime (九)：聚焦cache_t(2)(objc-msg-arm64.s 文件全解析).md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 从源码解析Runtime (九)：聚焦cache_t(2)(objc-msg-arm64.s 文件全解析).md"; sourceTree = "<group>"; };
 		8E15F1D424E423FE00660C93 /* iOS消息转发机制.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS消息转发机制.md"; sourceTree = "<group>"; };
 		8E15F1D624E5768C00660C93 /* HHStaff.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = HHStaff.h; sourceTree = "<group>"; };
 		8E15F1D724E5768C00660C93 /* HHStaff.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = HHStaff.m; sourceTree = "<group>"; };
@@ -163,14 +163,14 @@
 		8E2572D624D304DE0080F598 /* Array.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Array.cpp; sourceTree = "<group>"; };
 		8E2572D724D304DE0080F598 /* Array.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = Array.hpp; sourceTree = "<group>"; };
 		8E5CCE0624B9FF3D0081B5FF /* Review_1.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Review_1.cpp; sourceTree = "<group>"; };
-		8E6DFE182523862B00D2830E /* iOS 从源码解析Runtime (八)：聚焦 objc_class(cache_t 及方法缓存实现相关内容篇(1)).md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 从源码解析Runtime (八)：聚焦 objc_class(cache_t 及方法缓存实现相关内容篇(1)).md"; sourceTree = "<group>"; };
+		8E6DFE182523862B00D2830E /* iOS 从源码解析Runtime (八)：聚焦cache_t 及方法缓存实现相关内容篇(1).md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 从源码解析Runtime (八)：聚焦cache_t 及方法缓存实现相关内容篇(1).md"; sourceTree = "<group>"; };
 		8EA593D624CDB969002785EF /* OfferReview */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = OfferReview; sourceTree = BUILT_PRODUCTS_DIR; };
 		8EA593D824CDB969002785EF /* main.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
 		8EA593DE24CDBD0B002785EF /* AssignmentOperator.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = AssignmentOperator.cpp; sourceTree = "<group>"; };
 		8EA593DF24CDBD0B002785EF /* AssignmentOperator.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = AssignmentOperator.hpp; sourceTree = "<group>"; };
 		8EA593E224CF0B40002785EF /* ConstructBinaryTree.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = ConstructBinaryTree.cpp; sourceTree = "<group>"; };
 		8EA593E324CF0B40002785EF /* ConstructBinaryTree.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = ConstructBinaryTree.hpp; sourceTree = "<group>"; };
-		8EA68A6A252DA35400BE2852 /* iOS 从源码解析Runtime (十)：聚焦 objc_class(cache_t 及方法缓存实现相关内容篇(3)(objc-msg-arm64.s补充)).md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 从源码解析Runtime (十)：聚焦 objc_class(cache_t 及方法缓存实现相关内容篇(3)(objc-msg-arm64.s补充)).md"; sourceTree = "<group>"; };
+		8EA68A6A252DA35400BE2852 /* iOS 从源码解析Runtime (十)：聚焦cache_t(3)(objc-msg-arm64.s补充).md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 从源码解析Runtime (十)：聚焦cache_t(3)(objc-msg-arm64.s补充).md"; sourceTree = "<group>"; };
 		8EA68A6B252DA76300BE2852 /* iOS 从源码解析Runtime (十一)：聚焦 objc_class(class_data_bits_t、class_ro_t、entsize_list_tt相关内容篇).md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 从源码解析Runtime (十一)：聚焦 objc_class(class_data_bits_t、class_ro_t、entsize_list_tt相关内容篇).md"; sourceTree = "<group>"; };
 		8EF1A8AA253B4E7E0058AEAD /* iOS 从 libclosure-74 源码来研究 Block 实现原理(2).md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 从 libclosure-74 源码来研究 Block 实现原理(2).md"; sourceTree = "<group>"; };
 		D2090C0324CFA51E00FA4F51 /* NextNodeInBinaryTrees.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = NextNodeInBinaryTrees.cpp; sourceTree = "<group>"; };
@@ -262,7 +262,7 @@
 		D2330A2424AF0FD500C6480D /* Algorithm_C */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = Algorithm_C; sourceTree = BUILT_PRODUCTS_DIR; };
 		D2330A2724AF0FD500C6480D /* main.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
 		D23730582514A96E00274FBA /* iOS 从源码解析Runtime (四)：引用计数表内部数据结构DenseMapBase.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 从源码解析Runtime (四)：引用计数表内部数据结构DenseMapBase.md"; sourceTree = "<group>"; };
-		D2373059251C880C00274FBA /* iOS 从源码解析Runtime (七)：聚焦 isa、objc_object(dealloc、autorelease返回值优化篇).md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 从源码解析Runtime (七)：聚焦 isa、objc_object(dealloc、autorelease返回值优化篇).md"; sourceTree = "<group>"; };
+		D2373059251C880C00274FBA /* iOS 从源码解析Runtime (七)：聚焦objc_object(dealloc、autorelease返回值优化篇).md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 从源码解析Runtime (七)：聚焦objc_object(dealloc、autorelease返回值优化篇).md"; sourceTree = "<group>"; };
 		D237305A251C888D00274FBA /* iOS 从源码解析Runtime (六)：AutoreleasePool实现原理解读.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 从源码解析Runtime (六)：AutoreleasePool实现原理解读.md"; sourceTree = "<group>"; };
 		D237C63D24D24648001E0B21 /* StackWithMin.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = StackWithMin.cpp; sourceTree = "<group>"; };
 		D237C63E24D24648001E0B21 /* StackWithMin.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = StackWithMin.hpp; sourceTree = "<group>"; };
@@ -886,14 +886,14 @@
 				D23730582514A96E00274FBA /* iOS 从源码解析Runtime (四)：引用计数表内部数据结构DenseMapBase.md */,
 				D24C822225120D1400E3BF5E /* iOS 从源码解析Runtime (五)：聚焦objc_object(retain、release、retaincount).md */,
 				D237305A251C888D00274FBA /* iOS 从源码解析Runtime (六)：AutoreleasePool实现原理解读.md */,
+				D2373059251C880C00274FBA /* iOS 从源码解析Runtime (七)：聚焦objc_object(dealloc、autorelease返回值优化篇).md */,
+				8E6DFE182523862B00D2830E /* iOS 从源码解析Runtime (八)：聚焦cache_t 及方法缓存实现相关内容篇(1).md */,
+				8E0E62B22525ECB10076A530 /* iOS 从源码解析Runtime (九)：聚焦cache_t(2)(objc-msg-arm64.s 文件全解析).md */,
+				8EA68A6A252DA35400BE2852 /* iOS 从源码解析Runtime (十)：聚焦cache_t(3)(objc-msg-arm64.s补充).md */,
 				D2164F2124FF10F10000A6AA /* iOS AssociatedObject 底层实现原理.md */,
 				D2164F442501E8880000A6AA /* iOS Category 底层实现原理(一)：概念与数据结构.md */,
 				D2E0674D2506118F008BF0E9 /* iOS Category 底层实现原理(二)：函数分析与加载流程.md */,
 				D2E067692508E82E008BF0E9 /* iOS Category 底层实现原理(三)：附加+load函数超详细解析.md */,
-				D2373059251C880C00274FBA /* iOS 从源码解析Runtime (七)：聚焦 isa、objc_object(dealloc、autorelease返回值优化篇).md */,
-				8E6DFE182523862B00D2830E /* iOS 从源码解析Runtime (八)：聚焦 objc_class(cache_t 及方法缓存实现相关内容篇(1)).md */,
-				8E0E62B22525ECB10076A530 /* iOS 从源码解析Runtime (九)：聚焦 objc_class(cache_t 及方法缓存实现相关内容篇(2)(objc-msg-arm64.s 文件全解析)).md */,
-				8EA68A6A252DA35400BE2852 /* iOS 从源码解析Runtime (十)：聚焦 objc_class(cache_t 及方法缓存实现相关内容篇(3)(objc-msg-arm64.s补充)).md */,
 				8EA68A6B252DA76300BE2852 /* iOS 从源码解析Runtime (十一)：聚焦 objc_class(class_data_bits_t、class_ro_t、entsize_list_tt相关内容篇).md */,
 				D2C74CF5253046AE0051B89F /* iOS 从源码解析Runtime (十二)：聚焦 objc_class(class_rw_t、class_rw_ext_t相关内容篇).md */,
 				D2C74CF62531A79C0051B89F /* iOS 从源码解析Runtime (十三)：聚焦 objc_class(objc_class函数相关内容篇).md */,
