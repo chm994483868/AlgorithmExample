@@ -149,7 +149,7 @@ _class_printMethodCacheStatistics
 
 #else
 
-// 不使用掩码的方式（_buckets 与 _mask 是两个变量，上面则是把 buckets 和 mask 合并保存在 _maskAndBuckets 中）
+// 不使用掩码的方式（_buckets 与 _mask 分别是两个变量，上面则是把 buckets 和 mask 合并保存在 _maskAndBuckets 中）
 #define CACHE_MASK_STORAGE CACHE_MASK_STORAGE_OUTLINED
 
 #endif
