@@ -1,4 +1,4 @@
-# iOS 从源码解析Runtime (八)：聚焦cache_t 及方法缓存实现相关内容篇(1)
+# iOS 从源码解析Runtime (八)：聚焦cache_t及方法缓存实现相关内容篇(1)
 
 > &emsp;前面连续几篇我们已经详细分析了 `objc_object` 的相关的所有源码，接下来几篇则开始分析定义于 `objc-runtime-new.h` 中的 `objc_class`，本篇先从 `struct objc_class : objc_object` 的 `cache_t cache` 开始，`cache_t` 主要实现方法缓存，帮助我们更快的找到方法地址进行调用。
   纵览 `objc-runtime-new.h` 文件真的超长，那我们就分块来学习，一起 ⛽️⛽️ 吧！
@@ -94,11 +94,10 @@ _class_printMethodCacheStatistics
 &emsp;到这里就看完注释了，有点懵，下面还是把源码一行一行看完，然后再回顾上面的内容到底指的是什么。
 
 ## CACHE_IMP_ENCODING/CACHE_MASK_STORAGE
-&emsp;在进入 `cache_t/bucket_t` 内容之前，首先看两个宏定义，`CACHE_IMP_ENCODING` 表示在 `bucket_t` 中 `IMP` 的存储方式，`CACHE_MASK_STORAGE` 表示 `cache_t` 中掩码的位置。`struct bucket_t` 和 `struct cache_t` 里面的不同实现部分正是根据这两个宏来判断的。
-我们最关注的 `x86_64(mac)` 和 `arm64(iphone)` 两个平台下 `bucket_t` 中 `IMP` 都是以 `ISA` 与 `IMP` 异或的值存储。而掩码位置的话 `x86_64` 下是 `CACHE_MASK_STORAGE_OUTLINED` 没有掩码，`buckets` 散列数组和 `_mask` 以两个成员变量分别表示。在 `arm64` 下则是 `CACHE_MASK_STORAGE_HIGH_16` 高 `16` 位为掩码，散列数组和 `mask` 共同保存在 `_maskAndBuckets` 中。 
+&emsp;在进入 `cache_t/bucket_t` 内容之前，首先看两个宏定义，`CACHE_IMP_ENCODING` 表示在 `bucket_t` 中 `IMP` 的存储方式，`CACHE_MASK_STORAGE` 表示 `cache_t` 中掩码的位置。`struct bucket_t` 和 `struct cache_t` 里面的不同实现部分正是根据这两个宏来判断的。我们最关注的 `x86_64(mac)` 和 `arm64(iphone)` 两个平台下 `bucket_t` 中 `IMP` 都是以 `ISA` 与 `IMP` 异或的值存储。而掩码位置的话 `x86_64` 下是 `CACHE_MASK_STORAGE_OUTLINED` 没有掩码，`buckets` 散列数组和 `_mask` 以两个成员变量分别表示。在 `arm64` 下则是 `CACHE_MASK_STORAGE_HIGH_16` 高 `16` 位为掩码，散列数组和 `mask` 共同保存在 `_maskAndBuckets` 中。 
 ```c++
 // 三种方法缓存存储 IMP 的方式：（bucket_t 中 _imp 成员变量存储 IMP 的方式）
-// Determine how the method cache stores IMPs.
+// Determine how the method cache stores IMPs. 
 // 确定方法缓存如何存储 IMPs. (IMP 是函数实现的指针，保存了函数实现的地址，根据 IMP 可以直接执行函数...)
 
 // Method cache contains raw IMP. 方法缓存包含原始的 IMP（bucket_t 中 _imp 为 IMP）
