@@ -1,4 +1,4 @@
-# iOS 从源码解析Runtime (八)：聚焦cache_t及方法缓存实现相关内容篇(1)
+# iOS 从源码解析Runtime (八)：聚焦cache_t 相关数据结构及函数解析(1)
 
 > &emsp;前面连续几篇我们已经详细分析了 `objc_object` 的相关的所有源码，接下来几篇则开始分析定义于 `objc-runtime-new.h` 中的 `objc_class`，本篇先从 `struct objc_class : objc_object` 的 `cache_t cache` 开始，`cache_t` 主要实现方法缓存，帮助我们更快的找到方法地址进行调用。
   纵览 `objc-runtime-new.h` 文件真的超长，那我们就分块来学习，一起 ⛽️⛽️ 吧！
@@ -438,7 +438,7 @@ struct objc_cache {
 
 OBJC_EXPORT struct objc_cache _objc_empty_cache OBJC_AVAILABLE(10.0, 2.0, 9.0, 1.0, 2.0);
 
-//位于 objc-cache-old.mm 中
+// 位于 objc-cache-old.mm 中
 // 静态的空缓存，所有类最初都指向此缓存。
 // 发送第一条消息时，它在缓存中未命中，当缓存新增时，它会检查这种情况，并使用 malloc 而不是 realloc。
 // 这避免了在 Messenger 中检查 NULL 缓存的需要。
@@ -453,7 +453,7 @@ struct objc_cache _objc_empty_cache =
 struct bucket_t *cache_t::emptyBuckets()
 {
     // 直接使用 & 取 _objc_empty_cache 的地址并返回，
-    // _objc_empty_cache 是一个全局变量，用来标记当前类的缓存是一个空缓存
+    // _objc_empty_cache 是一个全局变量，用来标记当前类的缓存是一个空缓存。
     return (bucket_t *)&_objc_empty_cache;
 }
 
@@ -464,7 +464,7 @@ struct bucket_t *cache_t::emptyBuckets()
 }
 ```
 #### buckets
-&emsp;散列表数组的起始地址。
+&emsp;散列数组的起始地址。
 ```c++
 // CACHE_MASK_STORAGE_OUTLINED
 // 没有任何 "锁头"，原子加载 _buckets 并返回
@@ -635,8 +635,13 @@ bool cache_t::canBeFreed()
 {
     // 调用 isConstantEmptyCache 函数，如果它返回 true，
     // 则表明 cache_t 的 buckets 当前正是那些准备的标记 emptyBuckets 的静态值
-    //（应该估计都是 cache_t::emptyBuckets() 全局的 (bucket_t *)&_objc_empty_cache 值），则不能进行释放，
-    // 否则是我们自己申请的有效的方法缓存内容，才可根据情况进行释放。
+    
+    //（当 capacity 小于 capacity 时，
+    // isConstantEmptyCache 函数内部的 emptyBucketsForCapacity 函数返回的都是:
+    // cache_t::emptyBuckets() 全局的 (bucket_t *)&_objc_empty_cache 值），则不能进行释放，
+    
+    // 我们自己申请的有效的方法缓存内容，才可根据情况进行释放。
+    
     return !isConstantEmptyCache();
 }
 ```
@@ -667,8 +672,8 @@ unsigned cache_t::capacity()
 }
 ```
 ### emptyBucketsForCapacity
-&emsp;根据入参 `capacity`，返回一个指定 `capacity` 容量的空的散列表，返回的这个 `bucket_t *` 是  `static bucket_t **emptyBucketsList` 这个静态变量指定下标的值，当 `capacity` 位于指定的区间时，返回的 `bucket_t *` 都是相同的。
-例如：`capacity` 值在 `[8，15]` 之内时，通过 `index = log2u(capacity)` 计算的 `index` 值都是相同的，那么调用 `emptyBucketsForCapacity` 函数返回的都是相同的 `emptyBucketsList[index]`。由于这里有 `EMPTY_BYTES` 限制，所以至少 `capacity`  大于 `9/1025` 才会使用到 `emptyBucketsList` 相关的逻辑，内部 `index` 是从 `3/10` 开始的。其它的情况则一律返回 `cache_t::emptyBuckets()`。
+&emsp;根据入参 `capacity`，返回一个指定 `capacity` 容量的空的散列表，返回的这个 `bucket_t *` 是  `static bucket_t **emptyBucketsList` 这个静态变量指定下标的值，当 `capacity` 位于指定的区间时，返回的 `bucket_t *` 都是相同的。如果 `capacity` 超出了现有的容量界限，则会对 `emptyBucketsList` 进行扩容。
+例如：`capacity` 值在 `[8，15]` 之内时，通过 `index = log2u(capacity)` 计算的 `index` 值都是相同的，那么调用 `emptyBucketsForCapacity` 函数返回的都是相同的 `emptyBucketsList[index]`。由于这里有 `EMPTY_BYTES` 限制，所以至少 `capacity`  大于 `9/1025` 才会使用到 `emptyBucketsList` 相关的逻辑，内部 `index` 是从 `3/10`（2 的 3 次方是 8，2 的 10 次方是 1024） 开始的。其它的情况则一律返回 `cache_t::emptyBuckets()`。
 ```c++
 bucket_t *emptyBucketsForCapacity(mask_t capacity, bool allocate = true)
 {
@@ -684,7 +689,7 @@ bucket_t *emptyBucketsForCapacity(mask_t capacity, bool allocate = true)
     // Use _objc_empty_cache if the buckets is small enough.
     // 如果 buckets 足够小的话使用 _objc_empty_cache。
     if (bytes <= EMPTY_BYTES) {
-        // 小于 ((8+1)*16) 主要针对的是 DEBUG 模式下：
+        // 小于 ((8+1)*16) 主要针对的是 DEBUG 模式下。
         // 小于 ((1024+1)*16) 非 DEBUG 模式（后面的乘以 16 是因为 sizeof(bucket_t) == 16）
         //（觉得这个 1025 的容量就已经很大大了，可能很难超过，大概率这里就直接返回 cache_t::emptyBuckets() 了）
         return cache_t::emptyBuckets();
@@ -697,7 +702,7 @@ bucket_t *emptyBucketsForCapacity(mask_t capacity, bool allocate = true)
     // 且返回值正是 emptyBucketsList[index]，就是说调用 emptyBucketsForCapacity 获取就是一个静态的定值
     static bucket_t **emptyBucketsList = nil;
     
-    // 静态的 mask_t (uint32_t)，下次再进入 emptyBucketsForCapacity 函数的话依然依然是保持上次的值
+    // 静态的 mask_t (uint32_t)，下次再进入 emptyBucketsForCapacity 函数的话依然是保持上次的值
     static mask_t emptyBucketsListCount = 0;
     
     // ⚠️
@@ -711,7 +716,6 @@ bucket_t *emptyBucketsForCapacity(mask_t capacity, bool allocate = true)
     // x 在 [16, 31] 区间内，大于等于 2^4, 所以返回值为 4
     
     mask_t index = log2u(capacity);
-
 
     if (index >= emptyBucketsListCount) {
         if (!allocate) return nil;
@@ -766,7 +770,7 @@ bucket_t *emptyBucketsForCapacity(mask_t capacity, bool allocate = true)
 }
 ```
 #### CONFIG_USE_CACHE_LOCK
-&emsp;`emptyBucketsForCapacity` 函数的入口就是一个 `CONFIG_USE_CACHE_LOCK` 宏定义，它是用来标志 `emptyBucketsForCapacity` 函数使用 `cacheUpdateLock` 还是 `runtimeLock`，注意这里针对的是 `Objective-C` 的版本，`__OBJC2__` 下使用的是 `runtimeLock` 否则使用 `cacheUpdateLock`。
+&emsp;`emptyBucketsForCapacity` 函数实现第一行就是一个 `CONFIG_USE_CACHE_LOCK` 宏定义，它是用来标志 `emptyBucketsForCapacity` 函数使用 `cacheUpdateLock` 还是 `runtimeLock`，注意这里针对的是 `Objective-C` 的版本，`__OBJC2__` 下使用的是 `runtimeLock` 否则使用 `cacheUpdateLock`。
 ```c++
 // OBJC_INSTRUMENTED controls whether message dispatching is dynamically monitored.
 // OBJC_INSTRUMENTED 控制是否动态监视消息调度。
@@ -888,8 +892,7 @@ size_t cache_t::bytesForCapacity(uint32_t cap)
 #define FAST_CACHE_ALLOC_DELTA16      0x0008 // 0b0000 0000 0000 1000
 ```
 ### hasFastInstanceSize/fastInstanceSize/setFastInstanceSize
-&emsp;在 `__LP64__` 平台下，`cache_t` 多了一个 `uint16_t _flags`。以下函数是根据 `_flags` 中的一些标志位做出不同的处理。
-
+&emsp;在 `__LP64__` 平台下，`cache_t` 多了一个 `uint16_t _flags`。以下函数是根据 `_flags` 中的一些标志位做出不同的处理。这些个函数内容都是给 `objc_class` 用的，本篇的内容是针对的都是方法缓存的学习，等到 `objc_class` 篇再详细分析下面的函数。
 ```c++
 #if FAST_CACHE_ALLOC_MASK
     bool hasFastInstanceSize(size_t extra) const
@@ -1013,7 +1016,9 @@ printf("😊😊 %d\n", __builtin_constant_p(a)); // 打印: 😊😊 0
 // CACHE_END_MARKER 值为 1 时，定义 endMarker 函数
 bucket_t *cache_t::endMarker(struct bucket_t *b, uint32_t cap)
 {
-    // 最后一个 bucket_t 的指针，-1 是从内存末尾再前移一个 bucket_t 的宽度
+    // 最后一个 bucket_t 的指针，-1 是从内存末尾再前移一个 bucket_t 的宽度，
+    // 这里是先把 bucket_t 指针转化为一个 unsigned long，然后加上 cap 的字节总数，
+    // 然后转化为 bucket_t 指针，然后再退一个指针的宽度，即 cache_t 哈希数组的最后一个 bucket_t 的位置。
     return (bucket_t *)((uintptr_t)b + bytesForCapacity(cap)) - 1;
 }
 ```
@@ -1040,7 +1045,7 @@ static inline mask_t cache_next(mask_t i, mask_t mask) {
 // objc_msgSend 有很多可用的寄存器。
 
 // Cache scan decrements. No end marker needed.
-// 缓存扫描减量。无需结束标记。
+// 缓存扫描减量，无需结束标记。
 
 #define CACHE_END_MARKER 0 // 定为 0
 
@@ -1080,13 +1085,12 @@ void cache_t::reallocate(mask_t oldCapacity, mask_t newCapacity, bool freeOld)
     setBucketsAndMask(newBuckets, newCapacity - 1);
     
     if (freeOld) {
-        // 这里不是立即释放旧的 bukckts，而是将旧的 buckets 添加到存放旧散列表的列表中，
-        // 以便稍后释放，注意这里是稍后释放。
+        // 这里不是立即释放旧的 bukckts，而是将旧的 buckets 添加到存放旧散列表的列表中，以便稍后释放，注意这里是稍后释放。
         cache_collect_free(oldBuckets, oldCapacity);
     }
 }
 ```
-#### `allocateBuckets`
+#### allocateBuckets
 ```c++
 #if CACHE_END_MARKER
 
@@ -1142,14 +1146,14 @@ bucket_t *allocateBuckets(mask_t newCapacity)
 
 #endif
 ```
-#### `cache_collect_free`
+#### cache_collect_free
 &emsp;`cache_collect_free` 函数声明在 `objc-cache.mm` 文件顶部，定义在 `objc-cache.mm` 的 `Line 977`。
 ```c++
 /*
 cache_collect_free.
 
 Add the specified malloc'd memory to the list of them to free at some later point.
-将指定的已分配内存添加到它们的列表中，以便稍后释放。
+将指定的已分配内存（待释放的方法列表）添加到它们的列表中，以便稍后释放。
 
 size is used for the collection threshold. It does not have to be precisely the block's size.
 size 用于收集阈值。它不必精确地是 块 的大小。
@@ -1182,7 +1186,7 @@ static void cache_collect_free(bucket_t *data, mask_t capacity)
     cache_collect(false);
 }
 ```
-#### `_garbage_make_room`
+#### _garbage_make_room
 &emsp;同样 `_garbage_make_room` 函数声明在 `objc-cache.mm` 顶部，定义在 `objc-cache.mm` 的 `Line 947`。
 ```c++
 /*
@@ -1247,7 +1251,7 @@ static void _garbage_make_room(void)
     }
 }
 ```
-#### `cache_collect`
+#### cache_collect
 ```c++
 /*
 cache_collect.  
@@ -1258,8 +1262,7 @@ collectALot tries harder to free memory.
 collectALot 如果为 true 则即使 garbage_byte_size 未达到阀值也会去释放内存（旧的 bucket_t）。
 
 Cache locks: cacheUpdateLock must be held by the caller.
-cacheUpdateLock 必须由调用方持有。需要加锁。（__objc2__ 下使用的是 runtimeLock）
-
+cacheUpdateLock 必须由调用方持有，需要加锁。（__objc2__ 下使用的是 runtimeLock）
 */
 void cache_collect(bool collectALot)
 {
@@ -1301,7 +1304,7 @@ void cache_collect(bool collectALot)
     }
 
     // No cache readers in progress - garbage is now deletable.
-    // 没有正在进行中的 缓存读取器 -现在可以删除 garbage 了。
+    // 没有正在进行中的 缓存读取器 现在可以删除 garbage 了。
 
     // Log our progress
     // Log
@@ -1355,7 +1358,7 @@ void cache_collect(bool collectALot)
     }
 }
 ```
-#### `_collecting_in_critical`
+#### _collecting_in_critical
 &emsp;同样 `_collecting_in_critical` 函数声明在 `objc-cache.mm` 顶部，定义在 `objc-cache.mm` 的 `Line 838`。
 返回 `true` 表示 `objc_msgSend`（或其他缓存读取器（`cache reader`））当前正在缓存中查找，并且可能仍在使用某些 `garbage`。返回 `false` 的话表示 `garbage` 中的 `bucket_t` 没有被在使用。
 
@@ -1468,7 +1471,7 @@ static int _collecting_in_critical(void)
     return result;
 }
 ```
-##### `HAVE_TASK_RESTARTABLE_RANGES`
+##### HAVE_TASK_RESTARTABLE_RANGES
 ```c++
 // Define HAVE_TASK_RESTARTABLE_RANGES to enable usage of task_restartable_ranges_synchronize().
 // 定义 HAVE_TASK_RESTARTABLE_RANGES 以启用使用 task_restartable_ranges_synchronize() 函数。
@@ -1479,7 +1482,7 @@ static int _collecting_in_critical(void)
 #   define HAVE_TASK_RESTARTABLE_RANGES 1
 #endif
 ```
-##### `task_restartable_ranges_synchronize`
+##### task_restartable_ranges_synchronize
 ```c++
 /*!
  * @function task_restartable_ranges_synchronize

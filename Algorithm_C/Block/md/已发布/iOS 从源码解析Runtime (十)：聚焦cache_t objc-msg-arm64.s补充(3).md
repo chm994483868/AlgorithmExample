@@ -1,4 +1,4 @@
-# iOS 从源码解析Runtime (十)：聚焦 objc_class(cache_t 及方法缓存实现相关内容篇(3)(objc-msg-arm64.s补充))
+# iOS 从源码解析Runtime (十)：聚焦cache_t objc-msg-arm64.s补充(3)
 
 > 由于上篇字数的限制，剩余最后的几个函数只能在此新开一篇了。
 

@@ -1,11 +1,11 @@
-# iOS 从源码解析Runtime (九)：聚焦 objc_class(cache_t 及方法缓存实现相关内容篇(2)(objc-msg-arm64.s 文件全解析))
+# iOS 从源码解析Runtime (九)：聚焦cache_t objc-msg-arm64.s解析(2)
 
-> 上篇分析了 `bucket_t` 和 `cache_t` 的几乎全部内容，最后由于篇幅限制剩两个函数留在本篇来分析，然后准备接着分析 `objc-cache.mm` 文件中与 `objc-cache.h` 文件对应的几个核心函数，正是由它们构成了完整的方法缓存实现，那么一起 ⛽️⛽️ 吧！
+> &emsp;上篇分析了 `bucket_t` 和 `cache_t` 的几乎全部内容，最后由于篇幅限制剩两个函数留在本篇来分析，然后准备接着分析 `objc-cache.mm` 文件中与 `objc-cache.h` 文件对应的几个核心函数，正是由它们构成了完整的方法缓存实现。⛽️⛽️
 
-> 这篇文章发的太晚了，主要是这几天时间都花在看汇编上了，我的汇编水平大概只是一年前看过王爽老师的那本汇编的书，然后就没怎么接触过了，感觉接下来的源码学习涉及到汇编的地方太多了，所以还是特别有必要对汇编做一个整体的认知和学习的，而不是单单只知道寄存器和单个指令是什么意思。本篇后半部分对 `objc-msg-arm64.s` 文件的每一行都做到了分析，那么一起⛽️⛽️吧！
+> &emsp;这篇文章发的太晚了，主要是这几天时间都花在看汇编上了，我的汇编水平大概只是一年前看过王爽老师的那本汇编的书，然后就没怎么接触过了，感觉接下来的源码学习涉及到汇编的地方太多了，所以还是特别有必要对汇编做一个整体的认知和学习的，而不是单单只知道寄存器和单个指令是什么意思。本篇后半部分对 `objc-msg-arm64.s` 文件的每一行都做到了分析。⛽️⛽️
 
-## `insert`
-&emsp;把指定的 `sel` 和 `imp` 插入到 `cache_t` 中，如果开始是空状态，则首先会初始一个容量为 4 散列数组再进行插入。其它情况插入之前会计算已用的容量占比是否到了临界值，如果是则首先进行扩容，然后再进行插入操作，如果还没有达到则直接插入。插入操作如果发生了哈希冲突则依次进行 `+1/-1` 的哈希探测。
+## insert
+&emsp;把指定的 `sel` 和 `imp` 插入到 `cache_t` 中，如果开始是空状态，则首先会初始一个容量为 4 散列数组再进行插入，其它情况插入之前会计算已用的容量占比是否到了临界值，如果是则首先进行扩容，然后再进行插入操作，如果还没有达到则直接插入，插入操作如果发生了哈希冲突则依次进行 `+1/-1` 的哈希探测。
 ```c++
 ALWAYS_INLINE
 void cache_t::insert(Class cls, SEL sel, IMP imp, id receiver)
@@ -37,7 +37,7 @@ void cache_t::insert(Class cls, SEL sel, IMP imp, id receiver)
         if (!capacity) capacity = INIT_CACHE_SIZE; // 如果 capacity 为 0，则赋值给初始值 4
         // 根据 capacity 申请新空间并初始化 buckets、mask(capacity - 1)、_occupied 
         // 这里还有一个点，由于旧 buckets 是准备的占位的静态数据是不需要释放的，
-        // 所有最后一个参数传递的是 false
+        // 所以最后一个参数传递的是 false。
         reallocate(oldCapacity, capacity, /* freeOld */false);
     }
     else if (fastpath(newOccupied + CACHE_END_MARKER <= capacity / 4 * 3)) { 
@@ -89,11 +89,11 @@ void cache_t::insert(Class cls, SEL sel, IMP imp, id receiver)
     // 旧 buckets 会被抛弃，并在合适时候释放其内存空间
     
     // 这里如果发生哈希冲突的话 do while 会进行一个线性的哈希探测(开放寻址法)，
-    // 为 sel 和 imp 找一个空位
+    // 为 sel 和 imp 找一个空位。
     do {
         if (fastpath(b[i].sel() == 0)) {
             // 如果 self 为 0，则表示 sel 的哈希值对应的下标处刚好是一个空位置，
-            // 直接把 sel 和 imp 放在此处即可
+            // 直接把 sel 和 imp 放在此处即可。
             
             // occupied 已占用数量 +1 
             incrementOccupied();
@@ -115,11 +115,11 @@ void cache_t::insert(Class cls, SEL sel, IMP imp, id receiver)
       // 下一个哈希值探测，这里不同的平台不同处理方式依次 +1 或者 -1
     } while (fastpath((i = cache_next(i, m)) != begin));
 
-    // 
+    // 如果未找到合适的位置则 bad_cache
     cache_t::bad_cache(receiver, (SEL)sel, cls);
 }
 ```
-### `INIT_CACHE_SIZE`
+### INIT_CACHE_SIZE
 ```c++
 /* 
 Initial cache bucket count. INIT_CACHE_SIZE must be a power of two.
@@ -132,7 +132,7 @@ enum {
     MAX_CACHE_SIZE       = (1 << MAX_CACHE_SIZE_LOG2), // 1 << 16 = 2^16 
 };
 ```
-### `cache_hash`
+### cache_hash
 ```c++
 // Class points to cache. SEL is key. Cache buckets store SEL+IMP.
 // 类指向缓存。 SEL 是 key。Cache 的 buckets 中保存 SEL+IMP(即 struct bucket_t)。
@@ -146,8 +146,8 @@ static inline mask_t cache_hash(SEL sel, mask_t mask)
     return (mask_t)(uintptr_t)sel & mask;
 }
 ```
-### `cache_next`
-&emsp;这是是 `sel` 发生哈希冲突时，哈希值的移动探测方式在不同的平台下有不同的处理。
+### cache_next
+&emsp;这里是 `sel` 发生哈希冲突时，哈希值的移动探测方式在不同的平台下有不同的处理。
 ```c++
 #if __arm__  ||  __x86_64__  ||  __i386__
 // objc_msgSend has few registers available.
@@ -188,7 +188,7 @@ static inline mask_t cache_next(mask_t i, mask_t mask) {
 
 #endif
 ```
-### `bad_cache`
+### bad_cache
 ```c++
 void cache_t::bad_cache(id receiver, SEL sel, Class isa)
 {
@@ -256,8 +256,8 @@ void cache_t::bad_cache(id receiver, SEL sel, Class isa)
          "invalid object, or a memory error somewhere else.");
 }
 ```
-&emsp;到这里 `bucket_t` 和 `cache_t` 定义的内容就全部看完了。接下来我们分析 `objc-cache.h` 中的内容。
-## `objc-cache.h`
+&emsp;到这里 `bucket_t` 和 `cache_t` 定义的内容就全部看完了。接下来我们分析 `objc-cache.h` 中的内容。（`objc-cache.h` 文件定义系统库中，并不在 `objc4-781` 中。）
+## objc-cache.h
 ```c++
 // objc-cache.h 文件的全部内容
 #ifndef _OBJC_CACHE_H
@@ -269,7 +269,7 @@ __BEGIN_DECLS
 
 extern void cache_init(void); // 初始化
 extern IMP cache_getImp(Class cls, SEL sel); // 获得指定的 IMP
-extern void cache_fill(Class cls, SEL sel, IMP imp, id receiver); // // 
+extern void cache_fill(Class cls, SEL sel, IMP imp, id receiver); // sel 和 imp 插入 cache 中
 extern void cache_erase_nolock(Class cls); // 重置缓存
 extern void cache_delete(Class cls); // 删除 buckets
 extern void cache_collect(bool collectALot); //旧 buckets 回收
@@ -278,7 +278,7 @@ __END_DECLS
 
 #endif
 ```
-### `cache_init`
+### cache_init
 ```c++
 // Define HAVE_TASK_RESTARTABLE_RANGES to enable
 // usage of task_restartable_ranges_synchronize()
@@ -333,9 +333,10 @@ void cache_init()
 #endif // HAVE_TASK_RESTARTABLE_RANGES
 }
 ```
-### `cache_getImp`
-&emsp;`cache_getImp` 函数竟然是个汇编函数。（突然莫名兴奋，终于找到需要认真复习总结汇编的理由了，之前看王爽老师的汇编书现在差不多已经忘的干净，终于可以重拾汇编了。🎉🎉）
-### `cache_fill`
+### cache_getImp
+&emsp;`cache_getImp` 是个汇编函数。（突然莫名兴奋，终于找到需要认真复习总结汇编的理由了，之前看王爽老师的汇编书现在差不多已经忘的干净，终于可以重拾汇编了。🎉🎉）
+
+### cache_fill
 ```c++
 void cache_fill(Class cls, SEL sel, IMP imp, id receiver)
 {
@@ -360,13 +361,14 @@ void cache_fill(Class cls, SEL sel, IMP imp, id receiver)
     }
     
 #else
+
     // 进行验证
     _collecting_in_critical();
     
 #endif
 }
 ```
-#### `DEBUG_TASK_THREADS`
+#### DEBUG_TASK_THREADS
 ```c++
 /*
 objc_task_threads 
@@ -402,12 +404,11 @@ This code can be regenerated by running `mig /usr/include/mach/task.defs`.
 可以通过运行 `mig /usr/include/mach/task.defs` 来重新生成该代码。
 */
 ```
-### `cache_erase_nolock`
-&emsp;`cache_erase_nolock` 函数的作用是为把 `cache` 置为 “空状态”，并回收旧`buckets`。 
+### cache_erase_nolock
+&emsp;`cache_erase_nolock` 函数的作用是为把 `cache` 置为 “空状态”，并回收旧 `buckets`。 
 ```c++
 // Reset this entire cache to the uncached lookup by reallocating it.
 // 通过重新分配整个缓存，将其重置为 未缓存的查询(uncached lookup)。
-// (重新分配整个缓存的时候是不会把旧缓存再放入新缓存内存空间里面的)
 
 // This must not shrink the cache - that breaks the lock-free scheme.
 // 这一定不能缩小缓存 - 这会破坏无锁方案。
@@ -433,6 +434,7 @@ void cache_erase_nolock(Class cls)
         auto oldBuckets = cache->buckets();
         
         // 取得一个空 buckets（标记用，实际保存 bucket_t 时会重新申请空间）
+        
         // buckets 是一个全局的 cache_t::emptyBuckets() 或是
         // 在静态 emptyBucketsList 中准备一个 buckets
         // (emptyBucketsForCapacity 函数的 allocate 参数默认是 true，
@@ -448,7 +450,7 @@ void cache_erase_nolock(Class cls)
     }
 }
 ```
-### `cache_delete`
+### cache_delete
 ```c++
 void cache_delete(Class cls)
 {
@@ -460,7 +462,7 @@ void cache_delete(Class cls)
 
     // 判断是否可以进行释放操作
     if (cls->cache.canBeFreed()) {
-        // !isConstantEmptyCache(); 
+        // !isConstantEmptyCache();
         // !(occupied() == 0 && buckets() == emptyBucketsForCapacity(capacity(), false))
         
         // 是否记录了待释放的 buckets，此时要执行释放了，-1
@@ -471,14 +473,15 @@ void cache_delete(Class cls)
     }
 }
 ```
-### `cache_collect`
+### cache_collect
 &emsp;`void cache_collect(bool collectALot)` 函数的功能是尝试去释放旧的 `buckets`。`collectALot` 参数表示是否尽力去尝试释放旧 `buckets` 的内存（即使目前处于待释放的 `buckets` 的内存占用少于阀值（`32*1024`），也尽力去尝试释放内存）。函数本体的话首先是加锁，然后如果待释放的 `buckets` 的内存占比小于阀值并且 `collectALot` 为 `false` 则直接 `return`，如果上述条件为 `false`，则继续进行是否能释放的判断，如果 `collectALot` 为 `false`，则判断是否有 `objc_msgSend`（或其他 `cache reader`）当前正在查找缓存，并且可能仍在使用一些待释放的 `buckets`，则此时直接返回。如果 `collectALot` 为 `true`，则一直循环等待 `_collecting_in_critical()` 直到没有  `objc_msgSend`（或其他 `cache reader`）正在查找缓存。然后接下来就是可以正常的进行释放了，并同时把 `garbage` 的标记值置为 0，表示为初始状态。更详细的内容可参看上篇。
 
 &emsp;到这里 `objc-cache.mm` 中除了跟线程相关的内容（由于线程相关的操作过于复杂这里就不展开讲了，以目前的水平真心看不懂，而且能找到的资料甚少，目前只需要知道线程会有自己的存储空间并根据几个指定的`key` 来保存一些信息就好了。其他相关的内容等深入学习线程相关内容的时候再深入探究）就全部看完了，接下来我们还有一个最重要的的汇编函数 `cache_getImp`，没错，它是用汇编来实现的，本人的汇编水平仅限于大概一年前看过王爽老师的一本汇编书籍外，别的对汇编好像一无所知，但是没关系其中涉及的指令并不复杂，如果我们上面已经深入学习了 `bucket_t` 和 `cache_t` 的结构的话，是一定能看的懂的，硬理解的话，无非就是我们日常的指针操作变成了寄存器操作而已，并不难理解，我们只需要专注于指令执行过程就好。
-相信所有开发者都听说过  `Objective-C` 的消息发送流程的一些知识点，而方法缓存就是为消息发送流程来服务的，此时如果继续学习下去的话我们需要对消息发送流程有一个认知，要发送消息那总得先有消息吧，那这消息从哪来要到哪去呢，这就涉及我们的 `objc_msgSend` 函数的执行流程了，那么一起来学习吧。
 
-## `objc_msgSend`
-### `objc_msgSend` 是从哪里来
+&emsp;相信所有开发者都听说过  `Objective-C` 的消息发送流程的一些知识点，而方法缓存就是为消息发送流程来服务的，此时如果继续学习下去的话我们需要对消息发送流程有一个认知，要发送消息那总得先有消息吧，那这消息从哪来要到哪去呢，这就涉及我们的 `objc_msgSend` 函数的执行流程了，那么一起来学习吧。
+
+## objc_msgSend
+### objc_msgSend 是从哪里来
 &emsp;首先我们使用控制台做一些 `cache_t` 结构的验证。
 ```c++
 // LGPerson.h
@@ -665,13 +668,16 @@ _occupied = 3
 ...
 ```
 &emsp;然后是连续调用上面的 7 个实例函数，统计出的 `_capacity` `_mask` `_occupied` 三个成员变量的值:
+
+| 变量 | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 |  
+| -- | -- | -- | -- | -- | -- | -- | -- | -- | -- |
 | _capacity | 4 | 4 | 8 | 8 | 8 | 8 | 8 | 8 | 16 |
 | _mask | 3 | 3 | 7 | 7 | 7 | 7 | 7 | 7 | 15 |
 | _occupied | 2 | 3 | 1 | 2 | 3 | 4 | 5 | 6 | 1 |
 
 &emsp;可看到 `_occupied` 每次达到 `_capacity` 的 `3/4` 以后都会进行扩容，扩容的话是每次扩大 2 倍。然后 `_occupied` 每次扩容以后又从 `1` 开始，也证明了上面的结论，`cache_t` 扩容以后后直接舍弃旧的 `buckets`。
 
-那看了半天 `objc_msgSend` 怎么还没有呈现呢，那么现在就开始：
+&emsp;那看了半天 `objc_msgSend` 怎么还没有呈现呢，那么现在就开始：
 ```c++
 // LGPerson.h
 @interface LGPerson : NSObject
@@ -728,18 +734,18 @@ return 0;
 // 返回值 (NSString *(*)(id, SEL, NSInteger))
 ...
 ```
-&emsp;看到这里发现我们日常编写的 `OC` 函数调用其实是被转化为 `objc_msgSend` 函数，此函数我们之前也多次见过，例如我们前几天刚看到的 `((id(*)(objc_object *, SEL))objc_msgSend)(this, @selector(retain));` 当重写了 `retain` 函数时会这样去调用。前面我们分析 `bucket_t` 时多次提到 `SEL` 是函数名字的字符串 `IMP` 是函数的地址，而函数执行的本质就是去找到函数的地址然后执行它，而这正是 `objc_msgSend` 所做的事情，再具体一点就是在 `id` 上找到 `SEL` 函数的地址并执行它。那么 `objc_msgSend` 是怎么实现的呢？乍看它以为是一个 `C/C++` 函数，但它其实是汇编实现的。
+&emsp;看到这里发现我们日常编写的 `OC` 函数调用其实是被转化为 `objc_msgSend` 函数，此函数我们之前也多次见过，例如我们前几天刚看到的 `((id(*)(objc_object *, SEL))objc_msgSend)(this, @selector(retain));` 当重写了 `retain` 函数时会这样去调用。前面我们分析 `bucket_t` 时多次提到 `SEL` 是函数名字的字符串，`IMP` 是函数的地址，而函数执行的本质就是去找到函数的地址然后执行它，而这正是 `objc_msgSend` 所做的事情，再具体一点就是在 `id` 上找到 `SEL` 函数的地址并执行它。那么 `objc_msgSend` 是怎么实现的呢？乍看它以为是一个 `C/C++` 函数，但它其实是汇编实现的。
 使用汇编的原因，除了 “快速，方法的查找操作是很频繁的，汇编是相对底层的语言更容易被机器识别，节省中间的一些编译过程”  还有一些重要的原因，可参考这篇 [翻译-为什么objc_msgSend必须用汇编实现](http://tutuge.me/2016/06/19/translation-why-objcmsgsend-must-be-written-in-assembly/)
 + 汇编更容易被机器识别。
 + 参数未知、类型未知对于 `C` 和 `C++` 来说不如汇编更得心应手
 
-### `objc_msgSend` 汇编实现
+### objc_msgSend 汇编实现
 
 &emsp;在 `objc4-781/Source` 文件夹下面，我们能看到几个后缀是 `.s` 的文件，没错它们正是汇编文件，且在每个文件的名字后面都包含一个 `-arm/-arm64/-i386/-x86-64` 以及 `-simulator-i386/-simulator-x86-64` 的后缀，它们所表明的正是此汇编文件所对应的平台。那么下面我们就解读一下 `objc-msg-arm64.s` 文件。 
 
-### `objc-msg-arm64.s`
+### objc-msg-arm64.s
 
-#### `RestartableEntry`
+#### RestartableEntry
 ```c++
 /*
  * objc-msg-arm64.s - ARM64 code to support objc messaging
@@ -759,7 +765,7 @@ return 0;
 // 称为汇编指示（Assembler Directive）或伪操作（Pseudo-operation），
 // 由于它不是真正的指令所以加个 "伪" 字。
 
-// .section 指示把代码划分成若干个段（Section），
+// .section 指示把代码划分成若干个区（Section），
 // 程序被操作系统加载执行时，每个段被加载到不同的地址，
 // 操作系统对不同的页面设置不同的读、写、执行权限。
 
@@ -845,6 +851,7 @@ _objc_restartableRanges:
 
 /* Selected field offsets in class structure */
 /* class 结构体中 Selected 字段的偏移量 */
+
 // 这里说的是 objc_class 结构体的成员，
 // 我们知道它的第一个成员变量是继承自 objc_object 的 isa_t isa 
 // 然后是 Class superclass、cache_t cache
@@ -855,22 +862,21 @@ _objc_restartableRanges:
 
 /* Selected field offsets in method structure */
 /* method 结构体中 Selected 字段的偏移量*/
+
 // 这里对应 method_t 结构体，它有 3 个成员变量：
 // SEL name、const char *types、MethodListIMP imp
 // name 偏移 0，(SEL 实际类型是 unsigned long 占 8 个字节，所以 types 成员变量偏移是 8) 
-// type 偏移是 8 (const char * 是一个指针，占 8 个字节)
-// imp 偏移量是 8
+// type 偏移是 8 (type 实际类型是 const char * 占 8 个字节，所以 imp 成员变量偏移是 16)
+// imp 偏移是 2 * 8
 
 #define METHOD_NAME      0
 #define METHOD_TYPES     __SIZEOF_POINTER__
 #define METHOD_IMP       (2 * __SIZEOF_POINTER__)
 
-// 这里宏定义是 bucket_t 的大小，它有两个成员变量 _imp 和 _sel 分别占 8 个字节
-// 所以这里是 16 个字节
+// BUCKET_SIZE 宏定义是 bucket_t 的大小，它有两个成员变量 _imp 和 _sel 分别占 8 个字节，所以这里是 16 个字节
 #define BUCKET_SIZE      (2 * __SIZEOF_POINTER__)
 ```
-
-#### `GetClassFromIsa_p16`
+#### GetClassFromIsa_p16
 &emsp;从 `isa` 中获取类指针并放在通用寄存器 `p16` 上。
 ```c++
 /*
@@ -910,7 +916,7 @@ _objc_indexed_classes:
     // uintptr_t has_assoc         : 1;
     // uintptr_t indexcls          : 15;
     // ...
-    // indexcls 是第 2-16 位
+    // indexcls 是第 1-15 位
     
     // .fill repeat, size, value 含义是反复拷贝 size 个字节，重复 repeat 次，
     // 其中 size 和 value 是可选的，默认值分别是 1 和 0 
@@ -954,7 +960,6 @@ _objc_indexed_classes:
     // TBNZ X1，#3 label // 若 X1[3] != 0，则跳转到 label
     // TBZ X1，#3 label // 若 X1[3]==0，则跳转到 label
     
-    // 没有找到 tbz 指令的详细解释，这里的猜想是，
     // 如果 p16[0] != 1 的话，表示现在 p16 中保存的不是非指针的 isa，则直接结束宏定义
     
     tbz    p16, #ISA_INDEX_IS_NPI_BIT, 1f    // done if not non-pointer isa
@@ -1029,7 +1034,7 @@ _objc_indexed_classes:
 
 .endmacro // 宏定义结束
 ```
-#### `ENTRY/STATIC_ENTRY/STATIC_ENTRY`
+#### ENTRY/STATIC_ENTRY/STATIC_ENTRY
 ```c++
 /*
  * ENTRY functionName
@@ -1066,8 +1071,8 @@ _objc_indexed_classes:
                  // 供其他程序（如加载器）寻找到。 
                  
                  // .global _start 让 _start 符号成为可见的标示符，
-                 // 这样链接器就知道跳转到程序中的什么地方并开始执行。
-                 // Linux 寻找这个 _start 标签作为程序的默认进入点
+                 // 这样链接器就知道跳转到程序中的什么地方并开始执行，
+                 // Linux 寻找这个 _start 标签作为程序的默认进入点。
                  
                  // .extern xxx 说明 xxx 为外部函数，
                  // 调用的时候可以遍访所有文件找到该函数并且使用它
@@ -1093,7 +1098,7 @@ $0:
 LExit$0: // 只有一个 LExit$0 标签 （以 L 开头的标签叫本地标签，这些标签只能用于函数内部） 
 .endmacro
 ```
-#### `UNWIND`
+#### UNWIND
 &emsp;看到下面每一个 `UNWIND` 的使用时机都是跟在 `ENTRY/STATIC_ENTRY` 后面的。
 
 ```c++
@@ -1129,7 +1134,7 @@ LExit$0: // 只有一个 LExit$0 标签 （以 L 开头的标签叫本地标签�
 #define NoFrame 0x02000000  // no frame, no SP adjustment
 #define FrameWithNoSaves 0x04000000  // frame, no non-volatile saves
 ```
-#### `TailCallCachedImp`
+#### TailCallCachedImp
 &emsp;在 `Project Headers/arm64-asm.h` 文件中定义了几个汇编宏来处理 `CacheLookup NORMAL|GETIMP|LOOKUP <function>` 函数的不同结果。
 当缓存命中的的时候，且是 `NORMAL` 的情况下，会使用 `TailCallCachedImp`，它功能是验证并且调用 `imp`。
 ```c++
@@ -1138,7 +1143,7 @@ LExit$0: // 只有一个 LExit$0 标签 （以 L 开头的标签叫本地标签�
     // eor 异或指令(exclusive or)
     // eor 指令的格式为：eor{条件}{S}  Rd，Rn，operand 
     // eor 指令将 Rn 的值与操作数 operand 按位逻辑”异或”，
-    // 相同为0，不同为1，结果存放到目的寄存器 Rd 中。
+    // 相同为 0，不同为 1，结果存放到目的寄存器 Rd 中。
     
     // $0 = cached imp, $1 = address of cached imp, $2 = SEL, $3 = isa
     
@@ -1155,7 +1160,7 @@ LExit$0: // 只有一个 LExit$0 标签 （以 L 开头的标签叫本地标签�
     brab    $0, $1
 .endmacro
 ```
-#### `AuthAndResignAsIMP`
+#### AuthAndResignAsIMP
 &emsp;仅验证 `IMP`。
 ```c++
 .macro AuthAndResignAsIMP
@@ -1182,10 +1187,9 @@ LExit$0: // 只有一个 LExit$0 标签 （以 L 开头的标签叫本地标签�
 .endmacro
 ```
 
-#### `CacheLookup`
+#### CacheLookup
 ```c++
 /*
- *
  * CacheLookup NORMAL|GETIMP|LOOKUP <function>
  * (分别代表三种不同的执行目的，LOOKUP 是进行查找，GETIMP 是获取 IMP, 
  * NORMAL 则是正常的找到 IMP 执行并会返回 IMP)
@@ -1219,6 +1223,8 @@ LExit$0: // 只有一个 LExit$0 标签 （以 L 开头的标签叫本地标签�
 #define GETIMP 1
 #define LOOKUP 2
 
+// CacheHit 的功能是缓存命中时，针对不同的情况来处理命中结果。
+
 // CacheHit: x17 = cached IMP, x12 = address of cached IMP, x1 = SEL, x16 = isa
 // 缓存命中：x17 缓存的 IMP x12 IMP 的地址 x1 SEL x16 中保存类信息
 
@@ -1236,6 +1242,7 @@ LExit$0: // 只有一个 LExit$0 标签 （以 L 开头的标签叫本地标签�
 .elseif $0 == GETIMP
     // GETIMP 仅在缓存中查找 IMP
     
+    // p17 中是 cached IMP，然后放进 p0 中
     mov    p0, p17 // 把 p17 的内容放到 p0 中
     
     // CBZ 比较（Compare），如果结果为零（Zero）就转移（只能跳到后面的指令）
@@ -1259,7 +1266,7 @@ LExit$0: // 只有一个 LExit$0 标签 （以 L 开头的标签叫本地标签�
     // return IMP
 9:    ret                // return IMP
 .elseif $0 == LOOKUP
-    // LOOKUP 查找
+    // LOOKUP 进行查找
     
     // No nil check for ptrauth: the caller would
     // crash anyway when they jump to a nil IMP.
@@ -1287,12 +1294,15 @@ LExit$0: // 只有一个 LExit$0 标签 （以 L 开头的标签叫本地标签�
 .endif
 .endmacro // 结束 CacheHit 汇编宏定义
 
-// 缓存未命中的宏:
+// CheckMiss 的功能是缓存未命中时，针对不同的情况来处理。
+
+// 缓存未命中的宏
 .macro CheckMiss
     // miss if bucket->sel == 0
     // 如果查找缓存时 bucket 的 sel 为 0
-    
 .if $0 == GETIMP
+    // GETIMP 仅在缓存中查找 IMP 的情况
+
     // CBZ 比较（Compare），如果结果为零（Zero）就转移（只能跳到后面的指令）
     // CBNZ 比较，如果结果非零（Non Zero）就转移（只能跳到后面的指令）
 
@@ -1307,13 +1317,14 @@ LExit$0: // 只有一个 LExit$0 标签 （以 L 开头的标签叫本地标签�
     cbz    p9, LGetImpMiss
     
 .elseif $0 == NORMAL
+
     // 如果 p9 是 0，则跳转到 标签 __objc_msgSend_uncached 处
     cbz    p9, __objc_msgSend_uncached
     
 .elseif $0 == LOOKUP
+
     // 如果 p9 是 0，则跳转到 标签 __objc_msgLookup_uncached 处
     cbz    p9, __objc_msgLookup_uncached
-    
 .else
 
 // .abort 停止汇编
@@ -1322,12 +1333,14 @@ LExit$0: // 只有一个 LExit$0 标签 （以 L 开头的标签叫本地标签�
 // Linux内核在发生 kernel panic 时会打印出 Oops 信息，
 // 把目前的寄存器状态、堆栈内容、以及完整的 Call trace 都 show 给我们看，
 // 这样就可以帮助我们定位错误。
+
 .abort oops
 
 .endif
 .endmacro // 结束 CheckMiss 汇编宏定义
 
-// 汇编宏 JumpMiss
+// JumpMiss 的功能是缓存未命中时，针对不同的情况进行跳转。
+
 .macro JumpMiss
 
 .if $0 == GETIMP
@@ -1350,19 +1363,20 @@ LExit$0: // 只有一个 LExit$0 标签 （以 L 开头的标签叫本地标签�
 // Linux内核在发生 kernel panic 时会打印出 Oops 信息，
 // 把目前的寄存器状态、堆栈内容、以及完整的 Call trace 都 show 给我们看，
 // 这样就可以帮助我们定位错误。
+
 .abort oops
 
 .endif
 .endmacro // 结束 JumpMiss 汇编宏定义
 
-// 通过 CacheLookup NORMAL 来找到缓存查找汇编源码
+// CacheLookup 进行汇编查找
 .macro CacheLookup
     //
     // Restart protocol:
     // 重启协议:
     //
-    // As soon as we're past the LLookupStart$1 label we may
-    // have loaded an invalid cache pointer or mask.
+    // As soon as we're past the LLookupStart$1 label we 
+    // may have loaded an invalid cache pointer or mask.
     // 一旦超过 LLookupStart$1 标签，我们可能已经加载了无效的 缓存指针 或 掩码。
     // 
     // When task_restartable_ranges_synchronize() is called,
@@ -1497,7 +1511,7 @@ LLookupStart$1:
     // 如果 p9 和 p1 不相等的话，则跳转到标签 2 处（进行哈希探测）
     b.ne    2f            //     scan more
     
-    // 如果 p9 和 p1 相等的话，即 CacheHit 缓存命中，直接调用或返回 imp
+    // 如果 p9 和 p1 相等的话，即 CacheHit 缓存命中，调用 CacheHit
     CacheHit $0            // call or return imp
     
 2:  // not hit: p12 = not-hit bucket 未命中
