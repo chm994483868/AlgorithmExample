@@ -9,7 +9,7 @@
 #include "BubbleSort.hpp"
 
 void BubbleSort::bubbleSort(int nums[], int count) {
-    // 
+    //
 }
 
 // 测试代码

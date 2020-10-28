@@ -1,17 +1,16 @@
-# iOS 从源码解析Runtime (十二)：聚焦 objc_class(class_rw_t、class_rw_ext_t相关内容篇)
+# iOS 从源码解析Runtime (十二)：聚焦objc_class(class_rw_t相关内容篇)
 
-> 上篇我们详细分析了 `class_ro_t`，其中可能有点模糊的是  `class_data_bits_t bits` 的 `data` 函数和 `safe_ro` 函数，其中如果类是处于未实现完成（`RW_REALIZED`）状态时 `data` 函数返回的是 `class_ro_t *`，当类实现完成后返回的则是 `class_rw_t *`，且当类实现完成以后 `class_rw_t` 有一个 `ro` 函数来返回 `class_ro_t *`，那这是怎么回事呢，这篇我们就来详细分析一下 ⛽️⛽️。
+> &emsp;上篇我们详细分析了 `class_ro_t`，其中可能有点模糊的是  `class_data_bits_t bits` 的 `data` 函数和 `safe_ro` 函数，其中如果类是处于未实现完成（`RW_REALIZED`）状态时 `data` 函数返回的是 `class_ro_t *`，当类实现完成后返回的则是 `class_rw_t *`，且当类实现完成以后 `class_rw_t` 有一个 `ro` 函数来返回 `class_ro_t *`，那这是怎么回事呢，这篇我们就来详细分析一下。 ⛽️⛽️
 
-## `class_rw_t`
+## class_rw_t
 &emsp;`class_rw_t` 的成员变量。
 ```c++
 struct class_rw_t {
     // Be warned that Symbolication knows the layout of this structure.
     // 请注意，Symbolication 知道此结构的布局。
     
-    // flags 打印看到是 2148007936
-    // 转为二进制的话是只有 31 位和 19 位是 1，其它位全部都是 0
-    // 大概对应于:
+    // 在上篇的测试代码中：flags 打印看到是 2148007936
+    // 转为二进制的话是只有 31 位和 19 位是 1，其它位全部都是 0，对应于:
     // class has started realizing but not yet completed it
     // #define RW_REALIZING (1<<19)
     // class_t->data is class_rw_t, not class_ro_t
@@ -22,7 +21,7 @@ struct class_rw_t {
     //（控制台打印值为 1）
     uint16_t witness;
     
-#if SUPPORT_INDEXED_ISA // isa 中保存 indexcls，大概是 watchOS
+#if SUPPORT_INDEXED_ISA // isa 中保存 indexcls，大概是 watchOS 下才会用到
     uint16_t index;
 #endif
 
@@ -36,10 +35,9 @@ struct class_rw_t {
     // 在编译时会根据类定义生成类的 class_ro_t 数据，其中包含方法列表、属性列表、成员变量列表等等内容
     
     // ro_or_rw_ext 会有两种情况：
-    // 1): 值是 class_ro_t *
-    // 2): 值是 class_rw_ext_t *，
-    //     而 class_ro_t * 作为 class_rw_ext_t 的 const class_ro_t *ro 成员变量保存
-    explicit_atomic<uintptr_t> ro_or_rw_ext;
+    // 1): 编译时值是 class_ro_t *
+    // 2): 编译后类实现完成后值是 class_rw_ext_t *，而编译时的 class_ro_t * 作为 class_rw_ext_t 的 const class_ro_t *ro 成员变量保存
+    explicit_atomic<uintptr_t> ro_or_rw_ext; // 变量名字对应与 class_ro_t or(或) class_rw_ext_t
 
     // 当前所属类的第一个子类
     // 测试时，定义了一个继承自 NSObject 的类，
@@ -49,11 +47,13 @@ struct class_rw_t {
     // 姊妹类、兄弟类
     // 测试时，定义了一个继承自 NSObject 的类，
     // 控制台打印看到 nextSiblingClass 是 NSUUID（好奇怪）
+    
+    // firstSubclass 和 nextSiblingClass 有超级重要的作用，后面会展开
     Class nextSiblingClass;
     ...
 };
 ```
-### `class_rw_ext_t`
+### class_rw_ext_t
 ```c++
 struct class_rw_ext_t {
     // 特别关注 ro 这个成员变量。
@@ -87,7 +87,7 @@ struct class_rw_ext_t {
     uint32_t version;
 };
 ```
-### `class_rw_t private`
+### class_rw_t private 部分
 &emsp;这里先分析一下 `class_rw_t` 的 `private` 部分。
 ```c++
 struct class_rw_t {
@@ -100,7 +100,7 @@ private:
     
     // 此时会发现 class_rw_t 一些端倪了。
     // 在 class_ro_t 中它是直接定义不同的成员变量来保存数据，
-    // 而在 class_rw_t 中，它大概是用来了一个中间人 struct class_rw_ext_t 来保存相关的数据。
+    // 而在 class_rw_t 中，它大概是用了一个中间人 struct class_rw_ext_t 来保存相关的数据。
     
     // 这里的数据存储根据类是否已经完成实现而分为两种情况：
     // 1): 类未实现完成时，ro_or_rw_ext 中存储的是 class_ro_t *
@@ -198,7 +198,7 @@ private:
     ...
 };
 ```
-#### `PointerUnion`
+#### PointerUnion
 &emsp;这里分析模版类 `objc::PointerUnion` 基于 `objc::PointerUnion<const class_ro_t *, class_rw_ext_t *>` 来进行。其中 `PT1` 是 `const class_ro_t *`（并且加了 `const`，表示 `class_ro_t` 内容不可被修改），`PT2` 是 `class_rw_ext_t *`。
 
 ```c++
@@ -316,7 +316,7 @@ public:
     }
 };
 ```
-#### `PointerUnionTypeSelector`
+#### PointerUnionTypeSelector
 ```c++
 // Ret will be EQ type if T1 is same as T2 or NE type otherwise.
 // 如果 T1 与 T2 相同，则 Ret 为 EQ 类型，否则为 NE 类型。
@@ -329,7 +329,7 @@ template <typename T> struct PointerUnionTypeSelectorReturn {
   using Return = T;
 };
 ```
-### `class_rw_t public`
+### class_rw_t public 部分
 &emsp;分析 `class_rw_t` 的 `public` 部分。
 ```c++
 struct class_rw_t {
@@ -479,7 +479,7 @@ public:
     }
 };
 ```
-### `list_array_tt`
+### list_array_tt
 &emsp;下面我们来分析最后 `4` 个数据结构，`method_array_t`、`property_array_t`、`protocol_array_t` 和它们的父类 `list_array_tt`。
 ```c++
 /*
@@ -512,7 +512,7 @@ public:
 * count/begin/end 迭代基础元数据元素。
 */
 ```
-#### `array_t`
+#### array_t
 ```c++
 struct array_t {
     // count 是 lists 数组中 List * 的数量
@@ -532,7 +532,7 @@ struct array_t {
     }
 };
 ```
-#### `list_array_tt protected`
+#### list_array_tt protected
 &emsp;`protected` 部分则是自定义的迭代器。
 ```c++
 template <typename Element, typename List>
@@ -590,7 +590,9 @@ class list_array_tt {
         const iterator& operator ++ () {
             ASSERT(m != mEnd);
             
-            // 这里是指迭代器指向的当前的方法列表的迭代器 (array_t 的 lists 中包含多个方法列表)
+            // 这里是指迭代器指向的当前的方法列表的迭代器
+            // (array_t 的 lists 中包含多个方法列表，每个列表迭代到 mEnd 后，会切换到下一个列表，并更新 m 和 mEnd)
+            // 
             // entsize_list_tt::iterator 自增
             m++;
             
@@ -615,7 +617,7 @@ class list_array_tt {
     ...
 };
 ```
-#### `list_array_tt private`
+#### list_array_tt private 部分
 ```c++
 template <typename Element, typename List>
 class list_array_tt {
@@ -628,11 +630,14 @@ class list_array_tt {
     union {
         // 联合体，包含两种情况：
         // list_array_tt 存储一个 entsize_list_tt 指针，保存一组内容（如只有一组 method_t）。
+        
         List* list;
         
         // list_array_tt 存储一个 array_t 指针，array_t 中是 entsize_list_tt * lists[0]，
         // 存储 entsize_list_tt * 的数组。
-        //（如多组 method_t。如给某个类编写了多个 category，每个 category 的实例方法数组会被一组一组追加进来）
+        //（如多组 method_t。如给某个类编写了多个 category，每个 category 的实例方法数组会被一组一组追加进来，
+        // 而不是说不同 category 的实例方法统一追加到一个大数组中）
+        
         uintptr_t arrayAndFlag;
     };
 
@@ -649,14 +654,14 @@ class list_array_tt {
     }
     
     // 把 array_t *array 强转为 uintptr_t，
-    // 并把第 1 位置为 0，标识当前 list_array_t 内部数据使用的是 array_t。
+    // 并把第 1 位置为 0，标识当前 list_array_t 内部数据使用的是 array_t
     void setArray(array_t *array) {
         arrayAndFlag = (uintptr_t)array | 1;
     }
     ...
 };
 ```
-#### `list_array_tt public`
+#### list_array_tt public 部分
 ```c++
 template <typename Element, typename List>
 class list_array_tt {
@@ -744,7 +749,7 @@ class list_array_tt {
             // 内部 realloc 函数申请  空间，同时 setArray 函数把第 1 位置为 1，作为标记
             setArray((array_t *)realloc(array(), array_t::byteSize(newCount)));
             
-            // 更行 count 值
+            // 更新 count 值
             array()->count = newCount;
             
             // 把原始的 array()->lists 移动到了后面的内存空间中，
@@ -837,12 +842,20 @@ class list_array_tt {
             // 空
             result.list = nil;
         }
-
+        
         return result;
     }
 };
 ```
-### `method_array_t`
+### try_free
+```c++
+static void try_free(const void *p) 
+{
+    // free 函数
+    if (p && malloc_size(p)) free((void *)p);
+}
+```
+### method_array_t
 ```c++
 class method_array_t : 
     public list_array_tt<method_t, method_list_t> 
@@ -869,7 +882,7 @@ class method_array_t :
     }
 };
 ```
-#### `endCategoryMethodLists`
+#### endCategoryMethodLists
 ```c++
 method_list_t * const *method_array_t::endCategoryMethodLists(Class cls) const
 {
@@ -893,7 +906,7 @@ method_list_t * const *method_array_t::endCategoryMethodLists(Class cls) const
     return mlistsEnd - 1;
 }
 ```
-### `property_array_t`
+### property_array_t
 ```c++
 class property_array_t : 
     public list_array_tt<property_t, property_list_t> 
@@ -912,7 +925,7 @@ class property_array_t :
     }
 };
 ```
-### `protocol_array_t`
+### protocol_array_t
 ```c++
 class protocol_array_t : 
     public list_array_tt<protocol_ref_t, protocol_list_t> 

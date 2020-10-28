@@ -171,7 +171,7 @@
 		8EA593E224CF0B40002785EF /* ConstructBinaryTree.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = ConstructBinaryTree.cpp; sourceTree = "<group>"; };
 		8EA593E324CF0B40002785EF /* ConstructBinaryTree.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = ConstructBinaryTree.hpp; sourceTree = "<group>"; };
 		8EA68A6A252DA35400BE2852 /* iOS 从源码解析Runtime (十)：聚焦cache_t objc-msg-arm64.s补充(3).md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 从源码解析Runtime (十)：聚焦cache_t objc-msg-arm64.s补充(3).md"; sourceTree = "<group>"; };
-		8EA68A6B252DA76300BE2852 /* iOS 从源码解析Runtime (十一)：聚焦 objc_class(class_data_bits_t、class_ro_t、entsize_list_tt相关内容篇).md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 从源码解析Runtime (十一)：聚焦 objc_class(class_data_bits_t、class_ro_t、entsize_list_tt相关内容篇).md"; sourceTree = "<group>"; };
+		8EA68A6B252DA76300BE2852 /* iOS 从源码解析Runtime (十一)：聚焦objc_class(class_data_bits_t内容篇).md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 从源码解析Runtime (十一)：聚焦objc_class(class_data_bits_t内容篇).md"; sourceTree = "<group>"; };
 		8EF1A8AA253B4E7E0058AEAD /* iOS 从 libclosure-74 源码来研究 Block 实现原理(2).md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 从 libclosure-74 源码来研究 Block 实现原理(2).md"; sourceTree = "<group>"; };
 		D2090C0324CFA51E00FA4F51 /* NextNodeInBinaryTrees.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = NextNodeInBinaryTrees.cpp; sourceTree = "<group>"; };
 		D2090C0424CFA51E00FA4F51 /* NextNodeInBinaryTrees.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = NextNodeInBinaryTrees.hpp; sourceTree = "<group>"; };
@@ -325,8 +325,8 @@
 		D2A32AE424E153EF00ECE821 /* OtherSon+Test.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = "OtherSon+Test.m"; sourceTree = "<group>"; };
 		D2A32AE624E1541B00ECE821 /* OtherGrandSon+Test.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "OtherGrandSon+Test.h"; sourceTree = "<group>"; };
 		D2A32AE724E1541B00ECE821 /* OtherGrandSon+Test.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = "OtherGrandSon+Test.m"; sourceTree = "<group>"; };
-		D2C74CF5253046AE0051B89F /* iOS 从源码解析Runtime (十二)：聚焦 objc_class(class_rw_t、class_rw_ext_t相关内容篇).md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 从源码解析Runtime (十二)：聚焦 objc_class(class_rw_t、class_rw_ext_t相关内容篇).md"; sourceTree = "<group>"; };
-		D2C74CF62531A79C0051B89F /* iOS 从源码解析Runtime (十三)：聚焦 objc_class(objc_class函数相关内容篇).md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 从源码解析Runtime (十三)：聚焦 objc_class(objc_class函数相关内容篇).md"; sourceTree = "<group>"; };
+		D2C74CF5253046AE0051B89F /* iOS 从源码解析Runtime (十二)：聚焦objc_class(class_rw_t 内容篇).md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 从源码解析Runtime (十二)：聚焦objc_class(class_rw_t 内容篇).md"; sourceTree = "<group>"; };
+		D2C74CF62531A79C0051B89F /* iOS 从源码解析Runtime (十三)：聚焦 objc_class(objc_class函数内容篇).md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 从源码解析Runtime (十三)：聚焦 objc_class(objc_class函数内容篇).md"; sourceTree = "<group>"; };
 		D2C74CF7253457C10051B89F /* iOS 从源码解析Runtime (十四)：由源码解读属性&成员变量的修饰符.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 从源码解析Runtime (十四)：由源码解读属性&成员变量的修饰符.md"; sourceTree = "<group>"; };
 		D2C74D042537F2100051B89F /* block_Temp.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = block_Temp.md; sourceTree = "<group>"; };
 		D2C74D05253D9C2E0051B89F /* 数据结构与算法-七大经典排序算法.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "数据结构与算法-七大经典排序算法.md"; sourceTree = "<group>"; };
@@ -890,14 +890,14 @@
 				8E6DFE182523862B00D2830E /* iOS 从源码解析Runtime (八)：聚焦cache_t 相关数据结构及函数解析(1).md */,
 				8E0E62B22525ECB10076A530 /* iOS 从源码解析Runtime (九)：聚焦cache_t objc-msg-arm64.s解析(2).md */,
 				8EA68A6A252DA35400BE2852 /* iOS 从源码解析Runtime (十)：聚焦cache_t objc-msg-arm64.s补充(3).md */,
+				8EA68A6B252DA76300BE2852 /* iOS 从源码解析Runtime (十一)：聚焦objc_class(class_data_bits_t内容篇).md */,
+				D2C74CF5253046AE0051B89F /* iOS 从源码解析Runtime (十二)：聚焦objc_class(class_rw_t 内容篇).md */,
+				D2C74CF62531A79C0051B89F /* iOS 从源码解析Runtime (十三)：聚焦 objc_class(objc_class函数内容篇).md */,
+				D2C74CF7253457C10051B89F /* iOS 从源码解析Runtime (十四)：由源码解读属性&成员变量的修饰符.md */,
 				D2164F2124FF10F10000A6AA /* iOS AssociatedObject 底层实现原理.md */,
+				D2E067692508E82E008BF0E9 /* iOS Category 底层实现原理(三)：附加+load函数超详细解析.md */,
 				D2164F442501E8880000A6AA /* iOS Category 底层实现原理(一)：概念与数据结构.md */,
 				D2E0674D2506118F008BF0E9 /* iOS Category 底层实现原理(二)：函数分析与加载流程.md */,
-				D2E067692508E82E008BF0E9 /* iOS Category 底层实现原理(三)：附加+load函数超详细解析.md */,
-				8EA68A6B252DA76300BE2852 /* iOS 从源码解析Runtime (十一)：聚焦 objc_class(class_data_bits_t、class_ro_t、entsize_list_tt相关内容篇).md */,
-				D2C74CF5253046AE0051B89F /* iOS 从源码解析Runtime (十二)：聚焦 objc_class(class_rw_t、class_rw_ext_t相关内容篇).md */,
-				D2C74CF62531A79C0051B89F /* iOS 从源码解析Runtime (十三)：聚焦 objc_class(objc_class函数相关内容篇).md */,
-				D2C74CF7253457C10051B89F /* iOS 从源码解析Runtime (十四)：由源码解读属性&成员变量的修饰符.md */,
 				D2C74D05253D9C2E0051B89F /* 数据结构与算法-七大经典排序算法.md */,
 				D2C74D06253ED8CC0051B89F /* iOS 中各种锁的介绍与运用.md */,
 			);

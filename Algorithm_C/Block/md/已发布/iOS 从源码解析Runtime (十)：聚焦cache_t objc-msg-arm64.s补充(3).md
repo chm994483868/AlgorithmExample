@@ -2,13 +2,13 @@
 
 > 由于上篇字数的限制，剩余最后的几个函数只能在此新开一篇了。
 
-#### `objc_msgSend`
+#### objc_msgSend
 &emsp;终于来到了我们最核心的 `objc_msgSend` 函数。
 ```c++
 /*
  *
- * 函数声明，两个函数入参一样，一个是执行函数并返回 id 返回值
- * 一个则是在 self 中找到指定 SEL 的 IMP
+ * 函数声明，两个函数入参一样，一个是执行函数并返回 id 返回值。
+ * 一个则是在 self 中找到指定 SEL 的 IMP。
  * id objc_msgSend(id self, SEL _cmd, ...);
  * IMP objc_msgLookup(id self, SEL _cmd, ...);
  * 
@@ -95,7 +95,8 @@ LGetIsaDone:
     // calls imp or objc_msgSend_uncached   
     // CacheLookup 前面已经详细解析过
     
-    // 如果有 isa，走到 CacheLookup 即缓存查找流程，也就是所谓的 sel-imp 快速查找流程
+    // 如果有 isa，走到 CacheLookup 即缓存查找流程，也就是所谓的 sel-imp 快速查找流程，
+    // NORMAL 和 _objc_msgSend
     CacheLookup NORMAL, _objc_msgSend
 
 #if SUPPORT_TAGGED_POINTERS
@@ -161,7 +162,7 @@ LReturnZero:
     // LExit 结束 _objc_msgSend 函数执行
     END_ENTRY _objc_msgSend
 ```
-#### `_objc_msgLookup`
+#### _objc_msgLookup
 &emsp;查找 `IMP`。
 ```c++
     // _objc_msgLookup 函数实现部分
@@ -226,7 +227,7 @@ LLookup_Nil:
     END_ENTRY _objc_msgLookup
 
 ```
-#### `__objc_msgNil`
+#### __objc_msgNil
 &emsp;未找到 `IMP` 时的结束工作。
 ```c++
     // 私有静态函数
@@ -249,7 +250,7 @@ LLookup_Nil:
     END_ENTRY __objc_msgNil
 
 ```
-#### `_objc_msgSendSuper/_objc_msgSendSuper2/_objc_msgLookupSuper2`
+#### _objc_msgSendSuper/_objc_msgSendSuper2/_objc_msgLookupSuper2
 &emsp;即我们日常使用的 `[super xxxxx]` 函数调用，它的第一个参数 `receiver` 同样是我们的 `self` 并不是 `self` 的父类，而它与 `_objc_msgSend` 仅有的不同的地方就是 `_objc_msgSendSuper` 直接去父类中查找。
 ```c++
     // _objc_msgSendSuper 函数
@@ -294,7 +295,7 @@ LLookup_Nil:
 
     END_ENTRY _objc_msgLookupSuper2
 ```
-#### `MethodTableLookup`
+#### MethodTableLookup
 ```c++
 .macro MethodTableLookup
     
@@ -324,7 +325,8 @@ LLookup_Nil:
     mov    x2, x16
     mov    x3, #3
     
-    // 跳转
+    // 如果缓存中未找到，则跳转到 _lookUpImpOrForward（c 函数） 去方法列表中去找函数，
+    // objc-runtime-new.mm 中的 lookUpImpOrForward 函数过于简单，就不在这里展开了。
     bl    _lookUpImpOrForward
 
     // IMP in x0
@@ -391,8 +393,7 @@ LGetImpMiss:
     // _cache_getImp 函数结束
     END_ENTRY _cache_getImp
 ```
-#### `_objc_msgForward`
-
+#### _objc_msgForward
 ```c++
 /*
 *

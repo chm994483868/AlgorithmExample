@@ -1,8 +1,9 @@
-# iOS 从源码解析Runtime (十一)：聚焦 objc_class(class_data_bits_t、class_ro_t、entsize_list_tt相关内容篇)
-> `objc_class` 的 `cache_t cache` 成员变量终于完完整整分析完了，接下来我们继续分析 `class_data_bits_t data`。
+# iOS 从源码解析Runtime (十一)：聚焦 objc_class(class_data_bits_t 内容篇)
 
-## `class_data_bits_t`
-&emsp;`class_data_bits_t data` 作为 `objc_class` 的第三个成员变量也是最后一个成员变量，它的作用正如它的名字 `data`，而它也正是存储管理了类相关的所有数据，例如我们上篇一直讲的当缓存未命中时就会去类的方法列表中继续查找，而这个方法列表正保存在 `data` 中，且方法列表不仅包含我们直接在类定义中编写的实例函数还包括我们在分类中为类添加的实例方法它们也会被追加到 `data` 中，等等 `data` 包含了太多数据和功能。下面我们一行一行来看它为类处理了哪些数据管理了类的哪些功能吧⛽️⛽️！
+> &emsp;`objc_class` 的 `cache_t cache` 成员变量中涉及方法缓存的内容终于完完整整分析完了，接下来我们继续分析 `class_data_bits_t data`。
+
+## class_data_bits_t
+&emsp;`class_data_bits_t data` 作为 `objc_class` 的第四个成员变量也是最后一个成员变量，它的作用正如它的名字 `data`，而它也正是存储管理了类相关的所有数据，例如我们上篇一直讲的当缓存未命中时就会去类的方法列表中继续查找，而这个方法列表正保存在 `data` 中，且方法列表不仅包含我们直接在类定义中编写的实例函数还包括我们在分类中为类添加的实例方法它们也会被追加到 `data` 中，等等 `data` 包含了太多数据和功能。下面我们一行一行来看它为类处理了哪些数据管理了类的哪些功能吧！⛽️⛽️
 ```c++
 struct objc_class : objc_object {
     // Class ISA;
@@ -14,7 +15,7 @@ struct objc_class : objc_object {
     ...
 };
 ```
-### `class_data_bits_t 成员变量`
+### class_data_bits_t 成员变量
 &emsp;在 `struct class_data_bits_t` 定义中声明了 `objc_class` 为其友元类，`objc_class` 可以完全访问和调用 `class_data_bits_t` 的私有成员变量和私有方法。然后是仅有的一个成员变量 `uintptr_t bits`，这里之所以把它命名为 `bits` 也是有其意义的，它通过掩码的形式保存 `class_rw_t` 指针和是否是 `swift` 类等一些标志位。   
 ```c++
 struct class_data_bits_t {
@@ -25,12 +26,12 @@ struct class_data_bits_t {
     ...
 };
 ```
-### `class_data_bits_t private 部分`
+### class_data_bits_t private 部分
 &emsp;代码中的注释真的超详细，这里就不展开说了。主要完成对 `bits` 的 `64` 位中指定位的设置和读取操作。
 ```c++
 private:
     // 尾部的 const 表示该方法内部不会修改 class_data_bits_t 的内部数据
-    // 这里返回值是一个 bool 来，通过与操作来取出 bits 的固定位的值来进行判断
+    // 这里返回值是一个 bool 类型，通过与操作来取出 bits 的指定位的值来进行判断
     bool getBit(uintptr_t bit) const
     {
         // 内部实现只有一个与操作，主要根据入参 bit(掩码) 来取得一些标识位
@@ -38,10 +39,10 @@ private:
         
         // class is a Swift class from the pre-stable Swift ABI
         // #define FAST_IS_SWIFT_LEGACY    (1UL<<0)
-        // 使用 bit 的第一位来进行判断
+        // 使用 bit 的第 0 位来进行判断
         
         // class is a Swift class from the stable Swift ABI
-        // bit 的 第二位 判断类是否是稳定的 Swift ABI 的 Swift 类
+        // bit 的 第 1 位 判断类是否是稳定的 Swift ABI 的 Swift 类
         // #define FAST_IS_SWIFT_STABLE (1UL<<1)
         
         return bits & bit;
@@ -101,7 +102,7 @@ private:
         __c11_atomic_fetch_and((_Atomic(uintptr_t) *)&bits, ~clear, __ATOMIC_RELAXED);
     }
 ```
-### `class_data_bits_t public 部分`
+### class_data_bits_t public 部分
 ```c++
 public:
     
@@ -181,7 +182,7 @@ public:
         class_rw_t *maybe_rw = data();
         
         // #define RW_REALIZED (1<<31)
-        // class_rw_t->flags 的第 32位标识了类是否已经实现完成
+        // class_rw_t->flags 的第 31 位标识了类是否已经实现完成
         
         if (maybe_rw->flags & RW_REALIZED) {
             // maybe_rw is rw
@@ -192,14 +193,13 @@ public:
             return maybe_rw->ro();
         } else {
             // maybe_rw is actually ro
-            // 如果类是未实现完成状态的话，此时 data 函数返回的是 class_ro_t * 
+            // 如果类是未实现完成状态的话，此时 data 函数返回的就是 class_ro_t * 
             
             return (class_ro_t *)maybe_rw;
         }
     }
     
-    // 设置当前类在类的全局列表中的索引，
-    // 此函数只针对于 isa 中是保存类索引的情况（目前的话大概是适用于 watchOS）
+    // 设置当前类在类的全局列表中的索引，此函数只针对于 isa 中是保存类索引的情况（目前的话大概是适用于 watchOS）
     void setClassArrayIndex(unsigned Idx) {
     
 #if SUPPORT_INDEXED_ISA // 只在 isa 中保存 indexcls 时适用
@@ -285,17 +285,26 @@ public:
 ```
 &emsp;`struct class_data_bits_t` 的内容看完了，接下来我们先看 `struct class_ro_t` 的内容。
 
-### `class_ro_t`
+### class_ro_t
 ```c++
 struct class_ro_t {
     // 通过掩码保存的一些标志位
     uint32_t flags;
     
-    // 实例的起始，看到在控制台的打印是 8，
-    // 猜测可能是 isa 指针的大小
+    // 当父类大小发生变化时，调整子类的实例对象的大小。
+    // 具体内容可查看 moveIvars 函数
+    // （自己成员变量的起始偏移量，会有些一些继承自父类的成员变量）
     uint32_t instanceStart;
     
-    // 所有成员变量占用字节大小的总和，没有进行任何内存对齐操作
+    // 根据内存对齐计算成员变量从前到后所占用的内存大小，
+    // 不过没有进行总体的内存对齐，例如最后一个成员变量是 char 时，
+    // 则最后只是加 1，instanceSize 的值是一个奇数，
+    // 再进行一个整体 8/4 字节对齐就好了，
+    //（__LP64__ 平台下 8 字节对齐，其它则是 4 字节对齐）
+        
+    // objc_class 的 alignedInstanceSize 函数，
+    // 完成了这最后一步的整体内存对齐。
+        
     uint32_t instanceSize;
     
     // 仅在 64 为系统架构下的包含的保留位
@@ -332,7 +341,7 @@ struct class_ro_t {
     _objc_swiftMetadataInitializer swiftMetadataInitializer() const {
         // class has ro field for Swift metadata initializer callback.
         // 类具有用于 Swift 元数据初始化程序回调的 ro 字段。
-        // #define RO_HAS_SWIFT_INITIALIZER (1<<6) // flags 的第七位是一个标识位
+        // #define RO_HAS_SWIFT_INITIALIZER (1<<6) // flags 的第 6 位是一个标识位
         
         if (flags & RO_HAS_SWIFT_INITIALIZER) {
             return _swiftMetadataInitializer_NEVER_USE[0];
@@ -367,7 +376,7 @@ struct class_ro_t {
     }
 };
 ```
-#### `_objc_swiftMetadataInitializer`
+#### _objc_swiftMetadataInitializer
 ```c++
 /** 
  * Callback from Objective-C to Swift to perform Swift class initialization.
@@ -378,7 +387,7 @@ typedef Class _Nullable
 (*_objc_swiftMetadataInitializer)(Class _Nonnull cls, void * _Nullable arg);
 #endif
 ```
-#### `memdup`
+#### memdup
 ```c++
 static inline void *
 memdup(const void *mem, size_t len)
@@ -391,10 +400,9 @@ memdup(const void *mem, size_t len)
     return dup;
 }
 ```
-#### `entsize_list_tt`
+#### entsize_list_tt
 &emsp;在分析方法列表、成员变量列表、属性列表之前先看一个重要的数据结构 `entsize_list_tt`，它可理解为一个数据容器，拥有自己的迭代器用于遍历元素。 
 （`ent` 应该是 `entry` 的缩写）
-
 ```c++
 /*
 * entsize_list_tt<Element, List, FlagMask>
@@ -623,7 +631,7 @@ struct entsize_list_tt {
 };
 ```
 &emsp;`entsize_list_tt` 源码全部看完了，还挺清晰的，注释极其详细，这里就不展开分析了，接下来分析 `entsize_list_tt` 的子类: `method_list_t`、`ivar_list_t`、`property_list_t`。
-#### `method_list_t`
+#### method_list_t
 &emsp;`method_list_t` 是在 `class_ro_t` 中用于保存方法列表的数据结构。它继承自 `entsize_list_tt`。
 ```c++
 // Two bits of entsize are used for fixup markers.
@@ -642,7 +650,7 @@ struct method_list_t : entsize_list_tt<method_t, method_list_t, 0x3> {
     }
 };
 ```
-#### `method_t`
+#### method_t
 &emsp;方法的数据结构。
 ```c++
 struct method_t {
@@ -662,7 +670,7 @@ struct method_t {
 };
 ```
 可参考 [stl 中 std::binary_function 的使用](https://blog.csdn.net/tangaowen/article/details/7547475)
-#### `isUniqued、isFixedUp、setFixedUp`
+#### isUniqued、isFixedUp、setFixedUp
 &emsp;三个函数主要涉及到 `method_list_t` 的 `flags` 标志位。
 ```c++
 /*
@@ -741,7 +749,7 @@ void method_list_t::setFixedUp() {
     entsizeAndFlags = entsize() | fixed_up_method_list;
 }
 ```
-#### `ivar_list_t`
+#### ivar_list_t
 &emsp;`ivr_list_t` 是 `class_ro_t` 中保存成员变量的数据结构，同样继承自 `entsize_list_tt`，`FlagMask` 模版参数是 `0`。
 ```c++
 struct ivar_list_t : entsize_list_tt<ivar_t, ivar_list_t, 0> {
@@ -760,7 +768,7 @@ struct ivar_list_t : entsize_list_tt<ivar_t, ivar_list_t, 0> {
     }
 };
 ```
-#### `ivar_t`
+#### ivar_t
 ```c++
 struct ivar_t {
 
@@ -830,8 +838,8 @@ struct ivar_t {
     }
 };
 ```
-##### `验证 int32_t *offset`
-我们首先定义一个 `LGPerson` 类：
+##### 验证 int32_t *offset
+&emsp;我们首先定义一个 `LGPerson` 类：
 ```c++
 // 定义一个 LGPerson 类
 // LGPerson.h 如下，.m 为空即可
@@ -839,9 +847,9 @@ struct ivar_t {
 @property (nonatomic, strong) NSMutableArray *arr;
 @end
 ```
-然后在终端执行 `clang -rewrite-objc LGPerson.m` 生成 `LGPerson.cpp`。 
-摘录 `LGPerson.cpp`:
-`ivar_list_t` 如下，`arr` 为仅有的成员变量，它对应的 `ivar_t` 初始化部分 `int32_t *offset` 值使用了 `(unsigned long int *)&OBJC_IVAR_$_LGPerson$_arr`。
+&emsp;然后在终端执行 `clang -rewrite-objc LGPerson.m` 生成 `LGPerson.cpp`。 
+&emsp;摘录 `LGPerson.cpp`:
+&emsp;`ivar_list_t` 如下，`arr` 为仅有的成员变量，它对应的 `ivar_t` 初始化部分 `int32_t *offset` 值使用了 `(unsigned long int *)&OBJC_IVAR_$_LGPerson$_arr`。
 ```c++
 static struct /*_ivar_list_t*/ {
     unsigned int entsize;  // sizeof(struct _prop_t)
@@ -853,7 +861,7 @@ static struct /*_ivar_list_t*/ {
     {{(unsigned long int *)&OBJC_IVAR_$_LGPerson$_arr, "_arr", "@\"NSMutableArray\"", 3, 8}}
 };
 ```
-在 `LGPerson.cpp` 文件中全局搜索 `OBJC_IVAR_$_LGPerson$_arr` 有如下结果:
+&emsp;在 `LGPerson.cpp` 文件中全局搜索 `OBJC_IVAR_$_LGPerson$_arr` 有如下结果:
 ```c++
 // 全局变量声明和定义赋值
 extern "C" unsigned long OBJC_IVAR_$_LGPerson$_arr;
@@ -871,13 +879,13 @@ static void _I_LGPerson_setArr_(LGPerson * self, SEL _cmd, NSMutableArray * _Non
     (*(NSMutableArray * _Nonnull *)((char *)self + OBJC_IVAR_$_LGPerson$_arr)) = arr; 
 }
 ```
-#### `property_list_t`
+#### property_list_t
 &emsp;`property_list_t` 是 `class_ro_t` 中保存属性的数据结构，同样继承自 `entsize_list_tt`，`FlagMask` 模版参数是 `0`。
 ```c++
 struct property_list_t : entsize_list_tt<property_t, property_list_t, 0> {
 };
 ```
-#### `property_t`
+#### property_t
 &emsp;看到 `property_t` 极其简单，编译器会自动生成一个对应的 _属性名的成员变量保存在 `ivars` 中。
 ```c++
 struct property_t {
@@ -896,13 +904,12 @@ struct property_t {
     const char *attributes;
 };
 ```
-#### `protocol_ref_t`
+#### protocol_ref_t
 ```c++
 // 实际用于 protocol_t 的指针
 typedef uintptr_t protocol_ref_t;  // protocol_t *, but unremapped
 ```
-
-#### `protocol_list_t`
+#### protocol_list_t
 ```c++
 struct protocol_list_t {
     // count is pointer-sized by accident.
@@ -946,7 +953,7 @@ struct protocol_list_t {
     }
 };
 ```
-#### `protocol_t`
+#### protocol_t
 ```c++
 struct protocol_t : objc_object {
     // 协议名
