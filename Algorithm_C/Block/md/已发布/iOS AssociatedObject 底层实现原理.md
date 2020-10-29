@@ -4,31 +4,34 @@
 
 ## 前言
 &emsp;使用 `Category` 为已经存在的类添加方法是我们很熟悉的常规操作，但是如果在 `Category` 中为类添加属性 `@property`，则编译器会立即给我们如下警告:
-```
+```c++
 Property 'categoryProperty' requires method 'categoryProperty' to be defined - use @dynamic or provide a method implementation in this category.
 Property 'categoryProperty' requires method 'setCategoryProperty:' to be defined - use @dynamic or provide a method implementation in this category
 ```
-提示我们需要手动为属性添加 `setter` `gettr` 方法或者使用 `@dynamic` 在运行时实现这些方法。
-**即明确的告诉我们在分类中 `@property` 并不会自动生成实例变量以及存取方法。**
+&emsp;提示我们需要手动为属性添加 `setter` `gettr` 方法或者使用 `@dynamic` 在运行时实现这些方法。
 
-不是说好的使用 `@property`，编译器会自动帮我们生成实例变量和对应的 `setter` 和 `getter` 方法吗，此机制只能在类定义中实现，因为在分类中，类的实例变量的布局已经固定，使用 `@property` 已经无法向固定的布局中添加新的实例变量，所以我们需要使用关联对象以及两个方法来模拟构成属性的三个要素。
+&emsp;**即明确的告诉我们在分类中 `@property` 并不会自动生成实例变量以及存取方法。**
 
-示例代码:
-```objective-c
+&emsp;不是说好的使用 `@property`，编译器会自动帮我们生成下划线实例变量和对应的 `setter` 和 `getter` 方法吗。此机制只能在类定义中实现，因为在分类中，类的实例变量的布局已经固定，使用 `@property` 已经无法向固定的布局中添加新的实例变量，所以我们需要使用关联对象以及两个方法来模拟构成属性的三个要素。
+
+&emsp;示例代码:
+```c++
 #import "HMObject.h"
 
 NS_ASSUME_NONNULL_BEGIN
 
 @interface HMObject (category)
+
 // 在分类中添加一个属性
 @property (nonatomic, copy) NSString *categoryProperty;
+
 @end
 
 NS_ASSUME_NONNULL_END
 ```
-```objective-c
+```c++
 #import "HMObject+category.h"
-#import <objc/runtime.h>
+#import <objc/runtime.h> 
 
 @implementation HMObject (category)
 
@@ -46,11 +49,11 @@ NS_ASSUME_NONNULL_END
 
 @end
 ```
-此时我们可以使用关联对象 `Associated Object` 来手动为 `categoryProperty` 添加存取方法，接下来我们对示例代码一步一步进行分析。
+&emsp;此时我们可以使用关联对象 `Associated Object` 来手动为 `categoryProperty` 添加存取方法，接下来我们对示例代码一步一步进行分析。
 
-## 在类定义中使用 `@property` 
+## 在类定义中使用 @property 
 &emsp;在类定义中我们使用 `@property` 为类添加属性，如果不使用 `@dynamic` 标识该属性的话，编译器会自动帮我们生成一个名字为下划线加属性名的实例变量和该属性的 `setter` 和 `getter` 方法。我们编写如下代码:
-```objective-c
+```c++
 // .h 中如下书写
 #import <Foundation/Foundation.h>
 
@@ -71,17 +74,17 @@ NS_ASSUME_NONNULL_END
 
 @end
 ```
-编译器会自动帮我们做如下三件事:
+&emsp;编译器会自动帮我们做如下三件事:
 1. 添加实例变量 `_cusProperty`
 2. 添加 `setter` 方法 `setCusProperty`
 3. 添加 `getter` 方法 `cusProperty`
 
-即如下 `HMObject.m` 代码实现：
-```objective-c
+&emsp;即如下 `HMObject.m` 代码实现：
+```c++
 #import "HMObject.h"
 
 @implementation HMObject
-//@dynamic cusProperty;
+// @dynamic cusProperty;
 {
     NSString *_cusProperty;
 }
@@ -96,16 +99,15 @@ NS_ASSUME_NONNULL_END
 
 @end
 ```
-### 验证 `@property`
-下面我们通过 `LLDB` 进行验证，首先我们把 `HMObject.m` 的代码都注释掉，只留下 `HMObject.h` 中的 `cusProperty` 属性。
-然后在 `main` 函数中编写如下代码：
+### 验证 @property
+&emsp;下面我们通过 `LLDB` 进行验证，首先我们把 `HMObject.m` 的代码都注释掉，只留下 `HMObject.h` 中的 `cusProperty` 属性。然后在 `main` 函数中编写如下代码：
 ```c++
 Class cls = NSClassFromString(@"HMObject");
 NSLog(@"%@", cls); // ⬅️ 这里打一个断点
 ```
-开始验证：
+&emsp;开始验证：
 
-> 这里我们也可以使用 `runtime` 的 `class_copyPropertyList`、`class_copyMethodList`、`class_copyIvarList` 三个函数来分别获取 `HMObject` 的属性列表、方法列表和成员变量列表来验证编译器为我们自动生成了什么内容，但是这里我们采用一种更为简单的方法，仅通过控制台打印即可验证。
+> &emsp;这里我们也可以使用 `runtime` 的 `class_copyPropertyList`、`class_copyMethodList`、`class_copyIvarList` 三个函数来分别获取 `HMObject` 的属性列表、方法列表和成员变量列表来验证编译器为我们自动生成了什么内容，但是这里我们采用一种更为简单的方法，仅通过控制台打印即可验证。
 
 1. 找到 `cls` 的 `bits`：
 ```c++
@@ -180,7 +182,7 @@ NSLog(@"%@", cls); // ⬅️ 这里打一个断点
   }
 }
 ```
-看到只有一个名字是 `cusProperty` 的属性，属性的 `attributes` 是：`"T@\"NSString\",C,N,V_cusProperty"`
+&emsp;看到只有一个名字是 `cusProperty` 的属性，属性的 `attributes` 是：`"T@\"NSString\",C,N,V_cusProperty"`
 
 |code|meaning|
 |...|...|
@@ -189,7 +191,7 @@ NSLog(@"%@", cls); // ⬅️ 这里打一个断点
 |N|nonatomic|
 |V|实例变量|
 
-关于它的详细信息可参考 [《Objective-C Runtime Programming Guide》](https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/ObjCRuntimeGuide/Articles/ocrtPropertyIntrospection.html)。
+&emsp;关于它的详细信息可参考 [《Objective-C Runtime Programming Guide》](https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/ObjCRuntimeGuide/Articles/ocrtPropertyIntrospection.html)。
 
 8. 打印 `baseMethodList`
 ```c++
@@ -209,10 +211,8 @@ NSLog(@"%@", cls); // ⬅️ 这里打一个断点
   }
 }
 ```
-看到方法的 `TypeEncoding` 如下:
-`types = 0x0000000100000f79 "@16@0:8"`
-从左向右分别表示的含义是: `@` 表示返回类型是 `OC` 对象，16 表示所有参数总长度，再往后 `@` 表示第一个参数的类型，对应函数调用的 `self` 类型，0 表示从第 0 位开始，分隔号 : 表示第二个参数类型，对应 `SEL`，8 表示从第 8 位开始，因为前面的一个参数 `self` 占 8 个字节。下面开始是自定义参数，因为 `getter` 函数没有自定义函数，所以只有 `self` 和 `SEL` 参数就结束了。
-对应的函数原型正是 `objc_msgSend` 函数:
+&emsp;看到方法的 `TypeEncoding` 如下:
+&emsp;`types = 0x0000000100000f79 "@16@0:8"` 从左向右分别表示的含义是: `@` 表示返回类型是 `OC` 对象，16 表示所有参数总长度，再往后 `@` 表示第一个参数的类型，对应函数调用的 `self` 类型，0 表示从第 0 位开始，分隔号 : 表示第二个参数类型，对应 `SEL`，8 表示从第 8 位开始，因为前面的一个参数 `self` 占 8 个字节。下面开始是自定义参数，因为 `getter` 函数没有自定义函数，所以只有 `self` 和 `SEL` 参数就结束了。对应的函数原型正是 `objc_msgSend` 函数:
 ```c++
 void
 objc_msgSend(void /* id self, SEL op, ... */ )
@@ -232,9 +232,9 @@ objc_msgSend(void /* id self, SEL op, ... */ )
   imp = 0x0000000100000c00 (KCObjcTest`-[HMObject .cxx_destruct])
 }
 ```
-看到一个是 `cusProperty` 的 `setter` 函数，一个是 `C++` 的析构函数。
+&emsp;看到一个是 `cusProperty` 的 `setter` 函数，一个是 `C++` 的析构函数。
 
-为了做出对比，我们注释掉  `HMObject.h` 中的 `cusProperty` 属性，然后重走上面的流程，可打印出如下信息:
+&emsp;为了做出对比，我们注释掉  `HMObject.h` 中的 `cusProperty` 属性，然后重走上面的流程，可打印出如下信息:
 ```c++
 (lldb) x/5gx cls
 0x100002240: 0x0000000100002218 0x00000001003ee140
@@ -263,21 +263,19 @@ objc_msgSend(void /* id self, SEL op, ... */ )
 }
 (lldb) 
 ```
-可看到 `ivars`、`baseProperties` 和 `baseMethodList` 都是 `0x0000000000000000`，即编译器没有为 `HMObject` 生成属性、成员变量和函数。
-至此 `@property` 的作用可得到完整证明。
+&emsp;可看到 `ivars`、`baseProperties` 和 `baseMethodList` 都是 `0x0000000000000000`，即编译器没有为 `HMObject` 生成属性、成员变量和函数。至此 `@property` 的作用可得到完整证明。
 
-`@property` 能够为我们自动生成实例变量以及存取方法，而这三者构成了属性这个类似于语法糖的概念，为我们提供了更便利的点语法来访问属性：
+&emsp;`@property` 能够为我们自动生成实例变量以及存取方法，而这三者构成了属性这个类似于语法糖的概念，为我们提供了更便利的点语法来访问属性：
 
-`self.property` 等价于 `[self property];`
-`self.property = value;` 等价于 `[self setProperty:value];`
+> &emsp;`self.property` 等价于 `[self property];`
+> &emsp;`self.property = value;` 等价于 `[self setProperty:value];`
 
-习惯于 `C/C++` 结构体和结构体指针取结构体成员变量时使用 `.` 和 `->`。初见 `OC` 的点语法时有一丝疑问，`self` 明明是一个指针，访问它的成员变量时为什么用 `.` 呢？如果按 `C/C++` 的规则，不是应该使用 `self->_property` 吗？
+&emsp;习惯于 `C/C++` 结构体和结构体指针取结构体成员变量时使用 `.` 和 `->`。初见 `OC` 的点语法时有一丝疑问，`self` 明明是一个指针，访问它的成员变量时为什么可以用 `.` 呢？如果按 `C/C++` 的规则，不是应该使用 `self->_property` 吗？
 
-这里我们应与 `C/C++` 的点语法做出区别理解，`OC` 中点语法是用来帮助我们便捷访问属性的，在类内部我们可以使用 `_proerty`、`self->_propery` 和 `self.property` 三种方式访问同一个成员变量，区别在于使用 `self.property` 时是通过调用 `property` 的 `setter` 和 `getter` 来读取成员变量，而前两种则是直接读取，因此当我们重写属性的 `setter` 和 `getter` 并在内部做一些自定义操作时，我们一定要记得使用 `self.property` 来访问属性。
+&emsp;这里我们应与 `C/C++` 的点语法做出区别理解，`OC` 中点语法是用来帮助我们便捷访问属性的，在类内部我们可以使用 `_proerty`、`self->_propery` 和 `self.property` 三种方式访问同一个成员变量，区别在于使用 `self.property` 时是通过调用 `property` 的 `setter` 和 `getter` 来读取成员变量，而前两种则是直接读取，因此当我们重写属性的 `setter` 和 `getter` 并在内部做一些自定义操作时，我们一定要记得使用 `self.property` 来访问属性。
 
-##  `Associated Object`
-&emsp;我们使用 `objc_setAssociatedObject` 和 `objc_getAssociatedObject` 来分别模拟属性的存取方法，而使用关联对象模拟实例变量。
-`runtime.h` 中定义了如下三个与关联对象相关的函数接口:
+##  Associated Object
+&emsp;我们使用 `objc_setAssociatedObject` 和 `objc_getAssociatedObject` 来分别模拟属性的存取方法，而使用关联对象模拟实例变量。`runtime.h` 中定义了如下三个与关联对象相关的函数接口:
 ```c++
 /** 
  * Sets an associated value for a given object using a given key and association policy.
@@ -349,11 +347,11 @@ objc_removeAssociatedObjects(id _Nonnull object)
     OBJC_AVAILABLE(10.6, 3.1, 9.0, 1.0, 2.0);
 ```
 
-### `const void *key`
+### const void *key
 &emsp;存取函数中的参数 `key` 我们都使用了 `@selector(categoryProperty)`，其实也可以使用静态指针 `static void *` 类型的参数来代替，不过这里强烈建议使用 `@selector(categoryProperty)` 作为 `key` 传入，因为这种方法省略了声明参数的代码，并且能很好地保证 `key` 的唯一性。
  
-### `objc_AssociationPolicy policy`
-`policy` 代表关联策略:
+### objc_AssociationPolicy policy
+&emsp;`policy` 代表关联策略:
 ```c++
 /**
  * Policies related to associative references.
@@ -380,7 +378,7 @@ typedef OBJC_ENUM(uintptr_t, objc_AssociationPolicy) {
     OBJC_ASSOCIATION_COPY = 01403          
 };
 ```
-注释已经解释的很清楚了，即不同的策略对应不同的修饰符:
+&emsp;注释已经解释的很清楚了，即不同的策略对应不同的修饰符:
 | objc_AssociationPolicy | 修饰符 |
 | ... | ... |
 | OBJC_ASSOCIATION_ASSIGN | assign |
@@ -389,9 +387,9 @@ typedef OBJC_ENUM(uintptr_t, objc_AssociationPolicy) {
 | OBJC_ASSOCIATION_RETAIN | atomic, strong |
 | OBJC_ASSOCIATION_COPY | atomic, copy |
 
-`objc-references.mm` 文件包含了所有的核心操作，首先来分析相关的数据结构。
+&emsp;`objc-references.mm` 文件包含了所有的核心操作，首先来分析相关的数据结构。
 
-### `ObjcAssociation`
+### ObjcAssociation
 &emsp;`associated object` 机制中用于保存**关联策略**和**关联值**。
 ```c++
 class ObjcAssociation {
@@ -409,7 +407,7 @@ public:
     // 赋值操作符采用默认
     ObjcAssociation &operator=(const ObjcAssociation &other) = default;
     
-    // 交换 policy 和 value
+    // 和 other 交换 policy 和 value
     ObjcAssociation(ObjcAssociation &&other) : ObjcAssociation() {
         swap(other);
     }
@@ -463,28 +461,26 @@ public:
     }
 };
 ```
-
-### `ObjectAssociationMap`
+### ObjectAssociationMap
 ```c++
 typedef DenseMap<const void *, ObjcAssociation> ObjectAssociationMap;
 ```
-`DenseMap` 这里不在展开，把 `ObjectAssociationMap` 理解为一个 `key` 是 `const void *` `value` 是 `ObjcAssociation` 的哈希表即可。
+&emsp;`DenseMap` 这里不在展开，把 `ObjectAssociationMap` 理解为一个 `key` 是 `const void *` `value` 是 `ObjcAssociation` 的哈希表即可。
 
-### `AssociationsHashMap`
+### AssociationsHashMap
 ```c++
 typedef DenseMap<DisguisedPtr<objc_object>, ObjectAssociationMap> AssociationsHashMap;
 ```
-同上，把 `AssociationsHashMap` 理解为一个 `key` 是 `DisguisedPtr<objc_object>` `value` 是 `ObjectAssociationMap` 的哈希表即可。
-`DisguisedPtr<objc_object>` 可理解为把 `objc_object` 地址伪装为一个整数。可参考:[iOS weak 底层实现原理(一)：DisguisedPtr](https://juejin.im/post/6865468675940417550)
+&emsp;同上，把 `AssociationsHashMap` 理解为一个 `key` 是 `DisguisedPtr<objc_object>` `value` 是 `ObjectAssociationMap` 的哈希表即可。`DisguisedPtr<objc_object>` 可理解为把 `objc_object` 地址伪装为一个整数。可参考:[iOS weak 底层实现原理(一)：SideTable|s、weak_table_t、weak_entry_t 等数据结构](https://juejin.im/post/6865468675940417550)
 
-### `AssociationsManager`
+### AssociationsManager
 &emsp;`AssociationsManager` 的类定义不复杂，从数据结构角度来看的话它是作为一个 `key` 是 `DisguisedPtr<objc_object>` `value` 是 `ObjectAssociationMap` 的哈希表来用的，这么看它好像和上面的 `AssociationsHashMap` 有些重合，其实它内部正是存储了一个局部静态的 `AssociationsHashMap` 用来存储程序中所有的关联对象。
 
-#### `AssociationsManagerLock`
+#### AssociationsManagerLock
 ```c++
 spinlock_t AssociationsManagerLock;
 ```
-一个全局的自旋锁（互斥锁），保证 `AssociationsManager` 中对 `AssociationsHashMap` 操作的线程安全。
+&emsp;一个全局的自旋锁（互斥锁），保证 `AssociationsManager` 中对 `AssociationsHashMap` 操作的线程安全。
 ```c++
 // class AssociationsManager manages a lock / hash table singleton pair.
 // Allocating an instance acquires the lock
@@ -517,9 +513,9 @@ public:
 // 为什么这里在类定义外面还写了这句代码 ？
 AssociationsManager::Storage AssociationsManager::_mapStorage;
 ```
-管理 `AssociationsHashMap` 静态变量。
+&emsp;管理 `AssociationsHashMap` 静态变量。
 
-总结:
+&emsp;总结:
 1. 通过 `AssociationsManager` 的 `get` 函数取得一个全局唯一 `AssociationsHashMap`。
 2. 根据我们的原始对象的 `DisguisedPtr<objc_object>` 从 `AssociationsHashMap` 取得 `ObjectAssociationMap`。
 3. 根据我们指定的关联 `key`(`const void *key`) 从 `ObjectAssociationMap` 取得 `ObjcAssociation`。
@@ -528,7 +524,7 @@ AssociationsManager::Storage AssociationsManager::_mapStorage;
 示例图:
 ![associated object相关数据结构](https://p9-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/cc5e47b5525c4739994bd95bcc78fc43~tplv-k3u1fbpfcp-zoom-1.image)
 
-### `objc_setAssociatedObject`
+### objc_setAssociatedObject
 ```c++
 void
 objc_setAssociatedObject(id object, const void *key, id value, objc_AssociationPolicy policy)
@@ -536,12 +532,10 @@ objc_setAssociatedObject(id object, const void *key, id value, objc_AssociationP
     SetAssocHook.get()(object, key, value, policy);
 }
 ```
-
 `SetAssocHook`:
 ```c++
 static ChainedHookFunction<objc_hook_setAssociatedObject> SetAssocHook{_base_objc_setAssociatedObject};
 ```
-
 `_base_objc_setAssociatedObject`
 ```c++
 static void
@@ -550,7 +544,6 @@ _base_objc_setAssociatedObject(id object, const void *key, id value, objc_Associ
   _object_set_associative_reference(object, key, value, policy);
 }
 ```
-
 `forbidsAssociatedObjects`
 ```c++
 // class does not allow associated objects on its instances
@@ -560,7 +553,6 @@ bool forbidsAssociatedObjects() {
     return (data()->flags & RW_FORBIDS_ASSOCIATED_OBJECTS);
 }
 ```
-
 `try_emplace`
 ```c++
 // Inserts key,value pair into the map if the key isn't already in the map.
@@ -585,9 +577,7 @@ std::pair<iterator, bool> try_emplace(const KeyT &Key, Ts &&... Args) {
            true);
 }
 ```
-
-`setHasAssociatedObjects`
-设置对象的 `uintptr_t has_assoc : 1;` 位，标记该对象有关联对象，该对象 `dealloc` 时要进行清理工作。
+&emsp;`setHasAssociatedObjects` 设置对象的 `uintptr_t has_assoc : 1;` 位，标记该对象有关联对象，该对象 `dealloc` 时要进行清理工作。
 ```c++
 inline void
 objc_object::setHasAssociatedObjects()
@@ -605,7 +595,6 @@ objc_object::setHasAssociatedObjects()
     if (!StoreExclusive(&isa.bits, oldisa.bits, newisa.bits)) goto retry;
 }
 ```
-
 `_object_set_associative_reference`
 ```c++
 void
@@ -655,8 +644,6 @@ _object_set_associative_reference(id object, const void *key, id value, uintptr_
             // 重建或者替换 association
             auto &refs = refs_result.first->second;
             
-            // 这里存在一个疑问，如果值对象第一关联新值，且是 strong 强引用对象，
-            // 如果 association 里面一直存放的就是新值新策略，那执行到函数结尾岂不是要执行 release 操作了 ？
             auto result = refs.try_emplace(key, std::move(association));
             if (!result.second) {
                 // 替换
@@ -694,16 +681,16 @@ _object_set_associative_reference(id object, const void *key, id value, uintptr_
     association.releaseHeldValue();
 }
 ```
-函数执行过程中有两种情况:
+&emsp;函数执行过程中有两种情况:
 + `value != nil` 新增/更新关联对象的值
 + `value == nil` 删除一个关联对象
 
 函数流程图：
 ![_object_set_associative_reference流程图](https://p6-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/1c4350153140465b86d3ad44d1f917f2~tplv-k3u1fbpfcp-zoom-1.image)
 
-如果看通了上面的 `_object_set_associative_reference` 则看  `_object_get_associative_reference` 是很容易看懂的。
+&emsp;如果看通了上面的 `_object_set_associative_reference` 则看  `_object_get_associative_reference` 是很容易看懂的。
 
-### `objc_getAssociatedObject`
+### objc_getAssociatedObject
 ```c++
 id
 objc_getAssociatedObject(id object, const void *key)
@@ -746,8 +733,7 @@ _object_get_associative_reference(id object, const void *key)
     return association.autoreleaseReturnedValue();
 }
 ```
-### `objc_removeAssociatedObjects`
-
+### objc_removeAssociatedObjects
 `hasAssociatedObjects`
 ```c++
 inline bool
@@ -758,7 +744,6 @@ objc_object::hasAssociatedObjects()
     return true;
 }
 ```
-
 `objc_removeAssociatedObjects`
 ```c++
 void objc_removeAssociatedObjects(id object) 
@@ -812,10 +797,10 @@ _object_remove_assocations(id object)
 ```
 
 ## 关联对象的本质
-在分类中到底能否实现属性？首先要知道属性是什么，属性的概念决定了这个问题的答案。
+&emsp;在分类中到底能否实现属性？首先要知道属性是什么，属性的概念决定了这个问题的答案。
 + 如果把属性理解为通过方法访问的实例变量，那这个问题的答案就是不能，因为分类不能为类增加额外的实例变量。
 + 如果属性只是一个存取方法以及存储值的容器的集合，那么分类可以实现属性。
-分类中对属性的实现其实只是实现了一个看起来像属性的接口而已。
+&emsp;分类中对属性的实现其实只是实现了一个看起来像属性的接口而已。
 
 ## 参考链接
 **参考链接:🔗**
