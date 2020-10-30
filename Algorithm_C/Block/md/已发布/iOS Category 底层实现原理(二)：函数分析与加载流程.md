@@ -56,8 +56,7 @@ void _objc_init(void)
 #endif
 }
 ```
-
-### `_dyld_objc_notify_register`
+### _dyld_objc_notify_register
 ```c++
 _dyld_objc_notify_register(&map_images, load_images, unmap_image);
 
@@ -79,33 +78,32 @@ typedef void (*_dyld_objc_notify_mapped)(unsigned count, const char* const paths
 typedef void (*_dyld_objc_notify_init)(const char* path, const struct mach_header* mh);
 typedef void (*_dyld_objc_notify_unmapped)(const char* path, const struct mach_header* mh);
 ```
-> 该方法是 `runtime` 特有的方法，该方法的调用时机是，当 `oc` 对象、镜像（ `images` ）被映射（ `mapped` ），未被映射（ `unmapped` ）以及被初始化了（ `initialized` ）。这个方法是 `dlyd` 中声明的，一旦调用该方法，调用结果会作为该函数的参数回传回来。比如，当所有的 `images` 以及 `section` 为 `objc-image-info` 被加载之后会回调 `mapped` 方法，在 `_objc_init` 中正是 `&map_images` 函数。`load` 方法也将在这个方法中被调用。
+> &emsp;该方法是 `runtime` 特有的方法，该方法的调用时机是，当 `oc` 对象、镜像（ `images` ）被映射（ `mapped` ），未被映射（ `unmapped` ）以及被初始化了（ `initialized` ）。这个方法是 `dlyd` 中声明的，一旦调用该方法，调用结果会作为该函数的参数回传回来。比如，当所有的 `images` 以及 `section` 为 `objc-image-info` 被加载之后会回调 `mapped` 方法，在 `_objc_init` 中正是 `&map_images` 函数。`load` 方法也将在这个方法中被调用。
 
-`map_images` 对应函数指针:
+&emsp;`map_images` 对应函数指针:
 ```c++
 // count 文件数 paths 文件的路径 mh 文件的 header
 typedef void (*_dyld_objc_notify_mapped)(unsigned count, const char* const paths[], const struct mach_header* const mh[]);
 ```
-`load_images` 对应函数指针:
+&emsp;`load_images` 对应函数指针:
 ```c++
 // path 文件的路径 mh 文件的 header
 typedef void (*_dyld_objc_notify_init)(const char* path, const struct mach_header* mh);
 ```
-`unmap_image` 对应函数指针:
+&emsp;`unmap_image` 对应函数指针:
 ```c++
 // path 文件的路径 mh 文件的 header
 typedef void (*_dyld_objc_notify_unmapped)(const char* path, const struct mach_header* mh);
 ```
-
-`map_images` 方法只会调用一次，`load_images` 会调用多次，也很好理解，`map_images` 会把文件数以及文件的 `path`、`header` 等信息给到 `runtime`，`load_images` 则负责每个文件的加载等过程。
+&emsp;`map_images` 方法只会调用一次，`load_images` 会调用多次，也很好理解，`map_images` 会把文件数以及文件的 `path`、`header` 等信息给到 `runtime`，`load_images` 则负责每个文件的加载过程。
 
 > ~~看到 `_dyld_objc_notify_register` 函数的第一个参数是 `map_imags` 的函数地址。`_objc_init` 里面调用 `map_images` 最终会调用 `objc-runtime-new.mm` 里面的 `_read_images` 函数，而 `category` 加载到类上面正是从 `_read_images` 函数里面开始的。~~
 
-`objc4-781` 发生了一些修改，在 `load_images` 函数里面调用 `loadAllCategories()` 函数，且它的前面有一句 `didInitialAttachCategories =  true` 这个全局静态变量表示 `category` 数据是否已经完成初始化，且默认为 `false`。在 `load_images` 被设置为 `true`，且是整个 `objc4-781` 唯一的一次赋值操作，那么可以断定: 在 `load_images`  函数里面调用 `loadAllCategories()` 一定是早于 `_read_images` 里面的 `for` 循环里面调用 `load_categories_nolock` 函数的。因为 `_read_images` 里面 `for` 循环开始之前要先判断 `didInitialAttachCategories` 为 `true`, 之前是没有这个逻辑的。
+&emsp;`objc4-781` 发生了一些修改，在 `load_images` 函数里面会调用 `loadAllCategories()` 函数，且它的前面有一句 `if` 判断 `didInitialAttachCategories` 这个全局静态变量的值，它是表示 `category` 数据是否已经完成初始化，且默认为 `false`。在 `load_images` 被设置为 `true`，且是整个 `objc4-781` 唯一的一次赋值操作，那么可以断定: 在 `load_images`  函数里面调用 `loadAllCategories()` 一定是早于 `_read_images` 里面的 `for` 循环里面调用 `load_categories_nolock` 函数的。因为 `_read_images` 里面 `for` 循环开始之前要先判断 `didInitialAttachCategories` 是否为 `true`，之前版本的 `objc4-xxx` 是没有这个逻辑的。所以这里是把 `category` 的数据附加到 `objc-class` 中的动作延后到了 `load_images`。
 
-### `map_images`
+### map_images
 ```c++
-/***********************************************************************
+/*
 * map_images
 * Process the given images which are being mapped in by dyld.
 * 处理由 dyld 映射的给定 images。
@@ -115,7 +113,7 @@ typedef void (*_dyld_objc_notify_unmapped)(const char* path, const struct mach_h
 
 * Locking: write-locks runtimeLock
 * rutimeLock 是一个全局的互斥锁（mutex_t runtimeLock;）
-**********************************************************************/
+*/
 void
 map_images(unsigned count, const char * const paths[],
            const struct mach_header * const mhdrs[])
@@ -127,29 +125,27 @@ map_images(unsigned count, const char * const paths[],
 }
 ```
 
-### `map_images_nolock`
+### map_images_nolock
 &emsp;`map_images_nolock` 参数:
 + `mhCount`: `mach-o header count`，即 `mach-o header` 个数
 + `mhPaths`: `mach-o header Paths`，即 `header` 的路径数组
 + `mhdrs`: `mach-o headers`，即 `headers`
 
-`map_images_nolock` 主要做了 4 件事:
+&emsp;`map_images_nolock` 主要做了 4 件事:
 1. 拿到 `dlyd` 传过来的 `mach_header`，封装为 `header_info` 
 2. 初始化 `selector` 
-
-3. `arr_init();` 初始化 `autorelease pool page` 初始化 `SideTablesMap` 和 `associations` 初始化
+3. `arr_init()` 内部: 1): 初始化 `AutoreleasePoolPage` 2): 初始化 `SideTablesMap` 3): `AssociationsManager` 初始化
   ```c++
   void arr_init(void) {
-      AutoreleasePoolPage::init();
+      AutoreleasePoolPage::init(); // 自动释放池初始化
       SideTablesMap.init(); // SideTablesMap 初始化
       _objc_associations_init(); // AssociationsManager::init(); 初始化
   }
   ```
 4. 读取 `images`
 
-在 `objc4-781` 下:
+&emsp;在 `objc4-781` 下:
 + 把 `OBJC_PRINT_IMAGES` 添加到 `Environment Variables` 中，看到打印: `processing 256 newly-mapped images...`。
-
 ```c++
 /*
 * map_images_nolock
@@ -184,12 +180,10 @@ if (hCount > 0) {
 ...
 }
 ```
-
-### `_read_images`
+### _read_images
 &emsp;读取各个 `section` 中的数据并放到缓存中，这里的缓存大部分都是全局静态变量。
 
-`GETSECT(_getObjc2CategoryList, category_t *, "__objc_catlist");`
-之前用 `clang` 编译 `category` 文件时，看到 `DATA段下的` `__objc_catlist` 区，保存 `category` 数据。
+&emsp;`GETSECT(_getObjc2CategoryList, category_t *, "__objc_catlist")` 之前用 `clang` 编译 `category` 文件时，看到 `DATA段下的` `__objc_catlist` 区，保存 `category` 数据。
 
 + 把 `OBJC_PRINT_CLASS_SETUP` 添加到 `Environment Variables` 中，看到打印: `found 21690 classes during launch`。
 
