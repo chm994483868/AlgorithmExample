@@ -7,8 +7,6 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		8E15F1D824E5768C00660C93 /* HHStaff.m in Sources */ = {isa = PBXBuildFile; fileRef = 8E15F1D724E5768C00660C93 /* HHStaff.m */; };
-		8E15F1DB24E5774B00660C93 /* HHManager.m in Sources */ = {isa = PBXBuildFile; fileRef = 8E15F1DA24E5774B00660C93 /* HHManager.m */; };
 		8E2572BD24D062C90080F598 /* CPower.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8E2572BB24D062C90080F598 /* CPower.cpp */; };
 		8E2572C124D0696F0080F598 /* Print1ToMaxOfNDigits.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8E2572BF24D0696F0080F598 /* Print1ToMaxOfNDigits.cpp */; };
 		8E2572C524D1B3AE0080F598 /* MirrorOfBinaryTree.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8E2572C324D1B3AE0080F598 /* MirrorOfBinaryTree.cpp */; };
@@ -18,6 +16,7 @@
 		8E2572D524D304690080F598 /* MoreThanHalfNumber.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8E2572D324D304690080F598 /* MoreThanHalfNumber.cpp */; };
 		8E2572D824D304DE0080F598 /* Array.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8E2572D624D304DE0080F598 /* Array.cpp */; };
 		8E5CCE0724B9FF3D0081B5FF /* Review_1.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8E5CCE0624B9FF3D0081B5FF /* Review_1.cpp */; };
+		8E919556254D57DA0039A12E /* AssignmentOperator_1.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8E919554254D57DA0039A12E /* AssignmentOperator_1.cpp */; };
 		8EA593D924CDB969002785EF /* main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8EA593D824CDB969002785EF /* main.cpp */; };
 		8EA593E024CDBD0B002785EF /* AssignmentOperator.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8EA593DE24CDBD0B002785EF /* AssignmentOperator.cpp */; };
 		8EA593E424CF0B40002785EF /* ConstructBinaryTree.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8EA593E224CF0B40002785EF /* ConstructBinaryTree.cpp */; };
@@ -66,15 +65,6 @@
 		D239E78024D4012500DA0BE5 /* TranslateNumbersToStrings.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D239E77E24D4012500DA0BE5 /* TranslateNumbersToStrings.cpp */; };
 		D239E78424D4161800DA0BE5 /* MaxValueOfGifts.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D239E78224D4161800DA0BE5 /* MaxValueOfGifts.cpp */; };
 		D239E78824D4290200DA0BE5 /* LongestSubstringWithoutDup.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D239E78624D4290200DA0BE5 /* LongestSubstringWithoutDup.cpp */; };
-		D28F813A24C6E60E00EE7EF3 /* RecursiveSummary.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D28F813824C6E60E00EE7EF3 /* RecursiveSummary.cpp */; };
-		D2A32AD324E1477300ECE821 /* GrandSon+Test.m in Sources */ = {isa = PBXBuildFile; fileRef = D2A32AD224E1477300ECE821 /* GrandSon+Test.m */; };
-		D2A32AD624E14D5500ECE821 /* OtherFather.m in Sources */ = {isa = PBXBuildFile; fileRef = D2A32AD524E14D5500ECE821 /* OtherFather.m */; };
-		D2A32AD924E14D9200ECE821 /* OtherSon.m in Sources */ = {isa = PBXBuildFile; fileRef = D2A32AD824E14D9200ECE821 /* OtherSon.m */; };
-		D2A32ADC24E14DC700ECE821 /* OtherGrandSon.m in Sources */ = {isa = PBXBuildFile; fileRef = D2A32ADB24E14DC700ECE821 /* OtherGrandSon.m */; };
-		D2A32ADF24E1538100ECE821 /* Father+Test2.m in Sources */ = {isa = PBXBuildFile; fileRef = D2A32ADE24E1538100ECE821 /* Father+Test2.m */; };
-		D2A32AE224E153CF00ECE821 /* OtherFather+Test.m in Sources */ = {isa = PBXBuildFile; fileRef = D2A32AE124E153CF00ECE821 /* OtherFather+Test.m */; };
-		D2A32AE524E153EF00ECE821 /* OtherSon+Test.m in Sources */ = {isa = PBXBuildFile; fileRef = D2A32AE424E153EF00ECE821 /* OtherSon+Test.m */; };
-		D2A32AE824E1541B00ECE821 /* OtherGrandSon+Test.m in Sources */ = {isa = PBXBuildFile; fileRef = D2A32AE724E1541B00ECE821 /* OtherGrandSon+Test.m */; };
 		D2EB010024D912C6009EAFD6 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2EB00FF24D912C6009EAFD6 /* main.swift */; };
 		D2EB010924D9136D009EAFD6 /* BubbleSort.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2EB010824D9136D009EAFD6 /* BubbleSort.swift */; };
 		D2EB010C24D91F91009EAFD6 /* BubbleSort.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D2EB010A24D91F91009EAFD6 /* BubbleSort.cpp */; };
@@ -92,12 +82,7 @@
 		D2EB013624D97392009EAFD6 /* HeapSort.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2EB013524D97392009EAFD6 /* HeapSort.swift */; };
 		D2EB013B24DA2DC8009EAFD6 /* TwoSum.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D2EB013924DA2DC8009EAFD6 /* TwoSum.cpp */; };
 		D2EB014324DB7A5C009EAFD6 /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = D2EB014224DB7A5C009EAFD6 /* main.m */; };
-		D2EB014F24DC0002009EAFD6 /* Father.m in Sources */ = {isa = PBXBuildFile; fileRef = D2EB014E24DC0002009EAFD6 /* Father.m */; };
-		D2EB015524DC00CE009EAFD6 /* Son.m in Sources */ = {isa = PBXBuildFile; fileRef = D2EB015424DC00CE009EAFD6 /* Son.m */; };
-		D2EB015824DC04F0009EAFD6 /* Father+Test.m in Sources */ = {isa = PBXBuildFile; fileRef = D2EB015724DC04F0009EAFD6 /* Father+Test.m */; };
-		D2EB015B24DC0593009EAFD6 /* Son+Test.m in Sources */ = {isa = PBXBuildFile; fileRef = D2EB015A24DC0592009EAFD6 /* Son+Test.m */; };
 		D2F305B524DF90890020A5C2 /* NSObject+ArcDebugRetainCount.m in Sources */ = {isa = PBXBuildFile; fileRef = D2F305B424DF90890020A5C2 /* NSObject+ArcDebugRetainCount.m */; settings = {COMPILER_FLAGS = "-fno-objc-arc"; }; };
-		D2FF2CD224DC1B200029E56E /* GrandSon.m in Sources */ = {isa = PBXBuildFile; fileRef = D2FF2CD124DC1B200029E56E /* GrandSon.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -142,10 +127,6 @@
 /* Begin PBXFileReference section */
 		8E0E62B22525ECB10076A530 /* iOS 从源码解析Runtime (九)：聚焦cache_t objc-msg-arm64.s解析(2).md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 从源码解析Runtime (九)：聚焦cache_t objc-msg-arm64.s解析(2).md"; sourceTree = "<group>"; };
 		8E15F1D424E423FE00660C93 /* iOS消息转发机制.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS消息转发机制.md"; sourceTree = "<group>"; };
-		8E15F1D624E5768C00660C93 /* HHStaff.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = HHStaff.h; sourceTree = "<group>"; };
-		8E15F1D724E5768C00660C93 /* HHStaff.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = HHStaff.m; sourceTree = "<group>"; };
-		8E15F1D924E5774B00660C93 /* HHManager.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = HHManager.h; sourceTree = "<group>"; };
-		8E15F1DA24E5774B00660C93 /* HHManager.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = HHManager.m; sourceTree = "<group>"; };
 		8E2572BB24D062C90080F598 /* CPower.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = CPower.cpp; sourceTree = "<group>"; };
 		8E2572BC24D062C90080F598 /* CPower.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = CPower.hpp; sourceTree = "<group>"; };
 		8E2572BF24D0696F0080F598 /* Print1ToMaxOfNDigits.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Print1ToMaxOfNDigits.cpp; sourceTree = "<group>"; };
@@ -164,6 +145,8 @@
 		8E2572D724D304DE0080F598 /* Array.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = Array.hpp; sourceTree = "<group>"; };
 		8E5CCE0624B9FF3D0081B5FF /* Review_1.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Review_1.cpp; sourceTree = "<group>"; };
 		8E6DFE182523862B00D2830E /* iOS 从源码解析Runtime (八)：聚焦cache_t 相关数据结构及函数解析(1).md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 从源码解析Runtime (八)：聚焦cache_t 相关数据结构及函数解析(1).md"; sourceTree = "<group>"; };
+		8E919554254D57DA0039A12E /* AssignmentOperator_1.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = AssignmentOperator_1.cpp; sourceTree = "<group>"; };
+		8E919555254D57DA0039A12E /* AssignmentOperator_1.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = AssignmentOperator_1.hpp; sourceTree = "<group>"; };
 		8EA593D624CDB969002785EF /* OfferReview */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = OfferReview; sourceTree = BUILT_PRODUCTS_DIR; };
 		8EA593D824CDB969002785EF /* main.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
 		8EA593DE24CDBD0B002785EF /* AssignmentOperator.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = AssignmentOperator.cpp; sourceTree = "<group>"; };
@@ -307,24 +290,6 @@
 		D2407F3D24BD626B0018D876 /* LearnedList.strings */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; path = LearnedList.strings; sourceTree = "<group>"; };
 		D24C822225120D1400E3BF5E /* iOS 从源码解析Runtime (五)：聚焦objc_object(retain、release、retaincount).md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 从源码解析Runtime (五)：聚焦objc_object(retain、release、retaincount).md"; sourceTree = "<group>"; };
 		D24C82232512140800E3BF5E /* iOS 从源码解析Runtime (三)：引用计数表内部数据结构DenseMap.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 从源码解析Runtime (三)：引用计数表内部数据结构DenseMap.md"; sourceTree = "<group>"; };
-		D28F813824C6E60E00EE7EF3 /* RecursiveSummary.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = RecursiveSummary.cpp; sourceTree = "<group>"; };
-		D28F813924C6E60E00EE7EF3 /* RecursiveSummary.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = RecursiveSummary.hpp; sourceTree = "<group>"; };
-		D2A32AD124E1477300ECE821 /* GrandSon+Test.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "GrandSon+Test.h"; sourceTree = "<group>"; };
-		D2A32AD224E1477300ECE821 /* GrandSon+Test.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = "GrandSon+Test.m"; sourceTree = "<group>"; };
-		D2A32AD424E14D5500ECE821 /* OtherFather.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = OtherFather.h; sourceTree = "<group>"; };
-		D2A32AD524E14D5500ECE821 /* OtherFather.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = OtherFather.m; sourceTree = "<group>"; };
-		D2A32AD724E14D9200ECE821 /* OtherSon.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = OtherSon.h; sourceTree = "<group>"; };
-		D2A32AD824E14D9200ECE821 /* OtherSon.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = OtherSon.m; sourceTree = "<group>"; };
-		D2A32ADA24E14DC700ECE821 /* OtherGrandSon.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = OtherGrandSon.h; sourceTree = "<group>"; };
-		D2A32ADB24E14DC700ECE821 /* OtherGrandSon.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = OtherGrandSon.m; sourceTree = "<group>"; };
-		D2A32ADD24E1538100ECE821 /* Father+Test2.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "Father+Test2.h"; sourceTree = "<group>"; };
-		D2A32ADE24E1538100ECE821 /* Father+Test2.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = "Father+Test2.m"; sourceTree = "<group>"; };
-		D2A32AE024E153CF00ECE821 /* OtherFather+Test.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "OtherFather+Test.h"; sourceTree = "<group>"; };
-		D2A32AE124E153CF00ECE821 /* OtherFather+Test.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = "OtherFather+Test.m"; sourceTree = "<group>"; };
-		D2A32AE324E153EF00ECE821 /* OtherSon+Test.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "OtherSon+Test.h"; sourceTree = "<group>"; };
-		D2A32AE424E153EF00ECE821 /* OtherSon+Test.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = "OtherSon+Test.m"; sourceTree = "<group>"; };
-		D2A32AE624E1541B00ECE821 /* OtherGrandSon+Test.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "OtherGrandSon+Test.h"; sourceTree = "<group>"; };
-		D2A32AE724E1541B00ECE821 /* OtherGrandSon+Test.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = "OtherGrandSon+Test.m"; sourceTree = "<group>"; };
 		D2C74CF5253046AE0051B89F /* iOS 从源码解析Runtime (十二)：聚焦objc_class(class_rw_t 内容篇).md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 从源码解析Runtime (十二)：聚焦objc_class(class_rw_t 内容篇).md"; sourceTree = "<group>"; };
 		D2C74CF62531A79C0051B89F /* iOS 从源码解析Runtime (十三)：聚焦 objc_class(objc_class函数内容篇).md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 从源码解析Runtime (十三)：聚焦 objc_class(objc_class函数内容篇).md"; sourceTree = "<group>"; };
 		D2C74CF7253457C10051B89F /* iOS 从源码解析Runtime (十四)：由源码解读属性&成员变量的修饰符.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 从源码解析Runtime (十四)：由源码解读属性&成员变量的修饰符.md"; sourceTree = "<group>"; };
@@ -368,18 +333,8 @@
 		D2EB014024DB7A5C009EAFD6 /* Block */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = Block; sourceTree = BUILT_PRODUCTS_DIR; };
 		D2EB014224DB7A5C009EAFD6 /* main.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = main.m; sourceTree = "<group>"; };
 		D2EB014724DB7B3A009EAFD6 /* iOS 从 libclosure-74 源码来研究 Block 实现原理(1).md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 从 libclosure-74 源码来研究 Block 实现原理(1).md"; sourceTree = "<group>"; };
-		D2EB014D24DC0002009EAFD6 /* Father.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Father.h; sourceTree = "<group>"; };
-		D2EB014E24DC0002009EAFD6 /* Father.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = Father.m; sourceTree = "<group>"; };
-		D2EB015324DC00CE009EAFD6 /* Son.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Son.h; sourceTree = "<group>"; };
-		D2EB015424DC00CE009EAFD6 /* Son.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = Son.m; sourceTree = "<group>"; };
-		D2EB015624DC04F0009EAFD6 /* Father+Test.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "Father+Test.h"; sourceTree = "<group>"; };
-		D2EB015724DC04F0009EAFD6 /* Father+Test.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = "Father+Test.m"; sourceTree = "<group>"; };
-		D2EB015924DC0592009EAFD6 /* Son+Test.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "Son+Test.h"; sourceTree = "<group>"; };
-		D2EB015A24DC0592009EAFD6 /* Son+Test.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = "Son+Test.m"; sourceTree = "<group>"; };
 		D2F305B324DF90890020A5C2 /* NSObject+ArcDebugRetainCount.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "NSObject+ArcDebugRetainCount.h"; sourceTree = "<group>"; };
 		D2F305B424DF90890020A5C2 /* NSObject+ArcDebugRetainCount.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = "NSObject+ArcDebugRetainCount.m"; sourceTree = "<group>"; };
-		D2FF2CD024DC1B200029E56E /* GrandSon.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = GrandSon.h; sourceTree = "<group>"; };
-		D2FF2CD124DC1B200029E56E /* GrandSon.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = GrandSon.m; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -513,39 +468,6 @@
 				8E2572D424D304690080F598 /* MoreThanHalfNumber.hpp */,
 			);
 			path = 39_MoreThanHalfNumber;
-			sourceTree = "<group>";
-		};
-		8E2572DA24DC44650080F598 /* Initialize_load */ = {
-			isa = PBXGroup;
-			children = (
-				D2EB014D24DC0002009EAFD6 /* Father.h */,
-				D2EB014E24DC0002009EAFD6 /* Father.m */,
-				D2A32AD424E14D5500ECE821 /* OtherFather.h */,
-				D2A32AD524E14D5500ECE821 /* OtherFather.m */,
-				D2A32AE024E153CF00ECE821 /* OtherFather+Test.h */,
-				D2A32AE124E153CF00ECE821 /* OtherFather+Test.m */,
-				D2EB015624DC04F0009EAFD6 /* Father+Test.h */,
-				D2EB015724DC04F0009EAFD6 /* Father+Test.m */,
-				D2A32ADD24E1538100ECE821 /* Father+Test2.h */,
-				D2A32ADE24E1538100ECE821 /* Father+Test2.m */,
-				D2EB015324DC00CE009EAFD6 /* Son.h */,
-				D2EB015424DC00CE009EAFD6 /* Son.m */,
-				D2A32AD724E14D9200ECE821 /* OtherSon.h */,
-				D2A32AD824E14D9200ECE821 /* OtherSon.m */,
-				D2A32AE324E153EF00ECE821 /* OtherSon+Test.h */,
-				D2A32AE424E153EF00ECE821 /* OtherSon+Test.m */,
-				D2EB015924DC0592009EAFD6 /* Son+Test.h */,
-				D2EB015A24DC0592009EAFD6 /* Son+Test.m */,
-				D2FF2CD024DC1B200029E56E /* GrandSon.h */,
-				D2FF2CD124DC1B200029E56E /* GrandSon.m */,
-				D2A32ADA24E14DC700ECE821 /* OtherGrandSon.h */,
-				D2A32ADB24E14DC700ECE821 /* OtherGrandSon.m */,
-				D2A32AE624E1541B00ECE821 /* OtherGrandSon+Test.h */,
-				D2A32AE724E1541B00ECE821 /* OtherGrandSon+Test.m */,
-				D2A32AD124E1477300ECE821 /* GrandSon+Test.h */,
-				D2A32AD224E1477300ECE821 /* GrandSon+Test.m */,
-			);
-			path = Initialize_load;
 			sourceTree = "<group>";
 		};
 		8E3ECB7324C28B2C004D4F4E /* MirrorOfBinaryTree */ = {
@@ -771,6 +693,8 @@
 			children = (
 				8EA593DE24CDBD0B002785EF /* AssignmentOperator.cpp */,
 				8EA593DF24CDBD0B002785EF /* AssignmentOperator.hpp */,
+				8E919554254D57DA0039A12E /* AssignmentOperator_1.cpp */,
+				8E919555254D57DA0039A12E /* AssignmentOperator_1.hpp */,
 			);
 			path = 01_AssignmentOperator;
 			sourceTree = "<group>";
@@ -1311,7 +1235,6 @@
 		D2407F3824BD3D9A0018D876 /* Review */ = {
 			isa = PBXGroup;
 			children = (
-				D28F813724C6E5F700EE7EF3 /* RecursiveSummary */,
 				D21EDC9524C04E4000CBF16E /* LearnedList */,
 				8E5CCE0624B9FF3D0081B5FF /* Review_1.cpp */,
 			);
@@ -1442,15 +1365,6 @@
 			children = (
 			);
 			path = CommonParentInTree;
-			sourceTree = "<group>";
-		};
-		D28F813724C6E5F700EE7EF3 /* RecursiveSummary */ = {
-			isa = PBXGroup;
-			children = (
-				D28F813824C6E60E00EE7EF3 /* RecursiveSummary.cpp */,
-				D28F813924C6E60E00EE7EF3 /* RecursiveSummary.hpp */,
-			);
-			path = RecursiveSummary;
 			sourceTree = "<group>";
 		};
 		D2CB579724C7CBBF00B31AE3 /* MoreThanHalfNumber */ = {
@@ -1738,14 +1652,9 @@
 			isa = PBXGroup;
 			children = (
 				D2E526C924E3CEEC00ACD06F /* md */,
-				8E2572DA24DC44650080F598 /* Initialize_load */,
 				D2F305B324DF90890020A5C2 /* NSObject+ArcDebugRetainCount.h */,
 				D2F305B424DF90890020A5C2 /* NSObject+ArcDebugRetainCount.m */,
 				D2EB014224DB7A5C009EAFD6 /* main.m */,
-				8E15F1D624E5768C00660C93 /* HHStaff.h */,
-				8E15F1D724E5768C00660C93 /* HHStaff.m */,
-				8E15F1D924E5774B00660C93 /* HHManager.h */,
-				8E15F1DA24E5774B00660C93 /* HHManager.m */,
 			);
 			path = Block;
 			sourceTree = "<group>";
@@ -1943,6 +1852,7 @@
 			files = (
 				D227131424D126F2009B180D /* NumericStrings.cpp in Sources */,
 				D227131824D139B5009B180D /* ReorderArray.cpp in Sources */,
+				8E919556254D57DA0039A12E /* AssignmentOperator_1.cpp in Sources */,
 				D227132824D16CBB009B180D /* MergeSortedLists.cpp in Sources */,
 				D2090C1124CFCF3600FA4F51 /* Fibonacci.cpp in Sources */,
 				D2EB012C24D95F74009EAFD6 /* MergeSort.cpp in Sources */,
@@ -2010,7 +1920,6 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				D28F813A24C6E60E00EE7EF3 /* RecursiveSummary.cpp in Sources */,
 				D2330A2824AF0FD500C6480D /* main.cpp in Sources */,
 				D2EB013B24DA2DC8009EAFD6 /* TwoSum.cpp in Sources */,
 				8E5CCE0724B9FF3D0081B5FF /* Review_1.cpp in Sources */,
@@ -2036,22 +1945,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				D2EB015824DC04F0009EAFD6 /* Father+Test.m in Sources */,
-				D2A32AE224E153CF00ECE821 /* OtherFather+Test.m in Sources */,
-				D2A32AD624E14D5500ECE821 /* OtherFather.m in Sources */,
-				8E15F1DB24E5774B00660C93 /* HHManager.m in Sources */,
-				D2EB014F24DC0002009EAFD6 /* Father.m in Sources */,
-				D2A32AD924E14D9200ECE821 /* OtherSon.m in Sources */,
-				D2EB015524DC00CE009EAFD6 /* Son.m in Sources */,
-				D2A32ADC24E14DC700ECE821 /* OtherGrandSon.m in Sources */,
-				D2FF2CD224DC1B200029E56E /* GrandSon.m in Sources */,
-				8E15F1D824E5768C00660C93 /* HHStaff.m in Sources */,
-				D2A32AD324E1477300ECE821 /* GrandSon+Test.m in Sources */,
-				D2A32AE824E1541B00ECE821 /* OtherGrandSon+Test.m in Sources */,
-				D2A32ADF24E1538100ECE821 /* Father+Test2.m in Sources */,
-				D2EB015B24DC0593009EAFD6 /* Son+Test.m in Sources */,
 				D2F305B524DF90890020A5C2 /* NSObject+ArcDebugRetainCount.m in Sources */,
-				D2A32AE524E153EF00ECE821 /* OtherSon+Test.m in Sources */,
 				D2EB014324DB7A5C009EAFD6 /* main.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

@@ -3,7 +3,7 @@
 > &emsp;上篇我们分析学习了 category 相关的数据结构，本篇我们来分析相关的函数，以及我们定义的 category 数据是怎么附加到 objc_class 中的。
 
 ## category 相关函数分析
-&emsp;`category` 的加载涉及到 `runtime` 的初始化及加载流程且内容实在过于多，这里只是粗略的介绍下，详细内容准备开新篇来讲。本篇只研究 `runtime` 初始化加载过程中涉及的 `category` 的加载。`Objective-C` 的运行是依赖 `runtime` 来做的，而 `runtime` 和其他系统库一样，是由 `OS X` 和 `iOS` 通过 `dyld(the dynamic link editor)` 来动态加载的。
+&emsp;`category` 的加载涉及到 `runtime` 的初始化及加载流程且内容实在过于多，这里只是粗略的介绍下，关于 `runtime` 加载流程的详细内容准备开新篇来讲。本篇只研究 `runtime` 初始化加载过程中涉及的 `category` 的加载。`Objective-C` 的运行是依赖 `runtime` 来做的，而 `runtime` 和其他系统库一样，是由 `OS X` 和 `iOS` 通过 `dyld(the dynamic link editor)` 来动态加载的。
 
 ### _objc_init
 &emsp;`_objc_init` 是 `runtime` 的入口函数，在 `objc-os.mm` 实现。下面我们来一起看看吧：
@@ -47,7 +47,11 @@ void _objc_init(void)
     
     cache_init();
     _imp_implementationWithBlock_init();
-
+    
+    // 这里的三兄弟要牢记一下
+    // 1. &map_images
+    // 2. load_images
+    // 3. unmap_image
     _dyld_objc_notify_register(&map_images, load_images, unmap_image);
 
 #if __OBJC2__
@@ -80,27 +84,30 @@ typedef void (*_dyld_objc_notify_unmapped)(const char* path, const struct mach_h
 ```
 > &emsp;该方法是 `runtime` 特有的方法，该方法的调用时机是，当 `oc` 对象、镜像（ `images` ）被映射（ `mapped` ），未被映射（ `unmapped` ）以及被初始化了（ `initialized` ）。这个方法是 `dlyd` 中声明的，一旦调用该方法，调用结果会作为该函数的参数回传回来。比如，当所有的 `images` 以及 `section` 为 `objc-image-info` 被加载之后会回调 `mapped` 方法，在 `_objc_init` 中正是 `&map_images` 函数。`load` 方法也将在这个方法中被调用。
 
-&emsp;`map_images` 对应函数指针:
+&emsp;`map_images` 函数对应的函数指针类型:
 ```c++
-// count 文件数 paths 文件的路径 mh 文件的 header
+// count 文件数 
+// paths 文件的路径
+// mh 文件的 header（指针数组）
 typedef void (*_dyld_objc_notify_mapped)(unsigned count, const char* const paths[], const struct mach_header* const mh[]);
 ```
-&emsp;`load_images` 对应函数指针:
+&emsp;`load_images` 函数对应的函数指针类型:
 ```c++
-// path 文件的路径 mh 文件的 header
+// path 文件的路径
+// mh 文件的 header（指针）
 typedef void (*_dyld_objc_notify_init)(const char* path, const struct mach_header* mh);
 ```
 &emsp;`unmap_image` 对应函数指针:
 ```c++
-// path 文件的路径 mh 文件的 header
+// path 文件的路径
+// mh 文件的 header（指针）
 typedef void (*_dyld_objc_notify_unmapped)(const char* path, const struct mach_header* mh);
 ```
-&emsp;`map_images` 方法只会调用一次，`load_images` 会调用多次，也很好理解，`map_images` 会把文件数以及文件的 `path`、`header` 等信息给到 `runtime`，`load_images` 则负责每个文件的加载过程。
+&emsp;`map_images` 方法只会调用一次，`load_images` 会调用多次，也很好理解，`map_images` 会把文件数以及文件的 `path`、`header` 地址等信息给到 `runtime`，`load_images` 则负责每个文件的加载过程。
 
 > ~~看到 `_dyld_objc_notify_register` 函数的第一个参数是 `map_imags` 的函数地址。`_objc_init` 里面调用 `map_images` 最终会调用 `objc-runtime-new.mm` 里面的 `_read_images` 函数，而 `category` 加载到类上面正是从 `_read_images` 函数里面开始的。~~
 
-&emsp;`objc4-781` 发生了一些修改，在 `load_images` 函数里面会调用 `loadAllCategories()` 函数，且它的前面有一句 `if` 判断 `didInitialAttachCategories` 这个全局静态变量的值，它是表示 `category` 数据是否已经完成初始化，且默认为 `false`。在 `load_images` 被设置为 `true`，且是整个 `objc4-781` 唯一的一次赋值操作，那么可以断定: 在 `load_images`  函数里面调用 `loadAllCategories()` 一定是早于 `_read_images` 里面的 `for` 循环里面调用 `load_categories_nolock` 函数的。因为 `_read_images` 里面 `for` 循环开始之前要先判断 `didInitialAttachCategories` 是否为 `true`，之前版本的 `objc4-xxx` 是没有这个逻辑的。所以这里是把 `category` 的数据附加到 `objc-class` 中的动作延后到了 `load_images`。
-
+&emsp;`objc4-781` 发生了一些修改，在 `load_images` 函数里面会调用 `loadAllCategories()` 函数，且它的前面有一句 `if` 判断 `didInitialAttachCategories` 这个全局静态变量的值，它是表示 `category` 数据是否已经完成初始化，且默认为 `false`。在 `load_images` 被设置为 `true`，且是整个 `objc4-781` 唯一的一次赋值操作，那么可以断定: 在 `load_images`  函数里面调用 `loadAllCategories()` 一定是早于 `_read_images` 里面的 `for` 循环里面调用 `load_categories_nolock` 函数的。因为 `_read_images` 里面 `for` 循环开始之前要先判断 `didInitialAttachCategories` 是否为 `true`，之前版本的 `objc4-xxx` 是没有这个逻辑的。所以这里是把 `category` 的数据附加到 `objc-class` 中的动作延后到了 `load_images` 阶段。
 ### map_images
 ```c++
 /*
@@ -124,12 +131,11 @@ map_images(unsigned count, const char * const paths[],
     return map_images_nolock(count, paths, mhdrs);
 }
 ```
-
 ### map_images_nolock
 &emsp;`map_images_nolock` 参数:
 + `mhCount`: `mach-o header count`，即 `mach-o header` 个数
 + `mhPaths`: `mach-o header Paths`，即 `header` 的路径数组
-+ `mhdrs`: `mach-o headers`，即 `headers`
++ `mhdrs`: `mach-o headers`，即 `headers`（指针数组）
 
 &emsp;`map_images_nolock` 主要做了 4 件事:
 1. 拿到 `dlyd` 传过来的 `mach_header`，封装为 `header_info` 
@@ -144,8 +150,8 @@ map_images(unsigned count, const char * const paths[],
   ```
 4. 读取 `images`
 
-&emsp;在 `objc4-781` 下:
-+ 把 `OBJC_PRINT_IMAGES` 添加到 `Environment Variables` 中，看到打印: `processing 256 newly-mapped images...`。
+> &emsp;在 `objc4-781` 下，把 `OBJC_PRINT_IMAGES` 添加到 `Environment Variables` 中，看到控制台打印: `processing 256 newly-mapped images...`。
+
 ```c++
 /*
 * map_images_nolock
@@ -170,6 +176,7 @@ map_images_nolock(unsigned mhCount, const char * const mhPaths[],
                   const struct mach_header * const mhdrs[])
 {
 ...
+// map_images_nolock 函数的实现很长，这里只摘出调用 _read_images 函数的部分
 if (hCount > 0) {
     // hList 是 header_info * 数组
     // hCount 是其长度
@@ -183,19 +190,19 @@ if (hCount > 0) {
 ### _read_images
 &emsp;读取各个 `section` 中的数据并放到缓存中，这里的缓存大部分都是全局静态变量。
 
-&emsp;`GETSECT(_getObjc2CategoryList, category_t *, "__objc_catlist")` 之前用 `clang` 编译 `category` 文件时，看到 `DATA段下的` `__objc_catlist` 区，保存 `category` 数据。
+> &emsp;`GETSECT(_getObjc2CategoryList, category_t *, "__objc_catlist")` 之前用 `clang` 编译 `category` 文件时，看到 `DATA段下的` `__objc_catlist` 区，保存 `category` 数据。
 
-+ 把 `OBJC_PRINT_CLASS_SETUP` 添加到 `Environment Variables` 中，看到打印: `found 21690 classes during launch`。
+> &emsp;在 `objc4-781` 下，把 `OBJC_PRINT_CLASS_SETUP` 添加到 `Environment Variables` 中，看到控制台打印: `found 21690 classes during launch`。
 
 ```c++
 /*
 * _read_images
 * Perform initial processing of the headers in the linked
 * list beginning with headerList. 
-* 从 headerList 的起点开始对其中的 header（数据类型是 header_info 结构体） 执行初始化
+* 从 headerList 的起点开始对其中的 header（数据类型是 header_info 结构体）执行初始化
 * 
 * Called by: map_images_nolock
-* 是被 map_images_nolock 调用的
+* 该函数是被 map_images_nolock 调用的
 *
 * Locking: runtimeLock acquired by map_images
 * 由 map_images 函数获取 runtimeLock，调用 _read_images 之前已经加锁
@@ -207,8 +214,7 @@ void _read_images(header_info **hList, uint32_t hCount, int totalClasses, int un
 // IMAGE TIMES: discover categories
 // Discover categories. Only do this after the initial category
 // attachment has been done.
-// 仅在完成初始类别附件（category_t 结构体列表，包含该类所有的类别）
-// 后才执行 Discover categories.
+// 仅在完成初始类别附件（category_t 结构体列表，包含该类所有的类别）后才执行 Discover categories.
 
 // For categories present at startup,
 // discovery is deferred until the first load_images call after the
@@ -217,6 +223,7 @@ void _read_images(header_info **hList, uint32_t hCount, int totalClasses, int un
 
 // 遍历加载每个 header_info 中的 category 数据
 // 由于 didInitialAttachCategories 默认为 false，所以第一次调用 _read_images 时，是不会执行 if 里面的 for 循环的。
+
 if (didInitialAttachCategories) {
     for (EACH_HEADER) {
         load_categories_nolock(hi);
@@ -226,13 +233,16 @@ if (didInitialAttachCategories) {
 ts.log("IMAGE TIMES: discover categories");
 
 // 紧接着是 "IMAGE TIMES: realize non-lazy classes" 实现非懒加载类
+
 // Category discovery MUST BE Late to avoid potential races
 // when other threads call the new category code before this thread finishes its fixups.
 
 // +load handled by prepare_load_methods()
+// 由 prepare_load_methods() 后才真正执行 +load 函数
 
 // Realize non-lazy classes (for +load methods and static instances)
 // 实现非懒加载类（为了 +load 函数和静态实例）
+
 for (EACH_HEADER) {
     // GETSECT(_getObjc2NonlazyClassList, classref_t const, "__objc_nlclslist");
     // 读出 __objc_nlclslist 内的类数据
@@ -245,21 +255,23 @@ for (EACH_HEADER) {
         
         if (!cls) continue;
         
-        // 添加到一个全局类表中
+        // 添加非懒加载类到一个全局类表中
         addClassTableEntry(cls);
-
+        
+        // 如果是一个 Swift 类会执行一个 _objc_fatal
         if (cls->isSwiftStable()) {
             if (cls->swiftMetadataInitializer()) {
                 _objc_fatal("Swift class %s with a metadata initializer "
                             "is not allowed to be non-lazy",
                             cls->nameForLogging());
             }
+            
             // fixme also disallow relocatable classes
             // We can't disallow all Swift classes because of
             // classes like Swift.__EmptyArrayStorage
         }
         
-        // 实现类
+        // 实现 Swift 之外的类
         realizeClassWithoutSwift(cls, nil);
     }
 }
@@ -276,19 +288,18 @@ ts.log("IMAGE TIMES: realize non-lazy classes");
 static bool didInitialAttachCategories = false;
 ```
 &emsp;这里 `discover categories` 的内容 `objc4-781` 和 `objc4-779.1` 已经完全不一样，这里多了全局静态变量  `didInitialAttachCategories` 的控制，它默认是 `false` 表示启动时是否已经将 `category` 的数据初始化完成，全局搜索只发现在 `load_images` 函数中有把它置为 `true`。
-
-### `EACH_HEADER`
+### EACH_HEADER
 ```c++
 // header_info **hList 
 // hList 是一个元素是 header_info * 的数组
-// 循环控制
+// 循环控制，遍历 hList 数组
+
 #define EACH_HEADER \
 hIndex = 0;         \
 hIndex < hCount && (hi = hList[hIndex]); \
 hIndex++
 ```
-
-### `realizeClassWithoutSwift`
+### realizeClassWithoutSwift
 ```c++
 /*
 * realizeClassWithoutSwift
@@ -315,8 +326,10 @@ static Class realizeClassWithoutSwift(Class cls, Class previously)
 
     // 判空
     if (!cls) return nil;
+    
     // 如果已经初始化了，return cls.
     if (cls->isRealized()) return cls;
+    
     ASSERT(cls == remapClass(cls));
 
     // fixme verify class is not in an un-dlopened part of the shared cache?
@@ -325,6 +338,7 @@ static Class realizeClassWithoutSwift(Class cls, Class previously)
     auto isMeta = ro->flags & RO_META;
     
     if (ro->flags & RO_FUTURE) {
+        // 如果是一个 FUTURE 类，
         // 已经初始化过的类才会进入这里
         // This was a future class. rw data is already allocated.
         rw = cls->data();
@@ -339,11 +353,13 @@ static Class realizeClassWithoutSwift(Class cls, Class previously)
         // 第一次初始化类，创建一个新的 rw 并对 rw 的 ro 赋值
         rw = objc::zalloc<class_rw_t>();
         rw->set_ro(ro);
+        
         // 同时设置三个标志位（它们分别处于不同的二进制位）
         rw->flags = RW_REALIZED|RW_REALIZING|isMeta;
         cls->setData(rw);
     }
 
+// 如果 FAST_CACHE_META 为真，则把类是否是元类的标识位转移到类的 cacahe 成员变量中
 #if FAST_CACHE_META
     if (isMeta) cls->cache.setBit(FAST_CACHE_META);
 #endif
@@ -421,6 +437,7 @@ static Class realizeClassWithoutSwift(Class cls, Class previously)
             // from root class to root metaclass
             // 这也可以通过 addSubclass（）传播，但是非指针 isa 设置需要更早的使用它。
             // instanceRequireRawIsa 不会从 根类 传播到 根元类
+            
             instancesRequireRawIsa = true;
             rawIsaIsInherited = true;
         }
@@ -465,7 +482,6 @@ static Class realizeClassWithoutSwift(Class cls, Class previously)
     // the superclass.
     // 从 ro 或超类传播关联的对象禁止标志
     
-    
     // 如果该类不允许在其实例上关联对象或者父类存在且父类也不允许在其实例上关联对象
     // 则禁止该类进行关联对象
     if ((ro->flags & RO_FORBIDS_ASSOCIATED_OBJECTS) ||
@@ -478,8 +494,7 @@ static Class realizeClassWithoutSwift(Class cls, Class previously)
     // 将此类连接到其超类的子类列表
     if (supercls) {
         // 这个方法包含的信息还挺多的，作为延展学习，一定要看一下
-        // 终于看到了一直迷惑的 firstSubclass 和 nextSiblingClass 
-        // 什么时候会用到
+        // 终于看到了一直迷惑的 firstSubclass 和 nextSiblingClass 是什么时候进行设置的
         addSubclass(supercls, cls);
     } else {
         // 如果没有 supercls 则添加到根类
@@ -494,15 +509,14 @@ static Class realizeClassWithoutSwift(Class cls, Class previously)
     return cls;
 }
 ```
-
-### `addSubclass`
-为 `class_rw_t` 的两个成员变量 `nextSiblingClass` `firstSubclass` 解谜，它们是在 `realizeClassWithoutSwift` 函数中被设置。
+### addSubclass
+&emsp;为 `class_rw_t` 的两个成员变量 `nextSiblingClass` `firstSubclass` 解谜，它们是在 `realizeClassWithoutSwift` 函数中被设置。
 ```c++
-/***********************************************************************
+/*
 * addSubclass
 * Adds subcls as a subclass of supercls.
 * Locking: runtimeLock must be held by the caller.
-**********************************************************************/
+*/
 static void addSubclass(Class supercls, Class subcls)
 {
     runtimeLock.assertLocked();
@@ -513,13 +527,17 @@ static void addSubclass(Class supercls, Class subcls)
 
         objc_debug_realized_class_generation_count++;
         
+        // 子类的兄弟类是父类的第一个子类
         subcls->data()->nextSiblingClass = supercls->data()->firstSubclass;
+        // 父类的第一个子类是 subcls
         supercls->data()->firstSubclass = subcls;
-
+        
+        // 父类的 C++ 构造函数下放给子类
         if (supercls->hasCxxCtor()) {
             subcls->setHasCxxCtor();
         }
-
+        
+        // 父类的 C++ 析构函数下放给子类
         if (supercls->hasCxxDtor()) {
             subcls->setHasCxxDtor();
         }
@@ -530,14 +548,14 @@ static void addSubclass(Class supercls, Class subcls)
 
         // Special case: instancesRequireRawIsa does not propagate
         // from root class to root metaclass
+        //  递归
         if (supercls->instancesRequireRawIsa()  &&  supercls->superclass) {
             subcls->setInstancesRequireRawIsaRecursively(true);
         }
     }
 }
 ```
-
-### `load_images`
+### load_images
 ```c++
 /*
 * load_images
@@ -551,34 +569,34 @@ load_images(const char *path __unused, const struct mach_header *mh)
     if (!didInitialAttachCategories && didCallDyldNotifyRegister) {
         // 全局的唯一一次把 didInitialAttachCategories 置为 true
         didInitialAttachCategories = true;
+        
+        // 加载所有的分类数据
         loadAllCategories();
     }
     ...
 }
 ```
-执行 `if` 这里有两个条件 `!didInitialAttachCategories` 和 `didCallDyldNotifyRegister`，`didCallDyldNotifyRegister` 会在 `_dyld_objc_notify_register` 函数的末尾置为 `true`，`didInitialAttachCategories` 则默认是 `false`，然后进入该 `if` 后，被置为 `true`，且全局搜索只有这一次赋值操作，自此该 `if` 就再也不会进入第二次了。
+&emsp;执行 `if` 这里有两个条件 `!didInitialAttachCategories` 和 `didCallDyldNotifyRegister`，`didCallDyldNotifyRegister` 会在 `_dyld_objc_notify_register` 函数的末尾置为 `true`，`didInitialAttachCategories` 则默认是 `false`，然后进入该 `if` 后，被置为 `true`，且全局搜索只有这一次赋值操作，自此该 `if` 就再也不会进入第二次了。
 
-### `loadAllCategories`
+### loadAllCategories
 &emsp;循环调用 `load_categories_nolock` 函数，由于目前对 `runtime` 初始化加载流程不熟悉，暂时无法定论加载 `category` 是从哪开始的，但是目前可以确定的是加载 `category` 是调用 `load_categories_nolock` 函数来做的，下面我们就详细分析 `load_categories_nolock` 函数。
 ```c++
 static void loadAllCategories() {
     mutex_locker_t lock(runtimeLock);
+    // 循环调用 load_categories_nolock 函数
     for (auto *hi = FirstHeader; hi != NULL; hi = hi->getNext()) {
         load_categories_nolock(hi);
     }
 }
 ```
-
-### `load_categories_nolock` 
-
-**这里会涉及懒加载的类和非懒加载的类的，此处先不表，不影响我们阅读原始代码，我们先硬着头把函数实现一行一行读完。**
-
+### load_categories_nolock
+**这里会涉及懒加载的类和非懒加载的类的，此处先不表，不影响我们阅读原始代码，我们先把函数实现一行一行读完。**
 ```c++
 static void load_categories_nolock(header_info *hi) {
     // 是否有类属性？（目前我们还没有见过给类添加属性的操作）
     bool hasClassProperties = hi->info()->hasCategoryClassProperties();
 
-    // 这里语法有点像 OC 的 block 
+    // 这里语法有点像 block 
     // 先定义函数内容，然后再调用执行
     
     // 此处是在尾部调用执行
@@ -609,11 +627,12 @@ static void load_categories_nolock(header_info *hi) {
             // // header 数据
             //    struct header_info *hi;
             // };
+            
             // 构建一个 locstamped_category_t 的局部变量
             locstamped_category_t lc{cat, hi};
 
             if (!cls) {
-                // 如类不存在，执行 log
+                // 如类不存在，执行 log，并跳出本次循环
                 // Category's target class is missing (probably weak-linked).
                 // Ignore the category.
                 if (PrintConnecting) {
@@ -706,10 +725,9 @@ static void load_categories_nolock(header_info *hi) {
     processCatlist(_getObjc2CategoryList2(hi, &count));
 }
 ```
-看到 `category` 中的协议会同时添加到类和元类。
-这里还涉及到一个点: `objc::unattachedCategories.addForClass(lc, cls);` 可理解为操作 `key` 是 `cls` `value` 是 `category_list` 的哈希表，当前 `cls` 还没有实现，那这些 `category` 的内容什么是否附加到类上的。在上一节我们看 `UnattachedCategories` 数据结构时，看到 `attachToClass` 函数就是做这个事情的，把事先保存的 `category` 数据附加到 `cls`  上。全局搜索，我们可以发现 `attachToClass` 只会在 `methodizeClass` 里面调用，然后全局搜索 `methodizeClass` 函数，发现只有在 `realizeClassWithoutSwift` 中调用它。
+&emsp;看到 `category` 中的协议会同时添加到类和元类。这里还涉及到一个点: `objc::unattachedCategories.addForClass(lc, cls)` 可理解为操作 `key` 是 `cls` `value` 是 `category_list` 的哈希表，当前 `cls` 还没有实现，那这些 `category` 的内容什么时候附加到类上的。在上一节我们看 `UnattachedCategories` 数据结构时，看到 `attachToClass` 函数就是做这个事情的，把事先保存的 `category` 数据附加到 `cls`  上。全局搜索，我们可以发现 `attachToClass` 只会在 `methodizeClass` 里面调用，然后全局搜索 `methodizeClass` 函数，发现只有在 `realizeClassWithoutSwift` 中调用它。
 
-### `attachCategories`
+### attachCategories
 ```c++
 // Attach method lists and properties and protocols from categories to a class.
 // 将 方法列表 以及 属性 和 协议 从 categories 附加到类。
@@ -870,8 +888,7 @@ attachCategories(Class cls, const locstamped_category_t *cats_list, uint32_t cat
     rwe->protocols.attachLists(protolists + ATTACH_BUFSIZ - protocount, protocount);
 }
 ```
-
-### `prepareMethodLists`
+### prepareMethodLists
 ```c++
 static void 
 prepareMethodLists(Class cls, method_list_t **addedLists, int addedCount,
@@ -943,7 +960,7 @@ prepareMethodLists(Class cls, method_list_t **addedLists, int addedCount,
 }
 ```
 
-### `fixupMethodList`
+### fixupMethodList
 &emsp;最终把方法列表: `Mark method list as uniqued and sorted`，调用的 `sel_registerNameNoLock` 函数涉及到 `SEL`，看的一头雾水，本文是专注于 `category` 的，先对其有个大概理解，等到 `SEL` 部分再深入学习。
 ```c++
 static void 
@@ -975,9 +992,8 @@ fixupMethodList(method_list_t *mlist, bool bundleCopy, bool sort)
 }
 ```
 
-### `attachLists` 
-&emsp;呼...终于到这里了，真正进行分类中的内容追加到类中。开冲...
-这里是把 `category` 的内容追加到 `class_rw_ext_t` 中去，这里先看函数实现。`objc_class` 涉及到的数据结构暂时不在这里展开，等开新篇再讲。 
+### attachLists
+&emsp;呼...终于到这里了，真正进行分类中的内容追加到类中。开冲... 这里是把 `category` 的内容追加到 `class_rw_ext_t` 中去，这里先看函数实现。`objc_class` 涉及到的数据结构暂时不在这里展开，等开新篇再讲。 
 ```c++
 void attachLists(List* const * addedLists, uint32_t addedCount) {
     if (addedCount == 0) return;
@@ -1049,9 +1065,8 @@ void attachLists(List* const * addedLists, uint32_t addedCount) {
     }
 }
 ```
-这里可明确确认 `category` 中添加的函数会放在原函数的前面，当调用同名函数时，原函数会被 “覆盖”。
-
-### `flushCaches`
+&emsp;这里可明确确认 `category` 中添加的函数会放在原函数的前面，当调用同名函数时，原函数会被 “覆盖”。
+### flushCaches
 ```c++
 /*
 * _objc_flush_caches
@@ -1086,8 +1101,7 @@ static void flushCaches(Class cls)
     }
 }
 ```
-
-### `methodizeClass`
+### methodizeClass
 &emsp;把之前类不存在时，保存的类与 `category` 的映射中的数据追加到类中。
 ```c++
 /*

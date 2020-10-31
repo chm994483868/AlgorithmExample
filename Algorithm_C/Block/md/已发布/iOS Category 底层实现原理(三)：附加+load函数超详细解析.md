@@ -1,20 +1,21 @@
 # iOS Category 底层实现原理(三)：附加+load函数超详细解析
 
-## `+load` 函数分析
+## +load 函数分析
 &emsp;既然写到这里了，那我们就顺便把 `+load` 函数的调用流程分析一下吧。
-+ 实现 `+load` 的分类和类是非懒加载分类和非懒加载类，未实现 `+load` 函数的分类和类，是懒加载类。懒记载类只有我们第一次用到它们的时候，才会执行实现。
-+ `load` 函数执行是直接由其函数地址直接调用的，不是走 `msgSend` 的函数查找流程的，所以类和分类中的 `load` 函数是完全不存在 “覆盖” 行为的。它们都会执行，执行的流程的话：首先是 类一定早于分类的，然后父类一定早于子类，分类之间则是谁先编译则谁先执行。（这里刚好和不同分类中的同名函数，后编译的分类中的函数会 “覆盖” 先编译的分类相反。）
-+ 正常情况我们都不应该手动调用 `load` 函数，我们只要要交给系统自己等待调用即可，切全局只会调用一次。
 
-### 再探 `load_images`
-`load_images` 函数正是用来是负责调用指定的 `mach_header` 中的类和分类的 `+load` 函数的。比较 `objc4-799.1`，发现  `objc4-781` 中的 `load_images` 多了一个作用，多了如下 4 行代码。
++ 实现 `+load` 的分类和类是非懒加载分类和非懒加载类，未实现 `+load` 函数的分类和类，是懒加载分类和懒加载类。懒加载类只有我们第一次用到它们的时候，才会执行实现。
++ `load` 函数执行是直接由其函数地址直接调用的，不是走 `msgSend` 的函数查找流程的，所以类和分类中的 `load` 函数是完全不存在 “覆盖” 行为的。它们都会执行，执行的流程的话：首先是 类一定早于分类的，然后父类一定早于子类，分类之间则是谁先编译则谁先执行。（这里刚好和不同分类中的同名函数，后编译的分类中的函数会 “覆盖” 先编译的分类相反。）
++ 正常情况我们都不应该手动调用 `load` 函数，我们只要要交给系统自己等待调用即可，且全局只会调用一次。
+
+### 再探 load_images
+&emsp;`load_images` 函数正是用来是负责调用指定的 `mach_header` 中的类和分类的 `+load` 函数的。比较 `objc4-799.1`，发现  `objc4-781` 中的 `load_images` 多了一个作用，多了如下 4 行代码。
 ```c++
  if (!didInitialAttachCategories && didCallDyldNotifyRegister) {
      didInitialAttachCategories = true;
      loadAllCategories();
  }
 ```
-在 `781` 中 `apple` 把加载 `category` 的数据延后了，之前 `799.1` 中是在 `_read_images` 中加载的。上面我们已经对此过程分析过了，下面我们主要把目光聚焦它的下半部分：
+&emsp;在 `781` 中 `apple` 把加载 `category` 的数据延后了，之前 `799.1` 中是在 `_read_images` 中加载的。前面我们已经对此过程分析过了，下面我们主要把目光聚焦它的下半部分：
 ```c++
 /*
 * load_images
@@ -56,26 +57,28 @@ load_images(const char *path __unused, const struct mach_header *mh)
     call_load_methods();
 }
 ```
-
-### `hasLoadMethods`
+### hasLoadMethods
 ```c++
 // Quick scan for +load methods that doesn't take a lock.
 // 为了快速扫描有没有 +load 函数没有进行加锁。
 bool hasLoadMethods(const headerType *mhdr)
 {
     size_t count;
+    
     // GETSECT(_getObjc2NonlazyClassList, classref_t const, "__objc_nlclslist");
-    // 判断 DATA 段下 __objc_nlclslist 区有没有非懒加载类
+    // 判断 DATA 段下 __objc_nlclslist 区有没有非懒加载 类
+    
     if (_getObjc2NonlazyClassList(mhdr, &count)  &&  count > 0) return true;
     
     // GETSECT(_getObjc2NonlazyCategoryList, category_t * const, "__objc_nlcatlist");
-    // 判断 DATA 段下 __objc_nlcatlist 区有没有非懒加载分类
+    // 判断 DATA 段下 __objc_nlcatlist 区有没有非懒加载 分类
+    
     if (_getObjc2NonlazyCategoryList(mhdr, &count)  &&  count > 0) return true;
+    
     return false;
 }
 ```
-
-### `prepare_load_methods`
+### prepare_load_methods
 ```c++
 void prepare_load_methods(const headerType *mhdr)
 {
@@ -133,8 +136,7 @@ void prepare_load_methods(const headerType *mhdr)
     }
 }
 ```
-
-### `schedule_class_load`
+### schedule_class_load
 ```c++
 /*
 * prepare_load_methods
@@ -171,7 +173,7 @@ static void schedule_class_load(Class cls)
     cls->setInfo(RW_LOADED); 
 }
 ```
-### `add_class_to_loadable_list`
+### add_class_to_loadable_list
 ```c++
 
 struct loadable_class {
@@ -236,8 +238,7 @@ void add_class_to_loadable_list(Class cls)
     loadable_classes_used++;
 }
 ```
-
-### `getLoadMethod`
+### getLoadMethod
 ```c++
 /*
 * objc_class::getLoadMethod
@@ -281,7 +282,7 @@ objc_class::getLoadMethod()
 &emsp;注意这里取的是 `ro()->baseMethods()` 的函数列表
 它里面保存的 `+load` 函数只会来自类定义中的 `+load` 函数实现，分类中的 `+load` 函数是被追加到 `rw` 中的。
 
-### `add_category_to_loadable_list`
+### add_category_to_loadable_list
 ```c++
 
 struct loadable_category {
@@ -340,8 +341,7 @@ void add_category_to_loadable_list(Category cat)
     loadable_categories_used++;
 }
 ```
-
-### `call_load_methods`
+### call_load_methods
 ```c++
 /*
 * call_load_methods
@@ -425,8 +425,7 @@ void call_load_methods(void)
     loading = NO;
 }
 ```
-
-### `call_class_loads`
+### call_class_loads
 ```c++
 /*
 * call_class_loads
@@ -479,7 +478,7 @@ static void call_class_loads(void)
     if (classes) free(classes);
 }
 ```
-### `call_category_loads`
+### call_category_loads
 ```c++
 /*
 * call_category_loads
