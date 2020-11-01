@@ -17,6 +17,8 @@
 		8E2572D824D304DE0080F598 /* Array.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8E2572D624D304DE0080F598 /* Array.cpp */; };
 		8E5CCE0724B9FF3D0081B5FF /* Review_1.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8E5CCE0624B9FF3D0081B5FF /* Review_1.cpp */; };
 		8E919556254D57DA0039A12E /* AssignmentOperator_1.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8E919554254D57DA0039A12E /* AssignmentOperator_1.cpp */; };
+		8E919561254EE3280039A12E /* QueueWithTwoStacks_1.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8E91955F254EE3280039A12E /* QueueWithTwoStacks_1.cpp */; };
+		8E919568254EEBA80039A12E /* StackWithTwoQueues_1.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8E919566254EEBA80039A12E /* StackWithTwoQueues_1.cpp */; };
 		8EA593D924CDB969002785EF /* main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8EA593D824CDB969002785EF /* main.cpp */; };
 		8EA593E024CDBD0B002785EF /* AssignmentOperator.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8EA593DE24CDBD0B002785EF /* AssignmentOperator.cpp */; };
 		8EA593E424CF0B40002785EF /* ConstructBinaryTree.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8EA593E224CF0B40002785EF /* ConstructBinaryTree.cpp */; };
@@ -154,6 +156,11 @@
 		8E6DFE182523862B00D2830E /* iOS 从源码解析Runtime (八)：聚焦cache_t 相关数据结构及函数解析(1).md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 从源码解析Runtime (八)：聚焦cache_t 相关数据结构及函数解析(1).md"; sourceTree = "<group>"; };
 		8E919554254D57DA0039A12E /* AssignmentOperator_1.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = AssignmentOperator_1.cpp; sourceTree = "<group>"; };
 		8E919555254D57DA0039A12E /* AssignmentOperator_1.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = AssignmentOperator_1.hpp; sourceTree = "<group>"; };
+		8E91955F254EE3280039A12E /* QueueWithTwoStacks_1.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = QueueWithTwoStacks_1.cpp; sourceTree = "<group>"; };
+		8E919560254EE3280039A12E /* QueueWithTwoStacks_1.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = QueueWithTwoStacks_1.hpp; sourceTree = "<group>"; };
+		8E919566254EEBA80039A12E /* StackWithTwoQueues_1.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = StackWithTwoQueues_1.cpp; sourceTree = "<group>"; };
+		8E919567254EEBA80039A12E /* StackWithTwoQueues_1.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = StackWithTwoQueues_1.hpp; sourceTree = "<group>"; };
+		8E91956D254EF1E10039A12E /* 《剑指 Offer》面试题一～面试题十的总结.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "《剑指 Offer》面试题一～面试题十的总结.md"; sourceTree = "<group>"; };
 		8EA593D624CDB969002785EF /* OfferReview */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = OfferReview; sourceTree = BUILT_PRODUCTS_DIR; };
 		8EA593D824CDB969002785EF /* main.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
 		8EA593DE24CDBD0B002785EF /* AssignmentOperator.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = AssignmentOperator.cpp; sourceTree = "<group>"; };
@@ -761,6 +768,8 @@
 			children = (
 				D2090C0724CFAD4B00FA4F51 /* QueueWithTwoStacks.cpp */,
 				D2090C0824CFAD4B00FA4F51 /* QueueWithTwoStacks.hpp */,
+				8E91955F254EE3280039A12E /* QueueWithTwoStacks_1.cpp */,
+				8E919560254EE3280039A12E /* QueueWithTwoStacks_1.hpp */,
 			);
 			path = 09_QueueWithTwoStacks;
 			sourceTree = "<group>";
@@ -770,6 +779,8 @@
 			children = (
 				D2090C0B24CFBCC600FA4F51 /* StackWithTwoQueues.cpp */,
 				D2090C0C24CFBCC600FA4F51 /* StackWithTwoQueues.hpp */,
+				8E919566254EEBA80039A12E /* StackWithTwoQueues_1.cpp */,
+				8E919567254EEBA80039A12E /* StackWithTwoQueues_1.hpp */,
 			);
 			path = 09_02_StackWithTwoQueues;
 			sourceTree = "<group>";
@@ -826,6 +837,7 @@
 				8EF1A8AA253B4E7E0058AEAD /* iOS 从 libclosure-74 源码来研究 Block 实现原理(2).md */,
 				D2C74D042537F2100051B89F /* block_Temp.md */,
 				D2C74D05253D9C2E0051B89F /* 数据结构与算法-七大经典排序算法.md */,
+				8E91956D254EF1E10039A12E /* 《剑指 Offer》面试题一～面试题十的总结.md */,
 				D2164F1724F3B9A20000A6AA /* iOS weak 底层实现原理(一)：SideTable|s、weak_table_t、weak_entry_t 等数据结构.md */,
 				D2164F1E24F899FA0000A6AA /* iOS weak 底层实现原理(二)：objc-weak 函数列表全解析.md */,
 				D20B5C8024EBCEFE0077EF6D /* iOS weak 底层实现原理(三)：weak变量从初始化到被置为nil 都经历了什么.md */,
@@ -1914,6 +1926,7 @@
 				D237C63F24D24648001E0B21 /* StackWithMin.cpp in Sources */,
 				D21B43A324CE83160078EEF9 /* FindDuplication.cpp in Sources */,
 				D227132424D165A1009B180D /* ReverseList.cpp in Sources */,
+				8E919568254EEBA80039A12E /* StackWithTwoQueues_1.cpp in Sources */,
 				D2090C1524CFF75E00FA4F51 /* MinNumberInRotatedArray.cpp in Sources */,
 				D227133024D17ADA009B180D /* SubstructureInTree.cpp in Sources */,
 				D227131C24D14BEB009B180D /* KthNodeFromEnd.cpp in Sources */,
@@ -1954,6 +1967,7 @@
 				D2EB011E24D955D6009EAFD6 /* SelectSort.cpp in Sources */,
 				D237C66224D2BC31001E0B21 /* ConvertBinarySearchTree.cpp in Sources */,
 				8E2572C824D1B45D0080F598 /* BinaryTree.cpp in Sources */,
+				8E919561254EE3280039A12E /* QueueWithTwoStacks_1.cpp in Sources */,
 				D239E78024D4012500DA0BE5 /* TranslateNumbersToStrings.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
