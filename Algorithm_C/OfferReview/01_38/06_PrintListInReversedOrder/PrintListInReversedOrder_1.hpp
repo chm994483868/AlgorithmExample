@@ -1,13 +1,13 @@
 //
-//  PrintListInReversedOrder.hpp
+//  PrintListInReversedOrder_1.hpp
 //  OfferReview
 //
-//  Created by CHM on 2020/7/27.
+//  Created by CHM on 2020/11/1.
 //  Copyright © 2020 CHM. All rights reserved.
 //
 
-#ifndef PrintListInReversedOrder_hpp
-#define PrintListInReversedOrder_hpp
+#ifndef PrintListInReversedOrder_1_hpp
+#define PrintListInReversedOrder_1_hpp
 
 #include <stdio.h>
 #include <stack>
@@ -17,7 +17,7 @@
 using namespace List;
 using namespace std;
 
-namespace PrintListInReversedOrder {
+namespace PrintListInReversedOrder_1 {
 
 // 开局的两个小题
 // 往链表末尾添加一个节点
@@ -26,7 +26,7 @@ void addToTail(ListNode** pHead, int value);
 void removeNode(ListNode** pHead, int value);
 
 // 6：从尾到头打印链表
-// 题目：输入一个链表的头节点，从尾到头反过来打印出每个节点的值。
+// 题目：输入一个链表的头结点，从尾到头反过来打印出每个节点的值。
 void printListReversingly_Iteratively(ListNode* pHead);
 void printListReversingly_Recursively(ListNode* pHead);
 
@@ -43,4 +43,4 @@ void Test();
 
 }
 
-#endif /* PrintListInReversedOrder_hpp */
+#endif /* PrintListInReversedOrder_1_hpp */

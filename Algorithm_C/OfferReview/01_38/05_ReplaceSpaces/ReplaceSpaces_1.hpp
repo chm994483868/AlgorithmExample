@@ -1,23 +1,23 @@
 //
-//  ReplaceSpaces.hpp
+//  ReplaceSpaces_1.hpp
 //  OfferReview
 //
-//  Created by CHM on 2020/7/27.
+//  Created by CHM on 2020/11/1.
 //  Copyright © 2020 CHM. All rights reserved.
 //
 
-#ifndef ReplaceSpaces_hpp
-#define ReplaceSpaces_hpp
+#ifndef ReplaceSpaces_1_hpp
+#define ReplaceSpaces_1_hpp
 
-#include <iostream>
 #include <stdio.h>
+#include <iostream>
 #include <cstring>
 #include <string>
 #include <algorithm>
 
 using namespace std;
 
-namespace ReplaceSpaces {
+namespace ReplaceSpaces_1 {
 
 // 5：替换空格
 // 题目：请实现一个函数，把字符串中的每个空格替换成 "%20"。例如输入 “We are happy.”，
@@ -51,4 +51,4 @@ void Test();
 
 }
 
-#endif /* ReplaceSpaces_hpp */
+#endif /* ReplaceSpaces_1_hpp */
