@@ -29,6 +29,7 @@
 		D202B25D254E914D00D9BFBC /* PrintListInReversedOrder_1.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D202B25B254E914D00D9BFBC /* PrintListInReversedOrder_1.cpp */; };
 		D202B260254EA1B400D9BFBC /* ConstructBinaryTree_1.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D202B25E254EA1B400D9BFBC /* ConstructBinaryTree_1.cpp */; };
 		D202B263254EAFA700D9BFBC /* NextNodeInBinaryTrees_1.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D202B261254EAFA700D9BFBC /* NextNodeInBinaryTrees_1.cpp */; };
+		D202B266254FA14A00D9BFBC /* Fibonacci_1.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D202B264254FA14A00D9BFBC /* Fibonacci_1.cpp */; };
 		D2090C0524CFA51E00FA4F51 /* NextNodeInBinaryTrees.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D2090C0324CFA51E00FA4F51 /* NextNodeInBinaryTrees.cpp */; };
 		D2090C0924CFAD4B00FA4F51 /* QueueWithTwoStacks.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D2090C0724CFAD4B00FA4F51 /* QueueWithTwoStacks.cpp */; };
 		D2090C0D24CFBCC600FA4F51 /* StackWithTwoQueues.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D2090C0B24CFBCC600FA4F51 /* StackWithTwoQueues.cpp */; };
@@ -184,6 +185,8 @@
 		D202B25F254EA1B400D9BFBC /* ConstructBinaryTree_1.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = ConstructBinaryTree_1.hpp; sourceTree = "<group>"; };
 		D202B261254EAFA700D9BFBC /* NextNodeInBinaryTrees_1.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = NextNodeInBinaryTrees_1.cpp; sourceTree = "<group>"; };
 		D202B262254EAFA700D9BFBC /* NextNodeInBinaryTrees_1.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = NextNodeInBinaryTrees_1.hpp; sourceTree = "<group>"; };
+		D202B264254FA14A00D9BFBC /* Fibonacci_1.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Fibonacci_1.cpp; sourceTree = "<group>"; };
+		D202B265254FA14A00D9BFBC /* Fibonacci_1.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = Fibonacci_1.hpp; sourceTree = "<group>"; };
 		D2090C0324CFA51E00FA4F51 /* NextNodeInBinaryTrees.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = NextNodeInBinaryTrees.cpp; sourceTree = "<group>"; };
 		D2090C0424CFA51E00FA4F51 /* NextNodeInBinaryTrees.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = NextNodeInBinaryTrees.hpp; sourceTree = "<group>"; };
 		D2090C0724CFAD4B00FA4F51 /* QueueWithTwoStacks.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = QueueWithTwoStacks.cpp; sourceTree = "<group>"; };
@@ -790,6 +793,8 @@
 			children = (
 				D2090C0F24CFCF3600FA4F51 /* Fibonacci.cpp */,
 				D2090C1024CFCF3600FA4F51 /* Fibonacci.hpp */,
+				D202B264254FA14A00D9BFBC /* Fibonacci_1.cpp */,
+				D202B265254FA14A00D9BFBC /* Fibonacci_1.hpp */,
 			);
 			path = 10_Fibonacci;
 			sourceTree = "<group>";
@@ -1927,6 +1932,7 @@
 				D21B43A324CE83160078EEF9 /* FindDuplication.cpp in Sources */,
 				D227132424D165A1009B180D /* ReverseList.cpp in Sources */,
 				8E919568254EEBA80039A12E /* StackWithTwoQueues_1.cpp in Sources */,
+				D202B266254FA14A00D9BFBC /* Fibonacci_1.cpp in Sources */,
 				D2090C1524CFF75E00FA4F51 /* MinNumberInRotatedArray.cpp in Sources */,
 				D227133024D17ADA009B180D /* SubstructureInTree.cpp in Sources */,
 				D227131C24D14BEB009B180D /* KthNodeFromEnd.cpp in Sources */,

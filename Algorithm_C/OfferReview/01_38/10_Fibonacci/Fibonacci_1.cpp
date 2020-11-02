@@ -1,20 +1,20 @@
 //
-//  Fibonacci.cpp
+//  Fibonacci_1.cpp
 //  OfferReview
 //
-//  Created by CHM on 2020/7/28.
+//  Created by CHM on 2020/11/2.
 //  Copyright © 2020 CHM. All rights reserved.
 //
 
-#include "Fibonacci.hpp"
+#include "Fibonacci_1.hpp"
 
 // 递归方式求 1+2+3+...+n
-long long Fibonacci::addFrom1ToN_Recursive(int n) {
+long long Fibonacci_1::addFrom1ToN_Recursive(int n) {
     return n <= 0? 0: n + addFrom1ToN_Recursive(n - 1);
 }
 
 // 循环方式求 1+2+3+...+n
-long long Fibonacci::addFrom1ToN_Iterative(int n) {
+long long Fibonacci_1::addFrom1ToN_Iterative(int n) {
     int sum = 0;
     for (int i = 1; i <= n; ++i) {
         sum += i;
@@ -22,8 +22,7 @@ long long Fibonacci::addFrom1ToN_Iterative(int n) {
     return sum;
 }
 
-// 方法1：递归
-long long Fibonacci::fibonacci_Solution1(unsigned int n) {
+long long Fibonacci_1::fibonacci_Solution1(unsigned int n) {
     if (n <= 0) {
         return 0;
     }
@@ -35,9 +34,9 @@ long long Fibonacci::fibonacci_Solution1(unsigned int n) {
     return fibonacci_Solution1(n - 1) + fibonacci_Solution1(n - 2);
 }
 
-// 方法2：循环
-long long Fibonacci::fibonacci_Solution2(unsigned int n) {
+long long Fibonacci_1::fibonacci_Solution2(unsigned int n) {
     int results[] = {0, 1};
+    
     if (n < 2) {
         return results[n];
     }
@@ -56,7 +55,7 @@ long long Fibonacci::fibonacci_Solution2(unsigned int n) {
 }
 
 // 测试代码
-void Fibonacci::Test(int n, int expected) {
+void Fibonacci_1::Test(int n, int expected) {
     printf("fibonacci_Solution1 = %lld", fibonacci_Solution1(n));
     
     if(fibonacci_Solution1(n) == expected)
@@ -71,7 +70,7 @@ void Fibonacci::Test(int n, int expected) {
         printf("Test for %d in solution2 failed.\n", n);
 }
 
-void Fibonacci::Test() {
+void Fibonacci_1::Test() {
     Test(0, 0);
     Test(1, 1);
     Test(2, 1);
@@ -88,31 +87,3 @@ void Fibonacci::Test() {
     
     Test(45, 22222);
 }
-
-class Solution {
-public:
-    int fib(int n) {
-        if (n == 0) {
-            return 0;
-        }
-        
-        if (n == 1) {
-            return 1;
-        }
-        
-        // 0 1 2 3 4 5 6
-        // 0 1 1 2 3 5 8
-        
-        int fibOne = 0;
-        int fibTwo = 1;
-        int fibN = 0;
-        for (int i = 2; i <= n; ++i) {
-            fibN = fibOne + fibTwo;
-            
-            fibOne = fibTwo;
-            fibTwo = fibN;
-        }
-        
-        return fibN;
-    }
-};
