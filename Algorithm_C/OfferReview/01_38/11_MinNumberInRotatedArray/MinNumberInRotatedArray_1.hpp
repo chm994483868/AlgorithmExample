@@ -1,13 +1,13 @@
 //
-//  MinNumberInRotatedArray.hpp
+//  MinNumberInRotatedArray_1.hpp
 //  OfferReview
 //
-//  Created by CHM on 2020/7/28.
+//  Created by CHM on 2020/11/2.
 //  Copyright © 2020 CHM. All rights reserved.
 //
 
-#ifndef MinNumberInRotatedArray_hpp
-#define MinNumberInRotatedArray_hpp
+#ifndef MinNumberInRotatedArray_1_hpp
+#define MinNumberInRotatedArray_1_hpp
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -16,7 +16,7 @@
 
 using namespace std;
 
-namespace MinNumberInRotatedArray {
+namespace MinNumberInRotatedArray_1 {
 
 // 开局相关题目：
 // 快速排序
@@ -25,7 +25,7 @@ int partition(int data[], int length, int start, int end);
 void swap(int* num1, int* num2);
 void quickSort(int data[], int length, int start, int end);
 // 员工年龄排序（计数排序）
-void sortAges(int ages[], int length);
+void sortAges(int args[], int length);
 
 // 11：旋转数组的最小数字
 // 题目：把一个数组最开始的若干个元素搬到数组的末尾，我们称之为数组的旋转。
@@ -42,4 +42,4 @@ void Test();
 
 }
 
-#endif /* MinNumberInRotatedArray_hpp */
+#endif /* MinNumberInRotatedArray_1_hpp */

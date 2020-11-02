@@ -30,6 +30,8 @@
 		D202B260254EA1B400D9BFBC /* ConstructBinaryTree_1.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D202B25E254EA1B400D9BFBC /* ConstructBinaryTree_1.cpp */; };
 		D202B263254EAFA700D9BFBC /* NextNodeInBinaryTrees_1.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D202B261254EAFA700D9BFBC /* NextNodeInBinaryTrees_1.cpp */; };
 		D202B266254FA14A00D9BFBC /* Fibonacci_1.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D202B264254FA14A00D9BFBC /* Fibonacci_1.cpp */; };
+		D202B269254FC8BF00D9BFBC /* MinNumberInRotatedArray_1.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D202B267254FC8BF00D9BFBC /* MinNumberInRotatedArray_1.cpp */; };
+		D202B26C254FDE2300D9BFBC /* StringPathInMatrix_1.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D202B26A254FDE2300D9BFBC /* StringPathInMatrix_1.cpp */; };
 		D2090C0524CFA51E00FA4F51 /* NextNodeInBinaryTrees.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D2090C0324CFA51E00FA4F51 /* NextNodeInBinaryTrees.cpp */; };
 		D2090C0924CFAD4B00FA4F51 /* QueueWithTwoStacks.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D2090C0724CFAD4B00FA4F51 /* QueueWithTwoStacks.cpp */; };
 		D2090C0D24CFBCC600FA4F51 /* StackWithTwoQueues.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D2090C0B24CFBCC600FA4F51 /* StackWithTwoQueues.cpp */; };
@@ -187,6 +189,10 @@
 		D202B262254EAFA700D9BFBC /* NextNodeInBinaryTrees_1.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = NextNodeInBinaryTrees_1.hpp; sourceTree = "<group>"; };
 		D202B264254FA14A00D9BFBC /* Fibonacci_1.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Fibonacci_1.cpp; sourceTree = "<group>"; };
 		D202B265254FA14A00D9BFBC /* Fibonacci_1.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = Fibonacci_1.hpp; sourceTree = "<group>"; };
+		D202B267254FC8BF00D9BFBC /* MinNumberInRotatedArray_1.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = MinNumberInRotatedArray_1.cpp; sourceTree = "<group>"; };
+		D202B268254FC8BF00D9BFBC /* MinNumberInRotatedArray_1.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = MinNumberInRotatedArray_1.hpp; sourceTree = "<group>"; };
+		D202B26A254FDE2300D9BFBC /* StringPathInMatrix_1.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = StringPathInMatrix_1.cpp; sourceTree = "<group>"; };
+		D202B26B254FDE2300D9BFBC /* StringPathInMatrix_1.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = StringPathInMatrix_1.hpp; sourceTree = "<group>"; };
 		D2090C0324CFA51E00FA4F51 /* NextNodeInBinaryTrees.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = NextNodeInBinaryTrees.cpp; sourceTree = "<group>"; };
 		D2090C0424CFA51E00FA4F51 /* NextNodeInBinaryTrees.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = NextNodeInBinaryTrees.hpp; sourceTree = "<group>"; };
 		D2090C0724CFAD4B00FA4F51 /* QueueWithTwoStacks.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = QueueWithTwoStacks.cpp; sourceTree = "<group>"; };
@@ -804,6 +810,8 @@
 			children = (
 				D2090C1324CFF75E00FA4F51 /* MinNumberInRotatedArray.cpp */,
 				D2090C1424CFF75E00FA4F51 /* MinNumberInRotatedArray.hpp */,
+				D202B267254FC8BF00D9BFBC /* MinNumberInRotatedArray_1.cpp */,
+				D202B268254FC8BF00D9BFBC /* MinNumberInRotatedArray_1.hpp */,
 			);
 			path = 11_MinNumberInRotatedArray;
 			sourceTree = "<group>";
@@ -813,6 +821,8 @@
 			children = (
 				D2090C1724D010B800FA4F51 /* StringPathInMatrix.cpp */,
 				D2090C1824D010B800FA4F51 /* StringPathInMatrix.hpp */,
+				D202B26A254FDE2300D9BFBC /* StringPathInMatrix_1.cpp */,
+				D202B26B254FDE2300D9BFBC /* StringPathInMatrix_1.hpp */,
 			);
 			path = 12_StringPathInMatrix;
 			sourceTree = "<group>";
@@ -1910,6 +1920,8 @@
 				D2090C1124CFCF3600FA4F51 /* Fibonacci.cpp in Sources */,
 				D2EB012C24D95F74009EAFD6 /* MergeSort.cpp in Sources */,
 				D2EB011024D92F70009EAFD6 /* InsertSort.cpp in Sources */,
+				D202B269254FC8BF00D9BFBC /* MinNumberInRotatedArray_1.cpp in Sources */,
+				D202B26C254FDE2300D9BFBC /* StringPathInMatrix_1.cpp in Sources */,
 				D202B257254E720100D9BFBC /* FindInPartiallySortedMatrix_1.cpp in Sources */,
 				8E2572C124D0696F0080F598 /* Print1ToMaxOfNDigits.cpp in Sources */,
 				D227130824D10B2F009B180D /* DeleteNodeInList.cpp in Sources */,

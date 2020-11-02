@@ -1,18 +1,18 @@
 //
-//  StringPathInMatrix.hpp
+//  StringPathInMatrix_1.hpp
 //  OfferReview
 //
-//  Created by CHM on 2020/7/28.
+//  Created by CHM on 2020/11/2.
 //  Copyright © 2020 CHM. All rights reserved.
 //
 
-#ifndef StringPathInMatrix_hpp
-#define StringPathInMatrix_hpp
+#ifndef StringPathInMatrix_1_hpp
+#define StringPathInMatrix_1_hpp
 
 #include <stdio.h>
 #include <string>
 
-namespace StringPathInMatrix {
+namespace StringPathInMatrix_1 {
 
 // 12：矩阵中的路径
 // 题目：请设计一个函数，用来判断在一个矩阵中是否存在一条包含某字符串所有
@@ -106,4 +106,4 @@ void Test();
 
 }
 
-#endif /* StringPathInMatrix_hpp */
+#endif /* StringPathInMatrix_1_hpp */
