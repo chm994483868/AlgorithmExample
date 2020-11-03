@@ -681,24 +681,51 @@ NextNodeInBinaryTrees::BinaryTreeNode* NextNodeInBinaryTrees::getNext(BinaryTree
         return nullptr;
     }
     
+    // 分三种情况：
     BinaryTreeNode* pNext = nullptr;
     if (pNode->m_pRight != nullptr) {
+        // 1. 一个节点的右节点不为 nullptr 时，即该节点存在右子树，那么它的下一个节点就是它的右子树的最左节点，
+        // 如果它的右子节点是叶子节点的话，那么下一个节点就是它自己了，例如：左根右 （正对应了它这个右）
+        
         BinaryTreeNode* pRight = pNode->m_pRight;
+        
+        // 一个向下循环，找到右子树的最左子节点
         while (pRight->m_pLeft != nullptr) {
             pRight = pRight->m_pLeft;
         }
+        
+        // 然后把找到的结果赋值给 pNext
+        // （pNext 也有两种情况，1): 还是上面的 pNode->m_pRight 2): while 循环里面找到的一个 m_pLeft）
         pNext = pRight;
+        
     } else if (pNode->m_pParent != nullptr) {
+        // 2. 这里也分两种情况首先上面的 if 已经排除该节点是没有右子节点的，然后它可能的就是：
+        // 1): 该节点是它父节点的左子节点，此时根据 "左根右" 可知下一个节点就是它的父节点
+        // 2): 该节点是它父节点的右子节点，此时情况则比较复杂一点，依然是根据 "左根右"，此时我们向上找节点，
+        //     它的直接父节点肯定已经使用过了，然后再往上找父节点，如果这个父节点是它自己父节点的左子节点，
+        //     则这下一个节点就是这个父节点的父节点了。
+        
+        // pCurrent 记录当前节点
         BinaryTreeNode* pCurrent = pNode;
+        // 记录当前节点的父节点
         BinaryTreeNode* pParent = pNode->m_pParent;
         
+        // 如果父节点不为空，且该节点是父节点的左子节点，则不用进入 while 循环了，要找的下一个节点就是这个父节点，
+        // 下面直接把 pParent 赋值给 pNext 返回就好了。
         while (pParent != nullptr && pCurrent == pParent->m_pRight) {
+            // 如果进入了循环，就向上找第一个父节点是它父节点的左子节点的节点，如果找到了就会结束 while 循环
+            
+            // 更新 pCurrent 为父节点
             pCurrent = pParent;
+            // 更新 pParent 节点为下一个父节点
             pParent = pParent->m_pParent;
         }
+        
+        // 这里
         pNext = pParent;
     }
     
+    // 最后返回 pNext
     return pNext;
 }
 ```
