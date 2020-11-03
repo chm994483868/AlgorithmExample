@@ -102,7 +102,7 @@ void AssignmentOperator::CMyString::Print() {
     printf("%s", m_pData);
 }
 ```
-## 面试题 3:(一)找出数组中重复的数字
+## 3:(一)找出数组中重复的数字
 &emsp;题目：在一个长度为 n 的数组里的所有数字都在 0 到 n - 1 的范围内。数组中某些数字是重复的，但不知道有几个数字重复了，也不知道每个数字重复了几次。请找出数组中任意一个重复的数字。例如，如果输入长度为7的数组 {2, 3, 1, 0, 2, 5, 3}，那么对应的输出是重复的数字 2 或者 3。
 ```c++
 namespace FindDuplication {
@@ -150,7 +150,7 @@ bool FindDuplication::duplicate(int numbers[], int length, int *duplication) {
     return false;
 }
 ```
-## 面试题 3:(二)不修改数组找出重复的数字
+## 3:(二)不修改数组找出重复的数字
 &emsp;题目：在一个长度为 n+1 的数组里的所有数字都在 1 到 n 的范围内，所以数组中至少有一个数字是重复的。请找出数组中任意一个重复的数字，但不能修改输入的数组。例如，如果输入长度为 8 的数组 {2, 3, 5, 4, 3, 2, 6, 7}，那么对应的输出是重复的数字2或者3。
 ```c++
 namespace FindDuplicationNoEdit {
@@ -413,9 +413,10 @@ void PrintListInReversedOrder::addToTail(ListNode** pHead, int value) {
     pNew->m_pNext = nullptr;
     
     if (*pHead == nullptr) {
-        // 如果入参头节点为空
+        // 如果入参头节点为空，则新建的节点就是头节点了
         *pHead = pNew;
     } else {
+        // 其它情况下则 while 循环找到链表的最后一个节点，把新节点放在最后一个节点的 m_pNext
         ListNode* pNode = *pHead;
         while (pNode->m_pNext != nullptr) {
             pNode = pNode->m_pNext;
@@ -431,40 +432,55 @@ void PrintListInReversedOrder::removeNode(ListNode** pHead, int value) {
         return;
     }
     
+    // 准备一个临时节点 pToBeDeleted 用保存找到的待删除的节点
     ListNode* pToBeDeleted = nullptr;
+    
     if ((*pHead)->m_nValue == value)  {
+        // 如果要删除头节点，用 pToBeDeleted 记录
         pToBeDeleted = *pHead;
+        
+        // 更新头节点为它的下一个节点
         *pHead = (*pHead)->m_pNext;
     } else {
+        
+        // while 循环开始从链表头节点开始找第一个节点的 m_nValue 的值等于 value
         ListNode* pNode = *pHead;
         while (pNode->m_pNext != nullptr && pNode->m_pNext->m_nValue != value) {
             pNode = pNode->m_pNext;
         }
         
         if (pNode->m_pNext != nullptr && pNode->m_pNext->m_nValue == value) {
+            // 如果找到了，则 pToBeDeleted 记录该节点
             pToBeDeleted = pNode->m_pNext;
+            // 更新原始 pNode->m_pNext 为下下一个节点
             pNode->m_pNext = pNode->m_pNext->m_pNext;
         }
     }
     
+    // 如果 pToBeDeleted 不为空，则进行删除
     if (pToBeDeleted != nullptr) {
         delete pToBeDeleted;
         pToBeDeleted = nullptr;
     }
 }
 
+// 迭代的方式从尾到头打印链表，准备一个 stack 从头到尾存放每个节点，然后依次出栈打印
 void PrintListInReversedOrder::printListReversingly_Iteratively(ListNode* pHead) {
     if (pHead == nullptr) {
         return;
     }
     
+    // 准备一个存放节点的 stack
     std::stack<ListNode*> nodes;
+    
+    // 从链表头节点开始，遍历每个节点并放入 stack 中
     ListNode* pNode = pHead;
     while (pNode != nullptr) {
         nodes.push(pNode);
         pNode = pNode->m_pNext;
     }
     
+    // 依次出栈打印节点
     while (!nodes.empty()) {
         ListNode* node = nodes.top();
         printf("%d\t", node->m_nValue);
@@ -472,14 +488,221 @@ void PrintListInReversedOrder::printListReversingly_Iteratively(ListNode* pHead)
     }
 }
 
+// 递归的方式从尾到头打印链表
 void PrintListInReversedOrder::printListReversingly_Recursively(ListNode* pHead) {
     if (pHead != nullptr) {
+        
+        // 只要 m_pNext 不为 nullptr 则一直进行递归
         if (pHead->m_pNext != nullptr) {
             printListReversingly_Recursively(pHead->m_pNext);
         }
         
+        // 当 m_pNext 为 nullptr 后开始执行下面的打印语句
         printf("%d\t", pHead->m_nValue);
     }
 }
+```
+## 面试题 7:重建二叉树
+&emsp;题目：输入某二叉树的前序遍历和中序遍历的结果，请重建出该二叉树。假设输入的前序遍历和中序遍历的结果中都不含重复的数字。例如输入前序遍历序列 {1, 2, 4, 7, 3, 5, 6, 8} 和中序遍历序列 {4, 7, 2, 1, 5, 3, 8, 6}，则重建出如下所示的二叉树并输出它的头结点。
+              1
+           /     \
+          2       3
+         /       / \
+        4       5   6
+         \         /
+          7       8
+
+```c++
+namespace ConstructBinaryTree {
+
+struct BinaryTreeNode {
+    int m_nValue;
+    BinaryTreeNode* m_pLeft;
+    BinaryTreeNode* m_pRight;
+};
+
+BinaryTreeNode* constructCore(int* startPreorder, int* endPreorder, int* startInorder, int* endInorder);
+BinaryTreeNode* construct(int* preorder, int* inorder, int length);
+
+// 辅助函数
+BinaryTreeNode* CreateBinaryTreeNode(int value);
+void ConnectTreeNodes(BinaryTreeNode* pParent, BinaryTreeNode* pLeft, BinaryTreeNode* pRight);
+void PrintTreeNode(const BinaryTreeNode* pNode);
+void PrintTree(const BinaryTreeNode* pRoot);
+void DestroyTree(BinaryTreeNode* pRoot);
+
+}
+
+ConstructBinaryTree::BinaryTreeNode*  ConstructBinaryTree::constructCore(int* startPreorder, int* endPreorder, int* startInorder, int* endInorder) {
+
+    // 前序遍历序列的第一个数字是根节点的值
+    int rootValue = startPreorder[0];
+    
+    // 构建根节点
+    BinaryTreeNode* root = new BinaryTreeNode();
+    root->m_nValue = rootValue;
+    root->m_pLeft = root->m_pRight = nullptr;
+    
+    // 判断是否是就一个根结点的树 (如果前序遍历序列头尾指针相同，中序遍历序列头尾指针相同，且四个指针的值都相同)
+    if (startPreorder == endPreorder) {
+        if (startInorder == endInorder && *startPreorder == *startInorder) {
+            return root;
+        } else {
+            throw std::exception(); // 入参错误
+        }
+    }
+
+    // 从中序序列的起点开始，在中序序列中找到根节点
+    int* rootInorder = startInorder;
+    while (rootInorder <= endInorder && *rootInorder != rootValue) {
+        ++rootInorder;
+    }
+
+    // 如果一直遍历到中序序列的尾部后还是没有找到根节点，则入参错误
+    if (rootInorder == endInorder && *rootInorder != rootValue) {
+        throw std::exception(); // 入参错误，在中序序列中没有找到根节点
+    }
+
+    // 取得左子树的长度（根节点和中序序列第一个节点的距离便是根节点左子树的长度）
+    long leftLength = rootInorder - startInorder;
+    
+    // 取得根节点左子树前序遍历的终点
+    int* leftPreorderEnd = startPreorder + leftLength;
+
+    // 如果左子树存在，则递归构建左子树
+    if (leftLength > 0) {
+        root->m_pLeft = constructCore(startPreorder + 1, leftPreorderEnd, startInorder, rootInorder - 1);
+    }
+
+    // 这里 endPreorder - startPreorder 得到的是左子树和右子树的总长度，如果大于左子树的长度，则表明一定存在右子树
+    // 递归构建右子树
+    if (leftLength < endPreorder - startPreorder) {
+        root->m_pRight = constructCore(leftPreorderEnd + 1, endPreorder, rootInorder + 1, endInorder);
+    }
+
+    return root;
+}
+
+ConstructBinaryTree::BinaryTreeNode* ConstructBinaryTree::construct(int* preorder, int* inorder, int length) {
+    if (preorder == nullptr || inorder == nullptr || length <= 0) {
+        return nullptr;
+    }
+    
+    // 重建二叉树
+    return constructCore(preorder, preorder + length - 1, inorder, inorder + length - 1);
+}
+
+// 辅助函数
+
+// 构建节点
+ConstructBinaryTree::BinaryTreeNode* ConstructBinaryTree::CreateBinaryTreeNode(int value) {
+    BinaryTreeNode* pNode = new BinaryTreeNode();
+    pNode->m_nValue = value;
+    pNode->m_pLeft = nullptr;
+    pNode->m_pRight = nullptr;
+
+    return pNode;
+}
+
+// 左右子节点赋值
+void ConstructBinaryTree::ConnectTreeNodes(BinaryTreeNode* pParent, BinaryTreeNode* pLeft, BinaryTreeNode* pRight) {
+    if(pParent != nullptr) {
+        pParent->m_pLeft = pLeft;
+        pParent->m_pRight = pRight;
+    }
+}
+
+// 打印一个节点
+void ConstructBinaryTree::PrintTreeNode(const BinaryTreeNode* pNode) {
+    if(pNode != nullptr) {
+        printf("value of this node is: %d\n", pNode->m_nValue);
+
+        if(pNode->m_pLeft != nullptr)
+            printf("value of its left child is: %d.\n", pNode->m_pLeft->m_nValue);
+        else
+            printf("left child is nullptr.\n");
+
+        if(pNode->m_pRight != nullptr)
+            printf("value of its right child is: %d.\n", pNode->m_pRight->m_nValue);
+        else
+            printf("right child is nullptr.\n");
+    } else {
+        printf("this node is nullptr.\n");
+    }
+
+    printf("\n");
+}
+
+// 前序打印二叉树
+void ConstructBinaryTree::PrintTree(const BinaryTreeNode* pRoot) {
+    PrintTreeNode(pRoot);
+
+    if (pRoot != nullptr) {
+        if(pRoot->m_pLeft != nullptr)
+            PrintTree(pRoot->m_pLeft);
+
+        if(pRoot->m_pRight != nullptr)
+            PrintTree(pRoot->m_pRight);
+    }
+}
+
+// 前序销毁二叉树
+void ConstructBinaryTree::DestroyTree(BinaryTreeNode* pRoot) {
+    if (pRoot != nullptr) {
+        BinaryTreeNode* pLeft = pRoot->m_pLeft;
+        BinaryTreeNode* pRight = pRoot->m_pRight;
+
+        delete pRoot;
+        pRoot = nullptr;
+
+        DestroyTree(pLeft);
+        DestroyTree(pRight);
+    }
+}
+```
+## 面试题 8:二叉树的下一个结点
+&emsp;题目：给定一棵二叉树和其中的一个结点，如何找出中序遍历顺序的下一个结点？树中的结点除了有两个分别指向左右子结点的指针以外，还有一个指向父结点的指针。
+```c++
+namespace NextNodeInBinaryTrees {
+
+struct BinaryTreeNode {
+    int m_nValue;
+    BinaryTreeNode* m_pParent;
+    BinaryTreeNode* m_pLeft;
+    BinaryTreeNode* m_pRight;
+};
+
+BinaryTreeNode* getNext(BinaryTreeNode* pNode);
+
+}
+
+NextNodeInBinaryTrees::BinaryTreeNode* NextNodeInBinaryTrees::getNext(BinaryTreeNode* pNode) {
+    if (pNode == nullptr) {
+        return nullptr;
+    }
+    
+    BinaryTreeNode* pNext = nullptr;
+    if (pNode->m_pRight != nullptr) {
+        BinaryTreeNode* pRight = pNode->m_pRight;
+        while (pRight->m_pLeft != nullptr) {
+            pRight = pRight->m_pLeft;
+        }
+        pNext = pRight;
+    } else if (pNode->m_pParent != nullptr) {
+        BinaryTreeNode* pCurrent = pNode;
+        BinaryTreeNode* pParent = pNode->m_pParent;
+        
+        while (pParent != nullptr && pCurrent == pParent->m_pRight) {
+            pCurrent = pParent;
+            pParent = pParent->m_pParent;
+        }
+        pNext = pParent;
+    }
+    
+    return pNext;
+}
+```
+## 面试题 9:用两个栈实现队列
+```c++
 
 ```
