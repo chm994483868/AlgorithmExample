@@ -9,7 +9,7 @@
 #include "QuickSort.hpp"
 
 void QuickSort::quickSort(int nums[], int l, int r) {
-    //
+    // 
 }
 
 // 测试代码

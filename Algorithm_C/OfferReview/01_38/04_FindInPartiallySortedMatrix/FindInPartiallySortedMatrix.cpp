@@ -12,34 +12,46 @@ bool FindInPartiallySortedMatrix::find(int* matrix, int rows, int columns, int n
     bool found = false;
     
     if (matrix != nullptr && rows > 0 && columns > 0) {
-        // 从右上角开始
+//        // 从右上角开始（第一行和最后一列）
 //        int row = 0;
 //        int column = columns - 1;
 //
+//        // 循环结束的条件是行数达到最大，列数达到最小
 //        while (row < rows && column >= 0) {
+//            // 取出值
 //            int current = matrix[row * columns + column];
+//
 //            if (current == number) {
+//                // 如果相等，即找到了
 //                found = true;
 //                break;
 //            } else if (current > number) {
+//                // 如果大于要找的值，则缩小列
 //                --column;
 //            } else {
+//                // 如果小于要找的值，则扩大行
 //                ++row;
 //            }
 //        }
         
-        // 从左下角
+        // 从左下角开始（最后一行和第一列）
         int row = rows - 1;
         int column = 0;
         
+        // 循环结束的条件是列数达到最大，行数达到最小
         while (row >= 0 && column < columns) {
+            // 取出值
             int current = matrix[row * columns + column];
+            
             if (current == number) {
+                // 如果相等，即找到了
                 found = true;
                 break;
             } else if (current > number) {
+                // 如果大于要找的值，则缩小行
                 --row;
             } else {
+                // 如果小于要找的值，则扩大列
                 ++column;
             }
         }
