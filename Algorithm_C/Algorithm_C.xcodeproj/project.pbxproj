@@ -40,6 +40,11 @@
 		D202B27F25512BE100D9BFBC /* Print1ToMaxOfNDigits_1.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D202B27D25512BE100D9BFBC /* Print1ToMaxOfNDigits_1.cpp */; };
 		D202B28225513CDF00D9BFBC /* DeleteNodeInList_1.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D202B28025513CDF00D9BFBC /* DeleteNodeInList_1.cpp */; };
 		D202B2852551413500D9BFBC /* DeleteDuplicatedNode_1.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D202B2832551413500D9BFBC /* DeleteDuplicatedNode_1.cpp */; };
+		D202B28925524F0700D9BFBC /* RegularExpressions_1.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D202B28725524F0700D9BFBC /* RegularExpressions_1.cpp */; };
+		D202B28C2552561B00D9BFBC /* NumericStrings_1.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D202B28A2552561B00D9BFBC /* NumericStrings_1.cpp */; };
+		D202B28F25525FA500D9BFBC /* ReorderArray_1.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D202B28D25525FA500D9BFBC /* ReorderArray_1.cpp */; };
+		D202B292255264FD00D9BFBC /* KthNodeFromEnd_1.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D202B290255264FD00D9BFBC /* KthNodeFromEnd_1.cpp */; };
+		D202B29525526CBE00D9BFBC /* EntryNodeInListLoop_1.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D202B29325526CBE00D9BFBC /* EntryNodeInListLoop_1.cpp */; };
 		D2090C0524CFA51E00FA4F51 /* NextNodeInBinaryTrees.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D2090C0324CFA51E00FA4F51 /* NextNodeInBinaryTrees.cpp */; };
 		D2090C0924CFAD4B00FA4F51 /* QueueWithTwoStacks.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D2090C0724CFAD4B00FA4F51 /* QueueWithTwoStacks.cpp */; };
 		D2090C0D24CFBCC600FA4F51 /* StackWithTwoQueues.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D2090C0B24CFBCC600FA4F51 /* StackWithTwoQueues.cpp */; };
@@ -217,6 +222,17 @@
 		D202B28125513CDF00D9BFBC /* DeleteNodeInList_1.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = DeleteNodeInList_1.hpp; sourceTree = "<group>"; };
 		D202B2832551413500D9BFBC /* DeleteDuplicatedNode_1.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = DeleteDuplicatedNode_1.cpp; sourceTree = "<group>"; };
 		D202B2842551413500D9BFBC /* DeleteDuplicatedNode_1.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = DeleteDuplicatedNode_1.hpp; sourceTree = "<group>"; };
+		D202B2862552441700D9BFBC /* 《剑指 Offer》面试题十一～面试题二十的总结.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "《剑指 Offer》面试题十一～面试题二十的总结.md"; sourceTree = "<group>"; };
+		D202B28725524F0700D9BFBC /* RegularExpressions_1.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = RegularExpressions_1.cpp; sourceTree = "<group>"; };
+		D202B28825524F0700D9BFBC /* RegularExpressions_1.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = RegularExpressions_1.hpp; sourceTree = "<group>"; };
+		D202B28A2552561B00D9BFBC /* NumericStrings_1.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = NumericStrings_1.cpp; sourceTree = "<group>"; };
+		D202B28B2552561B00D9BFBC /* NumericStrings_1.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = NumericStrings_1.hpp; sourceTree = "<group>"; };
+		D202B28D25525FA500D9BFBC /* ReorderArray_1.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = ReorderArray_1.cpp; sourceTree = "<group>"; };
+		D202B28E25525FA500D9BFBC /* ReorderArray_1.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = ReorderArray_1.hpp; sourceTree = "<group>"; };
+		D202B290255264FD00D9BFBC /* KthNodeFromEnd_1.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = KthNodeFromEnd_1.cpp; sourceTree = "<group>"; };
+		D202B291255264FD00D9BFBC /* KthNodeFromEnd_1.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = KthNodeFromEnd_1.hpp; sourceTree = "<group>"; };
+		D202B29325526CBE00D9BFBC /* EntryNodeInListLoop_1.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = EntryNodeInListLoop_1.cpp; sourceTree = "<group>"; };
+		D202B29425526CBE00D9BFBC /* EntryNodeInListLoop_1.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = EntryNodeInListLoop_1.hpp; sourceTree = "<group>"; };
 		D2090C0324CFA51E00FA4F51 /* NextNodeInBinaryTrees.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = NextNodeInBinaryTrees.cpp; sourceTree = "<group>"; };
 		D2090C0424CFA51E00FA4F51 /* NextNodeInBinaryTrees.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = NextNodeInBinaryTrees.hpp; sourceTree = "<group>"; };
 		D2090C0724CFAD4B00FA4F51 /* QueueWithTwoStacks.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = QueueWithTwoStacks.cpp; sourceTree = "<group>"; };
@@ -897,6 +913,7 @@
 				D2C74D042537F2100051B89F /* block_Temp.md */,
 				D2C74D05253D9C2E0051B89F /* 数据结构与算法-七大经典排序算法.md */,
 				8E91956D254EF1E10039A12E /* 《剑指 Offer》面试题一～面试题十的总结.md */,
+				D202B2862552441700D9BFBC /* 《剑指 Offer》面试题十一～面试题二十的总结.md */,
 				D2164F1724F3B9A20000A6AA /* iOS weak 底层实现原理(一)：SideTable|s、weak_table_t、weak_entry_t 等数据结构.md */,
 				D2164F1E24F899FA0000A6AA /* iOS weak 底层实现原理(二)：objc-weak 函数列表全解析.md */,
 				D20B5C8024EBCEFE0077EF6D /* iOS weak 底层实现原理(三)：weak变量从初始化到被置为nil 都经历了什么.md */,
@@ -1056,6 +1073,8 @@
 			children = (
 				D227130E24D11DB5009B180D /* RegularExpressions.cpp */,
 				D227130F24D11DB5009B180D /* RegularExpressions.hpp */,
+				D202B28725524F0700D9BFBC /* RegularExpressions_1.cpp */,
+				D202B28825524F0700D9BFBC /* RegularExpressions_1.hpp */,
 			);
 			path = 19_RegularExpressionsMatching;
 			sourceTree = "<group>";
@@ -1065,6 +1084,8 @@
 			children = (
 				D227131224D126F2009B180D /* NumericStrings.cpp */,
 				D227131324D126F2009B180D /* NumericStrings.hpp */,
+				D202B28A2552561B00D9BFBC /* NumericStrings_1.cpp */,
+				D202B28B2552561B00D9BFBC /* NumericStrings_1.hpp */,
 			);
 			path = 20_NumericStrings;
 			sourceTree = "<group>";
@@ -1074,6 +1095,8 @@
 			children = (
 				D227131624D139B5009B180D /* ReorderArray.cpp */,
 				D227131724D139B5009B180D /* ReorderArray.hpp */,
+				D202B28D25525FA500D9BFBC /* ReorderArray_1.cpp */,
+				D202B28E25525FA500D9BFBC /* ReorderArray_1.hpp */,
 			);
 			path = 21_ReorderArray;
 			sourceTree = "<group>";
@@ -1083,6 +1106,8 @@
 			children = (
 				D227131A24D14BEB009B180D /* KthNodeFromEnd.cpp */,
 				D227131B24D14BEB009B180D /* KthNodeFromEnd.hpp */,
+				D202B290255264FD00D9BFBC /* KthNodeFromEnd_1.cpp */,
+				D202B291255264FD00D9BFBC /* KthNodeFromEnd_1.hpp */,
 			);
 			path = 22_KthNodeFromEnd;
 			sourceTree = "<group>";
@@ -1092,6 +1117,8 @@
 			children = (
 				D227131E24D1577D009B180D /* EntryNodeInListLoop.cpp */,
 				D227131F24D1577D009B180D /* EntryNodeInListLoop.hpp */,
+				D202B29325526CBE00D9BFBC /* EntryNodeInListLoop_1.cpp */,
+				D202B29425526CBE00D9BFBC /* EntryNodeInListLoop_1.hpp */,
 			);
 			path = 23_EntryNodeInListLoop;
 			sourceTree = "<group>";
@@ -1974,6 +2001,7 @@
 				D202B257254E720100D9BFBC /* FindInPartiallySortedMatrix_1.cpp in Sources */,
 				8E2572C124D0696F0080F598 /* Print1ToMaxOfNDigits.cpp in Sources */,
 				D227130824D10B2F009B180D /* DeleteNodeInList.cpp in Sources */,
+				D202B28925524F0700D9BFBC /* RegularExpressions_1.cpp in Sources */,
 				D202B25D254E914D00D9BFBC /* PrintListInReversedOrder_1.cpp in Sources */,
 				D239E72724D3BDDF00DA0BE5 /* DigitsInSequence.cpp in Sources */,
 				D2090C2124D0293B00FA4F51 /* NumberOf1InBinary.cpp in Sources */,
@@ -1983,6 +2011,7 @@
 				D2EB010C24D91F91009EAFD6 /* BubbleSort.cpp in Sources */,
 				D237C64324D25B20001E0B21 /* StackPushPopOrder.cpp in Sources */,
 				8E2572CC24D1C3780080F598 /* SymmetricalBinaryTree.cpp in Sources */,
+				D202B28C2552561B00D9BFBC /* NumericStrings_1.cpp in Sources */,
 				D202B2792551144D00D9BFBC /* NumberOf1InBinary_1.cpp in Sources */,
 				D237C65B24D2AAF8001E0B21 /* CopyComplexList.cpp in Sources */,
 				D239E78424D4161800DA0BE5 /* MaxValueOfGifts.cpp in Sources */,
@@ -1997,6 +2026,7 @@
 				D227132424D165A1009B180D /* ReverseList.cpp in Sources */,
 				8E919568254EEBA80039A12E /* StackWithTwoQueues_1.cpp in Sources */,
 				D202B266254FA14A00D9BFBC /* Fibonacci_1.cpp in Sources */,
+				D202B28F25525FA500D9BFBC /* ReorderArray_1.cpp in Sources */,
 				D2090C1524CFF75E00FA4F51 /* MinNumberInRotatedArray.cpp in Sources */,
 				D227133024D17ADA009B180D /* SubstructureInTree.cpp in Sources */,
 				D227131C24D14BEB009B180D /* KthNodeFromEnd.cpp in Sources */,
@@ -2009,6 +2039,7 @@
 				D21B43AB24CEB54B0078EEF9 /* FindInPartiallySortedMatrix.cpp in Sources */,
 				8E2572D524D304690080F598 /* MoreThanHalfNumber.cpp in Sources */,
 				D202B263254EAFA700D9BFBC /* NextNodeInBinaryTrees_1.cpp in Sources */,
+				D202B292255264FD00D9BFBC /* KthNodeFromEnd_1.cpp in Sources */,
 				D239E71F24D3A3B200DA0BE5 /* GreatestSumOfSubarrays.cpp in Sources */,
 				D2090C1924D010B800FA4F51 /* StringPathInMatrix.cpp in Sources */,
 				D21B43B324CED1390078EEF9 /* PrintListInReversedOrder.cpp in Sources */,
@@ -2027,6 +2058,7 @@
 				D202B27F25512BE100D9BFBC /* Print1ToMaxOfNDigits_1.cpp in Sources */,
 				D237C65324D27FEE001E0B21 /* SquenceOfBST.cpp in Sources */,
 				8E2572C524D1B3AE0080F598 /* MirrorOfBinaryTree.cpp in Sources */,
+				D202B29525526CBE00D9BFBC /* EntryNodeInListLoop_1.cpp in Sources */,
 				D237C64F24D27648001E0B21 /* PrintTreesInZigzag.cpp in Sources */,
 				D21B43AF24CEC0CD0078EEF9 /* ReplaceSpaces.cpp in Sources */,
 				D2EB013024D96467009EAFD6 /* HeapSort.cpp in Sources */,

@@ -1,6 +1,6 @@
 # iOS weak 底层实现原理(一)：SideTable|s、weak_table_t、weak_entry_t 等数据结构
 
-> 为了全面透彻的理解 `weak` 关键字的工作原理，现在从最底层的数据结构开始挖掘，力求构建一个完整的认知体系。
+> &emsp;为了全面透彻的理解 `weak` 关键字的工作原理，现在从最底层的数据结构开始挖掘，力求构建一个完整的认知体系。
 
 ## template <typename T> class DisguisedPtr
 &emsp;`template <typename T> class DisguisedPtr` 是在 `Project Headers/objc-private.h` 中定义的一个模版工具类，主要的功能是把 `T` 指针（`T` 类型变量的地址）转化为一个 `unsigned long`，实现**指针到整数的相互映射**，起到**指针伪装**的作用，使指针隐藏于系统工具（如 `leaks` 工具）。在 `objc4-781` 全局搜索 `DisguisedPtr` 发现 `T` 仅作为 `objc_object` 和 `objc_object *` 类型使用。而 `T` 类型是 `objc_object *` 时，用于隐藏 `__weak` 变量的地址。

@@ -729,7 +729,231 @@ NextNodeInBinaryTrees::BinaryTreeNode* NextNodeInBinaryTrees::getNext(BinaryTree
     return pNext;
 }
 ```
-## 面试题 9:用两个栈实现队列
+## 9:(一)用两个栈实现队列
+&emsp;题目：用两个栈实现一个队列。队列的声明如下，请实现它的两个函数 appendTail 和 deleteHead，分别完成在队列尾部插入结点和在队列头部删除结点的功能。
 ```c++
+namespace QueueWithTwoStacks {
+
+template <typename T>
+class CQueue {
+public:
+    CQueue(void);
+    ~CQueue(void);
+    
+    // 在队列末尾添加一个节点
+    void appendTail(const T& node);
+    
+    // 删除队列的头节点
+    T deleteHead();
+    
+private:
+    // 两个栈
+    std::stack<T> stack1;
+    std::stack<T> stack2;
+};
+
+}
+
+template <typename T>
+QueueWithTwoStacks::CQueue<T>::CQueue(void) { }
+
+template <typename T>
+QueueWithTwoStacks::CQueue<T>::~CQueue(void) { }
+
+template <typename T>
+void QueueWithTwoStacks::CQueue<T>::appendTail(const T& node) {
+    // 入队列时始终使用 stack1，出队列时始终使用 stack2
+    //（可以牢记这里，这里和下面用两个队列实现栈的时候有极大的区别）
+    
+    stack1.push(node);
+}
+
+template <typename T>
+T QueueWithTwoStacks::CQueue<T>::deleteHead() {
+    // 出队列始终使用 stack2
+    
+    // 如果 stack2 为空，则把 stack1 中的数据出栈，统统入栈到 stack2
+    if (stack2.empty()) {
+        // stack1 栈中数据出栈并把直接入栈到 stack2
+        while (!stack1.empty()) {
+            T& data = stack1.top();
+            stack1.pop();
+            stack2.push(data);
+        }
+    }
+    
+    // 如果 stack2 为空则表明目前队列为空，无法进行出队
+    if (stack2.empty()) {
+        throw std::exception(); // 栈当前为空，无法弹出数据
+    }
+    
+    // 把 stack2 栈顶数据出栈，作为队列出队
+    T head = stack2.top();
+    stack2.pop();
+    
+    return head;
+}
+```
+## 9:(二)用两个队列实现栈
+&emsp;题目：用两个队列实现一个栈。栈的声明如下，请实现它的两个函数 appendHead 和 deleteHead，分别完成在栈顶部插入结点和在栈头部删除结点的功能。
+```c++
+namespace StackWithTwoQueues {
+
+template <typename T>
+class CStack {
+public:
+    CStack(void);
+    ~CStack(void);
+    
+    // 在栈顶部添加一个节点
+    void appendHead(const T& node);
+    
+    // 删除栈的顶部节点
+    T deleteHead();
+    
+private:
+    // 两个队列
+    std::queue<T> queue1;
+    std::queue<T> queue2;
+};
+
+}
+
+template <typename T>
+StackWithTwoQueues::CStack<T>::CStack(void) {}
+
+template <typename T>
+StackWithTwoQueues::CStack<T>::~CStack(void) {}
+
+template <typename T>
+void StackWithTwoQueues::CStack<T>::appendHead(const T& node) {
+
+    // 入栈时那个队列为空用哪个
+    if (queue1.empty()) {
+        queue2.push(node);
+    } else if (queue2.empty()) {
+        queue1.push(node);
+    }
+}
+
+template <typename T>
+T StackWithTwoQueues::CStack<T>::deleteHead() {
+
+    // 如果 queue1 和 queue2 都是空，则表明当前栈为空
+    if (queue1.empty() && queue2.empty()) {
+        throw std::exception(); // 当前栈为空
+    }
+    
+    // 如果 queue1 为空
+    if (queue1.empty()) {
+    
+        // 循环把 queue2 的数据出队并入队到 queue1 中，直到 queue2 中只剩最后一个值
+        while (queue2.size() > 1) {
+            T& node = queue2.front();
+            queue2.pop();
+            
+            queue1.push(node);
+        }
+        
+        // 把 queue2 中最后一个值出队，作为栈出栈
+        T node = queue2.front();
+        queue2.pop();
+        return node;
+        
+    } else if (queue2.empty()) {
+        // 同上
+        while (queue1.size() > 1) {
+            T& node = queue1.front();
+            queue1.pop();
+            
+            queue2.push(node);
+        }
+        
+        T node = queue1.front();
+        queue1.pop();
+        return node;
+    }
+    
+    throw std::exception(); // 当前栈为空
+}
+
+```
+## 面试题 10:斐波那契数列
+&emsp;题目：写一个函数，输入 n，求斐波那契（Fibonacci）数列的第 n 项。
+```c++
+namespace Fibonacci {
+
+// 开局的小问题
+// 递归方式求 1+2+3+...+n
+long long addFrom1ToN_Recursive(int n);
+// 循环方式求 1+2+3+...+n
+long long addFrom1ToN_Iterative(int n);
+
+// 方法1：递归
+long long fibonacci_Solution1(unsigned int n);
+// 方法2：循环
+long long fibonacci_Solution2(unsigned int n);
+
+}
+
+// 递归方式求 1+2+3+...+n
+long long Fibonacci::addFrom1ToN_Recursive(int n) {
+    // 递归的方式则是使用三目运算符控制递归结束的条件
+    return n <= 0? 0: n + addFrom1ToN_Recursive(n - 1);
+}
+
+// 循环方式求 1+2+3+...+n
+long long Fibonacci::addFrom1ToN_Iterative(int n) {
+    int sum = 0;
+    
+    // 循环的方式则是从 1 累加到 n
+    for (int i = 1; i <= n; ++i) {
+        sum += i;
+    }
+    return sum;
+}
+
+// 方法1：递归求斐波那契（Fibonacci）数列的第 n 项
+long long Fibonacci::fibonacci_Solution1(unsigned int n) {
+    if (n <= 0) {
+        return 0;
+    }
+    
+    if (n == 1) {
+        return 1;
+    }
+    
+    return fibonacci_Solution1(n - 1) + fibonacci_Solution1(n - 2);
+}
+
+// 方法2：循环求斐波那契（Fibonacci）数列的第 n 项
+long long Fibonacci::fibonacci_Solution2(unsigned int n) {
+    // 表示前两个值
+    int results[] = {0, 1};
+    if (n < 2) {
+        return results[n];
+    }
+    
+    // 0 1 1 2 3 5 8 13 ...
+    // 从第三个开始，每个数字都是前两个数字的和
+    
+    int fibonacciOne = 0;
+    int fibonacciTwo = 1;
+    int fibN = 0;
+    
+    // i 从 2 开始，即第三个数开始
+    for (int i = 2; i <= n; ++i) {
+        // 每个数字都是前两个数字的和
+        fibN = fibonacciOne + fibonacciTwo;
+        
+        // 更新 fibonacciOne
+        fibonacciOne = fibonacciTwo;
+        
+        // 更新 fibonacciTwo
+        fibonacciTwo = fibN;
+    }
+    
+    return fibN;
+}
 
 ```
