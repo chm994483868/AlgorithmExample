@@ -374,6 +374,8 @@ int maxProductAfterCutting_solution2(int length);
 
 // 条件1: 绳子长度大于 1，（ n > 1 ）
 // 条件2: 至少要减 1 刀，（ m >= 1 ）
+
+// 动态规划
 int CuttingRope::maxProductAfterCutting_solution1(int length) {
     // 绳子长度小于 2 不符合题目要求，返回 0
     if (length < 2) {
@@ -405,26 +407,25 @@ int CuttingRope::maxProductAfterCutting_solution1(int length) {
         max = 0;
         
         // j 表示绳子被剪的段数，
-        // 这里 j 的界限只需要到 i / 2，
-        
-        // 例如: i = 4，j <= 2
-        // i = 5，j <= 2， => i - j = 2
-        // i = 6，j <= 3， => i - j = 3
-        // i = 8, j <= 4,  => i - j = 4
-        // ...
-        // 即只需要到一半，
+        // 这里 j 的界限只需要到 i / 2，因为 j + (i - j) = i ,
+        // products[j] * products[i - j] 中，i 和 i - j 从 j = i / 2 以后就重合了
         
         for (int j = 1; j <= i / 2; ++j) {
+            
+            // 这里从下到上，根据前面的值统计绳子长度变长以后能出现的乘积的最大值
             int product = products[j] * products[i - j];
             
+            // 记录最大乘积
             if (max < product) {
                 max = product;
             }
             
+            // 这里是 i，即统计绳子长度从 4 往后随着长度的增加每个长度的最大乘积保存在 products 数组对应的下标位置
             products[i] = max;
         }
     }
     
+    // 最后从 products 数组中，取出 length 的最大乘积
     max = products[length];
     
     // 释放 products 内存空间
@@ -434,6 +435,7 @@ int CuttingRope::maxProductAfterCutting_solution1(int length) {
     return max;
 }
 
+// 贪婪算法，（尽可能多的减出长度是 3 的段，）
 int CuttingRope::maxProductAfterCutting_solution2(int length) {
     if (length < 2) {
         return 0;
@@ -451,11 +453,18 @@ int CuttingRope::maxProductAfterCutting_solution2(int length) {
     // 当绳子最后剩下的长度为 4 的时候，不能再剪去长度为 3 的绳子段。
     // 此时更好的办法是把绳子剪成长度为 2 的两段，因为 2 * 2 > 3 * 1.
     if (length - timesOf3 * 3 == 1) {
+        // 此时表示绳子长度可减为一个长度是 4 的段和另外 n 个长度是 3 的段。
+        
+        // 这里把长度是 3 的段减少 1
         timesOf3 -= 1;
     }
     
+    // 如果最后可减出一段长度为 4，则这里 timesOf2 会等于 2。
+    // 其它情况最后一段长度是 0 1 2 时，timesOf2 则分别是 0 0 1
+    
     int timesOf2 = (length - timesOf3 * 3) / 2;
     
+    // 然后分别求 3 和 2 的次方的乘积
     return (int) (pow(3, timesOf3)) * (int) (pow(2, timesOf2));
 }
 ```
@@ -477,29 +486,41 @@ int numberOf1_Solution2(int n);
 
 }
 
+// 用 1 分别向左移动 32 位，每次和 n 做与操作，统计 n 的二进制表示中每一位是否是 1
 int NumberOf1InBinary::numberOf1_Solution1(int n) {
     int count = 0;
     unsigned int flag = 1;
+    
     // 这里 flag 要向右移动 32 位才能结束 while 循环
+    
     while (flag) {
+        
+        // 1 每次向左移动一次就和 n 做一次与操作，判断 n 的该位是否是 1
         if (n & flag) {
+            // 统计次数
             ++count;
         }
         
+        // 左移
         flag = flag << 1;
     }
     
+    // 返回 count 
     return count;
 }
 
 int NumberOf1InBinary::numberOf1_Solution2(int n) {
     int count = 0;
-    // 这里很巧妙，while 循环的次数就是 1 的个数
+    
+    // 这里很巧妙，while 循环的次数就是 n 二进制表示中 1 的个数
     while (n) {
         ++count;
-        n = (n - 1) & n; // 减 1 后再做 与 操作，后面的 1 全部被去掉了...
+        
+        // n 减 1 后再和 n 做 与 操作，后面的 1 全部被去掉了
+        n = (n - 1) & n;
     }
     
+    // 返回 count
     return count;
 }
 ```
