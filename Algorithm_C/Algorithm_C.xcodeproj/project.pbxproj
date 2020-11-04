@@ -45,6 +45,9 @@
 		D202B28F25525FA500D9BFBC /* ReorderArray_1.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D202B28D25525FA500D9BFBC /* ReorderArray_1.cpp */; };
 		D202B292255264FD00D9BFBC /* KthNodeFromEnd_1.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D202B290255264FD00D9BFBC /* KthNodeFromEnd_1.cpp */; };
 		D202B29525526CBE00D9BFBC /* EntryNodeInListLoop_1.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D202B29325526CBE00D9BFBC /* EntryNodeInListLoop_1.cpp */; };
+		D202B29925527F7500D9BFBC /* ReverseList_1.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D202B29725527F7500D9BFBC /* ReverseList_1.cpp */; };
+		D202B29C255280F800D9BFBC /* MergeSortedLists_1.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D202B29A255280F800D9BFBC /* MergeSortedLists_1.cpp */; };
+		D202B29F255282D600D9BFBC /* SubstructureInTree_1.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D202B29D255282D600D9BFBC /* SubstructureInTree_1.cpp */; };
 		D2090C0524CFA51E00FA4F51 /* NextNodeInBinaryTrees.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D2090C0324CFA51E00FA4F51 /* NextNodeInBinaryTrees.cpp */; };
 		D2090C0924CFAD4B00FA4F51 /* QueueWithTwoStacks.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D2090C0724CFAD4B00FA4F51 /* QueueWithTwoStacks.cpp */; };
 		D2090C0D24CFBCC600FA4F51 /* StackWithTwoQueues.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D2090C0B24CFBCC600FA4F51 /* StackWithTwoQueues.cpp */; };
@@ -233,6 +236,14 @@
 		D202B291255264FD00D9BFBC /* KthNodeFromEnd_1.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = KthNodeFromEnd_1.hpp; sourceTree = "<group>"; };
 		D202B29325526CBE00D9BFBC /* EntryNodeInListLoop_1.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = EntryNodeInListLoop_1.cpp; sourceTree = "<group>"; };
 		D202B29425526CBE00D9BFBC /* EntryNodeInListLoop_1.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = EntryNodeInListLoop_1.hpp; sourceTree = "<group>"; };
+		D202B2962552798F00D9BFBC /* GCD.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = GCD.md; sourceTree = "<group>"; };
+		D202B29725527F7500D9BFBC /* ReverseList_1.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = ReverseList_1.cpp; sourceTree = "<group>"; };
+		D202B29825527F7500D9BFBC /* ReverseList_1.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = ReverseList_1.hpp; sourceTree = "<group>"; };
+		D202B29A255280F800D9BFBC /* MergeSortedLists_1.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = MergeSortedLists_1.cpp; sourceTree = "<group>"; };
+		D202B29B255280F800D9BFBC /* MergeSortedLists_1.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = MergeSortedLists_1.hpp; sourceTree = "<group>"; };
+		D202B29D255282D600D9BFBC /* SubstructureInTree_1.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = SubstructureInTree_1.cpp; sourceTree = "<group>"; };
+		D202B29E255282D600D9BFBC /* SubstructureInTree_1.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = SubstructureInTree_1.hpp; sourceTree = "<group>"; };
+		D202B2A02552879200D9BFBC /* 《剑指 Offer》面试题二十一～面试题三十的总结.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "《剑指 Offer》面试题二十一～面试题三十的总结.md"; sourceTree = "<group>"; };
 		D2090C0324CFA51E00FA4F51 /* NextNodeInBinaryTrees.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = NextNodeInBinaryTrees.cpp; sourceTree = "<group>"; };
 		D2090C0424CFA51E00FA4F51 /* NextNodeInBinaryTrees.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = NextNodeInBinaryTrees.hpp; sourceTree = "<group>"; };
 		D2090C0724CFAD4B00FA4F51 /* QueueWithTwoStacks.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = QueueWithTwoStacks.cpp; sourceTree = "<group>"; };
@@ -914,6 +925,7 @@
 				D2C74D05253D9C2E0051B89F /* 数据结构与算法-七大经典排序算法.md */,
 				8E91956D254EF1E10039A12E /* 《剑指 Offer》面试题一～面试题十的总结.md */,
 				D202B2862552441700D9BFBC /* 《剑指 Offer》面试题十一～面试题二十的总结.md */,
+				D202B2A02552879200D9BFBC /* 《剑指 Offer》面试题二十一～面试题三十的总结.md */,
 				D2164F1724F3B9A20000A6AA /* iOS weak 底层实现原理(一)：SideTable|s、weak_table_t、weak_entry_t 等数据结构.md */,
 				D2164F1E24F899FA0000A6AA /* iOS weak 底层实现原理(二)：objc-weak 函数列表全解析.md */,
 				D20B5C8024EBCEFE0077EF6D /* iOS weak 底层实现原理(三)：weak变量从初始化到被置为nil 都经历了什么.md */,
@@ -937,6 +949,7 @@
 				D2E0674D2506118F008BF0E9 /* iOS Category 底层实现原理(二)：函数分析与加载流程.md */,
 				D2E067692508E82E008BF0E9 /* iOS Category 底层实现原理(三)：附加+load函数超详细解析.md */,
 				D2C74D06253ED8CC0051B89F /* iOS 中各种锁的介绍与运用总结.md */,
+				D202B2962552798F00D9BFBC /* GCD.md */,
 			);
 			path = "已发布";
 			sourceTree = "<group>";
@@ -1128,6 +1141,8 @@
 			children = (
 				D227132224D165A1009B180D /* ReverseList.cpp */,
 				D227132324D165A1009B180D /* ReverseList.hpp */,
+				D202B29725527F7500D9BFBC /* ReverseList_1.cpp */,
+				D202B29825527F7500D9BFBC /* ReverseList_1.hpp */,
 			);
 			path = 24_ReverseList;
 			sourceTree = "<group>";
@@ -1137,6 +1152,8 @@
 			children = (
 				D227132624D16CBB009B180D /* MergeSortedLists.cpp */,
 				D227132724D16CBB009B180D /* MergeSortedLists.hpp */,
+				D202B29A255280F800D9BFBC /* MergeSortedLists_1.cpp */,
+				D202B29B255280F800D9BFBC /* MergeSortedLists_1.hpp */,
 			);
 			path = 25_MergeSortedLists;
 			sourceTree = "<group>";
@@ -1161,6 +1178,8 @@
 			children = (
 				D227132E24D17AD9009B180D /* SubstructureInTree.cpp */,
 				D227132F24D17ADA009B180D /* SubstructureInTree.hpp */,
+				D202B29D255282D600D9BFBC /* SubstructureInTree_1.cpp */,
+				D202B29E255282D600D9BFBC /* SubstructureInTree_1.hpp */,
 			);
 			path = 26_SubstructureInTree;
 			sourceTree = "<group>";
@@ -1993,6 +2012,7 @@
 				8E919556254D57DA0039A12E /* AssignmentOperator_1.cpp in Sources */,
 				D227132824D16CBB009B180D /* MergeSortedLists.cpp in Sources */,
 				D2090C1124CFCF3600FA4F51 /* Fibonacci.cpp in Sources */,
+				D202B29F255282D600D9BFBC /* SubstructureInTree_1.cpp in Sources */,
 				D2EB012C24D95F74009EAFD6 /* MergeSort.cpp in Sources */,
 				D2EB011024D92F70009EAFD6 /* InsertSort.cpp in Sources */,
 				D202B269254FC8BF00D9BFBC /* MinNumberInRotatedArray_1.cpp in Sources */,
@@ -2022,6 +2042,7 @@
 				D202B27C255125A300D9BFBC /* CPower_1.cpp in Sources */,
 				D2090C1D24D01FCC00FA4F51 /* RobotMove.cpp in Sources */,
 				D237C63F24D24648001E0B21 /* StackWithMin.cpp in Sources */,
+				D202B29925527F7500D9BFBC /* ReverseList_1.cpp in Sources */,
 				D21B43A324CE83160078EEF9 /* FindDuplication.cpp in Sources */,
 				D227132424D165A1009B180D /* ReverseList.cpp in Sources */,
 				8E919568254EEBA80039A12E /* StackWithTwoQueues_1.cpp in Sources */,
@@ -2051,6 +2072,7 @@
 				8EA593D924CDB969002785EF /* main.cpp in Sources */,
 				D227130C24D11360009B180D /* DeleteDuplicatedNode.cpp in Sources */,
 				D2090C0D24CFBCC600FA4F51 /* StackWithTwoQueues.cpp in Sources */,
+				D202B29C255280F800D9BFBC /* MergeSortedLists_1.cpp in Sources */,
 				D2EB012524D95A00009EAFD6 /* QuickSort.cpp in Sources */,
 				D202B2732550EB2F00D9BFBC /* CuttingRope.cpp in Sources */,
 				8E2572D824D304DE0080F598 /* Array.cpp in Sources */,

@@ -30,18 +30,18 @@ bool NumericStrings_1::isNumeric(const char* str) {
         return false;
     }
     
-    // 1. 判断前面的整数部分可以是 + - 开头，或者直接省略了符号，
+    // 1. 判断前面的整数部分可以是 +/- 开头，或者直接省略了符号，
     //    numeric 也可能是 false，比如是从小数点开始的数字就没有整数部分: .10
     bool numeric = scanInteger(&str);
     
-    // 2. 遇到了小数点，必须不能包含 + - 所以使用 scanUnsignedInteger 函数判断，
-    //    由于整数部分可有可无，所以后面用的或（ || numeric ）
+    // 2. 到了小数点部分，必须不能包含 +/- 所以使用 scanUnsignedInteger 函数判断，
+    //    由于小数点前面的整数部分可有可无，所以后面用的或（ || numeric ）
     if (*str == '.') {
         ++str;
         numeric = scanUnsignedInteger(&str) || numeric;
     }
     
-    // 3. 遇到了指数，类似整数部分可以包含 + - 或者不包含，
+    // 3. 到了指数部分，类似整数部分可以包含 +/- 或者不包含，
     //    后面用的 && numeric，因为在数字表示中前面必须有内容才能出现指数部分
     if (*str == 'e' || *str == 'E') {
         ++str;
@@ -49,7 +49,7 @@ bool NumericStrings_1::isNumeric(const char* str) {
         numeric = scanInteger(&str) && numeric;
     }
     
-    // 4. numeric 为真，并且字符串到了末尾
+    // 4. numeric 为真，并且字符串到了末尾，才表示该字符串确实表示的是一个数值
     return numeric && *str == '\0';
 }
 

@@ -1,5 +1,6 @@
 # 《剑指 Offer》面试题十一～面试题二十的总结
-> &emsp;上一篇是 1~10 题，本篇是 11~20 题。⛽️⛽️
+
+> &emsp;上一篇是 1～10 题，本篇是 11～20 题。⛽️⛽️
 
 ## 面试题 11:旋转数组的最小数字
 &emsp;题目：把一个数组最开始的若干个元素搬到数组的末尾，我们称之为数组的旋转。输入一个递增排序的数组的一个旋转，输出旋转数组的最小元素。例如数组 {3, 4, 5, 1, 2} 为 {1, 2, 3, 4, 5} 的一个旋转，该数组的最小值为 1 。
@@ -7,11 +8,19 @@
 namespace MinNumberInRotatedArray {
 
 // 开局相关题目：
-// 快速排序
+
+// 返回 [start, end] 区间内的一个随机数
 unsigned int randomInRange(unsigned int start, unsigned int end);
+
+// data 在逻辑上分为两个部分，前一半都是小于某个值后一半都是大于某个值
 int partition(int data[], int length, int start, int end);
+
+// 用于交换数组中的两个位置的元素
 void swap(int* num1, int* num2);
+
+// 快速排序
 void quickSort(int data[], int length, int start, int end);
+
 // 员工年龄排序（计数排序）
 void sortAges(int ages[], int length);
 
@@ -20,9 +29,11 @@ int min(int* numbers, int length);
 
 }
 
-// 快速排序
+// 生成 [start, end] 区间内的一个随机数
 unsigned int MinNumberInRotatedArray::randomInRange(unsigned int start, unsigned int end) {
+    // 生成 [start, end] 区间内的一个随机数
     int rand = (random() % (end - start + 1)) + start;
+    
     return rand;
 }
 
@@ -31,43 +42,65 @@ int MinNumberInRotatedArray::partition(int data[], int length, int start, int en
         throw std::exception(); // 参数错误
     }
     
+    // 生成 [start, end] 区间内的一个随机数
     int index = randomInRange(start, end);
+    
+    // 把 data 的 index 和 end 处的值做交换 （目的是先把这个分界值放在数组的末尾处）
     swap(&data[index], &data[end]);
+    
+    // small 是 start 减 1，例如: start 是 0 时，那么 small 是 -1
     int small = start - 1;
+    
+    // 从 start 到 end 之前一位 的循环遍历
     for (index = start; index < end; ++index) {
+        // 这里使用 data[end] 与数组前面的每一位进行比较 
         if (data[index] < data[end]) {
+            // 只要是比 data[end] 小的话，small 就 +1
             ++small;
             
             if (small != index) {
+                // 如果本次遇到一个比 data[end] 小的值，且 small 和 index 不等，
+                // 表示目前 small 处的值大于 data[end]，而 data[index] 小于 data[end]，则 small 与 index 处的值进行交换
                 swap(&data[small], &data[index]);
             }
         }
     }
     
+    // 最后 small 要前进一步
     ++small;
+    
+    // 如果此时没有到 end 处，表示目前 small 处的值大于 end 的值，进行交换
     if (small != end) {
         swap(&data[small], &data[end]);
     }
     
+    // 返回值是 small，它正是一个分界，左边的值都小于 data[small]，右边的值都大于 data[small]
     return small;
 }
 
+// 根据指针进行交换值
 void MinNumberInRotatedArray::swap(int* num1, int* num2) {
     int temp = *num1;
     *num1 = *num2;
     *num2 = temp;
 }
 
+// 快速排序（还是挖坑 + 分治法好理解）
 void MinNumberInRotatedArray::quickSort(int data[], int length, int start, int end) {
+    // 递归结束的条件
     if (start == end) {
         return;
     }
     
+    // index 正是一个分界，左边的值都小于 data[index]，右边的值都大于 data[index]
     int index = partition(data, length, start, end);
+    
+    // 递归 左半部分进行排序
     if (index > start) {
         quickSort(data, length, start, index - 1);
     }
     
+    // 递归 右半部分进行排序
     if (index < end) {
         quickSort(data, length, index + 1, end);
     }
@@ -79,25 +112,37 @@ void MinNumberInRotatedArray::sortAges(int ages[], int length) {
         return;
     }
     
+    // 假设员工的年龄是 [0, 99] 岁
     const int oldestAge = 99;
+    
+    // 准备一个长度是 100 的数组，用来记录每个年龄的员工的人数
     int timesOfAge[oldestAge + 1];
     int i = 0;
+    // 数组初始化为 0 
     for (; i <= oldestAge; ++i) {
         timesOfAge[i] = 0;
     }
     
+    // 统计每个年龄的人数
     for (i = 0; i < length; ++i) {
         int age = ages[i];
+        
+        // 年龄超过 [0, 99] 的范围
         if (age < 0 || age > oldestAge) {
-            throw std::exception(); // 年龄超过范围
+            throw std::exception();
         }
         
+        // 统计（timesOfAge 的每个下标就对应一个年龄）
         ++timesOfAge[age];
     }
     
+    // 从低到高依次取出每个年龄的人数，然后把每个年龄的连续放在 ages 内   
     int index = 0;
     for (i = 0; i <= oldestAge; ++i) {
+        // count 代表年龄是 i 的人数
         int count = timesOfAge[i];
+        
+        // 然后 ages 数组内连续 count 个位置都是 i 
         while (count > 0) {
             ages[index] = i;
             ++index;
@@ -122,23 +167,40 @@ int MinNumberInRotatedArray::min(int* numbers, int length) {
         throw std::exception(); // 参数错误
     }
     
+    // 记录数组首位和末位
     int index1 = 0;
     int index2 = length - 1;
+    
+    // indexMid 初始为 index1（这里对应一种特殊情况，例如数组旋转的若干元素的若干是 0，即没有进行旋转，即 numbers[index1] 就是最小的元素了）
     int indexMid = index1;
+    
+    //（常规状态下发生旋转后 numbers[0] 是大于等于 numbers[length - 1] 的，如果不是的话表明数组没有进行旋转，可直接跳过 while 循环，执行下面的 return numbers[indexMid]，返回第 0 个元素）
     while (numbers[index1] >= numbers[index2]) {
+    
+        // index2 和 index1 相邻，表示找到了最小元素
+        
+        // 这里可以用 [1, 2] 旋转后是 [2, 1]
+        // [1, 2, 3] 旋转后 [2, 3, 1] 来理解 "index2 - index1 == 1" 是结束的条件。
+        
         if (index2 - index1 == 1) {
+            // 放在 indexMid 
             indexMid = index2;
             break;
         }
         
+        // 找到 index1 和 index2 的中间值
         indexMid = ((index2 - index1) >> 1) + index1;
+        
+        //（这里也是一种特殊情况，假如三个位置的值完全相同，则不能使用类似二分查找的思想进行查找，只能从前到后遍历数组找到最小的值）
         if (numbers[index1] == numbers[index2] && numbers[indexMid] == numbers[index1]) {
             return minInorder(numbers, index1, index2);
         }
         
         if (numbers[indexMid] >= numbers[index1]) {
+            // 表示最小值在右半部分
             index1 = indexMid;
         } else if (numbers[indexMid] <= numbers[index2]) {
+            // 表示最小值在左半部分
             index2 = indexMid;
         }
     }
@@ -147,10 +209,10 @@ int MinNumberInRotatedArray::min(int* numbers, int length) {
 }
 ```
 ## 面试题 12:矩阵中的路径
-&emsp;题目：请设计一个函数，用来判断在一个矩阵中是否存在一条包含某字符串所有字符的路径。路径可以从矩阵中任意一格开始，每一步可以在矩阵中向左、右、上、下移动一格。如果一条路径经过了矩阵的某一格，那么该路径不能再次进入该格子。例如在下面的3×4的矩阵中包含一条字符串“bfce”的路径（路径中的字母用下划线标出）。但矩阵中不包含字符串“abfb”的路径，因为字符串的第一个字符b占据了矩阵中的第一行第二个格子之后，路径不能再次进入这个格子。
-> A B T G
-> C F C S
-> J D E H
+&emsp;题目：请设计一个函数，用来判断在一个矩阵中是否存在一条包含某字符串所有字符的路径。路径可以从矩阵中任意一格开始，每一步可以在矩阵中向左、右、上、下移动一格。如果一条路径经过了矩阵的某一格，那么该路径不能再次进入该格子。例如在下面的 3×4 的矩阵中包含一条字符串 “bfce” 的路径（路径中的字母用下划线标出）。但矩阵中不包含字符串 “abfb” 的路径，因为字符串的第一个字符 b 占据了矩阵中的第一行第二个格子之后，路径不能再次进入这个格子。
+> &emsp;A ~B~ T G
+> &emsp;C ~F~ ~C~ S
+> &emsp;J D ~E~ H
 ```c++
 namespace StringPathInMatrix {
 
@@ -161,17 +223,26 @@ bool hasPath(const char* matrix, int rows, int cols, const char* str);
 
 bool StringPathInMatrix::hasPathCore(const char* matrix, int rows, int cols, int row, int col, const char* str, int& pathLength, bool* visited) {
     if (str[pathLength] == '\0') {
+        // 如果目前前进到 str 的末尾了，则表示在矩阵中找到 str 的完整路径了，返回 true
         return true;
     }
     
     bool hasPath = false;
+    
+    // 判断 row 是否在 [0, rows) 范围内，判断 col 是否在 [0, cols) 区间内，判断矩阵点是否等于 str 的一个点，判断该点没有被经过
     if (row >= 0 && row < rows && col >= 0 && col < cols && matrix[row * cols + col] == str[pathLength] && !visited[row * cols + col]) {
         
+        // 标记前进一步
         ++pathLength;
+        // 标记该点已经经过了
         visited[row * cols + col] = true;
         
+        // 上面表示找到了路径中的一个点符合，然后下面在四个方向上查找下一个节点
+        
+        // 判断 row 和 col 的四个方向是否包含路径上的下一个字符
         hasPath = hasPathCore(matrix, rows, cols, row - 1, col, str, pathLength, visited) || hasPathCore(matrix, rows, cols, row, col - 1, str, pathLength, visited) || hasPathCore(matrix, rows, cols, row + 1, col, str, pathLength, visited) || hasPathCore(matrix, rows, cols, row, col + 1, str, pathLength, visited);
         
+        // 不包含的话进行回溯
         if (!hasPath) {
             --pathLength;
             visited[row * cols + col] = false;
@@ -182,22 +253,31 @@ bool StringPathInMatrix::hasPathCore(const char* matrix, int rows, int cols, int
 }
 
 bool StringPathInMatrix::hasPath(const char* matrix, int rows, int cols, const char* str) {
+    // 起始条件判断
     if (matrix == nullptr || rows < 1 || cols < 1 || str == nullptr) {
         return false;
     }
     
+    // 准备一个 visited 数组，用来标记矩阵中的点是否已经走过了，不能重复经过。
     bool* visited = new bool[rows * cols];
+    // 初始把每个元素都置为 0
     memset(visited, 0, rows * cols);
+    
+    // 记录目前前进到 str 的哪个字符了
     int pathLength = 0;
 
     for (int row = 0; row < rows; ++row) {
         for (int col = 0; col < cols; ++col) {
+        
+            // 双层循环从 (0, 0) 处开始判断进行，这里的双层循环只是为了找一个起点而已，核心回溯法都在下面的 hasPathCore 函数内部
             if (hasPathCore(matrix, rows, cols, row, col, str, pathLength, visited)) {
                 return true;
             }
+            
         }
     }
     
+    // 释放 visited 内存空间
     delete [] visited;
     
     return false;
@@ -217,24 +297,38 @@ int movingCount(int threshold, int rows, int cols);
 
 int RobotMove::movingCoungCore(int threshold, int rows, int cols, int row, int col, bool* visited) {
     int count = 0;
+    
     if (check(threshold, rows, cols, row, col, visited)) {
         visited[row * cols + col] = true;
+        
+        // 统计四个方向
         count = 1 + movingCoungCore(threshold, rows, cols, row - 1, col, visited) + movingCoungCore(threshold, rows, cols, row, col - 1, visited) + movingCoungCore(threshold, rows, cols, row + 1, col, visited) + movingCoungCore(threshold, rows, cols, row, col + 1, visited);
+        
     }
     
     return count;
 }
 
+// 判断机器人是否可进入这个指定的坐标
 bool RobotMove::check(int threshold, int rows, int cols, int row, int col, bool* visited) {
     if (row >= 0 && row < rows && col >= 0 && col < cols && getDigitSum(row) + getDigitSum(col) <= threshold && !visited[row * cols + col]) {
+        // 1. row 在 [0, rows) 内，col 在 [0, cols) 内
+        // 2. row 和 col 的所有数字之和小于等于 threshold
+        // 3. 该坐标从没有进入过
+        
+        // 返回 true 
+        
         return true;
     } else {
         return false;
     }
 }
 
+// 计算入参 number 中的所有数字之和
 int RobotMove::getDigitSum(int number) {
     int sum = 0;
+    
+    // 从低位开始依次统计所有数字的和
     while (number > 0) {
         sum += number % 10;
         number /= 10;
@@ -244,22 +338,27 @@ int RobotMove::getDigitSum(int number) {
 }
 
 int RobotMove::movingCount(int threshold, int rows, int cols) {
+    // 判断入参是否合规
     if (threshold < 0 || rows <= 0 || cols <= 0) {
         return 0;
     }
     
+    // 准备一个长度是 rows * cols 的数组，用来标记坐标是否被经过过
     bool* visited = new bool[rows * cols];
+    // 数组每个元素初始为 false 
     for (int i = 0; i < rows * cols; ++i) {
         visited[i] = false;
     }
     
+    // 从 (0, 0) 开始
     int count = movingCoungCore(threshold, rows, cols, 0, 0, visited);
     
+    // 释放 visited 内存空间
     delete [] visited;
     
+    // 返回 count
     return count;
 }
-
 ```
 ## 面试题 14:剪绳子
 &emsp;题目：给你一根长度为 n 绳子，请把绳子剪成 m 段（ m、n 都是整数，n>1 并且 m≥1）。每段的绳子的长度记为 k[0]、k[1]、⋯⋯、k[m]。k[0] * k[1] * ⋯ *k[m] 可能的最大乘积是多少？例如当绳子的长度是 8 时，我们把它剪成长度分别为 2、3、3 的三段，此时得到最大的乘积 18。
@@ -273,28 +372,51 @@ int maxProductAfterCutting_solution2(int length);
 
 }
 
+// 条件1: 绳子长度大于 1，（ n > 1 ）
+// 条件2: 至少要减 1 刀，（ m >= 1 ）
 int CuttingRope::maxProductAfterCutting_solution1(int length) {
+    // 绳子长度小于 2 不符合题目要求，返回 0
     if (length < 2) {
         return 0;
     }
+    
+    // 绳子长度是 2 时只能剪成两个 1，乘积是 1
     if (length == 2) {
         return 1;
     }
+    
+    // 绳子长度是 3 时，剪成 1 和 2，乘积最大
     if (length == 3) {
         return 2;
     }
     
+    // 准备一个 length + 1 长度的数组，用于记录不同长度的绳子能剪出的乘积的最大值
     int* products = new int[length + 1];
+    
+    // 绳子长度为 0，1，2，3 时对应的乘积最大值
     products[0] = 0;
     products[1] = 1;
     products[2] = 2;
     products[3] = 3;
     
     int max = 0;
+    // i 表示绳子长度，从 4 开始
     for (int i = 4; i <= length; ++i) {
         max = 0;
+        
+        // j 表示绳子被剪的段数，
+        // 这里 j 的界限只需要到 i / 2，
+        
+        // 例如: i = 4，j <= 2
+        // i = 5，j <= 2， => i - j = 2
+        // i = 6，j <= 3， => i - j = 3
+        // i = 8, j <= 4,  => i - j = 4
+        // ...
+        // 即只需要到一半，
+        
         for (int j = 1; j <= i / 2; ++j) {
             int product = products[j] * products[i - j];
+            
             if (max < product) {
                 max = product;
             }
@@ -304,8 +426,11 @@ int CuttingRope::maxProductAfterCutting_solution1(int length) {
     }
     
     max = products[length];
+    
+    // 释放 products 内存空间
     delete [] products;
     
+    // 返回 max
     return max;
 }
 
@@ -333,7 +458,6 @@ int CuttingRope::maxProductAfterCutting_solution2(int length) {
     
     return (int) (pow(3, timesOf3)) * (int) (pow(2, timesOf2));
 }
-
 ```
 ## 面试题 15:二进制中1的个数
 &emsp;题目：请实现一个函数，输入一个整数，输出该数二进制表示中 1 的个数。例如把 9 表示成二进制是 1001，有 2 位是 1。因此如果输入 9，该函数输出 2。
@@ -454,7 +578,6 @@ double CPower::power(double base, int exponent) {
     
     return result;
 }
-
 ```
 ## 面试题 17:打印 1 到最大的 n 位数
 &emsp;题目：输入数字 n，按顺序打印出从 1 最大的 n 位十进制数。比如输入 3，则打印出 1、2、3 一直到最大的 3 位数即 999。
@@ -557,7 +680,6 @@ void Print1ToMaxOfNDigits::print1ToMaxOfNDigits_2(int n) {
         print1ToMaxOfNDigitsRecursively(number, n, 0);
     }
 }
-
 ```
 ## 18:(一)在 O(1) 时间删除链表结点
 &emsp;题目：给定单向链表的头指针和一个结点指针，定义一个函数在O(1)时间删除该结点。
@@ -568,35 +690,54 @@ void deleteNode(ListNode** pListHead, ListNode* pToBeDeleted);
 
 }
 
+// 核心思想是使用要删除节点的 m_pNext 来覆盖要删除的节点，
+// 如果要删除的节点是最后一个节点则只能从头遍历链表到最后一个节点前面来删除这最后一个节点，
+// 还有一种情况如果要链表仅有头节点，且删除的就是这个头节点的话，需要把入参 *pListHead 指向 nullptr。
+
 void DeleteNodeInList::deleteNode(ListNode** pListHead, ListNode* pToBeDeleted) {
+    // 入参判断，pListHead 是头节点指针的指针（因为当要删除的节点是头节点时，要进行置为 nullptr 的操作）
     if (pListHead == nullptr || *pListHead == nullptr || pToBeDeleted == nullptr) {
         return;
     }
     
     if (pToBeDeleted->m_pNext != nullptr) {
+        // 1. 如果要删除的节点的 m_pNext 不为 nullptr，则 m_pNext 节点向前移动一步，覆盖要删除的节点
+        
+        // pNext 是待删除节点的 m_pNext 节点
         ListNode* pNext = pToBeDeleted->m_pNext;
         
+        // 把 pNext 的 m_nValue 赋值给待删除节点 pToBeDeleted 的 m_nValue
         pToBeDeleted->m_nValue = pNext->m_nValue;
+        // 把 pNext 的 m_pNext 赋值给待删除节点 pToBeDeleted 的 m_pNext
         pToBeDeleted->m_pNext = pNext->m_pNext;
         
+        // 释放 pNext 的内存空间
         delete pNext;
         pNext = nullptr;
     } else if (*pListHead == pToBeDeleted) {
+        // 2. 链接仅有一个头节点，且待删除的节点就是这个头节点
+        
+        // 直接释放 pToBeDeleted 的内存空间
         delete pToBeDeleted;
         pToBeDeleted = nullptr;
+        
+        // 把 *pListHead 指向 nullptr
         *pListHead = nullptr;
     } else {
+        // 3. 待删除的节点是尾节点，只能从头遍历链表找到待删除节点的前一个节点 
         ListNode* pNode = *pListHead;
         while (pNode->m_pNext != pToBeDeleted) {
             pNode = pNode->m_pNext;
         }
         
+        // m_pNext 指向 nullptr
         pNode->m_pNext = nullptr;
+        
+        // 释放空间
         delete pToBeDeleted;
         pToBeDeleted = nullptr;
     }
 }
-
 ```
 ## 18:(二)删除链表中重复的结点
 &emsp;题目：在一个排序的链表中，如何删除重复的结点？
@@ -653,10 +794,117 @@ void DeleteDuplicatedNode::deleteDuplication(ListNode** pHead) {
 ## 面试题 19:正则表达式匹配
 &emsp;题目：请实现一个函数用来匹配包含 '.' 和 '*' 的正则表达式。模式中的字符 '.' 表示任意一个字符，而 '*' 表示它前面的字符可以出现任意次（含 0 次）。在本题中，匹配是指字符串的所有字符匹配整个模式。例如，字符串 "aaa" 与模式 "a.a" 和 "ab*ac*a" 匹配，但与 "aa.a" 及 "ab*a" 均不匹配。
 ```c++
-// 
+namespace RegularExpressions {
+
+bool matchCore(const char* str, const char* pattern);
+bool match(const char* str, const char* pattern);
+
+}
+
+bool RegularExpressions::matchCore(const char* str, const char* pattern) {
+    if (*str == '\0' && *pattern == '\0') {
+        // 如果匹配字符串和模式字符串都到了末尾，则返回 true
+        return true;
+    }
+    
+    if (*str != '\0' && *pattern == '\0') {
+        // 如果匹配字符串还没到末尾而模式字符串到了末尾，则返回 false
+        return false;
+    }
+    
+    if (*(pattern + 1) == '*') {
+        // 如果模式字符串第二个字符是 *
+        if (*str == *pattern ||(*pattern == '.' && *str != '\0')) {
+            // 1): 忽略模式字符串的前两个字符
+            // 2): 忽略匹配字符串第一个字符（因为 * 前面的字符串可出现若干次（包括零次））
+            // 3): 忽略匹配字符串第一个字符和忽略模式字符串的前两个字符
+            return matchCore(str, pattern + 2) || matchCore(str + 1, pattern) || matchCore(str + 1, pattern + 2);
+        } else {
+            // 忽略模式字符串的前两个字符
+            return matchCore(str, pattern + 2);
+        }
+    } else {
+        if (*str == *pattern ||(*pattern == '.' && *str != '\0')) {
+            // 第一个字符已经匹配完毕，双方同时前进一步
+            return matchCore(str + 1, pattern + 1);
+        }
+    }
+    
+    return false;
+}
+
+bool RegularExpressions::match(const char* str, const char* pattern) {
+    // 入参判断
+    if (str == nullptr || pattern == nullptr) {
+        return false;
+    }
+    
+    // 核心判断函数
+    return matchCore(str, pattern);
+}
 ```
 ## 面试题 20:表示数值的字符串
 &emsp;题目：请实现一个函数用来判断字符串是否表示数值（包括整数和小数）。例如，字符串“+100”、“5e2”、“-123”、“3.1416”及“-1E-16”都表示数值，但“12e”、“1a3.14”、“1.2.3”、“+-5”及“12e+5.4”都不是。
 ```c++
-//
+namespace NumericStrings {
+
+// 每次指针往前扫描遇到不符合的条件则停止扫描，并不是一次扫描完毕...
+// 在最后的 return 里面自会判断，是否到达了字符串末尾
+// 如果没有到达字符串末尾，则不符合...
+bool scanUnsignedInteger(const char** str);
+bool scanInteger(const char** str);
+
+bool isNumeric(const char* str);
+
+}
+
+// 判断无符号整数，从字符串起点开始，都是 [0, 9] 中的任意字符
+bool NumericStrings::scanUnsignedInteger(const char** str) {
+    const char* before = *str;
+    while (**str != '\0' && **str >= '0' && **str <= '9') {
+        ++(*str);
+    }
+    
+    // 这里是 *str > before，表示 str 至少前进一步才会返回 true
+    return *str > before;
+}
+
+// 判断有符号整数，即前面包含 + / - 或者都不包含
+bool NumericStrings::scanInteger(const char** str) {
+    if (**str == '+' || **str == '-') {
+        // 如果 str 起点是 +/- 则前进一步
+        ++(*str);
+    }
+    
+    // 判断后面是无符号整数
+    return scanUnsignedInteger(str);
+}
+
+bool NumericStrings::isNumeric(const char* str) {
+    if (str == nullptr) {
+        return false;
+    }
+    
+    // 1. 判断前面的整数部分可以是 +/- 开头，或者直接省略了符号，
+    //    numeric 也可能是 false，比如是从小数点开始的数字就没有整数部分: .10
+    bool numeric = scanInteger(&str);
+    
+    // 2. 到了小数点部分，必须不能包含 +/- 所以使用 scanUnsignedInteger 函数判断，
+    //    由于小数点前面的整数部分可有可无，所以后面用的或（ || numeric ）
+    if (*str == '.') {
+        ++str;
+        numeric = scanUnsignedInteger(&str) || numeric;
+    }
+    
+    // 3. 到了指数部分，类似整数部分可以包含 +/- 或者不包含，
+    //    后面用的 && numeric，因为在数字表示中前面必须有内容才能出现指数部分
+    if (*str == 'e' || *str == 'E') {
+        ++str;
+        numeric = scanInteger(&str) && numeric;
+    }
+    
+    // 4. numeric 为真，并且字符串到了末尾，才表示该字符串确实表示的是一个数值
+    return numeric && *str == '\0';
+}
 ```
+## 完结撒花🎉🎉，感谢陪伴！
