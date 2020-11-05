@@ -244,6 +244,7 @@
 		D202B29D255282D600D9BFBC /* SubstructureInTree_1.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = SubstructureInTree_1.cpp; sourceTree = "<group>"; };
 		D202B29E255282D600D9BFBC /* SubstructureInTree_1.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = SubstructureInTree_1.hpp; sourceTree = "<group>"; };
 		D202B2A02552879200D9BFBC /* 《剑指 Offer》面试题二十一～面试题三十的总结.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "《剑指 Offer》面试题二十一～面试题三十的总结.md"; sourceTree = "<group>"; };
+		D202B2A125538DB800D9BFBC /* 《剑指 Offer》面试题三十一～面试题四十的总结.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "《剑指 Offer》面试题三十一～面试题四十的总结.md"; sourceTree = "<group>"; };
 		D2090C0324CFA51E00FA4F51 /* NextNodeInBinaryTrees.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = NextNodeInBinaryTrees.cpp; sourceTree = "<group>"; };
 		D2090C0424CFA51E00FA4F51 /* NextNodeInBinaryTrees.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = NextNodeInBinaryTrees.hpp; sourceTree = "<group>"; };
 		D2090C0724CFAD4B00FA4F51 /* QueueWithTwoStacks.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = QueueWithTwoStacks.cpp; sourceTree = "<group>"; };
@@ -926,6 +927,7 @@
 				8E91956D254EF1E10039A12E /* 《剑指 Offer》面试题一～面试题十的总结.md */,
 				D202B2862552441700D9BFBC /* 《剑指 Offer》面试题十一～面试题二十的总结.md */,
 				D202B2A02552879200D9BFBC /* 《剑指 Offer》面试题二十一～面试题三十的总结.md */,
+				D202B2A125538DB800D9BFBC /* 《剑指 Offer》面试题三十一～面试题四十的总结.md */,
 				D2164F1724F3B9A20000A6AA /* iOS weak 底层实现原理(一)：SideTable|s、weak_table_t、weak_entry_t 等数据结构.md */,
 				D2164F1E24F899FA0000A6AA /* iOS weak 底层实现原理(二)：objc-weak 函数列表全解析.md */,
 				D20B5C8024EBCEFE0077EF6D /* iOS weak 底层实现原理(三)：weak变量从初始化到被置为nil 都经历了什么.md */,

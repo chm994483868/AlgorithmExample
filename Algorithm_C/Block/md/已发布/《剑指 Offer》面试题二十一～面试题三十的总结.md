@@ -294,3 +294,167 @@ bool SubstructureInTree::hasSubtree(BinaryTreeNode* pRoot1, BinaryTreeNode* pRoo
     return result;
 }
 ```
+## 面试题 27:二叉树的镜像
+&emsp;题目：请完成一个函数，输入一个二叉树，该函数输出它的镜像。
+```c++
+namespace MirrorOfBinaryTree {
+
+void mirrorRecursively(BinaryTreeNode* pRoot);
+void mirrorIteratively(BinaryTreeNode* pRoot);
+
+}
+
+void MirrorOfBinaryTree::mirrorRecursively(BinaryTreeNode* pRoot) {
+    if (pRoot == nullptr) {
+        return;
+    }
+    
+    BinaryTreeNode* temp = pRoot->m_pLeft;
+    pRoot->m_pLeft = pRoot->m_pRight;
+    pRoot->m_pRight = temp;
+    
+    if (pRoot->m_pLeft != nullptr) {
+        mirrorRecursively(pRoot->m_pLeft);
+    }
+    
+    if (pRoot->m_pRight != nullptr) {
+        mirrorRecursively(pRoot->m_pRight);
+    }
+}
+
+void MirrorOfBinaryTree::mirrorIteratively(BinaryTreeNode* pRoot) {
+    if (pRoot == nullptr) {
+        return;
+    }
+    
+    std::stack<BinaryTreeNode*> nodes;
+    nodes.push(pRoot);
+    
+    while (!nodes.empty()) {
+        BinaryTreeNode* top = nodes.top();
+        nodes.pop();
+        
+        BinaryTreeNode* temp = top->m_pLeft;
+        top->m_pLeft = top->m_pRight;
+        top->m_pRight = temp;
+        
+        if (top->m_pLeft != nullptr) {
+            nodes.push(top->m_pLeft);
+        }
+        
+        if (top->m_pRight != nullptr) {
+            nodes.push(top->m_pRight);
+        }
+    }
+}
+```
+## 面试题 28:对称的二叉树
+&emsp;题目：请实现一个函数，用来判断一棵二叉树是不是对称的。如果一棵二叉树和它的镜像一样，那么它是对称的。
+```c++
+namespace SymmetricalBinaryTree {
+
+bool isSymmetrical(BinaryTreeNode* pRoot1, BinaryTreeNode* pRoot2);
+bool isSymmetrical(BinaryTreeNode* pRoot);
+
+}
+
+bool SymmetricalBinaryTree::isSymmetrical(BinaryTreeNode* pRoot1, BinaryTreeNode* pRoot2) {
+    if (pRoot1 == nullptr && pRoot2 == nullptr) {
+        return true;
+    }
+    
+    if (pRoot1 == nullptr || pRoot2 == nullptr) {
+        return false;
+    }
+    
+    if (pRoot1->m_nValue != pRoot2->m_nValue) {
+        return false;
+    }
+    
+    return isSymmetrical(pRoot1->m_pLeft, pRoot2->m_pRight) && isSymmetrical(pRoot1->m_pRight, pRoot2->m_pLeft);
+}
+
+bool SymmetricalBinaryTree::isSymmetrical(BinaryTreeNode* pRoot) {
+    return isSymmetrical(pRoot, pRoot);
+}
+```
+## 面试题 29:顺时针打印矩阵
+&emsp;题目：输入一个矩阵，按照从外向里以顺时针的顺序依次打印出每一个数字。
+```c++
+
+```
+## 面试题 30:包含min函数的栈
+&emsp;题目：定义栈的数据结构，请在该类型中实现一个能够得到栈的最小元素的 min 函数。在该栈中，调用 min、push 及 pop 的时间复杂度都是 O(1)。
+```c++
+namespace StackWithMin {
+
+template <typename T>
+class StackWithMin {
+public:
+    StackWithMin() {}
+    virtual ~StackWithMin() {}
+    
+    T& top();
+    const T& top() const;
+    
+    void push(const T& value);
+    void pop();
+    
+    const T& min() const;
+    
+    bool empty() const;
+    size_t size() const;
+private:
+    stack<T> m_data;
+    stack<T> m_min;
+};
+
+}
+
+template <typename T>
+T& StackWithMin::StackWithMin<T>::top() {
+    return m_data.top();
+}
+
+template <typename T>
+const T& StackWithMin::StackWithMin<T>::top() const {
+    return m_data.top();
+}
+
+template <typename T>
+void StackWithMin::StackWithMin<T>::push(const T& value) {
+    m_data.push(value);
+    
+    if (m_min.empty() || value < m_min.top()) {
+        m_min.push(value);
+    } else {
+        m_min.push(m_min.top());
+    }
+}
+
+template <typename T>
+void StackWithMin::StackWithMin<T>::pop() {
+    assert(m_data.size() > 0 && m_min.size() > 0);
+    
+    m_data.pop();
+    m_min.pop();
+}
+
+template <typename T>
+const T& StackWithMin::StackWithMin<T>::min() const {
+    assert(m_data.size() > 0 && m_min.size() > 0);
+    
+    return m_min.top();
+}
+
+template <typename T>
+bool StackWithMin::StackWithMin<T>::empty() const {
+    return m_data.empty();
+}
+
+template <typename T>
+size_t StackWithMin::StackWithMin<T>::size() const {
+    return m_data.size();
+}
+```
+## 完结撒花🎉🎉，感谢陪伴！
