@@ -6,11 +6,9 @@
 &emsp;题目：输入一个整数数组，实现一个函数来调整该数组中数字的顺序，使得所有奇数位于数组的前半部分，所有偶数位于数组的后半部分。
 ```c++
 namespace ReorderArray_1 {
-
 void reorder(int* pData, unsigned int length, bool(*func)(int));
 bool isEven(int n);
 void reorderOddEven_2(int* pData, unsigned int length);
-
 }
 
 void ReorderArray::reorder(int* pData, unsigned int length, bool(*func)(int)) {
@@ -50,7 +48,6 @@ void ReorderArray::reorderOddEven_2(int* pData, unsigned int length) {
 &emsp;题目：输入一个链表，输出该链表中倒数第k个结点。为了符合大多数人的习惯，本题从 1 开始计数，即链表的尾结点是倒数第1个结点。例如一个链表有 6 个结点，从头结点开始它们的值依次是 1、2、3、4、5、6。这个链表的倒数第 3 个结点是值为 4 的结点。
 ```c++
 namespace KthNodeFromEnd {
-
 // 求链表的中间节点。如果链表中的节点总数为奇数，则返回中间节点；
 // 如果节点总数是偶数，则返回中间两个节点的任意一个。
 // 可以定义两个指针，同时从链表的头节点出发，一个指针一次走一步
@@ -59,7 +56,6 @@ namespace KthNodeFromEnd {
 
 ListNode* findKthToTail(ListNode* pListHead, unsigned int k);
 ListNode* findMddleNode(ListNode* pListHead);
-
 }
 
 ListNode* KthNodeFromEnd::findKthToTail(ListNode* pListHead, unsigned int k) {
@@ -111,10 +107,8 @@ ListNode* KthNodeFromEnd::findMddleNode(ListNode* pListHead) {
 &emsp;题目：一个链表中包含环，如何找出环的入口结点？
 ```c++
 namespace EntryNodeInListLoop {
-
 ListNode* meetingNode(ListNode* pHead);
 ListNode* entryNodeOfLoop(ListNode* phead);
-
 }
 
 ListNode* EntryNodeInListLoop::meetingNode(ListNode* pHead) {
@@ -178,9 +172,7 @@ ListNode* EntryNodeInListLoop::entryNodeOfLoop(ListNode* pHead) {
 &emsp;题目：定义一个函数，输入一个链表的头结点，反转该链表并输出反转后链表的头结点。
 ```c++
 namespace ReverseList {
-
 ListNode* reverseList(ListNode* pHead);
-
 }
 
 ListNode* ReverseList::reverseList(ListNode* pHead) {
@@ -207,9 +199,7 @@ ListNode* ReverseList::reverseList(ListNode* pHead) {
 &emsp;题目：输入两个递增排序的链表，合并这两个链表并使新链表中的结点仍然是按照递增排序的。
 ```c++
 namespace MergeSortedLists {
-
 ListNode* merge(ListNode* pHead1, ListNode* pHead2);
-
 }
 
 ListNode* MergeSortedLists::merge(ListNode* pHead1, ListNode* pHead2) {
@@ -237,7 +227,6 @@ ListNode* MergeSortedLists::merge(ListNode* pHead1, ListNode* pHead2) {
 &emsp;题目：输入两棵二叉树 A 和 B，判断 B 是不是 A 的子结构。
 ```c++
 namespace SubstructureInTree {
-
 struct BinaryTreeNode {
     double m_dbValue;
     BinaryTreeNode* m_pLeft;
@@ -247,7 +236,6 @@ struct BinaryTreeNode {
 bool doesTree1HaveTree2(BinaryTreeNode* pRoot1, BinaryTreeNode* pRoot2);
 bool equal(double num1, double num2);
 bool hasSubtree(BinaryTreeNode* pRoot1, BinaryTreeNode* pRoot2);
-
 }
 
 bool SubstructureInTree::doesTree1HaveTree2(BinaryTreeNode* pRoot1, BinaryTreeNode* pRoot2) {
@@ -298,10 +286,8 @@ bool SubstructureInTree::hasSubtree(BinaryTreeNode* pRoot1, BinaryTreeNode* pRoo
 &emsp;题目：请完成一个函数，输入一个二叉树，该函数输出它的镜像。
 ```c++
 namespace MirrorOfBinaryTree {
-
 void mirrorRecursively(BinaryTreeNode* pRoot);
 void mirrorIteratively(BinaryTreeNode* pRoot);
-
 }
 
 void MirrorOfBinaryTree::mirrorRecursively(BinaryTreeNode* pRoot) {
@@ -352,10 +338,8 @@ void MirrorOfBinaryTree::mirrorIteratively(BinaryTreeNode* pRoot) {
 &emsp;题目：请实现一个函数，用来判断一棵二叉树是不是对称的。如果一棵二叉树和它的镜像一样，那么它是对称的。
 ```c++
 namespace SymmetricalBinaryTree {
-
 bool isSymmetrical(BinaryTreeNode* pRoot1, BinaryTreeNode* pRoot2);
 bool isSymmetrical(BinaryTreeNode* pRoot);
-
 }
 
 bool SymmetricalBinaryTree::isSymmetrical(BinaryTreeNode* pRoot1, BinaryTreeNode* pRoot2) {
@@ -387,7 +371,6 @@ bool SymmetricalBinaryTree::isSymmetrical(BinaryTreeNode* pRoot) {
 &emsp;题目：定义栈的数据结构，请在该类型中实现一个能够得到栈的最小元素的 min 函数。在该栈中，调用 min、push 及 pop 的时间复杂度都是 O(1)。
 ```c++
 namespace StackWithMin {
-
 template <typename T>
 class StackWithMin {
 public:
@@ -408,7 +391,6 @@ private:
     stack<T> m_data;
     stack<T> m_min;
 };
-
 }
 
 template <typename T>

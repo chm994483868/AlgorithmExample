@@ -6,9 +6,7 @@
 &emsp;题目：输入两个整数序列，第一个序列表示栈的压入顺序，请判断第二个序列是否为该栈的弹出顺序。假设压入栈的所有数字均不相等。例如序列 1、2、3、4、5 是某栈的压栈序列，序列 4、5、3、2、1 是该压栈序列对应的一个弹出序列，但 4、3、5、1、2 就不可能是该压栈序列的弹出序列。
 ```c++
 namespace StackPushPopOrder {
-
 bool isPopOrder(const int* pPush, const int* pPop, int nLength);
-
 }
 
 bool StackPushPopOrder::isPopOrder(const int* pPush, const int* pPop, int nLength) {
@@ -50,9 +48,7 @@ bool StackPushPopOrder::isPopOrder(const int* pPush, const int* pPop, int nLengt
 &emsp;题目：从上往下打印出二叉树的每个结点，同一层的结点按照从左到右的顺序打印。
 ```c++
 namespace PrintTreeFromTopToBottom {
-
 void printFromTopToBottom(BinaryTreeNode* pRoot);
-
 }
 
 void PrintTreeFromTopToBottom::printFromTopToBottom(BinaryTreeNode* pRoot) {
@@ -83,12 +79,10 @@ void PrintTreeFromTopToBottom::printFromTopToBottom(BinaryTreeNode* pRoot) {
 &emsp;题目：从上到下按层打印二叉树，同一层的结点按从左到右的顺序打印，每一层打印到一行。
 ```c++
 namespace PrintTreesInLines {
-
 // 32（二）：分行从上到下打印二叉树
 // 题目：从上到下按层打印二叉树，同一层的结点按从左到右的顺序打印，每一层
 // 打印到一行。
 void print(BinaryTreeNode* pRoot);
-
 }
 
 void PrintTreesInLines::print(BinaryTreeNode* pRoot) {
@@ -128,9 +122,7 @@ void PrintTreesInLines::print(BinaryTreeNode* pRoot) {
 &emsp;题目：请实现一个函数按照之字形顺序打印二叉树，即第一行按照从左到右的顺序打印，第二层按照从右到左的顺序打印，第三行再按照从左到右的顺序打印，其他行以此类推。
 ```c++
 namespace PrintTreesInZigzag {
-
 void print(BinaryTreeNode* pRoot);
-
 }
 
 void PrintTreesInZigzag::print(BinaryTreeNode* pRoot) {

@@ -6,7 +6,6 @@
 &emsp;题目：如下为类型 CMyString 的声明，请为该类型添加赋值运算符函数。
 ```c++
 namespace AssignmentOperator {
-
 // 1：赋值运算符函数
 // 题目：如下为类型 CMyString 的声明，请为该类型添加赋值运算符函数。
 
@@ -23,7 +22,6 @@ public:
 private:
     char* m_pData;
 };
-
 }
 
 AssignmentOperator::CMyString::CMyString(const char* pData) {
@@ -106,13 +104,11 @@ void AssignmentOperator::CMyString::Print() {
 &emsp;题目：在一个长度为 n 的数组里的所有数字都在 0 到 n - 1 的范围内。数组中某些数字是重复的，但不知道有几个数字重复了，也不知道每个数字重复了几次。请找出数组中任意一个重复的数字。例如，如果输入长度为7的数组 {2, 3, 1, 0, 2, 5, 3}，那么对应的输出是重复的数字 2 或者 3。
 ```c++
 namespace FindDuplication {
-
 /// 找出数组中重复的数字，返回值：true 输入有效，并且数组中存在重复的数字 false 输入无效，或者数组中没有重复的数字
 /// @param numbers 数组
 /// @param length 数组长度
 /// @param duplication （输出）数组中的一个重复的数字
 bool duplicate(int numbers[], int length, int *duplication);
-
 }
 
 bool FindDuplication::duplicate(int numbers[], int length, int *duplication) {
@@ -154,14 +150,12 @@ bool FindDuplication::duplicate(int numbers[], int length, int *duplication) {
 &emsp;题目：在一个长度为 n+1 的数组里的所有数字都在 1 到 n 的范围内，所以数组中至少有一个数字是重复的。请找出数组中任意一个重复的数字，但不能修改输入的数组。例如，如果输入长度为 8 的数组 {2, 3, 5, 4, 3, 2, 6, 7}，那么对应的输出是重复的数字2或者3。
 ```c++
 namespace FindDuplicationNoEdit {
-
 int countRange(const int* numbers, int length, int start, int end);
 
 /// 不修改数组找出重复的数字, 正数 输入有效，并且数组中存在重复的数字，返回值即为重复的数字
 /// @param number 数组
 /// @param length 数组长度
 int getDuplication(const int* number, int length);
-
 }
 
 // 统计数组中的元素落在指定数值范围内的次数
@@ -230,9 +224,7 @@ int FindDuplicationNoEdit::getDuplication(const int* numbers, int length) {
 &emsp;题目：在一个二维数组中，每一行都按照从左到右递增的顺序排序，每一列都按照从上到下递增的顺序排序。请完成一个函数，输入这样的一个二维数组和一个整数，判断数组中是否含有该整数。
 ```c++
 namespace FindInPartiallySortedMatrix {
-
 bool find(int* matrix, int rows, int columns, int number);
-
 }
 
 bool FindInPartiallySortedMatrix::find(int* matrix, int rows, int columns, int number) {
@@ -291,10 +283,8 @@ bool FindInPartiallySortedMatrix::find(int* matrix, int rows, int columns, int n
 &emsp;题目：请实现一个函数，把字符串中的每个空格替换成 "%20"。例如输入 “We are happy.”，则输出 “We%20are%20happy.”。
 ```c++
 namespace ReplaceSpaces {
-
 void replaceBlank(char str[], int length);
 string replaceSpace(string s);
-
 }
 
 void ReplaceSpaces::replaceBlank(char str[], int length) {
@@ -386,7 +376,6 @@ string ReplaceSpaces::replaceSpace(string s) {
 &emsp;题目：输入一个链表的头节点，从尾到头反过来打印出每个节点的值。
 ```c++
 namespace PrintListInReversedOrder {
-
 // 开局的两个小题
 // 往链表末尾添加一个节点
 void addToTail(ListNode** pHead, int value);
@@ -397,7 +386,6 @@ void removeNode(ListNode** pHead, int value);
 // 题目：输入一个链表的头节点，从尾到头反过来打印出每个节点的值。
 void printListReversingly_Iteratively(ListNode* pHead);
 void printListReversingly_Recursively(ListNode* pHead);
-
 }
 
 // 往链表末尾添加一个节点
@@ -513,7 +501,6 @@ void PrintListInReversedOrder::printListReversingly_Recursively(ListNode* pHead)
 
 ```c++
 namespace ConstructBinaryTree {
-
 struct BinaryTreeNode {
     int m_nValue;
     BinaryTreeNode* m_pLeft;
@@ -529,7 +516,6 @@ void ConnectTreeNodes(BinaryTreeNode* pParent, BinaryTreeNode* pLeft, BinaryTree
 void PrintTreeNode(const BinaryTreeNode* pNode);
 void PrintTree(const BinaryTreeNode* pRoot);
 void DestroyTree(BinaryTreeNode* pRoot);
-
 }
 
 ConstructBinaryTree::BinaryTreeNode*  ConstructBinaryTree::constructCore(int* startPreorder, int* endPreorder, int* startInorder, int* endInorder) {
@@ -663,7 +649,6 @@ void ConstructBinaryTree::DestroyTree(BinaryTreeNode* pRoot) {
 &emsp;题目：给定一棵二叉树和其中的一个结点，如何找出中序遍历顺序的下一个结点？树中的结点除了有两个分别指向左右子结点的指针以外，还有一个指向父结点的指针。
 ```c++
 namespace NextNodeInBinaryTrees {
-
 struct BinaryTreeNode {
     int m_nValue;
     BinaryTreeNode* m_pParent;
@@ -672,7 +657,6 @@ struct BinaryTreeNode {
 };
 
 BinaryTreeNode* getNext(BinaryTreeNode* pNode);
-
 }
 
 NextNodeInBinaryTrees::BinaryTreeNode* NextNodeInBinaryTrees::getNext(BinaryTreeNode* pNode) {
@@ -732,7 +716,6 @@ NextNodeInBinaryTrees::BinaryTreeNode* NextNodeInBinaryTrees::getNext(BinaryTree
 &emsp;题目：用两个栈实现一个队列。队列的声明如下，请实现它的两个函数 appendTail 和 deleteHead，分别完成在队列尾部插入结点和在队列头部删除结点的功能。
 ```c++
 namespace QueueWithTwoStacks {
-
 template <typename T>
 class CQueue {
 public:
@@ -750,7 +733,6 @@ private:
     std::stack<T> stack1;
     std::stack<T> stack2;
 };
-
 }
 
 template <typename T>
@@ -797,7 +779,6 @@ T QueueWithTwoStacks::CQueue<T>::deleteHead() {
 &emsp;题目：用两个队列实现一个栈。栈的声明如下，请实现它的两个函数 appendHead 和 deleteHead，分别完成在栈顶部插入结点和在栈头部删除结点的功能。
 ```c++
 namespace StackWithTwoQueues {
-
 template <typename T>
 class CStack {
 public:
@@ -815,7 +796,6 @@ private:
     std::queue<T> queue1;
     std::queue<T> queue2;
 };
-
 }
 
 template <typename T>
@@ -880,7 +860,6 @@ T StackWithTwoQueues::CStack<T>::deleteHead() {
 &emsp;题目：写一个函数，输入 n，求斐波那契（Fibonacci）数列的第 n 项。
 ```c++
 namespace Fibonacci {
-
 // 开局的小问题
 // 递归方式求 1+2+3+...+n
 long long addFrom1ToN_Recursive(int n);
@@ -891,7 +870,6 @@ long long addFrom1ToN_Iterative(int n);
 long long fibonacci_Solution1(unsigned int n);
 // 方法2：循环
 long long fibonacci_Solution2(unsigned int n);
-
 }
 
 // 递归方式求 1+2+3+...+n

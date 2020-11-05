@@ -148,12 +148,15 @@ int main(int argc, const char * argv[]) {
 //
 //    printf("🎉🎉🎉 后：%s\n", s);
     
+    char* a = "abcd";
+    printf("%zu\n", strlen(a));
+    
     // 1. 冒泡排序
 //    BubbleSort::Test();
     // 2. 插入排序
 //    InsertSort::Test();
     // 3. 希尔排序
-    ShellSort::Test();
+//    ShellSort::Test();
     // 4. 选择排序
 //    SelectSort::Test();
     // 5. 快速排序

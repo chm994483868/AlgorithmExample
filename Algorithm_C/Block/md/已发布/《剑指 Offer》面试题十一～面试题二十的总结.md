@@ -6,7 +6,6 @@
 &emsp;题目：把一个数组最开始的若干个元素搬到数组的末尾，我们称之为数组的旋转。输入一个递增排序的数组的一个旋转，输出旋转数组的最小元素。例如数组 {3, 4, 5, 1, 2} 为 {1, 2, 3, 4, 5} 的一个旋转，该数组的最小值为 1 。
 ```c++
 namespace MinNumberInRotatedArray {
-
 // 开局相关题目：
 
 // 返回 [start, end] 区间内的一个随机数
@@ -26,7 +25,6 @@ void sortAges(int ages[], int length);
 
 int minInorder(int* numbers, int index1, int index2);
 int min(int* numbers, int length);
-
 }
 
 // 生成 [start, end] 区间内的一个随机数
@@ -211,14 +209,14 @@ int MinNumberInRotatedArray::min(int* numbers, int length) {
 ## 面试题 12:矩阵中的路径
 &emsp;题目：请设计一个函数，用来判断在一个矩阵中是否存在一条包含某字符串所有字符的路径。路径可以从矩阵中任意一格开始，每一步可以在矩阵中向左、右、上、下移动一格。如果一条路径经过了矩阵的某一格，那么该路径不能再次进入该格子。例如在下面的 3×4 的矩阵中包含一条字符串 “bfce” 的路径（路径中的字母用下划线标出）。但矩阵中不包含字符串 “abfb” 的路径，因为字符串的第一个字符 b 占据了矩阵中的第一行第二个格子之后，路径不能再次进入这个格子。
 > &emsp;A ~B~ T G
+>
 > &emsp;C ~F~ ~C~ S
+>
 > &emsp;J D ~E~ H
 ```c++
 namespace StringPathInMatrix {
-
 bool hasPathCore(const char* matrix, int rows, int cols, int row, int col, const char* str, int& pathLength, bool* visited);
 bool hasPath(const char* matrix, int rows, int cols, const char* str);
-
 }
 
 bool StringPathInMatrix::hasPathCore(const char* matrix, int rows, int cols, int row, int col, const char* str, int& pathLength, bool* visited) {
@@ -287,12 +285,10 @@ bool StringPathInMatrix::hasPath(const char* matrix, int rows, int cols, const c
 &emsp;题目：地上有一个 m 行 n 列的方格。一个机器人从坐标 (0, 0) 的格子开始移动，它每一次可以向左、右、上、下移动一格，但不能进入行坐标和列坐标的数位之和大于 k 的格子。例如，当 k 为 18 时，机器人能够进入方格 (35, 37)，因为 3+5+3+7=18。但它不能进入方格 (35, 38)，因为 3+5+3+8=19。请问该机器人能够到达多少个格子？
 ```c++
 namespace RobotMove {
-
 int movingCoungCore(int threshold, int rows, int cols, int row, int col, bool* visited);
 bool check(int threshold, int rows, int cols, int row, int col, bool* visited);
 int getDigitSum(int number);
 int movingCount(int threshold, int rows, int cols);
-
 }
 
 int RobotMove::movingCoungCore(int threshold, int rows, int cols, int row, int col, bool* visited) {
@@ -364,12 +360,10 @@ int RobotMove::movingCount(int threshold, int rows, int cols) {
 &emsp;题目：给你一根长度为 n 绳子，请把绳子剪成 m 段（ m、n 都是整数，n>1 并且 m≥1）。每段的绳子的长度记为 k[0]、k[1]、⋯⋯、k[m]。k[0] * k[1] * ⋯ *k[m] 可能的最大乘积是多少？例如当绳子的长度是 8 时，我们把它剪成长度分别为 2、3、3 的三段，此时得到最大的乘积 18。
 ```c++
 namespace CuttingRope {
-
 // 动态规划
 int maxProductAfterCutting_solution1(int length);
 // 贪婪算法
 int maxProductAfterCutting_solution2(int length);
-
 }
 
 // 条件1: 绳子长度大于 1，（ n > 1 ）
@@ -472,7 +466,6 @@ int CuttingRope::maxProductAfterCutting_solution2(int length) {
 &emsp;题目：请实现一个函数，输入一个整数，输出该数二进制表示中 1 的个数。例如把 9 表示成二进制是 1001，有 2 位是 1。因此如果输入 9，该函数输出 2。
 ```c++
 namespace NumberOf1InBinary {
-
 // 相关题目:
 // 用一条语句判断一个整数是不是 2 的整数次方。
 // 一个整数如果是 2 的整数次方，那么它的二进制表示中有且只有一位是 1，而其它所有位都是 0。
@@ -483,7 +476,6 @@ namespace NumberOf1InBinary {
 
 int numberOf1_Solution1(int n);
 int numberOf1_Solution2(int n);
-
 }
 
 // 用 1 分别向左移动 32 位，每次和 n 做与操作，统计 n 的二进制表示中每一位是否是 1
@@ -528,16 +520,15 @@ int NumberOf1InBinary::numberOf1_Solution2(int n) {
 &emsp;题目：实现函数 double Power(double base, int exponent)，求 base 的 exponent 次方。不得使用库函数，同时不需要考虑大数问题。
 ```c++
 namespace CPower {
-
 static bool g_InvalidInput = false;
 bool equal(double num1, double num2);
 double powerWithUnsignedExponent(double base, unsigned int exponent);
-
 double power(double base, int exponent);
-
 }
 
+// 判断两个 double 值是否相等 ([-0.0000001, 0.0000001])
 bool CPower::equal(double num1, double num2) {
+    // [-0.0000001, 0.0000001]
     if ((num1 - num2 > -0.0000001) && (num1 - num2 < 0.0000001)) {
         return true;
     } else {
@@ -545,6 +536,7 @@ bool CPower::equal(double num1, double num2) {
     }
 }
 
+// 计算数字的正数次幂
 double CPower::powerWithUnsignedExponent(double base, unsigned int exponent) {
 //    if (exponent == 0) {
 //        return 1;
@@ -555,23 +547,32 @@ double CPower::powerWithUnsignedExponent(double base, unsigned int exponent) {
 //    }
 //
 //    double result = 1.0;
+
+      // 重复 exponent 次乘积运算
 //    for (unsigned int i = 1; i <= exponent; ++i) {
 //        result *= base;
 //    }
+
 //
 //    return result;
     
+    // 如果幂是 0，则返回 1，任何数的 0 次幂都是 1
     if (exponent == 0) {
         return 1;
     }
-
+    
+    // 如果幂是 1，则直接返回 base
     if (exponent == 1) {
         return base;
     }
-
+    
+    // 递归
+    // 幂值从一半开始即可，例如要算 base 的 6 次幂，只需要知道 base 的 3 次幂，base 的 3 次幂乘以 base 的 3 次幂即得 6 次幂。
+    // 
     double result = powerWithUnsignedExponent(base, exponent >> 1);
     result *= result;
 
+    // 当幂值是奇数时要多做一次 *base
     if ((exponent & 0x1) == 1) {
         result *= base;
     }
@@ -580,19 +581,25 @@ double CPower::powerWithUnsignedExponent(double base, unsigned int exponent) {
 }
 
 double CPower::power(double base, int exponent) {
+    // 全局变量表示参数输入是否有效
     g_InvalidInput = false;
     
+    // 如果 base 是 0 且 幂值是小于 0，则输入标记输入无效，且返回 0.0
     if (equal(base, 0.0) && exponent < 0) {
         g_InvalidInput = true;
         return 0.0;
     }
     
+    // 计算幂值的绝对值
     unsigned int absExponent = (unsigned int)exponent;
     if (exponent < 0) {
         absExponent = (unsigned int)(-exponent);
     }
     
+    // 计算幂值为正数时 base 的幂
     double result = powerWithUnsignedExponent(base, absExponent);
+    
+    // 如果幂为负数，则取倒数
     if (exponent < 0) {
         result = 1.0 / result;
     }
@@ -604,25 +611,28 @@ double CPower::power(double base, int exponent) {
 &emsp;题目：输入数字 n，按顺序打印出从 1 最大的 n 位十进制数。比如输入 3，则打印出 1、2、3 一直到最大的 3 位数即 999。
 ```c++
 namespace Print1ToMaxOfNDigits {
-
 void printNumber(char* number);
 bool increment(char* number);
 void print1ToMaxOfNDigits_1(int n);
-
 void print1ToMaxOfNDigitsRecursively(char* number, int length, int index);
 void print1ToMaxOfNDigits_2(int n);
-
 }
 
+// 考虑到大数问题，数字使用字符串来表示
+
+// 打印数字，这里从第一个非 0 字符开始打印
 void Print1ToMaxOfNDigits::printNumber(char* number) {
+    // 标记找到第一个非 0 字符
     bool isBeginning0 = true;
     unsigned long nLength = strlen(number);
+    
     unsigned long i = 0;
     for (; i < nLength; ++i) {
         if (isBeginning0 && number[i] != '0') {
             isBeginning0 = false;
         }
         
+        // 打印
         if (!isBeginning0) {
             printf("%c", number[i]);
         }
@@ -631,51 +641,83 @@ void Print1ToMaxOfNDigits::printNumber(char* number) {
     printf("\t");
 }
 
+// 字符串数值每次加 1，返回值表示是否打印到了最大的 n 位数
 bool Print1ToMaxOfNDigits::increment(char* number) {
+    // isOverflow 表示是否是最大的 n 位数溢出了
     bool isOverflow = false;
+    
+    // nTakeOver 表示进位，例如个位数字从 9 增加 1 到 10 了，则要向十位进 1
+    //（由于我们是做加法，所以 nTakeOver 只可能为 1 或 0，即有进位时是 1， 无进位时是 0）
     int nTakeOver = 0;
+    
+    // 字符串长度（不包括 '\0'）
     unsigned long nLength = strlen(number);
     unsigned long i = nLength - 1;
     
+    // "001" "002" "003" ... "010" "011" ... "100" "101" "102" ... "999" 
+    // 字符串末尾表示十进制的个位
+    
     for (; i >= 0; --i) {
+        // number[i] - '0' 把字符转化为整数
+        // 如果不是个位，则根据进位求和
         int sum = number[i] - '0' + nTakeOver;
+        
+        // 如果 i 是个位则自增 1
         if (i == nLength - 1) {
             ++sum;
         }
         
+        // 大于 10，表示要发生进位了
         if (sum >= 10) {
+            // 如果是 0 位求和大于等于 10，表示目前要发生进位了，例如 "999" + 1
             if (i == 0) {
+                // 标记要发生溢出了
                 isOverflow = true;
+                
             } else {
+                // 其它情况下，减去 10，得到该位的数值
                 sum -= 10;
+                
+                // 表示进位
                 nTakeOver = 1;
+                
+                // '0' + sum 把数字转为字符
                 number[i] = '0' + sum;
             }
         } else {
+            // 没有发生进位，正常 +1 后转为字符
             number[i] = '0' + sum;
+            
             break;
         }
     }
     
+    // 返回 isOverflow，表示目前是否到了最大 n 位数
     return isOverflow;
 }
 
 void Print1ToMaxOfNDigits::print1ToMaxOfNDigits_1(int n) {
+    // 入参判断
     if (n <= 0) {
         return;
     }
     
+    // 准备一个 n+1 长度的字符串表示数字
     char* number = new char[n + 1];
+    // 前 n 位置为 0，最后一位放空字符，表示字符串结尾
     memset(number, '0', n);
     number[n] = '\0';
     
+    // 循环打印数字
     while (!increment(number)) {
         printNumber(number);
     }
     
+    // 释放 number 的内存空间
     delete [] number;
 }
 
+// 排列，递归打印（每一位的数字是 0 ～ 9 的任一个数字）
 void Print1ToMaxOfNDigits::print1ToMaxOfNDigitsRecursively(char* number, int length, int index) {
     if (index == length - 1) {
         printNumber(number);
@@ -706,9 +748,7 @@ void Print1ToMaxOfNDigits::print1ToMaxOfNDigits_2(int n) {
 &emsp;题目：给定单向链表的头指针和一个结点指针，定义一个函数在O(1)时间删除该结点。
 ```c++
 namespace DeleteNodeInList {
-
 void deleteNode(ListNode** pListHead, ListNode* pToBeDeleted);
-
 }
 
 // 核心思想是使用要删除节点的 m_pNext 来覆盖要删除的节点，
@@ -764,49 +804,67 @@ void DeleteNodeInList::deleteNode(ListNode** pListHead, ListNode* pToBeDeleted) 
 &emsp;题目：在一个排序的链表中，如何删除重复的结点？
 ```c++
 namespace DeleteDuplicatedNode {
-
 void deleteDuplication(ListNode** pHead);
-
 }
 
 void DeleteDuplicatedNode::deleteDuplication(ListNode** pHead) {
+    // 入参判断
     if (pHead == nullptr || *pHead == nullptr) {
         return;
     }
     
+    // pPreNode 主要用于表示重复节点的前一个节点
     ListNode* pPreNode = nullptr;
+    // 头节点
     ListNode* pNode = *pHead;
     
     while (pNode != nullptr) {
         ListNode* pNext = pNode->m_pNext;
+        
+        // needDelete 用于表示是否发现了重复的节点需要删除
         bool needDelete = false;
         
+        // 如果节点的 m_nValue 和该节点的下个节点的 m_nValue 相等，则表示发现了重复的节点，要进行删除
         if (pNext != nullptr && pNode->m_nValue == pNext->m_nValue) {
             needDelete = true;
-        }
+        } 
         
         if (!needDelete) {
+            // 如果相邻的两个节点没有发生重复则可以稳定前进一个节点了。
+            
+            // 更新 pPreNode
             pPreNode = pNode;
+            // pNode 前进到下一个节点
             pNode = pNode->m_pNext;
         } else {
+            // 发现了值重复的节点，需要进行删除
+            
+            // 记录值，除了相邻的两个节点的重复外，可能连续的几个节点值都是重复的，都要进行删除
             int value = pNode->m_nValue;
+            // pToBeDelNode 用于记录待删除的节点
             ListNode* pToBeDelNode = pNode;
             
+            // while 循环，删除重复的节点
             while (pToBeDelNode != nullptr && pToBeDelNode->m_nValue == value) {
                 pNext = pToBeDelNode->m_pNext;
                 
+                // 删除节点
                 delete pToBeDelNode;
                 pToBeDelNode = nullptr;
                 
                 pToBeDelNode = pNext;
             }
             
+            // 这里如果 pPreNode 依然是 nullptr，表示头节点就发生了重复，头节点要被删除了
             if (pPreNode == nullptr) {
+                // 更新头节点
                 *pHead = pNext;
             } else {
+                // 更新 pPreNode 的下个节点指向 pNext
                 pPreNode->m_pNext = pNext;
             }
             
+            // 更新 pNode 继续进行循环，看链表后面是否还有重复的节点需要删除
             pNode = pNext;
         }
     }
@@ -816,10 +874,8 @@ void DeleteDuplicatedNode::deleteDuplication(ListNode** pHead) {
 &emsp;题目：请实现一个函数用来匹配包含 '.' 和 '*' 的正则表达式。模式中的字符 '.' 表示任意一个字符，而 '*' 表示它前面的字符可以出现任意次（含 0 次）。在本题中，匹配是指字符串的所有字符匹配整个模式。例如，字符串 "aaa" 与模式 "a.a" 和 "ab*ac*a" 匹配，但与 "aa.a" 及 "ab*a" 均不匹配。
 ```c++
 namespace RegularExpressions {
-
 bool matchCore(const char* str, const char* pattern);
 bool match(const char* str, const char* pattern);
-
 }
 
 bool RegularExpressions::matchCore(const char* str, const char* pattern) {
@@ -868,7 +924,6 @@ bool RegularExpressions::match(const char* str, const char* pattern) {
 &emsp;题目：请实现一个函数用来判断字符串是否表示数值（包括整数和小数）。例如，字符串“+100”、“5e2”、“-123”、“3.1416”及“-1E-16”都表示数值，但“12e”、“1a3.14”、“1.2.3”、“+-5”及“12e+5.4”都不是。
 ```c++
 namespace NumericStrings {
-
 // 每次指针往前扫描遇到不符合的条件则停止扫描，并不是一次扫描完毕...
 // 在最后的 return 里面自会判断，是否到达了字符串末尾
 // 如果没有到达字符串末尾，则不符合...
@@ -876,7 +931,6 @@ bool scanUnsignedInteger(const char** str);
 bool scanInteger(const char** str);
 
 bool isNumeric(const char* str);
-
 }
 
 // 判断无符号整数，从字符串起点开始，都是 [0, 9] 中的任意字符
