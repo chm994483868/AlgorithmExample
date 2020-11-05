@@ -19,6 +19,9 @@
 		8E919556254D57DA0039A12E /* AssignmentOperator_1.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8E919554254D57DA0039A12E /* AssignmentOperator_1.cpp */; };
 		8E919561254EE3280039A12E /* QueueWithTwoStacks_1.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8E91955F254EE3280039A12E /* QueueWithTwoStacks_1.cpp */; };
 		8E919568254EEBA80039A12E /* StackWithTwoQueues_1.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8E919566254EEBA80039A12E /* StackWithTwoQueues_1.cpp */; };
+		8E91958025542D020039A12E /* PrintTreesInLines_1.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8E91957E25542D020039A12E /* PrintTreesInLines_1.cpp */; };
+		8E9195872554317C0039A12E /* PrintTreesInZigzag_1.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8E9195852554317C0039A12E /* PrintTreesInZigzag_1.cpp */; };
+		8E91958E255437810039A12E /* SquenceOfBST_1.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8E91958C255437810039A12E /* SquenceOfBST_1.cpp */; };
 		8EA593D924CDB969002785EF /* main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8EA593D824CDB969002785EF /* main.cpp */; };
 		8EA593E024CDBD0B002785EF /* AssignmentOperator.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8EA593DE24CDBD0B002785EF /* AssignmentOperator.cpp */; };
 		8EA593E424CF0B40002785EF /* ConstructBinaryTree.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8EA593E224CF0B40002785EF /* ConstructBinaryTree.cpp */; };
@@ -187,6 +190,12 @@
 		8E919566254EEBA80039A12E /* StackWithTwoQueues_1.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = StackWithTwoQueues_1.cpp; sourceTree = "<group>"; };
 		8E919567254EEBA80039A12E /* StackWithTwoQueues_1.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = StackWithTwoQueues_1.hpp; sourceTree = "<group>"; };
 		8E91956D254EF1E10039A12E /* 《剑指 Offer》面试题一～面试题十的总结.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "《剑指 Offer》面试题一～面试题十的总结.md"; sourceTree = "<group>"; };
+		8E91957E25542D020039A12E /* PrintTreesInLines_1.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = PrintTreesInLines_1.cpp; sourceTree = "<group>"; };
+		8E91957F25542D020039A12E /* PrintTreesInLines_1.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = PrintTreesInLines_1.hpp; sourceTree = "<group>"; };
+		8E9195852554317C0039A12E /* PrintTreesInZigzag_1.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = PrintTreesInZigzag_1.cpp; sourceTree = "<group>"; };
+		8E9195862554317C0039A12E /* PrintTreesInZigzag_1.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = PrintTreesInZigzag_1.hpp; sourceTree = "<group>"; };
+		8E91958C255437810039A12E /* SquenceOfBST_1.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = SquenceOfBST_1.cpp; sourceTree = "<group>"; };
+		8E91958D255437810039A12E /* SquenceOfBST_1.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = SquenceOfBST_1.hpp; sourceTree = "<group>"; };
 		8EA593D624CDB969002785EF /* OfferReview */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = OfferReview; sourceTree = BUILT_PRODUCTS_DIR; };
 		8EA593D824CDB969002785EF /* main.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
 		8EA593DE24CDBD0B002785EF /* AssignmentOperator.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = AssignmentOperator.cpp; sourceTree = "<group>"; };
@@ -1294,6 +1303,8 @@
 			children = (
 				D237C64924D26CED001E0B21 /* PrintTreesInLines.cpp */,
 				D237C64A24D26CED001E0B21 /* PrintTreesInLines.hpp */,
+				8E91957E25542D020039A12E /* PrintTreesInLines_1.cpp */,
+				8E91957F25542D020039A12E /* PrintTreesInLines_1.hpp */,
 			);
 			path = 32_02_PrintTreesInLines;
 			sourceTree = "<group>";
@@ -1303,6 +1314,8 @@
 			children = (
 				D237C64D24D27648001E0B21 /* PrintTreesInZigzag.cpp */,
 				D237C64E24D27648001E0B21 /* PrintTreesInZigzag.hpp */,
+				8E9195852554317C0039A12E /* PrintTreesInZigzag_1.cpp */,
+				8E9195862554317C0039A12E /* PrintTreesInZigzag_1.hpp */,
 			);
 			path = 32_03_PrintTreesInZigzag;
 			sourceTree = "<group>";
@@ -1312,6 +1325,8 @@
 			children = (
 				D237C65124D27FEE001E0B21 /* SquenceOfBST.cpp */,
 				D237C65224D27FEE001E0B21 /* SquenceOfBST.hpp */,
+				8E91958C255437810039A12E /* SquenceOfBST_1.cpp */,
+				8E91958D255437810039A12E /* SquenceOfBST_1.hpp */,
 			);
 			path = 33_SquenceOfBST;
 			sourceTree = "<group>";
@@ -2067,6 +2082,7 @@
 				8E2572C124D0696F0080F598 /* Print1ToMaxOfNDigits.cpp in Sources */,
 				D227130824D10B2F009B180D /* DeleteNodeInList.cpp in Sources */,
 				D202B28925524F0700D9BFBC /* RegularExpressions_1.cpp in Sources */,
+				8E91958E255437810039A12E /* SquenceOfBST_1.cpp in Sources */,
 				D202B25D254E914D00D9BFBC /* PrintListInReversedOrder_1.cpp in Sources */,
 				D239E72724D3BDDF00DA0BE5 /* DigitsInSequence.cpp in Sources */,
 				D2090C2124D0293B00FA4F51 /* NumberOf1InBinary.cpp in Sources */,
@@ -2111,6 +2127,7 @@
 				D202B292255264FD00D9BFBC /* KthNodeFromEnd_1.cpp in Sources */,
 				D239E71F24D3A3B200DA0BE5 /* GreatestSumOfSubarrays.cpp in Sources */,
 				D2090C1924D010B800FA4F51 /* StringPathInMatrix.cpp in Sources */,
+				8E9195872554317C0039A12E /* PrintTreesInZigzag_1.cpp in Sources */,
 				D21B43B324CED1390078EEF9 /* PrintListInReversedOrder.cpp in Sources */,
 				D202B2BA2554040F00D9BFBC /* PrintTreeFromTopToBottom_1.cpp in Sources */,
 				D239E71724D3921A00DA0BE5 /* KLeastNumbers.cpp in Sources */,
@@ -2142,6 +2159,7 @@
 				D239E71B24D39BCA00DA0BE5 /* StreamMedian.cpp in Sources */,
 				D237C64724D265B0001E0B21 /* PrintTreeFromTopToBottom.cpp in Sources */,
 				D227131024D11DB5009B180D /* RegularExpressions.cpp in Sources */,
+				8E91958025542D020039A12E /* PrintTreesInLines_1.cpp in Sources */,
 				D2EB011E24D955D6009EAFD6 /* SelectSort.cpp in Sources */,
 				D237C66224D2BC31001E0B21 /* ConvertBinarySearchTree.cpp in Sources */,
 				D202B2762551044900D9BFBC /* CuttingRope_1.cpp in Sources */,

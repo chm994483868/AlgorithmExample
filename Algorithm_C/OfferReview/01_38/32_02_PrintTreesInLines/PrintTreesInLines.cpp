@@ -13,26 +13,42 @@ void PrintTreesInLines::print(BinaryTreeNode* pRoot) {
         return;
     }
     
+    // 准备一个队列，并把根节点放进队列
     deque<BinaryTreeNode*> dequeTreeNode;
     dequeTreeNode.push_back(pRoot);
+    
+    // nextLevel 用来统计第一行之外的一行中要打印的节点个数
     int nextLevel = 0;
+    
+    // toBePrinted 表示本行要打印的节点个数，默认值为 1 代指根节点的一行就一个节点
     int toBePrinted = 1;
+    
     while (!dequeTreeNode.empty()) {
+        
+        // 出队列并打印节点
         BinaryTreeNode* node = dequeTreeNode.front();
         printf("%d ", node->m_nValue);
         
+        // 如果左节点不为空，则放进队列
         if (node->m_pLeft != nullptr) {
             dequeTreeNode.push_back(node->m_pLeft);
+            // 统计节点
             ++nextLevel;
         }
         
         if (node->m_pRight != nullptr) {
             dequeTreeNode.push_back(node->m_pRight);
+            // 统计节点
             ++nextLevel;
         }
         
         dequeTreeNode.pop_front();
+        
+        // 本行要打印的节点个数减 1
         --toBePrinted;
+        
+        // 如果本行的节点打印完了，则打印换行，并更新 toBePrinted 为下一行要打印的节点个数，
+        // nextLevel 则置为 0，继续统计下下一行的节点个数
         if (toBePrinted == 0) {
             printf("\n");
             toBePrinted = nextLevel;

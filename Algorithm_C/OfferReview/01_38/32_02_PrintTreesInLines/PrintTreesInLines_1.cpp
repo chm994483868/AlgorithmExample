@@ -1,59 +1,44 @@
 //
-//  PrintTreesInZigzag.cpp
+//  PrintTreesInLines_1.cpp
 //  OfferReview
 //
-//  Created by CHM on 2020/7/30.
+//  Created by HM C on 2020/11/5.
 //  Copyright © 2020 CHM. All rights reserved.
 //
 
-#include "PrintTreesInZigzag.hpp"
+#include "PrintTreesInLines_1.hpp"
 
-void PrintTreesInZigzag::print(BinaryTreeNode* pRoot) {
+void PrintTreesInLines_1::print(BinaryTreeNode* pRoot) {
     if (pRoot == nullptr) {
         return;
     }
     
-    // levels 是一个长度是 2 的 stack<BinaryTreeNode*> 数组
-    stack<BinaryTreeNode*> levels[2];
+    deque<BinaryTreeNode*> dequeTreeNode;
+    dequeTreeNode.push_back(pRoot);
     
-    int current = 0;
-    int next = 1;
+    int nextLevel = 0;
+    int toBePrinted = 1;
     
-    levels[current].push(pRoot);
-    
-    while (!levels[0].empty() || !levels[1].empty()) {
-        BinaryTreeNode* node = levels[current].top();
-        levels[current].pop();
-        
+    while (!dequeTreeNode.empty()) {
+        BinaryTreeNode* node = dequeTreeNode.front();
         printf("%d ", node->m_nValue);
         
-        if (current == 0) {
-            // 如果 current 等于 0，则左子节点先入队，右子节点后入队，且队列是 levels[1]
-            
-            if (node->m_pLeft != nullptr) {
-                levels[next].push(node->m_pLeft);
-            }
-            
-            if (node->m_pRight != nullptr) {
-                levels[next].push(node->m_pRight);
-            }
-        } else {
-            // 如果 current 等于 1，则右子节点先入队，左子节点后入队，且队列是 levels[0]
-            
-            if (node->m_pRight != nullptr) {
-                levels[next].push(node->m_pRight);
-            }
-            
-            if (node->m_pLeft != nullptr) {
-                levels[next].push(node->m_pLeft);
-            }
+        if (node->m_pLeft != nullptr) {
+            dequeTreeNode.push_back(node->m_pLeft);
+            ++nextLevel;
         }
         
-        // 如果当前的 stack<BinaryTreeNode*> 为空，表示一行打印完成了，则切到下一行打印
-        if (levels[current].empty()) {
+        if (node->m_pRight != nullptr) {
+            dequeTreeNode.push_back(node->m_pRight);
+            ++nextLevel;
+        }
+        
+        dequeTreeNode.pop_front();
+        --toBePrinted;
+        if (toBePrinted == 0) {
             printf("\n");
-            current = 1 - current;
-            next = 1 - next;
+            toBePrinted = nextLevel;
+            nextLevel = 0;
         }
     }
 }
@@ -62,7 +47,7 @@ void PrintTreesInZigzag::print(BinaryTreeNode* pRoot) {
 //            8
 //        6      10
 //       5 7    9  11
-void PrintTreesInZigzag::Test1() {
+void PrintTreesInLines_1::Test1() {
     BinaryTreeNode* pNode8 = CreateBinaryTreeNode(8);
     BinaryTreeNode* pNode6 = CreateBinaryTreeNode(6);
     BinaryTreeNode* pNode10 = CreateBinaryTreeNode(10);
@@ -78,7 +63,7 @@ void PrintTreesInZigzag::Test1() {
     printf("====Test1 Begins: ====\n");
     printf("Expected Result is:\n");
     printf("8 \n");
-    printf("10 6 \n");
+    printf("6 10 \n");
     printf("5 7 9 11 \n\n");
 
     printf("Actual Result is: \n");
@@ -92,7 +77,7 @@ void PrintTreesInZigzag::Test1() {
 //          4
 //        3
 //      2
-void PrintTreesInZigzag::Test2() {
+void PrintTreesInLines_1::Test2() {
     BinaryTreeNode* pNode5 = CreateBinaryTreeNode(5);
     BinaryTreeNode* pNode4 = CreateBinaryTreeNode(4);
     BinaryTreeNode* pNode3 = CreateBinaryTreeNode(3);
@@ -120,7 +105,7 @@ void PrintTreesInZigzag::Test2() {
 //         4
 //          3
 //           2
-void PrintTreesInZigzag::Test3() {
+void PrintTreesInLines_1::Test3() {
     BinaryTreeNode* pNode5 = CreateBinaryTreeNode(5);
     BinaryTreeNode* pNode4 = CreateBinaryTreeNode(4);
     BinaryTreeNode* pNode3 = CreateBinaryTreeNode(3);
@@ -144,7 +129,7 @@ void PrintTreesInZigzag::Test3() {
     DestroyTree(pNode5);
 }
 
-void PrintTreesInZigzag::Test4() {
+void PrintTreesInLines_1::Test4() {
     BinaryTreeNode* pNode5 = CreateBinaryTreeNode(5);
 
     printf("====Test4 Begins: ====\n");
@@ -158,7 +143,7 @@ void PrintTreesInZigzag::Test4() {
     DestroyTree(pNode5);
 }
 
-void PrintTreesInZigzag::Test5() {
+void PrintTreesInLines_1::Test5() {
     printf("====Test5 Begins: ====\n");
     printf("Expected Result is:\n");
 
@@ -172,7 +157,7 @@ void PrintTreesInZigzag::Test5() {
 //       50
 //         \
 //         150
-void PrintTreesInZigzag::Test6() {
+void PrintTreesInLines_1::Test6() {
     BinaryTreeNode* pNode100 = CreateBinaryTreeNode(100);
     BinaryTreeNode* pNode50 = CreateBinaryTreeNode(50);
     BinaryTreeNode* pNode150 = CreateBinaryTreeNode(150);
@@ -191,55 +176,11 @@ void PrintTreesInZigzag::Test6() {
     printf("\n");
 }
 
-//                8
-//        4              12
-//     2     6       10      14
-//   1  3  5  7     9 11   13  15
-void PrintTreesInZigzag::Test7() {
-    BinaryTreeNode* pNode8 = CreateBinaryTreeNode(8);
-    BinaryTreeNode* pNode4 = CreateBinaryTreeNode(4);
-    BinaryTreeNode* pNode12 = CreateBinaryTreeNode(12);
-    BinaryTreeNode* pNode2 = CreateBinaryTreeNode(2);
-    BinaryTreeNode* pNode6 = CreateBinaryTreeNode(6);
-    BinaryTreeNode* pNode10 = CreateBinaryTreeNode(10);
-    BinaryTreeNode* pNode14 = CreateBinaryTreeNode(14);
-    BinaryTreeNode* pNode1 = CreateBinaryTreeNode(1);
-    BinaryTreeNode* pNode3 = CreateBinaryTreeNode(3);
-    BinaryTreeNode* pNode5 = CreateBinaryTreeNode(5);
-    BinaryTreeNode* pNode7 = CreateBinaryTreeNode(7);
-    BinaryTreeNode* pNode9 = CreateBinaryTreeNode(9);
-    BinaryTreeNode* pNode11 = CreateBinaryTreeNode(11);
-    BinaryTreeNode* pNode13 = CreateBinaryTreeNode(13);
-    BinaryTreeNode* pNode15 = CreateBinaryTreeNode(15);
-
-    ConnectTreeNodes(pNode8, pNode4, pNode12);
-    ConnectTreeNodes(pNode4, pNode2, pNode6);
-    ConnectTreeNodes(pNode12, pNode10, pNode14);
-    ConnectTreeNodes(pNode2, pNode1, pNode3);
-    ConnectTreeNodes(pNode6, pNode5, pNode7);
-    ConnectTreeNodes(pNode10, pNode9, pNode11);
-    ConnectTreeNodes(pNode14, pNode13, pNode15);
-
-    printf("====Test7 Begins: ====\n");
-    printf("Expected Result is:\n");
-    printf("8 \n");
-    printf("12 4 \n");
-    printf("2 6 10 14 \n");
-    printf("15 13 11 9 7 5 3 1 \n\n");
-
-    printf("Actual Result is: \n");
-    print(pNode8);
-    printf("\n");
-
-    DestroyTree(pNode8);
-}
-
-void PrintTreesInZigzag::Test() {
+void PrintTreesInLines_1::Test() {
     Test1();
     Test2();
     Test3();
     Test4();
     Test5();
     Test6();
-    Test7();
 }
