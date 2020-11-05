@@ -11,23 +11,31 @@ bool isEven(int n);
 void reorderOddEven_2(int* pData, unsigned int length);
 }
 
+// 这里的 func 函数指针可以抽象出来，此题是针对奇数位于偶数前面，
+// 我们可以在函数整体逻辑不变的情况下，做正数位于负数前面，能被 3 整除的数位于不能被 3 整除的数前面等等类似的题目
+
 void ReorderArray::reorder(int* pData, unsigned int length, bool(*func)(int)) {
+    // 入参判断
     if (pData == nullptr || length <= 0 || func == nullptr) {
         return;
     }
     
+    // 准备两个指针，分别从 pData 头部和尾部开始查找
     int* pBegin = pData;
     int* pEnd = pData + length - 1;
     
     while (pBegin < pEnd) {
+        // 从首开始遇到第一个偶数时停下
         while (pBegin < pEnd && (*func)(*pBegin)) {
             ++pBegin;
         }
         
+        // 从尾开始遇到第一个奇数时停下
         while (pBegin < pEnd && !(*func)(*pEnd)) {
             --pEnd;
         }
         
+        // 交换两个数字
         if (pBegin < pEnd) {
             int temp = *pBegin;
             *pBegin = *pEnd;
@@ -36,6 +44,8 @@ void ReorderArray::reorder(int* pData, unsigned int length, bool(*func)(int)) {
     }
 }
 
+// 如果 n 是奇数则返回 true，如果是偶数则返回 false.
+// 奇数二进制表示的最后一位一定是 1
 bool ReorderArray::isEven(int n) {
     return n & 0x1; // 返回 true 表示是奇数，返回 false 表示偶数
 }
@@ -58,11 +68,18 @@ ListNode* findKthToTail(ListNode* pListHead, unsigned int k);
 ListNode* findMddleNode(ListNode* pListHead);
 }
 
+// 准备两个指针，首先一个指针从链表头前进 k - 1 步，然后第二个指针也开始从头开始前进，
+// 当第一个指针到达链表尾部时，第二个指针就到达了倒数第 k 个节点。
+
 ListNode* KthNodeFromEnd::findKthToTail(ListNode* pListHead, unsigned int k) {
+    // 入参判断，头节点不为空且 k 必须大于 0
+    //（还有一种特殊的情况下面会判断，链表的总长度小于 k 时，也是返回 nullptr）
     if (pListHead == nullptr || k <= 0) {
         return nullptr;
     }
     
+    // pAHead 是第一个指针
+    // 
     ListNode* pAHead = pListHead;
     unsigned int i = 0;
     for (; i < k - 1; ++i) {
