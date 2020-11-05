@@ -1,37 +1,31 @@
 //
-//  PrintTreeFromTopToBottom.cpp
+//  PrintTreeFromTopToBottom_1.cpp
 //  OfferReview
 //
-//  Created by CHM on 2020/7/30.
+//  Created by CHM on 2020/11/5.
 //  Copyright © 2020 CHM. All rights reserved.
 //
 
-#include "PrintTreeFromTopToBottom.hpp"
+#include "PrintTreeFromTopToBottom_1.hpp"
 
-// 每次遍历打印完一个节点后把它的左右子节点入队，直到队列为空
-void PrintTreeFromTopToBottom::printFromTopToBottom(BinaryTreeNode* pRoot) {
+void PrintTreeFromTopToBottom_1::printFromTopToBottom(BinaryTreeNode* pRoot) {
     if (pRoot == nullptr) {
         return;
     }
     
-    // 准备一个队列，并首先把根节点入队列
     deque<BinaryTreeNode*> dequeTreeNode;
     dequeTreeNode.push_back(pRoot);
     
     while (!dequeTreeNode.empty()) {
-        // 节点出队列
         BinaryTreeNode* node = dequeTreeNode.front();
         dequeTreeNode.pop_front();
         
-        // 打印
         printf("%d\t", node->m_nValue);
         
-        // 如果出队的这个节点有左子节点，则入队列，为下一层的节点打印做准备
         if (node->m_pLeft != nullptr) {
             dequeTreeNode.push_back(node->m_pLeft);
         }
         
-        // 如果出队的这个节点有右子节点，则入队列，为下一层的节点打印做准备
         if (node->m_pRight != nullptr) {
             dequeTreeNode.push_back(node->m_pRight);
         }
@@ -39,7 +33,7 @@ void PrintTreeFromTopToBottom::printFromTopToBottom(BinaryTreeNode* pRoot) {
 }
 
 // 测试代码
-void PrintTreeFromTopToBottom::Test(char* testName, BinaryTreeNode* pRoot) {
+void PrintTreeFromTopToBottom_1::Test(char* testName, BinaryTreeNode* pRoot) {
     if(testName != nullptr)
         printf("%s begins: \n", testName);
     
@@ -56,7 +50,7 @@ void PrintTreeFromTopToBottom::Test(char* testName, BinaryTreeNode* pRoot) {
 //        6        14
 //       /\        /\
 //      4  8     12  16
-void PrintTreeFromTopToBottom::Test1() {
+void PrintTreeFromTopToBottom_1::Test1() {
     BinaryTreeNode* pNode10 = CreateBinaryTreeNode(10);
     BinaryTreeNode* pNode6 = CreateBinaryTreeNode(6);
     BinaryTreeNode* pNode14 = CreateBinaryTreeNode(14);
@@ -83,7 +77,7 @@ void PrintTreeFromTopToBottom::Test1() {
 //         2
 //        /
 //       1
-void PrintTreeFromTopToBottom::Test2() {
+void PrintTreeFromTopToBottom_1::Test2() {
     BinaryTreeNode* pNode5 = CreateBinaryTreeNode(5);
     BinaryTreeNode* pNode4 = CreateBinaryTreeNode(4);
     BinaryTreeNode* pNode3 = CreateBinaryTreeNode(3);
@@ -109,7 +103,7 @@ void PrintTreeFromTopToBottom::Test2() {
 //       4
 //        \
 //         5
-void PrintTreeFromTopToBottom::Test3() {
+void PrintTreeFromTopToBottom_1::Test3() {
     BinaryTreeNode* pNode1 = CreateBinaryTreeNode(1);
     BinaryTreeNode* pNode2 = CreateBinaryTreeNode(2);
     BinaryTreeNode* pNode3 = CreateBinaryTreeNode(3);
@@ -127,7 +121,7 @@ void PrintTreeFromTopToBottom::Test3() {
 }
 
 // 树中只有1个结点
-void PrintTreeFromTopToBottom::Test4() {
+void PrintTreeFromTopToBottom_1::Test4() {
     BinaryTreeNode* pNode1 = CreateBinaryTreeNode(1);
     Test("Test4", pNode1);
     
@@ -135,11 +129,11 @@ void PrintTreeFromTopToBottom::Test4() {
 }
 
 // 树中没有结点
-void PrintTreeFromTopToBottom::Test5() {
+void PrintTreeFromTopToBottom_1::Test5() {
     Test("Test5", nullptr);
 }
 
-void PrintTreeFromTopToBottom::Test() {
+void PrintTreeFromTopToBottom_1::Test() {
     Test1();
     Test2();
     Test3();
