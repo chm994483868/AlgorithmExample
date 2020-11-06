@@ -8,12 +8,18 @@
 
 #include "SquenceOfBST.hpp"
 
+// 二叉树搜索树的特点是：所有的左子节点都小于父节点，所有的右子节点都大于父节点
+// 二叉树的后序遍历序列是左右根则顺序，则首先可断定的是后序序列的最后一个元素一定是树的根节点
 bool SquenceOfBST::verifySquenceOfBST(int sequence[], int length) {
     if (sequence == nullptr || length <= 0) {
         return false;
     }
     
+    // 因为是后序序列，所以最后一个元素一定是二叉树的根节点，首先取出根节点的值
     int nRootValue = sequence[length - 1];
+    
+    // 在后序序列中找到左子树中的根节点的位置的后面一个位置，已知左子树的节点全部小于根节点，
+    // 右子树的节点全部大于根节点，所以可通过便利 [0, length-1) 找到左子树和右子树的分界
     unsigned int nLeftIndexEnd = 0;
     for (; nLeftIndexEnd < length - 1; ++nLeftIndexEnd) {
         if (sequence[nLeftIndexEnd] > nRootValue) {
@@ -21,6 +27,7 @@ bool SquenceOfBST::verifySquenceOfBST(int sequence[], int length) {
         }
     }
 
+    // 这里是判断所有右子树的节点都大于根节点，否则直接返回 false
     unsigned int nRightStart = nLeftIndexEnd;
     for (; nRightStart < length - 1; ++nRightStart) {
         if (sequence[nRightStart] < nRootValue) {
@@ -28,16 +35,20 @@ bool SquenceOfBST::verifySquenceOfBST(int sequence[], int length) {
         }
     }
 
+    // 下面开始递归判断左右子树后序序列是否符合二叉搜索树的规则
     bool bLeft = true;
+    // 如果 nLeftIndexEnd 大于 0 表示存在左子树，下面是递归判断左子树是否也是二叉搜索树
     if (nLeftIndexEnd > 0) {
         bLeft = verifySquenceOfBST(sequence, nLeftIndexEnd);
     }
 
     bool bRight = true;
+    // 如果 nLeftIndexEnd 小于 length - 1 表示存在右子树，下面是递归判断右子树是否也是二叉搜索树
     if (nLeftIndexEnd < length - 1) {
         bRight = verifySquenceOfBST(sequence + nLeftIndexEnd, length - nLeftIndexEnd - 1);
     }
-
+    
+    // 返回值（左右子树必须全部都是二叉搜索树）
     return bLeft && bRight;
 }
 

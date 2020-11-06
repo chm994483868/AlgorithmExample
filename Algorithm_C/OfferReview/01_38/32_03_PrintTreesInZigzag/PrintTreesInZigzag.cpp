@@ -13,14 +13,19 @@ void PrintTreesInZigzag::print(BinaryTreeNode* pRoot) {
         return;
     }
     
-    // levels 是一个长度是 2 的 stack<BinaryTreeNode*> 数组
+    // levels 是一个长度是 2 的 stack<BinaryTreeNode*> 数组，
+    // 从上到下每行的节点交替放在 levels[0] 和 levels[1] 中
     stack<BinaryTreeNode*> levels[2];
     
+    // current 表示当前正在打印的行的节点所在的 stack<BinaryTreeNode*>
     int current = 0;
+    // next 表示下一行节点所在的 stack<BinaryTreeNode*>
     int next = 1;
     
+    // 把根节点加入第一个栈
     levels[current].push(pRoot);
     
+    // 只要两个栈任一个不为空就表示还有节点需要打印
     while (!levels[0].empty() || !levels[1].empty()) {
         BinaryTreeNode* node = levels[current].top();
         levels[current].pop();
@@ -51,6 +56,8 @@ void PrintTreesInZigzag::print(BinaryTreeNode* pRoot) {
         
         // 如果当前的 stack<BinaryTreeNode*> 为空，表示一行打印完成了，则切到下一行打印
         if (levels[current].empty()) {
+            // 每次进入这个 if 表示要开始打印新的一行了，current 和 next 都分别做 1 和 0 的交换
+            
             printf("\n");
             current = 1 - current;
             next = 1 - next;

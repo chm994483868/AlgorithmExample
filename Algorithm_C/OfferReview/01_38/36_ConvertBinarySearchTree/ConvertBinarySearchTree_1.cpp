@@ -1,14 +1,14 @@
 //
-//  ConvertBinarySearchTree.cpp
+//  ConvertBinarySearchTree_1.cpp
 //  OfferReview
 //
-//  Created by CHM on 2020/7/30.
+//  Created by CHM on 2020/11/6.
 //  Copyright © 2020 CHM. All rights reserved.
 //
 
-#include "ConvertBinarySearchTree.hpp"
+#include "ConvertBinarySearchTree_1.hpp"
 
-void ConvertBinarySearchTree::convertNode(BinaryTreeNode* pNode, BinaryTreeNode** pLastNodeInList) {
+void ConvertBinarySearchTree_1::convertNode(BinaryTreeNode* pNode, BinaryTreeNode** pLastNodeInList) {
     if (pNode == nullptr) {
         return;
     }
@@ -30,13 +30,11 @@ void ConvertBinarySearchTree::convertNode(BinaryTreeNode* pNode, BinaryTreeNode*
     }
 }
 
-BinaryTreeNode* ConvertBinarySearchTree::convert(BinaryTreeNode* pRootOfTree) {
+BinaryTreeNode* ConvertBinarySearchTree_1::convert(BinaryTreeNode* pRootOfTree) {
     BinaryTreeNode* pLastNodeInList = nullptr;
     
-    // 二叉搜索树转换为双向链表
     convertNode(pRootOfTree, &pLastNodeInList);
     
-    // 从尾节点沿着 m_pLeft 遍历到链表头部节点并返回头节点
     BinaryTreeNode* pHeadOfList = pLastNodeInList;
     while (pHeadOfList != nullptr && pHeadOfList->m_pLeft != nullptr) {
         pHeadOfList = pHeadOfList->m_pLeft;
@@ -46,7 +44,7 @@ BinaryTreeNode* ConvertBinarySearchTree::convert(BinaryTreeNode* pRootOfTree) {
 }
 
 // 测试代码
-void ConvertBinarySearchTree::PrintDoubleLinkedList(BinaryTreeNode* pHeadOfList) {
+void ConvertBinarySearchTree_1::PrintDoubleLinkedList(BinaryTreeNode* pHeadOfList) {
     BinaryTreeNode* pNode = pHeadOfList;
 
     printf("The nodes from left to right are:\n");
@@ -70,7 +68,7 @@ void ConvertBinarySearchTree::PrintDoubleLinkedList(BinaryTreeNode* pHeadOfList)
     printf("\n");
 }
 
-void ConvertBinarySearchTree::DestroyList(BinaryTreeNode* pHeadOfList) {
+void ConvertBinarySearchTree_1::DestroyList(BinaryTreeNode* pHeadOfList) {
     BinaryTreeNode* pNode = pHeadOfList;
     while(pNode != nullptr) {
         BinaryTreeNode* pNext = pNode->m_pRight;
@@ -80,7 +78,7 @@ void ConvertBinarySearchTree::DestroyList(BinaryTreeNode* pHeadOfList) {
     }
 }
 
-void ConvertBinarySearchTree::Test(char* testName, BinaryTreeNode* pRootOfTree) {
+void ConvertBinarySearchTree_1::Test(char* testName, BinaryTreeNode* pRootOfTree) {
     if(testName != nullptr)
         printf("%s begins:\n", testName);
 
@@ -96,7 +94,7 @@ void ConvertBinarySearchTree::Test(char* testName, BinaryTreeNode* pRootOfTree) 
 //        6        14
 //       /\        /\
 //      4  8     12  16
-void ConvertBinarySearchTree::Test1() {
+void ConvertBinarySearchTree_1::Test1() {
     BinaryTreeNode* pNode10 = CreateBinaryTreeNode(10);
     BinaryTreeNode* pNode6 = CreateBinaryTreeNode(6);
     BinaryTreeNode* pNode14 = CreateBinaryTreeNode(14);
@@ -123,7 +121,7 @@ void ConvertBinarySearchTree::Test1() {
 //         2
 //        /
 //       1
-void ConvertBinarySearchTree::Test2() {
+void ConvertBinarySearchTree_1::Test2() {
     BinaryTreeNode* pNode5 = CreateBinaryTreeNode(5);
     BinaryTreeNode* pNode4 = CreateBinaryTreeNode(4);
     BinaryTreeNode* pNode3 = CreateBinaryTreeNode(3);
@@ -149,7 +147,7 @@ void ConvertBinarySearchTree::Test2() {
 //       4
 //        \
 //         5
-void ConvertBinarySearchTree::Test3() {
+void ConvertBinarySearchTree_1::Test3() {
     BinaryTreeNode* pNode1 = CreateBinaryTreeNode(1);
     BinaryTreeNode* pNode2 = CreateBinaryTreeNode(2);
     BinaryTreeNode* pNode3 = CreateBinaryTreeNode(3);
@@ -167,7 +165,7 @@ void ConvertBinarySearchTree::Test3() {
 }
 
 // 树中只有1个结点
-void ConvertBinarySearchTree::Test4() {
+void ConvertBinarySearchTree_1::Test4() {
     BinaryTreeNode* pNode1 = CreateBinaryTreeNode(1);
     Test("Test4", pNode1);
 
@@ -175,11 +173,11 @@ void ConvertBinarySearchTree::Test4() {
 }
 
 // 树中没有结点
-void ConvertBinarySearchTree::Test5() {
+void ConvertBinarySearchTree_1::Test5() {
     Test("Test5", nullptr);
 }
 
-void ConvertBinarySearchTree::Test() {
+void ConvertBinarySearchTree_1::Test() {
     Test1();
     Test2();
     Test3();

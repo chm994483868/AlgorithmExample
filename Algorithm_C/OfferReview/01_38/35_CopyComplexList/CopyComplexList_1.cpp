@@ -1,15 +1,15 @@
 //
-//  CopyComplexList.cpp
+//  CopyComplexList_1.cpp
 //  OfferReview
 //
-//  Created by CHM on 2020/7/30.
+//  Created by CHM on 2020/11/6.
 //  Copyright © 2020 CHM. All rights reserved.
 //
 
-#include "CopyComplexList.hpp"
+#include "CopyComplexList_1.hpp"
 
 // 复制节点，把每个复制的节点直接链接在原节点的后面
-void CopyComplexList::cloneNodes(ComplexListNode* pHead) {
+void CopyComplexList_1::cloneNodes(ComplexListNode* pHead) {
     ComplexListNode* pNode = pHead;
     while (pNode != nullptr) {
         // 新建节点 m_nValue 是原节点的 m_nValue，m_pSibling 暂时赋 nullptr
@@ -28,8 +28,8 @@ void CopyComplexList::cloneNodes(ComplexListNode* pHead) {
     }
 }
 
-// 更新 pNode，继续下个节点的复制
-void CopyComplexList::connectSiblingNodes(ComplexListNode* pHead) {
+// 链接复制节点的 m_pSibling 节点
+void CopyComplexList_1::connectSiblingNodes(ComplexListNode* pHead) {
     ComplexListNode* pNode = pHead;
     while (pNode != nullptr) {
         if (pNode->m_pSibling != nullptr) {
@@ -46,7 +46,7 @@ void CopyComplexList::connectSiblingNodes(ComplexListNode* pHead) {
 }
 
 // 从复制后的长链表中拆出复制链表
-ComplexListNode* CopyComplexList::reconnectNodes(ComplexListNode* pHead) {
+ComplexListNode* CopyComplexList_1::reconnectNodes(ComplexListNode* pHead) {
     // 用于遍历原链表的临时节点
     ComplexListNode* pNode = pHead;
     
@@ -87,19 +87,17 @@ ComplexListNode* CopyComplexList::reconnectNodes(ComplexListNode* pHead) {
     return pClonedHead;
 }
 
-ComplexListNode* CopyComplexList::clone(ComplexListNode* pHead) {
+ComplexListNode* CopyComplexList_1::clone(ComplexListNode* pHead) {
     // 复制节点，（复制的节点直接跟在原节点的后面）
     cloneNodes(pHead);
-    
     // 链接 m_pSibling 节点
     connectSiblingNodes(pHead);
-    
     // 重连，（即拆分原链表和新复制的链表）
     return reconnectNodes(pHead);
 }
 
 // 测试代码
-void CopyComplexList::Test(const char* testName, ComplexListNode* pHead) {
+void CopyComplexList_1::Test(const char* testName, ComplexListNode* pHead) {
     if(testName != nullptr)
         printf("%s begins:\n", testName);
 
@@ -118,7 +116,7 @@ void CopyComplexList::Test(const char* testName, ComplexListNode* pHead) {
 //  |       |      /|\             /|\
 //  --------+--------               |
 //          -------------------------
-void CopyComplexList::Test1() {
+void CopyComplexList_1::Test1() {
     ComplexListNode* pNode1 = CreateNode(1);
     ComplexListNode* pNode2 = CreateNode(2);
     ComplexListNode* pNode3 = CreateNode(3);
@@ -140,7 +138,7 @@ void CopyComplexList::Test1() {
 //         |       | /|\           /|\
 //         |       | --             |
 //         |------------------------|
-void CopyComplexList::Test2() {
+void CopyComplexList_1::Test2() {
     ComplexListNode* pNode1 = CreateNode(1);
     ComplexListNode* pNode2 = CreateNode(2);
     ComplexListNode* pNode3 = CreateNode(3);
@@ -162,7 +160,7 @@ void CopyComplexList::Test2() {
 //          |              /|\
 //          |               |
 //          |---------------|
-void CopyComplexList::Test3() {
+void CopyComplexList_1::Test3() {
     ComplexListNode* pNode1 = CreateNode(1);
     ComplexListNode* pNode2 = CreateNode(2);
     ComplexListNode* pNode3 = CreateNode(3);
@@ -178,7 +176,7 @@ void CopyComplexList::Test3() {
 }
 
 // 只有一个结点
-void CopyComplexList::Test4() {
+void CopyComplexList_1::Test4() {
     ComplexListNode* pNode1 = CreateNode(1);
     BuildNodes(pNode1, nullptr, pNode1);
 
@@ -186,11 +184,11 @@ void CopyComplexList::Test4() {
 }
 
 // 鲁棒性测试
-void CopyComplexList::Test5() {
+void CopyComplexList_1::Test5() {
     Test("Test5", nullptr);
 }
 
-void CopyComplexList::Test() {
+void CopyComplexList_1::Test() {
     Test1();
     Test2();
     Test3();
