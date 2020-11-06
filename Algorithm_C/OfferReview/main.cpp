@@ -63,6 +63,9 @@
 #include "DigitsInSequence.hpp"
 #include "TranslateNumbersToStrings.hpp"
 #include "MaxValueOfGifts.hpp"
+
+#import <libkern/OSAtomic.h>
+
 using namespace std;
 
 //// 定义类型别名

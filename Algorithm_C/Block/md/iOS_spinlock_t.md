@@ -66,7 +66,7 @@
 🌟🌟🌟
 sum 属性使用 `atomic` 和 `nonatomic` 结果相同，下篇文章再分析 `atomic` 虽是原子操作，但是依然不是线程安全的原因。它的原子操作只是限于对它所修饰的变量在做 `set` 操作时加锁而已。
 
-这里有一个有趣的点，我们来分析一下不加锁的情况下的打印：（这里我们把两条线层分别命名为 ⏰线程和⚽️线程）
+这里有一个有趣的点，我们来分析一下不加锁的情况下的打印：（这里我们把两条线分别命名为 ⏰线程和⚽️线程）
 1. 可以确定的是⏰线程和⚽️线程不会有任何一个可以打印 20000
 2. ⏰线程和⚽️线程两者的打印都到了 10000 以上
 3. ⏰线程或足球线程其中一个打印在 10000 以上一个在 10000 以下
@@ -154,7 +154,7 @@ sum 属性使用 `atomic` 和 `nonatomic` 结果相同，下篇文章再分析 `
   `!OSSPINLOCK_USE_INLINED_TRANSPARENT` 为真时（不知道是干啥的 😣），把 `OSSpinLock` 转换为 `os_unfair_lock_t`:
   
   ***在函数前加 `OSSPINLOCK_INLINE` 告诉编译器尽最大努力保证被修饰的函数内联：***
-  > ````objective-c
+  > ```objective-c
     #if __has_attribute(always_inline) // 尽最大努力保证函数内联
     #define OSSPINLOCK_INLINE static __inline
     #else
@@ -240,7 +240,7 @@ void _os_nospin_lock_unlock(_os_nospin_lock_t lock);
 例如 A/B 两个线程，A 的优先级大于 B 的，我们的本意是 A 的任务优先执行，但是使用 `OSSpinLock` 后，如果是 B 优先访问了共享资源获得了锁并加锁，而 A 线程再去访问共享资源的时候锁就会处于忙等状态，由于A 的优先级高它会一直占用 `cpu` 资源不会让出时间片，这样 B 一直不能获得 `cpu` 资源去执行任务，导致无法完成。
 
 
-> 《不再安全的 OSSpinLock》原文: 新版 iOS 中，系统维护了 5 个不同的线程优先级/QoS: background，utility，default，user-initiated，user-interactive。高优先级线程始终会在低优先级线程前执行，一个线程不会受到比它更低优先级线程的干扰。这种线程调度算法会产生潜在的优先级反转问题，从而破坏了 spin lock。
+> &emsp;《不再安全的 OSSpinLock》原文: 新版 iOS 中，系统维护了 5 个不同的线程优先级/QoS: background，utility，default，user-initiated，user-interactive。高优先级线程始终会在低优先级线程前执行，一个线程不会受到比它更低优先级线程的干扰。这种线程调度算法会产生潜在的优先级反转问题，从而破坏了 spin lock。
   具体来说，如果一个低优先级的线程获得锁并访问共享资源，这时一个高优先级的线程也尝试获得这个锁，它会处于 spin lock 的忙等状态从而占用大量 CPU。此时低优先级线程无法与高优先级线程争夺 CPU 时间，从而导致任务迟迟完不成、无法释放 lock。这并不只是理论上的问题，libobjc 已经遇到了很多次这个问题了，于是苹果的工程师停用了 OSSpinLock。
   苹果工程师 Greg Parker 提到，对于这个问题，一种解决方案是用 truly unbounded backoff 算法，这能避免 livelock 问题，但如果系统负载高时，它仍有可能将高优先级的线程阻塞数十秒之久；另一种方案是使用 handoff lock 算法，这也是 libobjc 目前正在使用的。锁的持有者会把线程 ID 保存到锁内部，锁的等待者会临时贡献出它的优先级来避免优先级反转的问题。理论上这种模式会在比较复杂的多锁条件下产生问题，但实践上目前还一切都好。
   libobjc 里用的是 Mach 内核的 thread_switch() 然后传递了一个 mach thread port 来避免优先级反转，另外它还用了一个私有的参数选项，所以开发者无法自己实现这个锁。另一方面，由于二进制兼容问题，OSSpinLock 也不能有改动。
