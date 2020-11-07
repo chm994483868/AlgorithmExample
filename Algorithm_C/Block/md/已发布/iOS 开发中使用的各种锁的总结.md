@@ -1,13 +1,11 @@
 # iOS 开发中使用的各种锁的总结
 
-> &emsp;
+> &emsp;本篇来总结 iOS 开发中使用到的锁，包括 spinlock_t、os_unfair_lock、pthread_mutex_t、NSLock、NSRecursiveLock、NSCondition、NSConditionLock、@synchronized、dispatch_semaphore、pthread_rwlock_t。 
 
 ## spinlock_t
-
 > &emsp;使用 OSSpinLock 需要先引入 #import <libkern/OSAtomic.h>。看到 usr/include/libkern/OSSpinLockDeprecated.h 名字后面的 Deprecated 强烈的提示着我们 OSSpinLock 已经不赞成使用了。
 > &emsp;查看 OSSpinLockDeprecated.h 文件内容 OSSPINLOCK_DEPRECATED_REPLACE_WITH(os_unfair_lock) 提示我们使用 os_unfair_lock 代替 OSSpinLock。
 > &emsp;OSSpinLock 存在线程安全问题，它可能导致优先级反转问题，目前我们在任何情况下都不应该再使用它，我们可以使用 apple 在 iOS 10.0 后推出的 os_unfair_lock (作为 OSSpinLock 的替代) 。关于 os_unfair_lock 我们下一节展开学习。
-
 ### OSSpinLock API 简单使用
 &emsp;`OSSpinLock API` 很简单，首先看下使用示例。
 ```objective-c
@@ -49,7 +47,6 @@
         OSSpinLockUnlock(&_lock); // 解锁
     });
 }
-
 @end
 
 // 打印 🖨️：
@@ -258,7 +255,6 @@ libobjc 里用的是 Mach 内核的 thread_switch() 然后传递了一个 mach t
 
 ## os_unfair_lock
 > &emsp;`os_unfair_lock` 设计宗旨是用于替换 `OSSpinLock`，从 `iOS 10` 之后开始支持，跟 `OSSpinLock` 不同，等待 `os_unfair_lock` 的线程会处于休眠状态（类似 `Runloop` 那样），不是忙等（`busy-wait`）。
-
 ### os_unfair_lock 引子
 &emsp;看到 `struct SideTable` 定义中第一个成员变量是 `spinlock_t slock;`， 这里展开对 `spinlock_t` 的学习。
 ```c++
@@ -303,11 +299,9 @@ class nocopy_t {
     ~nocopy_t() = default;
 };
 ```
-
 &emsp;`mute_tt` 类的第一个成员变量是: `os_unfair_lock mLock`。
 ### os_unfair_lock 正片
 &emsp;在 `usr/include/os/lock.h` 中看到 `os_unfair_lock` 的定义，使用 `os_unfair_lock` 首先需要引入 `#import <os/lock.h>` 。
-
 ### os_unfair_lock API 简单使用
 &emsp;`os_unfair_lock API` 很简单，首先看下使用示例。
 ```c++
@@ -315,10 +309,8 @@ class nocopy_t {
 #import <os/lock.h> // os_unfair_lock
 
 @interface ViewController ()
-
 @property (nonatomic, assign) NSInteger sum;
 @property (nonatomic, assign) os_unfair_lock unfairL;
-
 @end
 
 @implementation ViewController
@@ -350,9 +342,7 @@ class nocopy_t {
      */
      
     self.unfairL = OS_UNFAIR_LOCK_INIT; // 初始化
-    
     dispatch_queue_t globalQueue_DEFAULT = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0);
-
     self.sum = 0;
     
     __weak typeof(self) _self = self;
@@ -376,23 +366,17 @@ class nocopy_t {
         for (unsigned int i = 0; i < 10000; ++i) {
             self.sum++;
         }
-
         os_unfair_lock_unlock(&self->_unfairL); // 解锁
-
         NSLog(@"⏰⏰⏰ %ld", self.sum);
     });
 
     dispatch_async(globalQueue_DEFAULT, ^{
         __strong typeof(_self) self = _self;
-
         os_unfair_lock_lock(&self->_unfairL); // 加锁
-        
         for (unsigned int i = 0; i < 10000; ++i) {
             self.sum++;
         }
-        
         os_unfair_lock_unlock(&self->_unfairL); // 解锁
-
         NSLog(@"⚽️⚽️⚽️ %ld", self.sum);
     });
 }
@@ -402,8 +386,191 @@ class nocopy_t {
 ⚽️⚽️⚽️ 10000
 ⏰⏰⏰ 20000
 ```
-### os_unfair_lock.h 文件内容
-
+### lock.h 文件内容
+&emsp;首先是一个宏定义告诉我们 `os_unfair_lock` 出现的时机。看到 `os_unfair_lock` 是在 `iOS 10.0` 以后首次出现的。
+```c++
+#define OS_LOCK_API_VERSION 20160309
+#define OS_UNFAIR_LOCK_AVAILABILITY \
+__API_AVAILABLE(macos(10.12), ios(10.0), tvos(10.0), watchos(3.0))
+```
+> &emsp;/*!
+> * @typedef os_unfair_lock
+> *
+> * @abstract
+> * Low-level lock that allows waiters to block efficiently on contention.
+> *
+> * In general, higher level synchronization primitives such as those provided by
+> * the pthread or dispatch subsystems should be preferred.
+> *
+> * The values stored in the lock should be considered opaque and implementation
+> * defined, they contain thread ownership information that the system may use
+> * to attempt to resolve priority inversions.
+> *
+> * This lock must be unlocked from the same thread that locked it, attempts to
+> * unlock from a different thread will cause an assertion aborting the process.
+> *
+> * This lock must not be accessed from multiple processes or threads via shared
+> * or multiply-mapped memory, the lock implementation relies on the address of
+> * the lock value and owning process.
+> *
+> * Must be initialized with OS_UNFAIR_LOCK_INIT
+> *
+> * @discussion
+> * Replacement for the deprecated OSSpinLock. Does not spin on contention but
+> * waits in the kernel to be woken up by an unlock.
+> *
+> * As with OSSpinLock there is no attempt at fairness or lock ordering, e.g. an
+> * unlocker can potentially immediately reacquire the lock before a woken up
+> * waiter gets an opportunity to attempt to acquire the lock. This may be
+> * advantageous for performance reasons, but also makes starvation of waiters a
+> * possibility.
+> */
+&emsp;对以上摘要内容进行总结，大概包括以下 4 点：
+1. `os_unfair_lock` 是一个低等级锁。一些高等级的锁才应该是我们日常开发中的首选。
+2. 必须使用加锁时的同一个线程来进行解锁，尝试使用不同的线程来解锁将导致断言中止进程。
+3. 锁里面包含线程所有权信息来解决优先级反转问题。
+4. 不能通过共享或多重映射内存从多个进程或线程访问此锁，锁的实现依赖于锁值的地址和所属进程。
+5. 必须使用 `OS_UNFAIR_LOCK_INIT` 进行初始化。
+&emsp;`os_unfair_lock_s` 结构，typedef 定义别名，`os_unfair_lock` 是一个 `os_unfair_lock_s` 结构体，`os_unfair_lock_t` 是一个 `os_unfair_lock_s` 指针，该结构体内部就一个 `uint32_t _os_unfair_lock_opaque` 成员变量。
+```c++
+OS_UNFAIR_LOCK_AVAILABILITY
+typedef struct os_unfair_lock_s {
+    uint32_t _os_unfair_lock_opaque;
+} os_unfair_lock, *os_unfair_lock_t;
+```
+&emsp;针对不同的平台或者 `C++` 版本以不同的方式来进行初始化 `(os_unfair_lock){0}`。
+1. `(os_unfair_lock){0}`
+2. `os_unfair_lock{}`
+3. `os_unfair_lock()`
+4. `{0}`
+```c++
+#ifndef OS_UNFAIR_LOCK_INIT
+#if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 199901L
+#define OS_UNFAIR_LOCK_INIT ((os_unfair_lock){0}) // ⬅️
+#elif defined(__cplusplus) && __cplusplus >= 201103L
+#define OS_UNFAIR_LOCK_INIT (os_unfair_lock{}) // ⬅️
+#elif defined(__cplusplus)
+#define OS_UNFAIR_LOCK_INIT (os_unfair_lock()) // ⬅️
+#else
+#define OS_UNFAIR_LOCK_INIT {0} // ⬅️
+#endif
+#endif // OS_UNFAIR_LOCK_INIT
+```
++  `os_unfair_lock_lock` 加锁。
+```c++
+/*!
+ * @function os_unfair_lock_lock
+ *
+ * @abstract
+ * Locks an os_unfair_lock. // 锁定一个 os_unfair_lock
+ *
+ * @param lock
+ * Pointer to an os_unfair_lock. // 参数是一个 os_unfair_lock 指针
+ */
+OS_UNFAIR_LOCK_AVAILABILITY
+OS_EXPORT OS_NOTHROW OS_NONNULL_ALL
+void os_unfair_lock_lock(os_unfair_lock_t lock);
+```
++ `os_unfair_lock_trylock` 尝试加锁。
+```c++
+/*!
+ * @function os_unfair_lock_trylock
+ *
+ * @abstract
+ * Locks an os_unfair_lock if it is not already locked.
+ * 锁定一个 os_unfair_lock，如果它是之前尚未锁定的。
+ *
+ * @discussion
+ * It is invalid to surround this function with a retry loop, if this function
+ * returns false, the program must be able to proceed without having acquired
+ * the lock, or it must call os_unfair_lock_lock() directly (a retry loop around
+ * os_unfair_lock_trylock() amounts to an inefficient implementation of
+ * os_unfair_lock_lock() that hides the lock waiter from the system and prevents
+ * resolution of priority inversions).
+ * 如果此函数返回 false，则用重试循环包围此函数是无效的，程序必须能够有能力处理这种没有获得锁的情况保证程序正常运行，
+ * 或者必须直接调用 os_unfair_lock_lock()（os_unfair_lock_lock 会使线程阻塞一直到获得锁为止）。
+ * （围绕 os_unfair_lock_trylock() 的重试循环等于 os_unfair_lock_lock() 的低效实现，
+ * 该实现将 lock waiter 从系统中隐藏并解决了优先级反转问题）
+ * 
+ * @param lock
+ * Pointer to an os_unfair_lock.
+ * 参数是一个指向 os_unfair_lock 的指针。
+ *
+ * @result
+ * Returns true if the lock was succesfully locked and false if the lock was already locked.
+ * 锁定成功返回 true，如果之前已经被锁定则返回 false。
+ * 
+ */
+OS_UNFAIR_LOCK_AVAILABILITY
+OS_EXPORT OS_NOTHROW OS_WARN_RESULT OS_NONNULL_ALL
+bool os_unfair_lock_trylock(os_unfair_lock_t lock);
+```
++ `os_unfair_lock_unlock` 解锁。
+```c++
+/*!
+ * @function os_unfair_lock_unlock
+ *
+ * @abstract
+ * Unlocks an os_unfair_lock. // 解锁
+ *
+ * @param lock
+ * Pointer to an os_unfair_lock.
+ */
+OS_UNFAIR_LOCK_AVAILABILITY
+OS_EXPORT OS_NOTHROW OS_NONNULL_ALL
+void os_unfair_lock_unlock(os_unfair_lock_t lock);
+```
++ `os_unfair_lock_assert_owner` 判断当前线程是否是 `os_unfair_lock` 的所有者，否则触发断言。
+```c++
+/*!
+ * @function os_unfair_lock_assert_owner
+ *
+ * @abstract
+ * Asserts that the calling thread is the current owner of the specified unfair lock.
+ *
+ * @discussion
+ * If the lock is currently owned by the calling thread, this function returns. 
+ * 如果锁当前由调用线程所拥有，则此函数正常执行返回。
+ *
+ * If the lock is unlocked or owned by a different thread, this function asserts and terminates the process.
+ * 如果锁是未锁定或者由另一个线程所拥有，则执行断言。
+ *
+ * @param lock
+ * Pointer to an os_unfair_lock.
+ */
+OS_UNFAIR_LOCK_AVAILABILITY
+OS_EXPORT OS_NOTHROW OS_NONNULL_ALL
+void os_unfair_lock_assert_owner(os_unfair_lock_t lock);
+```
++ `os_unfair_lock_assert_not_owner` 与上相反，如果当前线程是指定 `os_unfair_lock` 的所有者则触发断言。
+```c++
+/*!
+ * @function os_unfair_lock_assert_not_owner
+ *
+ * @abstract
+ * Asserts that the calling thread is not the current owner of the specified unfair lock.
+ *
+ * @discussion
+ * If the lock is unlocked or owned by a different thread, this function returns.
+ *
+ * If the lock is currently owned by the current thread, this function assertsand terminates the process.
+ *
+ * @param lock
+ * Pointer to an os_unfair_lock.
+ */
+OS_UNFAIR_LOCK_AVAILABILITY
+OS_EXPORT OS_NOTHROW OS_NONNULL_ALL
+void os_unfair_lock_assert_not_owner(os_unfair_lock_t lock);
+```
++ 测试 `os_unfair_lock_assert_owner` 和 `os_unfair_lock_assert_not_owner`。
+```c++
+dispatch_async(globalQueue_DEFAULT, ^{
+    os_unfair_lock_assert_owner(&self->_unfairL);
+});
+os_unfair_lock_assert_not_owner(&self->_unfairL);
+```
+## pthread_mutex_t
+&emsp;`pthread_mutex_t` 是跨平台使用的锁，等待锁的线程会处于休眠状态，可根据不同的属性配置把 `pthread_mutex_t` 初始化为不同类型的锁，例如：互斥锁、递归锁、条件锁。当使用递归锁时，允许同一个线程重复进行加锁，另一个线程访问时就会等待，这样可以保证多线程时访问共用资源的安全性。`pthread_mutex_t` 使用时首先要引入头文件 `#import <pthread.h>`。
 
 
 
