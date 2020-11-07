@@ -1,8 +1,9 @@
 # iOS 开发中使用的各种锁的总结
 
-> &emsp;本篇来总结 iOS 开发中使用到的锁，包括 spinlock_t、os_unfair_lock、pthread_mutex_t、NSLock、NSRecursiveLock、NSCondition、NSConditionLock、@synchronized、dispatch_semaphore、pthread_rwlock_t。 
+> &emsp;锁是常用的同步工具。一段代码段在同一个时间只能允许被有限个线程访问，比如一个线程 A 进入需要保护的代码之前添加简单的互斥锁，另一个线程 B 就无法访问这段保护代码了，只有等待前一个线程 A 执行完被保护的代码后解锁，B 线程才能访问被保护的代码段。本篇就来总结这些 iOS 开发中使用到的锁，包括 spinlock_t、os_unfair_lock、pthread_mutex_t、NSLock、NSRecursiveLock、NSCondition、NSConditionLock、@synchronized、dispatch_semaphore、pthread_rwlock_t。 
 
 ## spinlock_t
+> &emsp;自旋锁，也只有加锁、解锁和尝试加锁三个方法。和 NSLock 不同的是 NSLock 请求加锁失败的话，会先轮询，但一秒后便会使线程进入 waiting 状态，等待唤醒。而 OSSpinLock 会一直轮询，等待时会消耗大量 CPU 资源，不适用于较长时间的任务。
 > &emsp;使用 OSSpinLock 需要先引入 #import <libkern/OSAtomic.h>。看到 usr/include/libkern/OSSpinLockDeprecated.h 名字后面的 Deprecated 强烈的提示着我们 OSSpinLock 已经不赞成使用了。
 > &emsp;查看 OSSpinLockDeprecated.h 文件内容 OSSPINLOCK_DEPRECATED_REPLACE_WITH(os_unfair_lock) 提示我们使用 os_unfair_lock 代替 OSSpinLock。
 > &emsp;OSSpinLock 存在线程安全问题，它可能导致优先级反转问题，目前我们在任何情况下都不应该再使用它，我们可以使用 apple 在 iOS 10.0 后推出的 os_unfair_lock (作为 OSSpinLock 的替代) 。关于 os_unfair_lock 我们下一节展开学习。
@@ -570,9 +571,1405 @@ dispatch_async(globalQueue_DEFAULT, ^{
 os_unfair_lock_assert_not_owner(&self->_unfairL);
 ```
 ## pthread_mutex_t
-&emsp;`pthread_mutex_t` 是跨平台使用的锁，等待锁的线程会处于休眠状态，可根据不同的属性配置把 `pthread_mutex_t` 初始化为不同类型的锁，例如：互斥锁、递归锁、条件锁。当使用递归锁时，允许同一个线程重复进行加锁，另一个线程访问时就会等待，这样可以保证多线程时访问共用资源的安全性。`pthread_mutex_t` 使用时首先要引入头文件 `#import <pthread.h>`。
+&emsp;`pthread_mutex_t` 是 C 语言下多线程互斥锁的方式，是跨平台使用的锁，等待锁的线程会处于休眠状态，可根据不同的属性配置把 `pthread_mutex_t` 初始化为不同类型的锁，例如：互斥锁、递归锁、条件锁。当使用递归锁时，允许同一个线程重复进行加锁，另一个线程访问时就会等待，这样可以保证多线程时访问共用资源的安全性。`pthread_mutex_t` 使用时首先要引入头文件 `#import <pthread.h>`。
+```c++
+PTHREAD_MUTEX_NORMAL // 缺省类型，也就是普通类型，当一个线程加锁后，其余请求锁的线程将形成一个队列，并在解锁后先进先出原则获得锁。
+PTHREAD_MUTEX_ERRORCHECK // 检错锁，如果同一个线程请求同一个锁，则返回 EDEADLK，否则与普通锁类型动作相同。这样就保证当不允许多次加锁时不会出现嵌套情况下的死锁
+PTHREAD_MUTEX_RECURSIVE //递归锁，允许同一个线程对同一锁成功获得多次，并通过多次 unlock 解锁。
+PTHREAD_MUTEX_DEFAULT // 适应锁，动作最简单的锁类型，仅等待解锁后重新竞争，没有等待队列。
+```
+&emsp;`pthread_mutex_trylock` 和 `trylock` 不同，`trylock` 返回的是 `YES` 和 `NO`，`pthread_mutex_trylock` 加锁成功返回的是 `0`，失败返回的是错误提示码。
+### pthread_mutex_t 简单使用
+&emsp;`pthread_mutex_t` 初始化时使用不同的 `pthread_mutexattr_t` 可获得不同类型的锁。
+#### 互斥锁（ PTHREAD_MUTEX_DEFAULT 或 PTHREAD_MUTEX_NORMAL ）
+```c++
+#import "ViewController.h"
+#import <pthread.h> // pthread_mutex_t
+
+@interface ViewController ()
+
+@property (nonatomic, assign) NSInteger sum;
+@property (nonatomic, assign) pthread_mutex_t lock;
+
+@end
+
+@implementation ViewController
+
+- (void)viewDidLoad {
+    [super viewDidLoad];
+    
+    self.sum = 0;
+    dispatch_queue_t global_queue = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0);
+
+    // 1. 互斥锁，默认状态为互斥锁
+    // 初始化属性
+    pthread_mutexattr_t att;
+    pthread_mutexattr_init(&att);
+    
+    // 设置属性，描述锁是什么类型
+    pthread_mutexattr_settype(&att, PTHREAD_MUTEX_DEFAULT);
+    
+    // 初始化锁
+    pthread_mutex_init(&self->_lock, &att);
+    // 销毁属性
+    pthread_mutexattr_destroy(&att);
+
+    __weak typeof(self) _self = self;
+    dispatch_async(global_queue, ^{
+        __strong typeof(_self) self = _self;
+        if (!self) return;
+    
+        pthread_mutex_lock(&self->_lock);
+        for (unsigned int i = 0; i < 10000; ++i) {
+            self.sum++;
+        }
+        pthread_mutex_unlock(&self->_lock);
+        
+        NSLog(@"😵😵😵 %ld", (long)self.sum);
+    });
+    
+    dispatch_async(global_queue, ^{
+        __strong typeof(_self) self = _self;
+        if (!self) return;
+        
+        pthread_mutex_lock(&self->_lock);
+        for (unsigned int i = 0; i < 10000; ++i) {
+            self.sum++;
+        }
+        pthread_mutex_unlock(&self->_lock);
+
+        NSLog(@"👿👿👿 %ld", (long)self.sum);
+    });
+}
+
+#pragma mark - dealloc
+
+- (void)dealloc {
+    NSLog(@"🧑‍🎤🧑‍🎤🧑‍🎤 dealloc 同时释放🔒...");
+    // 销毁锁
+    pthread_mutex_destroy(&self->_lock);
+}
+
+@end
+
+// 打印 🖨️：
+😵😵😵 10000
+👿👿👿 20000
+🧑‍🎤🧑‍🎤🧑‍🎤 dealloc 同时释放🔒...
+```
+#### 递归锁（ PTHREAD_MUTEX_RECURSIVE ）
+```c++
+#import "ViewController.h"
+#import <pthread.h> // pthread_mutex_t
+
+static int count = 3;
+@interface ViewController ()
+
+@property (nonatomic, assign) NSInteger sum;
+@property (nonatomic, assign) pthread_mutex_t recursivelock;
+
+@end
+
+@implementation ViewController
+
+- (void)viewDidLoad {
+    [super viewDidLoad];
+    
+    self.sum = 0;
+    dispatch_queue_t global_queue = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0);
+    
+    // 2. 递归锁（PTHREAD_MUTEX_RECURSIVE）
+    pthread_mutexattr_t recursiveAtt;
+    pthread_mutexattr_init(&recursiveAtt);
+    
+    // 设置属性，描述锁是什么类型
+    pthread_mutexattr_settype(&recursiveAtt, PTHREAD_MUTEX_RECURSIVE);
+    
+    // 初始化锁
+    pthread_mutex_init(&self->_recursivelock, &recursiveAtt);
+    // 销毁属性
+    pthread_mutexattr_destroy(&recursiveAtt);
+    
+    __weak typeof(self) _self = self;
+    dispatch_async(global_queue, ^{
+        __strong typeof(_self) self = _self;
+        if (!self) return;
+        
+        pthread_mutex_lock(&self->_recursivelock);
+        for (unsigned int i = 0; i < 10000; ++i) {
+            self.sum++;
+        }
+        pthread_mutex_unlock(&self->_recursivelock);
+
+        NSLog(@"😵😵😵 %ld", (long)self.sum);
+    });
+    
+    dispatch_async(global_queue, ^{
+        __strong typeof(_self) self = _self;
+        if (!self) return;
+        
+        // 递归锁验证
+        [self recursiveAction];
+    });
+    
+    dispatch_async(global_queue, ^{
+        __strong typeof(_self) self = _self;
+        if (!self) return;
+        
+        pthread_mutex_lock(&self->_recursivelock);
+        for (unsigned int i = 0; i < 10000; ++i) {
+            self.sum++;
+        }
+        pthread_mutex_lock(&self->_recursivelock);
+        
+        NSLog(@"👿👿👿 %ld", (long)self.sum);
+    });
+    
+    dispatch_async(global_queue, ^{
+        __strong typeof(_self) self = _self;
+        if (!self) return;
+        
+        // 递归锁验证
+        [self recursiveAction];
+    });
+}
+
+#pragma mark - Private Methods
+- (void)recursiveAction {
+    pthread_mutex_lock(&self->_recursivelock);
+    
+    NSLog(@"😓😓😓 count = %d", count);
+    if (count > 0) {
+        count--;
+        [self recursiveAction];
+    }
+
+    // else { // 如果是单线程的话，这里加一个递归出口没有任何问题
+    // return;
+    // }
+    
+    pthread_mutex_unlock(&self->_recursivelock);
+    count = 3;
+}
+
+#pragma mark - dealloc
+- (void)dealloc {
+    NSLog(@"🧑‍🎤🧑‍🎤🧑‍🎤 dealloc 同时释放🔒...");
+    pthread_mutex_destroy(&self->_recursivelock);
+}
+
+@end
+
+// 打印 🖨️:
+😵😵😵 10000
+😓😓😓 count = 3
+😓😓😓 count = 2
+😓😓😓 count = 1
+😓😓😓 count = 0
+
+👿👿👿 20000
+😓😓😓 count = 3
+😓😓😓 count = 2
+😓😓😓 count = 1
+😓😓😓 count = 0
+
+🧑‍🎤🧑‍🎤🧑‍🎤 dealloc 同时释放🔒...
+```
+#### 条件锁
+&emsp;首先设定以下场景，两条线程 `A` 和 `B`，`A` 线程中执行删除数组元素，`B` 线程中执行添加数组元素，由于不知道哪个线程会先执行，所以需要加锁实现，只有在添加之后才能执行删除操作，为互斥锁添加条件可以实现。通过此方法可以实现线程依赖。
+```c++
+#import "ViewController.h"
+
+#import <pthread.h> // pthread_mutex_t
+
+@interface ViewController ()
+
+@property (nonatomic, strong) NSMutableArray *dataArr;
+@property (nonatomic, assign) pthread_mutex_t lock;
+@property (nonatomic, assign) pthread_cond_t condition;
+
+@end
+
+@implementation ViewController
+
+- (void)viewDidLoad {
+    [super viewDidLoad];
+    
+    // 初始化数组
+    self.dataArr = [NSMutableArray array];
+    
+    // 初始化锁
+    pthread_mutexattr_t att;
+    pthread_mutexattr_init(&att);
+    pthread_mutexattr_settype(&att, PTHREAD_MUTEX_DEFAULT);
+    pthread_mutex_init(&self->_lock, &att);
+    pthread_mutexattr_destroy(&att);
+
+    // 初始化条件
+    pthread_cond_init(&self->_condition, NULL);
+    
+    dispatch_queue_t global_DEFAULT = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0);
+    dispatch_queue_t global_HIGH = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_HIGH, 0);
+
+    __weak typeof(self) _self = self;
+    
+    dispatch_async(global_HIGH, ^{
+        __strong typeof(_self) self = _self;
+        if (!self) return;
+        
+        pthread_mutex_lock(&self->_lock);
+        NSLog(@"🧑‍💻🧑‍💻🧑‍💻 delete begin");
+        
+        if (self.dataArr.count < 1) {
+            pthread_cond_wait(&self->_condition, &self->_lock);
+        }
+        
+        [self.dataArr removeLastObject];
+        NSLog(@"数组执行删除元素操作");
+        pthread_mutex_unlock(&self->_lock);
+    });
+    
+    dispatch_async(global_DEFAULT, ^{
+        __strong typeof(_self) self = _self;
+        if (!self) return;
+        
+        pthread_mutex_lock(&self->_lock);
+        NSLog(@"🧑‍💻🧑‍💻🧑‍💻 add begin");
+        
+        [self.dataArr addObject:@"CHM"];
+        pthread_cond_signal(&self->_condition);
+        
+        NSLog(@"数组执行添加元素操作");
+        pthread_mutex_unlock(&self->_lock);
+    });
+
+    NSThread *deThread = [[NSThread alloc] initWithTarget:self selector:@selector(deleteObj) object:nil];
+    [deThread start];
+
+    // sleep 1 秒，确保删除元素的线程先获得锁
+    sleep(1);
+
+    NSThread *addThread = [[NSThread alloc] initWithTarget:self selector:@selector(addObj) object:nil];
+    [addThread start];
+}
+
+#pragma mark - Private Methods
+
+- (void)deleteObj {
+    pthread_mutex_lock(&self->_lock);
+
+    NSLog(@"🧑‍💻🧑‍💻🧑‍💻 delete begin");
+    // 添加判断，如果没有数据则添加条件
+    
+    if (self.dataArr.count < 1) {
+        // 添加条件，如果数组为空，则添加等待线程休眠，将锁让出，这里会将锁让出去，所以下面的 addObj 线程才能获得锁
+        // 接收到信号时会再次加锁，然后继续向下执行
+        pthread_cond_wait(&self->_condition, &self->_lock);
+    }
+    
+    [self.dataArr removeLastObject];
+    NSLog(@"数组执行删除元素操作");
+
+    pthread_mutex_unlock(&self->_lock);
+}
+
+- (void)addObj {
+    pthread_mutex_lock(&self->_lock);
+
+    NSLog(@"🧑‍💻🧑‍💻🧑‍💻 add begin");
+    [self.dataArr addObject:@"HTI"];
+    
+    // 发送信号，说明已经添加元素了
+    pthread_cond_signal(&self->_condition);
+    
+    NSLog(@"数组执行添加元素操作");
+    pthread_mutex_unlock(&self->_lock);
+}
+
+#pragma mark - dealloc
+
+- (void)dealloc {
+    NSLog(@"🧑‍🎤🧑‍🎤🧑‍🎤 dealloc 同时释放🔒...");
+    
+    pthread_mutex_destroy(&self->_lock);
+    pthread_cond_destroy(&self->_condition);
+}
+
+@end
+
+// 打印 🖨️:
+🧑‍💻🧑‍💻🧑‍💻 delete begin
+🧑‍💻🧑‍💻🧑‍💻 add begin
+数组执行添加元素操作
+数组执行删除元素操作
+🧑‍🎤🧑‍🎤🧑‍🎤 dealloc 同时释放🔒...
+```
+## NSLock
+> &emsp;继承自 NSObject 并遵循 NSLocking 协议，lock 方法加锁，unlock 方法解锁，tryLock 尝试并加锁，如果返回 true 表示加锁成功，返回 false 表示加锁失败，谨记返回的 BOOL 表示加锁动作的成功或失败，并不是能不能加锁，即使加锁失败也会不会阻塞当前线程。lockBeforeDate: 是在指定的 Date 之前尝试加锁，如果在指定的时间之前都不能加锁，则返回 NO，且会阻塞当前线程。大概可以使用在：先预估上一个临界区的代码执行完毕需要多少时间，然后在这个时间之后为另一个代码段来加锁。
+
+1. 基于 `mutex` 基本锁的封装，更加面向对象，等待锁的线程会处于休眠状态。
+2. 遵守 `NSLocking` 协议，`NSLocking` 协议中仅有两个方法 `-(void)lock` 和 `-(void)unlock`。
+3. 可能会用到的方法: 
+  1. 初始化跟其他 `OC` 对象一样，直接进行 `alloc` 和 `init` 操作。
+  2. `-(void)lock;` 加锁。
+  3. `-(void)unlock;` 解锁。
+  4. `-(BOOL)tryLock;` 尝试加锁。
+  5. `-(BOOL)lockBeforeDate:(NSDate *)limit;` 在某一个时间点之前等待加锁。
+4. 在主线程连续调用 `[self.lock lock]` 会导致主线程死锁。
+5. 在主线程没有获取 `Lock` 的情况下和在获取 `Lock` 的情况下，连续两次 ` [self.lock unlock]` 都不会发生异常。（其他的锁可能连续解锁的情况下会导致 `crash`，还没有来的及测试）
+6. 在子线程连续 `[self.lock lock]` 会导致死锁，同时别的子线获取 `self.lock` 则会一直等待下去。
+7. 同时子线程死锁会导致 `ViewController` 不释放。
+### NSLock 使用
+```c++
+@interface ViewController ()
+
+@property (nonatomic, assign) NSInteger sum;
+@property (nonatomic, strong) NSLock *lock;
+
+@end
+
+@implementation ViewController
+
+- (void)viewDidLoad {
+    [super viewDidLoad];
+    
+    self.sum = 0;
+    self.lock = [[NSLock alloc] init];
+    dispatch_queue_t global_queue = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0);
+    
+    __weak typeof(self) _self = self;
+    dispatch_async(global_queue, ^{
+        __strong typeof(_self) self = _self;
+        if (!self) return;
+        
+        // 如果此处加锁失败，则阻塞当前线程，下面的代码不会执行，
+        // 直到等到 lock 被其他线程释放了，它可以加锁了，才会接着执行下面的代码
+        [self.lock lock];
+        for (unsigned int i = 0; i < 10000; ++i) {
+            self.sum++;
+        }
+        [self.lock unlock];
+        
+        NSLog(@"👿👿👿 %ld", (long)self.sum);
+    });
+    
+    dispatch_async(global_queue, ^{
+        __strong typeof(_self) self = _self;
+        if (!self) return;
+        
+        // 如果此处加锁失败，则阻塞当前线程，下面的代码不会执行，
+        // 直到等到 lock 被其他线程释放了，它可以加锁了，才会接着执行下面的代码
+        [self.lock lock];
+        for (unsigned int i = 0; i < 10000; ++i) {
+            self.sum++;
+        }
+        [self.lock unlock];
+        
+        NSLog(@"😵😵😵 %ld", (long)self.sum);
+    });
+}
+
+#pragma mark - dealloc
+- (void)dealloc {
+    NSLog(@"🧑‍🎤🧑‍🎤🧑‍🎤 dealloc 同时释放🔒...");
+}
+
+@end
+
+// 打印结果:
+😵😵😵 20000
+👿👿👿 10000
+🧑‍🎤🧑‍🎤🧑‍🎤 dealloc 同时释放🔒...
+
+__weak typeof(self) _self = self;
+// 线程 1
+dispatch_async(global_queue, ^{
+    __strong typeof(_self) self = _self;
+    if (!self) return;
+
+    [self.lock lock];
+    for (unsigned int i = 0; i < 10000; ++i) {
+        self.sum++;
+    }
+    sleep(3);
+    [self.lock unlock];
+    NSLog(@"👿👿👿 %ld", (long)self.sum);
+});
+
+// 线程 2
+dispatch_async(global_queue, ^{
+    __strong typeof(_self) self = _self;
+    if (!self) return;
+    sleep(1); // 保证让线程 1 先获得锁
+    
+    // 如果此处用 1，则在这个时间点不能获得锁
+    // 如果是用大于 2 的数字，则能获得锁
+    // 且这个 if 函数是会阻塞当前线程的
+    if ([self.lock lockBeforeDate: [NSDate dateWithTimeIntervalSinceNow:1]]) {
+        for (unsigned int i = 0; i < 10000; ++i) {
+            self.sum++;
+        }
+        [self.lock unlock];
+    } else {
+        NSLog(@"lockBeforeDate 失败，会直接来到这里吗，会不阻塞当前线程吗？");
+    }
+    
+    NSLog(@"😵😵😵 %ld", (long)self.sum);
+});
+```
+&emsp;`[self.lock lockBeforeDate: [NSDate dateWithTimeIntervalSinceNow:1]]`，lockBeforeDate: 方法会在指定 Date 之前尝试加锁，且这个过程是会阻塞线程 2 的，如果在指定时间之前都不能加锁，则返回 false，在指定时间之前能加锁，则返回 true。
+_priv 和 name，检测各个阶段，_priv 一直是 NULL。name 是用来标识的，用来输出的时候作为 lock 的名称。如果是三个线程，那么一个线程在加锁的时候，其余请求锁的的线程将形成一个等待队列，按先进先出原则，这个结果可以通过修改线程优先级进行测试得出。
 
 
+## NSRecursiveLock
+> &emsp;  NSRecursiveLock 是递归锁，和 NSLock 的区别在于，它可以在同一个线程中重复加锁也不会导致死锁。NSRecursiveLock 会记录加锁和解锁的次数，当二者次数相等时，此线程才会释放锁，其它线程才可以上锁成功。
+
+1. 同 `NSLock` 一样，也是基于 `mutex` 的封装，不过是基于 `mutex` 递归锁的封装，所以这是一个递归锁。
+2. 遵守 `NSLocking` 协议，`NSLocking` 协议中仅有两个方法 `-(void)lock` 和 `-(void)unlock`。
+3. 可能会用到的方法: 
+  1. 继承自 NSObject，所以初始化跟其他 OC 对象一样，直接进行 alloc 和 init 操作。
+  2. `-(void)lock;` 加锁
+  3. `-(void)unlock;` 解锁
+  4. `-(BOOL)tryLock;` 尝试加锁
+  5. `-(BOOL)lockBeforeDate:(NSDate *)limit;` 在某一个时间点之前等待加锁。
+4. 递归锁是可以在同一线程连续调用 `lock` 不会直接导致阻塞死锁，但是依然要执行相等次数的 `unlock`。不然异步线程再获取该递归锁会导致该异步线程阻塞死锁。
+5. 递归锁允许同一线程多次加锁，不同线程进入加锁入口会处于等待状态，需要等待上一个线程解锁完成才能进入加锁状态。
+### NSRecursiveLock 使用
+&emsp;其实是实现上面 `pthread_mutex_t` 和 `PTHREAD_MUTEX_RECURSIVE` 完成的递归锁场景，只是这里使用 `NSRecursiveLock` `API` 更加精简，使用起来更加简单方便。
+```c++
+#import "ViewController.h"
+
+static int count = 3;
+
+@interface ViewController ()
+
+@property (nonatomic, assign) NSInteger sum;
+@property (nonatomic, strong) NSLock *lock;
+@property (nonatomic, strong) NSRecursiveLock *recursiveLock;
+
+@end
+
+@implementation ViewController
+
+- (void)viewDidLoad {
+    [super viewDidLoad];
+    // Do any additional setup after loading the view.
+    
+    self.sum = 0;
+    self.recursiveLock = [[NSRecursiveLock alloc] init];
+    dispatch_queue_t global_queue = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0);
+    
+    __weak typeof(self) _self = self;
+    dispatch_async(global_queue, ^{
+        __strong typeof(_self) self = _self;
+        if (!self) return;
+    
+        [self.recursiveLock lock];
+        for (unsigned int i = 0; i < 10000; ++i) {
+            self.sum++;
+        }
+        [self.recursiveLock unlock];
+        
+        NSLog(@"👿👿👿 %ld", (long)self.sum);
+    });
+    
+    dispatch_async(global_queue, ^{
+        __strong typeof(_self) self = _self;
+        if (!self) return;
+        
+        [self recursiveAction];
+    });
+    
+    dispatch_async(global_queue, ^{
+        __strong typeof(_self) self = _self;
+        if (!self) return;
+        
+        [self.recursiveLock lock];
+        for (unsigned int i = 0; i < 10000; ++i) {
+            self.sum++;
+        }
+        [self.recursiveLock unlock];
+        
+        NSLog(@"😵😵😵 %ld", (long)self.sum);
+    });
+    
+    dispatch_async(global_queue, ^{
+        __strong typeof(_self) self = _self;
+        if (!self) return;
+        
+        [self recursiveAction];
+    });
+}
+
+#pragma mark - Private Methods
+
+- (void)recursiveAction {
+    [self.recursiveLock lock];
+    NSLog(@"😓😓😓 count = %d", count);
+    if (count > 0) {
+        count--;
+        [self recursiveAction];
+    }
+
+    // else { // 如果是单线程的话，这里加一个递归出口没有任何问题
+    // return;
+    // }
+
+    [self.recursiveLock unlock];
+    count = 3;
+}
+
+#pragma mark - dealloc
+- (void)dealloc {
+    NSLog(@"🧑‍🎤🧑‍🎤🧑‍🎤 dealloc 同时释放🔒...");
+}
+
+@end
+// 打印结果:
+😓😓😓 count = 3
+👿👿👿 10000
+😓😓😓 count = 2
+😓😓😓 count = 1
+😓😓😓 count = 0
+
+😵😵😵 20000
+😓😓😓 count = 3
+😓😓😓 count = 2
+😓😓😓 count = 1
+😓😓😓 count = 0
+```
+```c++
+NSRecursiveLock *lock = [[NSRecursiveLock alloc] init];
+dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+  static void (^RecursieveBlock)(int);
+  
+  RecursiveBlock = ^(int value) {
+      [lock lock];
+      if (value > 0) {
+          NSLog(@"value: %d", value);
+          
+          RecursiveBlock(value - 1);
+      }
+      [lock unlock];
+  };
+  
+  RecursiveBlock(2);
+});
+```
+&emsp;如上示例，如果用 NSLock 的话，lock 先锁上，但未执行解锁的时候，就会进入递归的下一层，并再次请求上锁，阻塞了该线程，线程被阻塞了，自然后面的解锁代码就永远不会执行，而形成了死锁。而 NSRecursiveLock 递归锁就是为了解决这个问题。
+
+## NSCondition
+> &emsp;NSCondition 的对象实际上作为一个锁和一个线程检查器，锁上之后其它线程也能上锁，而之后可以根据条件决定是否继续运行线程，即线程是否要进入 waiting 状态，经测试，NSCondition 并不会像上文的那些锁一样，先轮询，而是直接进入 waiting 状态，当其它线程中的该锁执行 signal 或者 broadcast 方法时，线程被唤醒，继续运行之后的方法。
+
+1. 基于 `mutex` 基础锁和 `cont` 条件的封装，所以它是互斥锁且自带条件，等待锁的线程休眠。
+2. 遵守 `NSLocking` 协议，`NSLocking` 协议中仅有两个方法 `-(void)lock` 和 `-(void)unlock`。
+3. 可能会用到的方法
+  1. 初始化跟其它 OC 对象一样，直接进行 `alloc` 和 `init` 操作。
+  2. `-(void)lock;` 加锁
+  3. `-(void)unlock;` 解锁
+  4. `-(BOOL)tryLock;` 尝试加锁
+  5. `-(BOOL)lockBeforeDate:(NSDate *)limit;` 在某一个时间点之前等待加锁
+  6. `-(void)wait;` 等待条件（进入休眠的同时放开锁，被唤醒的同时再次加锁）
+  7. `-(void)signal;` 发送信号激活等待该条件的线程，切记线程收到后是从 wait 状态开始的
+  8. `- (void)broadcast;` 发送广播信号激活等待该条件的所有线程，切记线程收到后是从 wait 状态开始的
+### NSCondition 使用
+```c++
+#import "ViewController.h"
+
+@interface ViewController ()
+
+@property (nonatomic, strong) NSMutableArray *dataArr;
+@property (nonatomic, strong) NSCondition *condition;
+
+@end
+
+@implementation ViewController
+
+- (void)viewDidLoad {
+    [super viewDidLoad];
+    // Do any additional setup after loading the view.
+    
+    // 初始化数组
+    self.dataArr = [NSMutableArray array];
+    
+    self.condition = [[NSCondition alloc] init];
+    dispatch_queue_t global_queue = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0);
+    
+    __weak typeof(self) _self = self;
+    dispatch_async(global_queue, ^{
+        __strong typeof(_self) self = _self;
+        if (!self) return;
+        
+        [self deleteObj];
+    });
+    
+    dispatch_async(global_queue, ^{
+        __strong typeof(_self) self = _self;
+        if (!self) return;
+        
+        [self deleteObj];
+    });
+    
+    // sleep 0.5 秒，确保删除元素的操作先取得锁
+    sleep(0.5);
+    
+    dispatch_async(global_queue, ^{
+        __strong typeof(_self) self = _self;
+        if (!self) return;
+        
+        [self addObj];
+    });
+}
+
+#pragma mark - Private Methods
+
+- (void)deleteObj {
+    [self.condition lock];
+    NSLog(@"🧑‍💻🧑‍💻🧑‍💻 delete begin");
+    
+    // 添加判断，如果没有数据则添加条件
+    if (self.dataArr.count < 1) {
+        // 添加条件，如果数组为空，则添加等待线程休眠，将锁让出，这里会将锁让出去，所以下面的 addObj 线程才能获得锁
+        // 接收到信号时会再次加锁，然后继续向下执行
+        
+        NSLog(@"下面是进入 wait...");
+        [self.condition wait];
+        
+        // 当 broadcast 过来的时候还是继续往下执行，
+        // 切记不是从 deleteObj 函数头部开始的，是从这里开始的
+        // 所以当第一个异步删除数组元素后，第二个异步进来时数组已经空了
+        NSLog(@"接收到 broadcast 或 signal 后的函数起点");
+    }
+    
+    NSLog(@"%@", self.dataArr);
+    [self.dataArr removeLastObject];
+    NSLog(@"🧑‍💻🧑‍💻🧑‍💻 数组执行删除元素操作");
+    [self.condition unlock];
+}
+
+- (void)addObj {
+    [self.condition lock];
+    NSLog(@"🧑‍💻🧑‍💻🧑‍💻 add begin");
+    
+    [self.dataArr addObject:@"CHM"];
+    
+    // 发送信号，说明已经添加元素了
+    // [self.condition signal];
+    // 通知所有符合条件的线程
+    [self.condition broadcast];
+    
+    NSLog(@"🧑‍💻🧑‍💻🧑‍💻 数组执行添加元素操作");
+    [self.condition unlock];
+}
+
+#pragma mark - dealloc
+- (void)dealloc {
+    NSLog(@"🧑‍🎤🧑‍🎤🧑‍🎤 dealloc 同时释放🔒...");
+}
+@end
+
+// 打印结果:
+
+// 这里两个异步线程执行都 [self.condition lock]，都正常进入了，
+// 并没有因为 self.condition 先被一条线程获取加锁了而另一条线程处于阻塞等待状态， 
+
+🧑‍💻🧑‍💻🧑‍💻 delete begin
+下面是进入 wait...
+🧑‍💻🧑‍💻🧑‍💻 delete begin
+下面是进入 wait...
+
+🧑‍💻🧑‍💻🧑‍💻 add begin
+🧑‍💻🧑‍💻🧑‍💻 数组执行添加元素操作
+接收到 broadcast 或 signal 后的函数起点
+(
+    CHM
+)
+🧑‍💻🧑‍💻🧑‍💻 数组执行删除元素操作
+接收到 broadcast 或 signal 后的函数起点
+(
+)
+🧑‍💻🧑‍💻🧑‍💻 数组执行删除元素操作
+🧑‍🎤🧑‍🎤🧑‍🎤 dealloc 同时释放🔒...
+```
+## NSConditionLock
+> &emsp;  NSConditionLock 和 NSLock 类似，同样是继承自 NSObject 和遵循 NSLocking 协议，加解锁 try 等方法都类似，只是多了一个 condition 属性，以及每个操作都多了一个关于 condition 属性的方法，例如 tryLock 和 tryLockWhenCondition:，NSConditionLock 可以称为条件锁。只有 condition 参数与初始化的时候相等或者上次解锁后设置的 condition 相等，lock 才能正确的进行加锁操作。unlockWithCondition: 并不是当 condition 符合条件时才解锁，而是解锁之后，修改 condition 的值为入参，当使用 unlock 解锁时， condition 的值保持不变。如果初始化用 init，则 condition 默认值为 0。lockWhenCondition: 和 lock 方法类似，加锁失败会阻塞当前线程，一直等下去，直到能加锁成功。tryLockWhenCondition: 和 tryLock 类似，表示尝试加锁，即使加锁失败也不会阻塞当前线程，但是同时满足 lock 是空闲状态并且 condition 符合条件才能尝试加锁成功。从上面看出，NSConditionLock 还可以实现任务之间的依赖。
+
+1. 基于 `NSCondition` 的进一步封装，可以更加高级的设置条件值。
+  > &emsp;假设有这样的场景，三个线程 A B C，执行完 A  线程后才能执行 B，执行完 B 线程后执行 C，就是为线程之间的执行添加依赖，`NSConditionLock` 可以方便的完成这个功能。
+2. 遵守 `NSLocking` 协议，`NSLocking` 协议中仅有两个方法 `-(void)lock` 和 `-(void)unlock`。
+3. 可能用到的方法：
+  1. 初始化跟其他 OC 对象一样，直接 `alloc` 和 `initWithCondition:(NSInteger)condition` 操作；（如果使用 `init` 方法，则 `condition` 默认为 0）。
+  2. 有一个属性是 `@property(readonly) NSInteger condition;` 用来设置条件值，如果不设定，则默认为零。
+  3. `-(void)lock;` 直接加锁。
+  4. `-(void)lockWhenCondition:(NSInteger)condition;` 根据 `condition` 值加锁，如果入参和当前的 `condition` 不等则不加。
+  5. `-(void)unlockWithCondition:(NSInteger)condition;` 解锁, 并设定 `condition` 的值为入参。
+  6. `-(BOOL)tryLock;` 尝试加锁。
+  7. `-(BOOL)lockBeforeDate:(NSDate *)limit;` 在某一个时间点之前等待加锁。
+### NSConditionLock 使用
+```c++
+#import "ViewController.h"
+
+@interface ViewController ()
+
+@property (nonatomic, strong) NSConditionLock *lock;
+
+@end
+
+@implementation ViewController
+
+- (void)viewDidLoad {
+    [super viewDidLoad];
+    self.lock = [[NSConditionLock alloc] initWithCondition:0];
+    [self createThreads];
+}
+
+#pragma mark - Private Methods
+
+- (void)createThreads {
+    // 需要执行的顺序为 A-B-C，但是因为在子线程中所以我们不能确定谁先执行，添加 sleep 使问题更突出点，c 线程先启动然后是 b 然后是 a。
+    NSThread *c = [[NSThread alloc] initWithTarget:self selector:@selector(threadC) object:nil];
+    [c start];
+    sleep(0.2);
+    
+    NSThread *b = [[NSThread alloc] initWithTarget:self selector:@selector(threadB) object:nil];
+    [b start];
+    sleep(0.2);
+    
+    NSThread *a = [[NSThread alloc] initWithTarget:self selector:@selector(threadA) object:nil];
+    [a start];
+}
+
+- (void)threadA {
+    NSLog(@"A begin");
+    [self.lock lockWhenCondition:0]; // 此时 Condition 值为 0 才能加锁成功，因为 Condition 初始值是 0，所以只有 A 能加锁成功
+    NSLog(@"A threadExcute");
+    [self.lock unlockWithCondition:1]; // 解锁并把 Condition 设置为 1
+    // [self unlock]; // 如果此处使用 unlock，则导致 B C 线程死锁，且导致 ViewController 不释放
+}
+
+- (void)threadB {
+    NSLog(@"B begin");
+    [self.lock lockWhenCondition:1]; // 此时 Condition 值为 1 才能加锁成功
+    NSLog(@"B threadExcute");
+    [self.lock unlockWithCondition:2]; // 解锁并把 Condition 设置为 2
+}
+
+- (void)threadC {
+    NSLog(@"C begin");
+    [self.lock lockWhenCondition:2]; // 此时 Condition 值为 2 才能加锁成功
+    NSLog(@"C threadExcute");
+    [self.lock unlock]; // 解锁
+}
+
+#pragma mark - dealloc
+- (void)dealloc {
+    NSLog(@"🧑‍🎤🧑‍🎤🧑‍🎤 dealloc 同时释放🔒...");
+}
+
+// 打印结果:
+// 虽然启动顺序是 C B A，但是执行顺序是 A B C，正是由 Condition 条件控制的，只有 Condition 匹配才能加锁成功，否则一直阻塞等待
+C begin
+B begin
+A begin
+
+A threadExcute
+B threadExcute
+C threadExcute
+🧑‍🎤🧑‍🎤🧑‍🎤 dealloc 同时释放🔒...
+```
+1. `[self.lock unlock];` 执行后 `condition` 保持不变，依然是初始化的值或者是上次执行 `lockWhenCondition:` 时的值。 
+2. A B C 3 条线程必须都执行加锁和解锁后 `ViewController` 才能正常释放，除了最后一条线程可以直接使用 `unlock` 执行解锁外，前两条线程 `unlockWithCondition:` 的入参 `condition` 的值必须和 `NSConditionLock` 当前的 `condition` 的值匹配起来。保证每条线程都 `lock` 和 `unlock`，无法正常执行时都会导致线程阻塞等待，`ViewController` 不会释放。
+3. 在同一线程连续 `[self.lock lockWhenCondition:1];` 会直接阻塞死锁，不管用的 `condition` 是否和当前锁的 `condition` 相等，都会导致阻塞死锁。
+
+## NSLocking、NSLock、NSConditionLock、NSRecursiveLock、NSCondition 定义
+```c++
+#import <Foundation/NSObject.h>
+
+@class NSDate;
+
+NS_ASSUME_NONNULL_BEGIN
+
+// NSLocking 协议，上面提到锁的类型只要是 NS 开头的都会遵守此协议
+@protocol NSLocking // 看到 NSLocking 协议只有加锁和解锁两个协议方法
+
+- (void)lock;
+- (void)unlock;
+
+@end
+
+@interface NSLock : NSObject <NSLocking> { // NSLock 是继承自 NSObject 并遵守 NSLocking 协议
+@private
+    void *_priv;
+}
+
+- (BOOL)tryLock; // 尝试加锁，返回 true 表示加锁成功
+- (BOOL)lockBeforeDate:(NSDate *)limit; // 在某个 NSDate 之前加锁
+
+@property (nullable, copy) NSString *name API_AVAILABLE(macos(10.5), ios(2.0), watchos(2.0), tvos(9.0));
+
+@end
+
+// 条件锁
+@interface NSConditionLock : NSObject <NSLocking> { // 继承自 NSObject 并遵守 NSLocking 协议
+@private
+    void *_priv;
+}
+
+- (instancetype)initWithCondition:(NSInteger)condition NS_DESIGNATED_INITIALIZER;
+
+@property (readonly) NSInteger condition; // 只读的 condition 属性
+- (void)lockWhenCondition:(NSInteger)condition; // 根据 condition 值加锁, 如果值不满足, 则不加;
+
+- (BOOL)tryLock;
+- (BOOL)tryLockWhenCondition:(NSInteger)condition; 
+
+- (void)unlockWithCondition:(NSInteger)condition; // 解锁, 并设定 condition 的值;
+- (BOOL)lockBeforeDate:(NSDate *)limit; // 在某一个时间点之前等待加锁
+- (BOOL)lockWhenCondition:(NSInteger)condition beforeDate:(NSDate *)limit;
+
+@property (nullable, copy) NSString *name API_AVAILABLE(macos(10.5), ios(2.0), watchos(2.0), tvos(9.0));
+
+@end
+
+// 递归锁
+@interface NSRecursiveLock : NSObject <NSLocking> { // 继承自 NSObject 并遵守 NSLocking 协议
+@private
+    void *_priv;
+}
+
+- (BOOL)tryLock; // 尝试加锁，返回 true 表示加锁成功
+- (BOOL)lockBeforeDate:(NSDate *)limit; // 在某个 NSDate 之前加锁
+
+@property (nullable, copy) NSString *name API_AVAILABLE(macos(10.5), ios(2.0), watchos(2.0), tvos(9.0));
+
+@end
+
+API_AVAILABLE(macos(10.5), ios(2.0), watchos(2.0), tvos(9.0))
+@interface NSCondition : NSObject <NSLocking> { // 继承自 NSObject 并遵守 NSLocking 协议
+@private
+    void *_priv;
+}
+
+- (void)wait; // 添加等待，线程休眠，并将锁让出
+- (BOOL)waitUntilDate:(NSDate *)limit; // 某个 NSDate 
+- (void)signal; // 发送信号，告知等待的线程，条件满足了
+- (void)broadcast; // 通知所有符合条件的线程，（通知所有在等待的线程）
+
+@property (nullable, copy) NSString *name API_AVAILABLE(macos(10.5), ios(2.0), watchos(2.0), tvos(9.0));
+
+@end
+
+NS_ASSUME_NONNULL_END
+```
+## @synchronized
+> &emsp;@synchronized(object) 指令使用的 object 为该锁的唯一标识，只有当标识相同时，才满足互斥，所以如果线程 2 中的 @synchronized(self) 改为 @synchronized(self.view)，则线程 2 就不会被阻塞，@synchronized 指令实现锁的优点就是我们不需要在代码中显式的创建锁对象，便可以实现锁的机制，但作为一种预防措施，@synchronized 块会隐式的添加一个异常处理例程来保护代码，**该处理例程会在异常抛出的时候自动释放互斥锁**。@synchronized 还有一个好处就是不用担心忘记解锁了。如果在 @synchronized(object) {} 内部 object 被释放或被设为 nil，从测试结果来看，不会产生问题，但如果 object 一开始就是 nil，则失去了加锁的功能。不过虽然 nil 不行，但是 [NSNull null] 是可以的。
+
+1. `objc4-750` 版本之前（`iOS 12` 之前）`@synchronized` 是一个基于 `pthread_mutex_t` 封装的递归锁，之后实现则发生了改变，底层的封装变为了 `os_unfair_lock`。下面验证它，在 `@synchronized` 打断点，并且打开 `Debug-> Debug Workflow -> Always Show Disassembly`:
+```c++
+#pragma mark - Private Methods
+
+- (void)recuresiveAction {
+    // ➡️ 在下面 @synchronized 上打断点  
+    @synchronized ([self class]) {
+        NSLog(@"🌰🌰🌰 count = %d", count);
+        if (count > 0) {
+            count--;
+            
+            [self recuresiveAction];
+        }
+    }
+}
+
+// 汇编 objc_Simple`-[ViewController recuresiveAction]:
+...
+0x10868fc4b <+43>:  callq  0x108690360               ; symbol stub for: objc_sync_enter // 👈 看到调用了 objc_sync_enter 函数
+...
+0x10868fcc7 <+167>: callq  0x108690366               ; symbol stub for: objc_sync_exit // 👈 看到调用了 objc_sync_exit 函数
+...
+```
+&emsp;看到 `@synchronized` 调用了 `objc_sync_enter` 和 `objc_sync_exit` 函数，下面从 `objc4-781` 中看一下这两个函数的实现，`objc_sync_exit` 和 `objc_sync_enter` 函数都位于 `objc-sync.mm`。
+```c++
+// End synchronizing on 'obj'. 
+// Returns OBJC_SYNC_SUCCESS or OBJC_SYNC_NOT_OWNING_THREAD_ERROR
+int objc_sync_exit(id obj)
+{
+    int result = OBJC_SYNC_SUCCESS;
+    
+    if (obj) {
+        SyncData* data = id2data(obj, RELEASE); 
+        if (!data) {
+            result = OBJC_SYNC_NOT_OWNING_THREAD_ERROR;
+        } else {
+            bool okay = data->mutex.tryUnlock(); // 尝试解锁，返回 true 表示解锁成功，否则表示失败
+            if (!okay) {
+                result = OBJC_SYNC_NOT_OWNING_THREAD_ERROR;
+            }
+        }
+    } else {
+        // @synchronized(nil) does nothing
+    }
+
+    return result;
+}
+```
+```c++
+// Begin synchronizing on 'obj'. 
+// Allocates recursive mutex associated with 'obj' if needed.
+// Returns OBJC_SYNC_SUCCESS once lock is acquired.  
+int objc_sync_enter(id obj)
+{
+    int result = OBJC_SYNC_SUCCESS;
+
+    if (obj) {
+        // 根据传入的对象，来获取一个锁，所以使用 @synchronized 时传入对象很重要
+        SyncData* data = id2data(obj, ACQUIRE);
+        ASSERT(data);
+        data->mutex.lock(); // 这里使用 data 的 mutex 成员变量执行 lock
+    } else {
+        // @synchronized(nil) does nothing
+        // 传入 nil 则什么也不做
+        if (DebugNilSync) {
+            _objc_inform("NIL SYNC DEBUG: @synchronized(nil); set a breakpoint on objc_sync_nil to debug");
+        }
+        objc_sync_nil();
+    }
+    
+    return result;
+}
+```
+`SyncData` 定义:
+```c++
+typedef struct alignas(CacheLineSize) SyncData {
+    struct SyncData* nextData;
+    DisguisedPtr<objc_object> object;
+    int32_t threadCount;  // number of THREADS using this block
+    recursive_mutex_t mutex;
+} SyncData;
+```
+`recursive_mutex_t` 是使用 `using` 关键字声明的模版类：`using recursive_mutex_t = recursive_mutex_tt<LOCKDEBUG>;` 下面看一下 `recursive_mutex_tt` 底层结构:
+```c++
+template <bool Debug>
+class recursive_mutex_tt : nocopy_t {
+    // 底层封装的是 os_unfair_recursive_lock
+    os_unfair_recursive_lock mLock;
+
+  public:
+    constexpr recursive_mutex_tt() : mLock(OS_UNFAIR_RECURSIVE_LOCK_INIT) {
+        lockdebug_remember_recursive_mutex(this);
+    }
+
+    constexpr recursive_mutex_tt(const fork_unsafe_lock_t unsafe)
+        : mLock(OS_UNFAIR_RECURSIVE_LOCK_INIT)
+    { }
+
+    void lock()
+    {
+        lockdebug_recursive_mutex_lock(this);
+        os_unfair_recursive_lock_lock(&mLock);
+    }
+    ...
+  };
+```
+`objc4-723` 中 `recursive_mutex_tt` 定义:
+```c++
+ // 在 objc4-723 版本中 recursive_mutex_tt 的底层结构为
+ class recursive_mutex_tt : nocopy_t {
+     // 底层封装的是互斥锁 pthread_mutex_t
+     pthread_mutex_t mLock;
+
+   public:
+     recursive_mutex_tt() : mLock(PTHREAD_RECURSIVE_MUTEX_INITIALIZER) {
+         lockdebug_remember_recursive_mutex(this);
+     }
+
+     recursive_mutex_tt(const fork_unsafe_lock_t unsafe)
+         : mLock(PTHREAD_RECURSIVE_MUTEX_INITIALIZER)
+     { }
+ ...
+ }
+```
+继续查看 `os_unfair_recursive_lock` 底层实现:
+```c++
+/*!
+* @typedef os_unfair_recursive_lock
+*
+* @abstract
+* Low-level lock that allows waiters to block efficiently on contention.
+*
+* @discussion
+* See os_unfair_lock.
+*
+*/
+OS_UNFAIR_RECURSIVE_LOCK_AVAILABILITY
+typedef struct os_unfair_recursive_lock_s {
+
+    os_unfair_lock ourl_lock; // 底层为互斥锁 os_unfair_lock 
+    uint32_t ourl_count; // 因为 @synchronized 为递归锁，所以需要记录加锁次数
+    
+} os_unfair_recursive_lock, *os_unfair_recursive_lock_t;
+```
+&emsp;到这里可以确认了底层是 `os_unfair_lock`。 然后我们还注意到 `OS_UNFAIR_RECURSIVE_LOCK_AVAILABILITY`:
+```c++
+/*! @group os_unfair_recursive_lock SPI
+ *
+ * @abstract
+ * Similar to os_unfair_lock, but recursive.
+ * 与 os_unfair_lock 相似，但是是递归的。
+ *
+ * @discussion
+ * Must be initialized with OS_UNFAIR_RECURSIVE_LOCK_INIT
+ * 必须使用 OS_UNFAIR_RECURSIVE_LOCK_INIT 进行初始化
+ */
+
+#define OS_UNFAIR_RECURSIVE_LOCK_AVAILABILITY \
+        __OSX_AVAILABLE(10.14) __IOS_AVAILABLE(12.0) \
+        __TVOS_AVAILABLE(12.0) __WATCHOS_AVAILABLE(5.0)
+```
+&emsp;这里表明是 `iOS 12.0` 之后才是出现的。至此可验证 `iOS 12.0` 后 `@synchronized` 是一个封装了 `os_unfair_lock` 的递归锁（`os_unfair_recursive_lock`）。
+
+2. `@synchronized(obj){...}` 传入一个对象 `obj` 进行加锁，如果传入空，则不执行操作。
+### @synchronized 使用
+```c++
+#import "ViewController.h"
+
+static int count = 3;
+
+@interface ViewController ()
+
+@end
+
+@implementation ViewController
+
+- (void)viewDidLoad {
+    [super viewDidLoad];
+    // Do any additional setup after loading the view.
+    dispatch_queue_t global_queue = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0);
+    __weak typeof(self) _self = self;
+    dispatch_async(global_queue, ^{
+        __strong typeof(_self) self = _self;
+        if (!self) return;
+            
+        [self recuresiveAction];
+    });
+}
+
+#pragma mark - Private Methods
+
+- (void)recuresiveAction {
+    @synchronized ([self class]) {
+        NSLog(@"🌰🌰🌰 count = %d", count);
+        if (count > 0) {
+            count--;
+            
+            [self recuresiveAction];
+        }
+    }
+}
+
+#pragma mark - dealloc
+- (void)dealloc {
+    NSLog(@"🧑‍🎤🧑‍🎤🧑‍🎤 dealloc 同时释放🔒...");
+}
+
+@end
+
+// 打印结果:
+🌰🌰🌰 count = 3
+🌰🌰🌰 count = 2
+🌰🌰🌰 count = 1
+🌰🌰🌰 count = 0
+
+🧑‍🎤🧑‍🎤🧑‍🎤 dealloc 同时释放🔒...
+```
+## dispatch_semaphore
+> &emsp;dispatch_semaphore 是 GCD 用来同步的一种方式，与他相关的只有三个函数，一个是创建信号量，一个是等待信号量，一个是发送信号。
+dispatch_semaphore 和 NSCondition 类似，都是一种基于信号的同步方式，但 NSCondition 信号只能发送，不能保存（如果没有线程在等待，则发送的信号会失效）。而 dispatch_semaphore 能保存发送的信号。dispatch_semaphore 的核心是 dispatch_semaphore_t 类型的信号量。
+> #emsp;dispatch_semaphore_create(1) 方法可以创建一个 dispatch_semaphore_t 类型的信号量，设定信号量的初始化值为 1。注意，这里的传入参数必须大于等于 0，否则 dispatch_semaphore 会返回 NULL。
+> &emsp;dispatch_semaphore_wait(signal, overTime) 方法会判断 signal 的信号值是否大于 0，大于 0 不会阻塞线程，消耗掉一个信号，执行后续任务。如果信号值为 0，该线程会和 NSCondition 一样直接进入 waiting 状态，等待其他线程发送信号唤醒线程去执行后续任务，或者当 overTime 时限到了，也会执行后续任务。
+> &emsp;dispatch_semaphore_signal(signal) 发送信号，如果没有等待的线程调用信号，则使 signal 信号值加 1（做到对信号的保存）。一个 dispatch_semaphore_wait（signal, overTime）方法会去对应一个 dispatch_semaphore_signal(signal) 看起来像 NSLock 的 lock 和 unlock，其实可以这样理解，区别只在于有信号量这个参数，lock unlock 只能同一时间，一个线程访问被保护的临界区，而如果 dispatcch_semaphore 的信号量初始值为 x，则可以有 x 个线程同时访问被保护的临界区。
+
+1. 本来是用于控制线程的最大并发数量，我们将并发数量设置为 `1` 也可以认为是加锁的功能。
+2. 可能会用到的方法：
+  1. 初始化 `dispatch_semaphore_create()` 传入的值为最大并发数量，设置为 `1` 则达到加锁效果。
+  2. 判断信号量的值 `dispatch_semaphore_wait()` 如果大于 `0`，则可以继续往下执行（同时信号量的值减去 `1`），如果信号量的值为 `0`，则线程进入休眠状态等待（此方法的第二个参数就是设置要等多久，一般是使用永久 `DISPATCH_TIME_FOREVER`）。
+  3. 释放信号量 `dispatch_semaphore_signal()` 同时使信号量的值加上 `1`。
+### dispatch_semaphore 使用
+```c++
+#import "ViewController.h"
+
+@interface ViewController ()
+
+@property (nonatomic, assign) NSInteger sum;
+@property (nonatomic, strong) dispatch_semaphore_t semaphore;
+
+@end
+
+@implementation ViewController
+
+- (void)viewDidLoad {
+    [super viewDidLoad];
+    self.sum = 0;
+    self.semaphore = dispatch_semaphore_create(1);
+    
+    dispatch_queue_t global_queue = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0);
+    
+    __weak typeof(self) _self = self;
+    dispatch_async(global_queue, ^{
+        __strong typeof(_self) self = _self;
+        if (!self) return;
+        
+        dispatch_semaphore_wait(self.semaphore, DISPATCH_TIME_FOREVER);
+        for (unsigned int i = 0; i < 10000; ++i) {
+            self.sum++;
+        }
+        dispatch_semaphore_signal(self.semaphore);
+        NSLog(@"🍐🍐🍐 %ld", (long)self.sum);
+    });
+    
+    dispatch_async(global_queue, ^{
+        __strong typeof(_self) self = _self;
+        if (!self) return;
+        
+        dispatch_semaphore_wait(self.semaphore, DISPATCH_TIME_FOREVER);
+        for (unsigned int i = 0; i < 10000; ++i) {
+            self.sum++;
+        }
+        dispatch_semaphore_signal(self.semaphore);
+        NSLog(@"🍎🍎🍎 %ld", (long)self.sum);
+    });
+}
+
+#pragma mark - dealloc
+- (void)dealloc {
+    NSLog(@"🧑‍🎤🧑‍🎤🧑‍🎤 dealloc 同时释放🔒...");
+}
+
+@end
+
+// 打印结果:
+🍐🍐🍐 10000
+🍎🍎🍎 20000
+🧑‍🎤🧑‍🎤🧑‍🎤 dealloc 同时释放🔒...
+```
+## pthread_rwlock_t
+&emsp;学习 `pthread_rwlock_t` 读写锁之前，首先引入一个问题：“如何实现一个多读单写的模型？”，需求如下:
++ 同时可以有多个线程读取。
++ 同时只能有一个线程写入。
++ 同时只能执行读取或者写入的一种。
+&emsp;首先想到的就是我们的 `pthread_rwlock_t`。
+1. 读取加锁可以同时多个线程进行，写入同时只能一个线程进行，等待的线程处于休眠状态。
+2. 可能会用到的方法：
+  1. `pthread_rwlock_init()` 初始化一个读写锁
+  
+  2. `pthread_rwlock_rdlock()` 读写锁的读取加锁
+  3. `pthread_rwlock_wrlock()` 读写锁的写入加锁
+  
+  4. `pthread_rwlock_unlock()` 解锁
+  5. `pthread_rwlock_destroy()` 销毁锁
+### pthread_rwlock_t 使用
+&emsp;代码示例，测试代码主要看，打印读取可以同时出现几个，打印写入同时只会出现一个。
+```c++
+#import "ViewController.h"
+#import <pthread.h>
+
+@interface ViewController ()
+
+@property (nonatomic, assign) pthread_rwlock_t lock;
+
+@end
+
+@implementation ViewController
+
+- (void)viewDidLoad {
+    [super viewDidLoad];
+    // Do any additional setup after loading the view.
+
+    [self rwlockType];
+}
+
+#pragma mark - Private methods
+- (void)rwlockType {
+    pthread_rwlock_init(&self->_lock, NULL);
+    
+    dispatch_queue_t globalQueue = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0);
+    __weak typeof(self) _self = self;
+    for (unsigned int i = 0; i < 100; ++i) {
+        // 同时创建多个线程进行写入操作
+        dispatch_async(globalQueue, ^{
+            __weak typeof(_self) self = _self;
+            if (!self) return;
+            
+            [self lockWriteAction];
+        });
+        
+        dispatch_async(globalQueue, ^{
+            __weak typeof(_self) self = _self;
+            if (!self) return;
+            
+            [self lockWriteAction];
+        });
+        
+        dispatch_async(globalQueue, ^{
+            __weak typeof(_self) self = _self;
+            if (!self) return;
+            
+            [self lockWriteAction];
+        });
+        
+        // 同时创建多个线程进行读操作
+        dispatch_async(globalQueue, ^{
+            __strong typeof(_self) self = _self;
+            if (!self) return;
+            
+            [self lockReadAction];
+        });
+        
+        dispatch_async(globalQueue, ^{
+            __strong typeof(_self) self = _self;
+            if (!self) return;
+            
+            [self lockReadAction];
+        });
+        
+        dispatch_async(globalQueue, ^{
+            __strong typeof(_self) self = _self;
+            if (!self) return;
+            
+            [self lockReadAction];
+        });
+    }
+}
+
+- (void)lockReadAction {
+    pthread_rwlock_rdlock(&self->_lock);
+    sleep(1);
+    NSLog(@"RWLock read action %@", [NSThread currentThread]);
+    pthread_rwlock_unlock(&self->_lock);
+}
+
+- (void)lockWriteAction {
+    pthread_rwlock_wrlock(&self->_lock);
+    sleep(1);
+    NSLog(@"RWLock Write Action %@", [NSThread currentThread]);
+    pthread_rwlock_unlock(&self->_lock);
+}
+
+#pragma mark - dealloc
+
+-(void)dealloc {
+    NSLog(@"🚚🚚🚚 deallocing...");
+    
+    pthread_rwlock_destroy(&self->_lock);
+}
+
+@end
+// 打印结果: 可看到每次 write 操作同一个时间只执行一次，每次执行 write 操作至少相差 1 的时间，而 read 操作，几乎三次读取完全同一时刻进行
+2020-08-23 21:56:47.918292+0800 algorithm_OC[17138:583665] RWLock Write Action <NSThread: 0x600001d45440>{number = 6, name = (null)}
+2020-08-23 21:56:48.918953+0800 algorithm_OC[17138:583666] RWLock Write Action <NSThread: 0x600001d58740>{number = 4, name = (null)}
+2020-08-23 21:56:49.924037+0800 algorithm_OC[17138:583667] RWLock Write Action <NSThread: 0x600001d06440>{number = 3, name = (null)}
+
+2020-08-23 21:56:50.927716+0800 algorithm_OC[17138:583697] RWLock read action <NSThread: 0x600001d00d40>{number = 10, name = (null)}
+2020-08-23 21:56:50.927716+0800 algorithm_OC[17138:583696] RWLock read action <NSThread: 0x600001d864c0>{number = 8, name = (null)}
+2020-08-23 21:56:50.927721+0800 algorithm_OC[17138:583698] RWLock read action <NSThread: 0x600001da4b40>{number = 9, name = (null)}
+...
+```
+### dispatch_barrier_async 实现多读单写
+1. 传入的并发队列必须是手动创建的，`dispatch_queue_create()` 方式，如果传入串行队列或者通过 `dispatch_get_global_queue()` 方式创建，则 `dispatch_barrier_async` 的作用就跟 `dispatch_async` 变的一样。
+2. 可能会用到的方法：
+  1. `dispatch_queue_create()` 创建并发队列
+  2. `dispatch_barrier_async()` 异步栅栏
+### dispatch_barrier_async 使用
+```c++
+#import "ViewController.h"
+
+@interface ViewController ()
+
+@property (nonatomic, strong) dispatch_queue_t queue;
+
+@end
+
+@implementation ViewController
+
+- (void)viewDidLoad {
+    [super viewDidLoad];
+    // Do any additional setup after loading the view.
+    
+    [self barrierAsyncType];
+}
+
+#pragma mark - Private methods
+- (void)barrierAsyncType {
+    self.queue = dispatch_queue_create("rw_queue", DISPATCH_QUEUE_CONCURRENT);
+    for (unsigned int i = 0; i < 100; ++i) {
+    
+        // 同时创建多个线程进行写入操作
+        [self barrierWriteAction];
+        [self barrierWriteAction];
+        [self barrierWriteAction];
+        
+        // 同时创建多个线程进行读取操作
+        [self barrierReadAction];
+        [self barrierReadAction];
+        [self barrierReadAction];
+    }
+}
+
+- (void)barrierReadAction {
+    dispatch_async(self.queue, ^{
+        sleep(1);
+        NSLog(@"barrier Read Action %@", [NSThread currentThread]);
+    });
+}
+
+- (void)barrierWriteAction {
+    // 写操作使用 dispatch_barrier_async
+    dispatch_barrier_async(self.queue, ^{
+        sleep(1);
+        NSLog(@"barrier Write Action %@", [NSThread currentThread]);
+    });
+}
+
+@end
+
+// 打印结果: 从打印时间可以看出，write 操作是依序进行的，每次间隔 1 秒，而 read 操作几乎都是同时进行 3 次
+2020-08-23 22:25:14.144265+0800 algorithm_OC[17695:604062] barrier Write Action <NSThread: 0x6000012a0180>{number = 5, name = (null)}
+2020-08-23 22:25:15.148017+0800 algorithm_OC[17695:604062] barrier Write Action <NSThread: 0x6000012a0180>{number = 5, name = (null)}
+2020-08-23 22:25:16.151869+0800 algorithm_OC[17695:604062] barrier Write Action <NSThread: 0x6000012a0180>{number = 5, name = (null)}
+
+2020-08-23 22:25:17.156004+0800 algorithm_OC[17695:604062] barrier Read Action <NSThread: 0x6000012a0180>{number = 5, name = (null)}
+2020-08-23 22:25:17.156040+0800 algorithm_OC[17695:604063] barrier Read Action <NSThread: 0x600001230340>{number = 6, name = (null)}
+2020-08-23 22:25:17.156023+0800 algorithm_OC[17695:604065] barrier Read Action <NSThread: 0x6000012e6300>{number = 3, name = (null)}
+...
+```
+## 总结
+&emsp;锁粗略的效率排序（不同的锁可能更擅长不同的场景）
+
+1. `os_unfair_lock` (`iOS 10` 之后)
+2. `OSSpinLock` (`iOS 10` 之前)
+3. `dispatch_semaphore` (`iOS` 版本兼容性好)
+4. `pthread_mutex_t` (`iOS` 版本兼容性好)
+5. `NSLock` (基于 `pthread_mutex_t` 封装)
+6. `NSCondition` (基于 `pthread_mutex_t` 封装)
+7. `pthread_mutex_t(recursive)` 递归锁的优先推荐
+8. `NSRecursiveLock` (基于 `pthread_mutex_t` 封装)
+9. `NSConditionLock` (基于 `NSCondition` 封装)
+10. `@synchronized`
+  1. `iOS 12` 之前基于 `pthread_mutex_t` 封装
+  2. `iOS 12` 之后基于 `os_unfair_lock` 封装（iOS 12 之后它的效率应该不是最低，应该在 3/4 左右）
+
+&emsp;自旋锁和互斥锁的取舍
+&emsp;自旋锁和互斥锁怎么选择，其实这个问题已经没有什么意义，因为自旋锁 `OSSpinLock` 在 `iOS 10` 之后已经废弃了，而它的替换方案 `os_unfair_lock` 是互斥锁，但是我们仍然做一下对比:
+**自旋锁:**
++ 预计线程需要等待的时间较短
++ 多核处理器
++ `CPU` 的资源不紧张
+**互斥锁:**
++ 预计线程需要等待的时间较长
++ 单核处理器
++ 临界区（加锁解锁之间的部分）有 I/O 操作
+
+**其它:**
+加锁和解锁的实现一定要配对出现，不然就会出现阻塞死锁的现象。
 
 ## 参考链接
 **参考链接:🔗**
@@ -584,3 +1981,5 @@ os_unfair_lock_assert_not_owner(&self->_unfairL);
 + [iOS锁-OSSpinLock与os_unfair_lock](https://www.jianshu.com/p/40adc41735b6)
 + [os_unfair_lock pthread_mutex](https://www.jianshu.com/p/6ff0dfe719bf)
 + [iOS 锁 部分一](https://www.jianshu.com/p/8ce323dbc491)
++ [iOS 锁 部分二](https://www.jianshu.com/p/d0fd5a5869e5)
++ [iOS 锁 部分三](https://www.jianshu.com/p/b6509683876c)

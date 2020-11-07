@@ -112,7 +112,7 @@
       recursive_mutex_t mutex;
   } SyncData;
   ```
-  `recursive_mutex_t` 使用使用 `using` 关键字声明的模版类。
+  `recursive_mutex_t` 使用 `using` 关键字声明的模版类。
   `using recursive_mutex_t = recursive_mutex_tt<LOCKDEBUG>;`
   下面看一下 `recursive_mutex_tt` 底层结构:
   ```c++

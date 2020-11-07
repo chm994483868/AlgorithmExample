@@ -50,12 +50,14 @@
             
             [self lockWriteAction];
         });
+        
         dispatch_async(globalQueue, ^{
             __weak typeof(_self) self = _self;
             if (!self) return;
             
             [self lockWriteAction];
         });
+        
         dispatch_async(globalQueue, ^{
             __weak typeof(_self) self = _self;
             if (!self) return;
@@ -70,12 +72,14 @@
             
             [self lockReadAction];
         });
+        
         dispatch_async(globalQueue, ^{
             __strong typeof(_self) self = _self;
             if (!self) return;
             
             [self lockReadAction];
         });
+        
         dispatch_async(globalQueue, ^{
             __strong typeof(_self) self = _self;
             if (!self) return;
