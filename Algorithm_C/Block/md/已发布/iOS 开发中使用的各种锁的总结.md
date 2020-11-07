@@ -1159,7 +1159,7 @@ dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
 &emsp;如上示例，如果用 NSLock 的话，lock 先锁上，但未执行解锁的时候，就会进入递归的下一层，并再次请求上锁，阻塞了该线程，线程被阻塞了，自然后面的解锁代码就永远不会执行，而形成了死锁。而 NSRecursiveLock 递归锁就是为了解决这个问题。
 
 ## NSCondition
-> &emsp;NSCondition 的对象实际上作为一个锁和一个线程检查器，锁上之后其它线程也能上锁，而之后可以根据条件决定是否继续运行线程，即线程是否要进入 waiting 状态，经测试，NSCondition 并不会像上文的那些锁一样，先轮询，而是直接进入 waiting 状态，当其它线程中的该锁执行 signal 或者 broadcast 方法时，线程被唤醒，继续运行之后的方法。
+> &emsp;NSCondition 的对象实际上作为一个锁和一个线程检查器，锁上之后其它线程也能上锁，而之后可以根据条件决定是否继续运行线程，即线程是否要进入 waiting 状态，经测试，NSCondition 并不会像上文的那些锁一样，先轮询，而是直接进入 waiting 状态，当其它线程中的该锁执行 signal 或者 broadcast 方法时，线程被唤醒，继续运行之后的方法。也就是使用 NSCondition 的模型为: 1. 锁定条件对象。2. 测试是否可以安全的履行接下来的任务。如果布尔值为假，调用条件对象的 wait 或者 waitUntilDate: 方法来阻塞线程。再从这些方法返回，则转到步骤 2 重新测试你的布尔值。（继续等待信号和重新测试，直到可以安全的履行接下来的任务，waitUntilDate: 方法有个等待时间限制，指定的时间到了，则返回 NO，继续运行接下来的任务。而等待信号，既线程执行 [lock signal] 发送的信号。其中 signal 和 broadcast 方法的区别在于，signal 只是一个信号量，只能唤醒一个等待的线程，想唤醒多个就得**多次调用**，而 broadcast 可以唤醒所有在等待的线程，如果没有等待的线程，这两个方法都没有作用。）
 
 1. 基于 `mutex` 基础锁和 `cont` 条件的封装，所以它是互斥锁且自带条件，等待锁的线程休眠。
 2. 遵守 `NSLocking` 协议，`NSLocking` 协议中仅有两个方法 `-(void)lock` 和 `-(void)unlock`。
@@ -1983,3 +1983,5 @@ dispatch_semaphore 和 NSCondition 类似，都是一种基于信号的同步方
 + [iOS 锁 部分一](https://www.jianshu.com/p/8ce323dbc491)
 + [iOS 锁 部分二](https://www.jianshu.com/p/d0fd5a5869e5)
 + [iOS 锁 部分三](https://www.jianshu.com/p/b6509683876c)
++ [iOS中保证线程安全的几种方式与性能对比](https://www.jianshu.com/p/938d68ed832c)
++ [关于 @synchronized，这儿比你想知道的还要多](http://yulingtianxia.com/blog/2015/11/01/More-than-you-want-to-know-about-synchronized/)

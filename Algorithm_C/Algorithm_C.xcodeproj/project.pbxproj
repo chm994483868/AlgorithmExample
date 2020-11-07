@@ -316,7 +316,6 @@
 		D20B5C7B24EB64500077EF6D /* iOS底层runtime应用之动态添加属性:成员变量.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS底层runtime应用之动态添加属性:成员变量.md"; sourceTree = "<group>"; };
 		D20B5C7C24EBB92B0077EF6D /* iOS底层懒加载类:非懒加载类.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS底层懒加载类:非懒加载类.md"; sourceTree = "<group>"; };
 		D20B5C8024EBCEFE0077EF6D /* iOS weak 底层实现原理(三)：weak变量从初始化到被置为nil 都经历了什么.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS weak 底层实现原理(三)：weak变量从初始化到被置为nil 都经历了什么.md"; sourceTree = "<group>"; };
-		D20B5C8124ECFF120077EF6D /* iOS_spinlock_t.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = iOS_spinlock_t.md; sourceTree = "<group>"; };
 		D20B5C8224ED0D270077EF6D /* =default 和 = delete使用.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "=default 和 = delete使用.md"; sourceTree = "<group>"; };
 		D20B5D3024ED2B890077EF6D /* constexpr关键字使用.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "constexpr关键字使用.md"; sourceTree = "<group>"; };
 		D21333F224E63B6C00A6175C /* 深入理解Objective-C中的alloc和init.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "深入理解Objective-C中的alloc和init.md"; sourceTree = "<group>"; };
@@ -324,16 +323,6 @@
 		D2164F0524EE10650000A6AA /* volatile关键字使用.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "volatile关键字使用.md"; sourceTree = "<group>"; };
 		D2164F0624EE113B0000A6AA /* 学习统计.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "学习统计.md"; sourceTree = "<group>"; };
 		D2164F0724EE28500000A6AA /* noexcept关键字学习.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "noexcept关键字学习.md"; sourceTree = "<group>"; };
-		D2164F0824EE45A60000A6AA /* iOS_os_unfair_lock.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = iOS_os_unfair_lock.md; sourceTree = "<group>"; };
-		D2164F0D24EFD9710000A6AA /* iOS_pthread_mutex_t.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = iOS_pthread_mutex_t.md; sourceTree = "<group>"; };
-		D2164F0E24F118060000A6AA /* iOS_NSLock.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = iOS_NSLock.md; sourceTree = "<group>"; };
-		D2164F0F24F2053A0000A6AA /* iOS_NSRecursiveLock.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = iOS_NSRecursiveLock.md; sourceTree = "<group>"; };
-		D2164F1024F212670000A6AA /* iOS_NSCondition.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = iOS_NSCondition.md; sourceTree = "<group>"; };
-		D2164F1124F22E670000A6AA /* iOS_NSConditionLock.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = iOS_NSConditionLock.md; sourceTree = "<group>"; };
-		D2164F1224F24B820000A6AA /* iOS_@synchronized.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS_@synchronized.md"; sourceTree = "<group>"; };
-		D2164F1324F25E070000A6AA /* iOS_dispatch_semaphore.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = iOS_dispatch_semaphore.md; sourceTree = "<group>"; };
-		D2164F1424F2654F0000A6AA /* iOS_pthread_rwlock_t.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = iOS_pthread_rwlock_t.md; sourceTree = "<group>"; };
-		D2164F1524F33A9A0000A6AA /* iOS_Lock总结.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS_Lock总结.md"; sourceTree = "<group>"; };
 		D2164F1724F3B9A20000A6AA /* iOS weak 底层实现原理(一)：SideTable|s、weak_table_t、weak_entry_t 等数据结构.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS weak 底层实现原理(一)：SideTable|s、weak_table_t、weak_entry_t 等数据结构.md"; sourceTree = "<group>"; };
 		D2164F1B24F505330000A6AA /* C++强制类型转换符reinterpret_cast.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "C++强制类型转换符reinterpret_cast.md"; sourceTree = "<group>"; };
 		D2164F1D24F8856E0000A6AA /* 野指针.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "野指针.md"; sourceTree = "<group>"; };
@@ -1703,17 +1692,6 @@
 				D20B5C7A24EA63FF0077EF6D /* iOS底层Class结构之Cache_t.md */,
 				D20B5C7B24EB64500077EF6D /* iOS底层runtime应用之动态添加属性:成员变量.md */,
 				D20B5C7C24EBB92B0077EF6D /* iOS底层懒加载类:非懒加载类.md */,
-				D20B5C8124ECFF120077EF6D /* iOS_spinlock_t.md */,
-				D2164F0824EE45A60000A6AA /* iOS_os_unfair_lock.md */,
-				D2164F0D24EFD9710000A6AA /* iOS_pthread_mutex_t.md */,
-				D2164F0E24F118060000A6AA /* iOS_NSLock.md */,
-				D2164F0F24F2053A0000A6AA /* iOS_NSRecursiveLock.md */,
-				D2164F1024F212670000A6AA /* iOS_NSCondition.md */,
-				D2164F1124F22E670000A6AA /* iOS_NSConditionLock.md */,
-				D2164F1224F24B820000A6AA /* iOS_@synchronized.md */,
-				D2164F1324F25E070000A6AA /* iOS_dispatch_semaphore.md */,
-				D2164F1424F2654F0000A6AA /* iOS_pthread_rwlock_t.md */,
-				D2164F1524F33A9A0000A6AA /* iOS_Lock总结.md */,
 			);
 			path = md;
 			sourceTree = "<group>";
