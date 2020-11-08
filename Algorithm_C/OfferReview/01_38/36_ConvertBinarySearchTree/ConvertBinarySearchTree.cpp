@@ -14,17 +14,24 @@ void ConvertBinarySearchTree::convertNode(BinaryTreeNode* pNode, BinaryTreeNode*
     }
     
     BinaryTreeNode* pCurrent = pNode;
+    // pCurrent 记录当前节点，然后沿着 m_pLeft 一直找下去，
+    // 到底的时的节点一定就是值最小的节点，也就是链表的头节点。
     if (pCurrent->m_pLeft != nullptr) {
         convertNode(pCurrent->m_pLeft, pLastNodeInList);
     }
     
+    // 这里先把 pCurrent 的 m_pLeft 指向 *pLastNodeInList，
+    // 第一次时它是 nullptr，它一直是作为链表的尾节点存在的，所以当一个节点进来时，m_pLeft 都是指向它，
+    // 然后下面 *pLastNodeInList 的 m_pRight 指向这个当前节点，即把这个节点追加到链表的尾部了。
     pCurrent->m_pLeft = *pLastNodeInList;
     if (*pLastNodeInList != nullptr) {
         (*pLastNodeInList)->m_pRight = pCurrent;
     }
     
+    // 然后更新 *pLastNodeInList，移动到链表的最后
     *pLastNodeInList = pCurrent;
     
+    // 这里是递归右子树或者右子节点
     if (pCurrent->m_pRight != nullptr) {
         convertNode(pCurrent->m_pRight, pLastNodeInList);
     }
@@ -43,6 +50,7 @@ BinaryTreeNode* ConvertBinarySearchTree::convert(BinaryTreeNode* pRootOfTree) {
         pHeadOfList = pHeadOfList->m_pLeft;
     }
     
+    // 返回链表的头节点
     return pHeadOfList;
 }
 
