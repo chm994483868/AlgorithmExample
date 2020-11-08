@@ -36,6 +36,7 @@ BinaryTreeNode* ConvertBinarySearchTree::convert(BinaryTreeNode* pRootOfTree) {
     // 二叉搜索树转换为双向链表
     convertNode(pRootOfTree, &pLastNodeInList);
     
+    // pLastNodeInList 指向双向链表的尾节点，
     // 从尾节点沿着 m_pLeft 遍历到链表头部节点并返回头节点
     BinaryTreeNode* pHeadOfList = pLastNodeInList;
     while (pHeadOfList != nullptr && pHeadOfList->m_pLeft != nullptr) {
