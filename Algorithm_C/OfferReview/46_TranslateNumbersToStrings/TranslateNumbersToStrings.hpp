@@ -22,6 +22,7 @@ namespace TranslateNumbersToStrings {
 // 译成"b"，⋯⋯，11翻译成"l"，⋯⋯，25翻译成"z"。一个数字可能有多个翻译。例
 // 如12258有5种不同的翻译，它们分别是"bccfi"、"bwfi"、"bczi"、"mcfi"和
 // "mzi"。请编程实现一个函数用来计算一个数字有多少种不同的翻译方法。
+
 int getTranslationCount(const string& number);
 int getTranslationCount(int number);
 

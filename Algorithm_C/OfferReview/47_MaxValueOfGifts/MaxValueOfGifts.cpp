@@ -9,68 +9,89 @@
 #include "MaxValueOfGifts.hpp"
 
 int MaxValueOfGifts::getMaxValue_solution1(const int* values, int rows, int cols) {
+    // 入参判断
     if (values == nullptr || rows <= 0 || cols <= 0) {
         return 0;
     }
     
+    // 准备一个 rows * cols 的矩阵记录到达每个坐标时能拿到的礼物的最大值
     int** maxValues = new int*[rows];
     unsigned int i = 0;
     for (; i < rows; ++i) {
         maxValues[i] = new int[cols];
     }
     
+    // 遍历棋盘
     for (i = 0; i < rows; ++i) {
         for (unsigned int j = 0; j < cols; ++j) {
+            
             int up = 0;
             int left = 0;
             
+            // 上面坐标点的最大值
             if (i > 0) {
                 up = maxValues[i - 1][j];
             }
             
+            // 左边一个坐标点d
             if (j > 0) {
                 left = maxValues[i][j - 1];
             }
             
+            // 记录当前最大值
             maxValues[i][j] = std::max(up, left) + values[i * cols + j];
         }
     }
     
+    // 右下角的最大值
     int maxValue = maxValues[rows - 1][cols - 1];
+    
+    // 释放内存
     for (i = 0; i < rows; ++i) {
         delete [] maxValues[i];
     }
     delete [] maxValues;
 
+    // 返回最大值
     return maxValue;
 }
 
 int MaxValueOfGifts::getMaxValue_solution2(const int* values, int rows, int cols) {
+    // 入参判断
     if (values == nullptr || rows <= 0 || cols <= 0) {
         return 0;
     }
     
+    // 仅需要一个一维数组足够保存最大值
     int* maxValues = new int[cols];
+    
+    // 遍历棋盘
     for (int i = 0; i < rows; ++i) {
         for (int j = 0; j < cols; ++j) {
+            
             int left = 0;
             int up = 0;
             
+            // 上面的最大值
             if (i > 0) {
                 up = maxValues[j];
             }
             
+            // 左面的最大值
             if (j > 0) {
                 left = maxValues[j - 1];
             }
             
+            // 记录当前最大值
             maxValues[j] = std::max(left, up) + values[i * cols + j];
         }
     }
-    
+
+    // 右下角的最大值
     int maxValue = maxValues[cols - 1];
+    // 释放内存
     delete [] maxValues;
-    
+    // 返回最大值
     return maxValue;
 }
 

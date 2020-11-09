@@ -19,6 +19,10 @@ namespace StringPermutation {
 void permutation(char* pStr, char* pBegin);
 void permutation(char* pStr);
 
+// 测试代码
+void Test(char* pStr);
+void Test();
+
 }
 
 #endif /* StringPermutation_hpp */

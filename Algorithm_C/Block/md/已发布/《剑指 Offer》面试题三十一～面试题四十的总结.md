@@ -444,17 +444,26 @@ void ConvertBinarySearchTree::convertNode(BinaryTreeNode* pNode, BinaryTreeNode*
     }
     
     BinaryTreeNode* pCurrent = pNode;
+    
+    // pCurrent 记录当前节点，然后沿着 m_pLeft 一直找下去，
+    // 到底的节点一定就是值最小的节点，也就是链表的头节点。
     if (pCurrent->m_pLeft != nullptr) {
+        // 一直沿着 pCurrent->m_pLeft 递归向下
         convertNode(pCurrent->m_pLeft, pLastNodeInList);
     }
     
+    // 这里先把 pCurrent 的 m_pLeft 指向 *pLastNodeInList，
+    // 第一次时 *pLastNodeInList 的值是 nullptr，它一直是作为当前链表的尾节点存在的，所以当一个节点进来时，m_pLeft 都是指向它，
+    // 然后下面 *pLastNodeInList 的 m_pRight 指向这个当前节点，即把这个进来的节点追加到链表的尾部了。
     pCurrent->m_pLeft = *pLastNodeInList;
     if (*pLastNodeInList != nullptr) {
         (*pLastNodeInList)->m_pRight = pCurrent;
     }
     
+    // 然后更新 *pLastNodeInList，往后移动到链表的最后，即更新了当前链表的尾节点。
     *pLastNodeInList = pCurrent;
     
+    // 这里是递归每个左子节点的右子树或者右子节点
     if (pCurrent->m_pRight != nullptr) {
         convertNode(pCurrent->m_pRight, pLastNodeInList);
     }
@@ -466,12 +475,14 @@ BinaryTreeNode* ConvertBinarySearchTree::convert(BinaryTreeNode* pRootOfTree) {
     // 二叉搜索树转换为双向链表
     convertNode(pRootOfTree, &pLastNodeInList);
     
+    // pLastNodeInList 指向双向链表的尾节点，
     // 从尾节点沿着 m_pLeft 遍历到链表头部节点并返回头节点
     BinaryTreeNode* pHeadOfList = pLastNodeInList;
     while (pHeadOfList != nullptr && pHeadOfList->m_pLeft != nullptr) {
         pHeadOfList = pHeadOfList->m_pLeft;
     }
     
+    // 返回链表的头节点
     return pHeadOfList;
 }
 ```
@@ -484,34 +495,58 @@ bool readStream(istream& stream, int* number);
 void deserialize(BinaryTreeNode** pRoot, istream& stream);
 }
 
+// 序列化二叉树
 void SerializeBinaryTrees::serialize(const BinaryTreeNode* pRoot, ostream& stream) {
+    // 如果根节点是 nullptr，则输出一个 $ 并 return，
+    // 同时它还是递归结束的的条件
     if (pRoot == nullptr) {
         stream << "$,";
         return;
     }
     
+    // 输出节点的值和一个逗号
     stream << pRoot->m_nValue << ',';
+    
+    // 递归序列化左子树
     serialize(pRoot->m_pLeft, stream);
+    
+    // 递归序列化右子树
     serialize(pRoot->m_pRight, stream);
 }
 
+// readStream 每次从流中读出一个数字或者一个字符 '$'，
+// 当从流中读出的是一个数字时，函数返回 true，否则返回 false
 bool SerializeBinaryTrees::readStream(istream& stream, int* number) {
+    // 流结束
     if(stream.eof())
         return false;
     
+    // 长度是 32 的 char 数组
     char buffer[32];
+    // 空字符
     buffer[0] = '\0';
     
     char ch;
+    // 键盘输入到 ch 中
     stream >> ch;
     int i = 0;
+    // 输入逗号表示一个完整的字符输入结束
     while(!stream.eof() && ch != ',') {
         buffer[i++] = ch;
         stream >> ch;
     }
     
+    // 当输入 $ 时表示一个 nullptr 节点，否则就是正常的节点的值
     bool isNumeric = false;
     if(i > 0 && buffer[0] != '$') {
+    
+    // atoi (表示 ascii to integer) 是把字符串转换成整型数的一个函数。
+    // int atoi(const char *nptr) 函数会扫描参数 nptr字符串，
+    // 会跳过前面的空白字符（例如空格，tab缩进）等。
+    // 如果 nptr 不能转换成 int 或者 nptr 为空字符串，那么将返回 0 [1]。
+    // 特别注意，该函数要求被转换的字符串是按十进制数理解的。
+    // atoi输入的字符串对应数字存在大小限制（与 int 类型大小有关），若其过大可能报错-1。
+    
         *number = atoi(buffer);
         isNumeric = true;
     }
@@ -519,15 +554,21 @@ bool SerializeBinaryTrees::readStream(istream& stream, int* number) {
     return isNumeric;
 }
 
+// 反序列化二叉树
 void SerializeBinaryTrees::deserialize(BinaryTreeNode** pRoot, istream& stream) {
     int number;
+    // 注意这里 pRoot 是 BinaryTreeNode**
+    // 如果读出了一个数字，则构建节点
     if (readStream(stream, &number)) {
+        // 构建新节点
         *pRoot = new BinaryTreeNode();
         (*pRoot)->m_nValue = number;
         (*pRoot)->m_pLeft = nullptr;
         (*pRoot)->m_pRight = nullptr;
         
+        // 传入左子节点的指针地址递归
         deserialize(&((*pRoot)->m_pLeft), stream);
+        // 传入右子节点的指针地址递归
         deserialize(&((*pRoot)->m_pRight), stream);
     }
 }
@@ -535,7 +576,42 @@ void SerializeBinaryTrees::deserialize(BinaryTreeNode** pRoot, istream& stream) 
 ## 面试题 38:字符串的排列
 &emsp;题目：输入一个字符串，打印出该字符串中字符的所有排列。例如输入字符串 abc，则打印出由字符 a、b、c 所能排列出来的所有字符串 abc、acb、bac、bca、cab 和 cba。
 ```c++
+// 求整个字符串的排列可以分为两步。
+// 第一步求所有可能出现在第一个位置的字符，即把第一个字符和后面所有的字符交换。
+// 第二步固定第一个字符，求后面所有字符的排列。
 
+//（a）把字符串分为两部分，一部分是字符串的第一个字符，另一部分是第一个字符以后的所有字符。
+//（b）拿第一个字符和它后面的字符逐个交换。 
+
+// 指针 pStr 指向整个字符串的第一个字符，pBegin 指向当前我们执行排列操作的字符串的第一个字符
+void StringPermutation::permutation(char* pStr, char* pBegin) {
+    if (*pBegin == '\0') {
+        printf("%s\n", pStr);
+    } else {
+        for (char* pCh = pBegin; *pCh != '\0'; ++pCh) {
+            char temp = *pCh;
+            *pCh = *pBegin;
+            *pBegin = temp;
+            
+            // 在每一次递归的时候，我们从 pBegin 向后扫描每一个字符（指针 pCh 指向的字符）
+            // 在交换 pBegin 和 pCh 指向的字符之后，我们再对 pBegin 后面的字符串递归的进行排列操作，
+            // 直至 pBegin 指向字符串的末尾
+            permutation(pStr, pBegin + 1);
+            
+            temp = *pCh;
+            *pCh = *pBegin;
+            *pBegin = temp;
+        }
+    }
+}
+
+void StringPermutation::permutation(char* pStr) {
+    if (pStr == nullptr) {
+        return;
+    }
+    
+    permutation(pStr, pStr);
+}
 ```
 ## 39:数组中出现次数超过一半的数字
 &emsp;题目：数组中有一个数字出现的次数超过数组长度的一半，请找出这个数字。例如输入一个长度为 9 的数组 {1, 2, 3, 2, 2, 2, 5, 4, 2} 。由于数字2在数组中出现了 5 次，超过数组长度的一半，因此输出 2。
