@@ -572,8 +572,104 @@ int MaxValueOfGifts::getMaxValue_solution2(const int* values, int rows, int cols
 ## 48:最长不含重复字符的子字符串
 &emsp;题目：请从字符串中找出一个最长的不包含重复字符的子字符串，计算该最长子字符串的长度。假设字符串中只包含从 'a' 到 'z' 的字符。
 ```c++
-// 
+namespace LongestSubstringWithoutDup {
+// 方法一：蛮力法
+bool hasDuplication(const std::string& str, int position[]);
+int longestSubstringWithoutDuplication_1(const std::string& str);
+//// 方法二：动态规划
+int longestSubstringWithoutDuplication_2(const std::string& str);    
+}
 
+// 判断字符是否重复出现
+bool LongestSubstringWithoutDup::hasDuplication(const std::string& str, int position[]) {
+    for (int i = 0; i < 26; ++i) {
+        position[i] = -1;
+    }
+    
+    for (int i = 0; i < str.length(); ++i) {
+        int indexInPosition = str[i] - 'a';
+        if (position[indexInPosition] >= 0) {
+            return true;
+        }
+        
+        position[indexInPosition] = indexInPosition;
+    }
+    
+    return false;
+}
+
+int LongestSubstringWithoutDup::longestSubstringWithoutDuplication_1(const std::string& str) {
+    int longest = 0;
+    int* position = new int[26];
+    for (int start = 0; start < str.length(); ++start) {
+        for (int end = start; end < str.length(); ++end) {
+            int count = end - start + 1;
+            const std::string& substring = str.substr(start, count);
+            if (!hasDuplication(substring, position)) {
+                if (count > longest) {
+                    longest = count;
+                } else {
+                    break;
+                }
+            }
+        }
+    }
+    
+    delete [] position;
+    return longest;
+}
+
+int LongestSubstringWithoutDup::longestSubstringWithoutDuplication_2(const std::string& str) {
+    
+    // 记录当前不重复字符串长度
+    int curLength = 0;
+    
+    // 记录最大长度
+    int maxLength = 0;
+    
+    // 准备一个长度是 26 的数组，标记 a 到 z 这 26 个字符上次出现的位置
+    int* position = new int[26];
+    unsigned int i = 0;
+    // 数组元素全部置为 -1
+    for (; i < 26; ++i) {
+        position[i] = -1;
+    }
+    
+    // 遍历字符串
+    for (i = 0; i < str.length(); ++i) {
+        
+        // 首先从 position 数组中找出该字符上次出现的位置（str[i] - 'a' 作为下标）
+        int prevIndex = position[str[i] - 'a'];
+        
+        // 如果还没出现过或者距离超过了当前 curLength，则 curLength 自增
+        if (prevIndex < 0 || i - prevIndex > curLength) {
+            ++curLength;
+        } else {
+            // 否则就是重复出现了，curLength 的值要变小了
+            
+            // 更新 maxLength
+            if (curLength > maxLength) {
+                maxLength = curLength;
+            }
+            
+            // 更新当前长度 curLength
+            curLength = i - prevIndex;
+        }
+        
+        // 记录字符的出现的位置
+        position[str[i] - 'a'] = i;
+    }
+    
+    // 是否更新 maxLength
+    if (curLength > maxLength) {
+        maxLength = curLength;
+    }
+    
+    // 释放内存
+    delete [] position;
+    // 返回 maxLength
+    return maxLength;
+}
 ```
 ## 面试题 49:丑数
 &emsp;题目：我们把只包含因子2、3和5的数称作丑数（Ugly Number）。求按从小到大的顺序的第1500个丑数。例如6、8都是丑数，但14不是，因为它包含因子7。习惯上我们把1当做第一个丑数。
