@@ -729,6 +729,47 @@ char* ReverseWordsInSentence::reverseSentence(char* pData) {
     return pData;
 }
 ```
+## 58:(二)左旋转字符串
+&emsp;题目：字符串的左旋转操作是把字符串前面的若干个字符转移到字符串的尾部。请定义一个函数实现字符串左旋转操作的功能。比如输入字符串 "abcdefg" 和数字  2，该函数将返回左旋转2位得到的结果 "cdefgab"。
+```c++
+namespace LeftRotateString {
+char* leftRotateString(char* pStr, int n);
+}
+
+// 三步完成，还是使用前面的字符串翻转函数，
+// 这里是先翻转字符串前面 n 个字符，
+// 再翻转字符串的后面部分，
+// 最后翻转整个字符串，
+
+char* LeftRotateString::leftRotateString(char* pStr, int n) {
+    if (pStr != nullptr) {
+        
+        // 获取字符串长度
+        int nLength = static_cast<int>(strlen(pStr));
+        
+        if (nLength > 0 && n > 0 && n < nLength) {
+            
+            // 把字符串在逻辑上分为两个部分:
+            // 字符串 1 [pStr, pStr + n - 1]
+            char* pFirstStart = pStr;
+            char* pFirstEnd = pStr + n - 1;
+            
+            // 字符串 2 [pStr + n, pStr + nLength - 1]
+            char* pSecondStart = pStr + n;
+            char* pSecondEnd = pStr + nLength - 1;
+            
+            // 翻转字符串的前面 n 个字符
+            reverse(pFirstStart, pFirstEnd);
+            // 翻转字符串的后面部分
+            reverse(pSecondStart, pSecondEnd);
+            // 翻转整个字符串
+            reverse(pFirstStart, pSecondEnd);
+        }
+    }
+    
+    return pStr;
+}
+```
 ## 完结撒花🎉🎉，感谢陪伴！
 
 ## 参考链接

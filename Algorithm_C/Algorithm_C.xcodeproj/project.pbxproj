@@ -25,6 +25,7 @@
 		8EA593D924CDB969002785EF /* main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8EA593D824CDB969002785EF /* main.cpp */; };
 		8EA593E024CDBD0B002785EF /* AssignmentOperator.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8EA593DE24CDBD0B002785EF /* AssignmentOperator.cpp */; };
 		8EA593E424CF0B40002785EF /* ConstructBinaryTree.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8EA593E224CF0B40002785EF /* ConstructBinaryTree.cpp */; };
+		8ED5F3C6255B339500B0294D /* LeftRotateString.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8ED5F3C4255B339500B0294D /* LeftRotateString.cpp */; };
 		D202B251254E656E00D9BFBC /* FindDuplication_1.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D202B24F254E656E00D9BFBC /* FindDuplication_1.cpp */; };
 		D202B254254E68D700D9BFBC /* FindDuplicationNoEdit_1.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D202B252254E68D700D9BFBC /* FindDuplicationNoEdit_1.cpp */; };
 		D202B257254E720100D9BFBC /* FindInPartiallySortedMatrix_1.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D202B255254E720100D9BFBC /* FindInPartiallySortedMatrix_1.cpp */; };
@@ -226,6 +227,8 @@
 		8EA593E324CF0B40002785EF /* ConstructBinaryTree.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = ConstructBinaryTree.hpp; sourceTree = "<group>"; };
 		8EA68A6A252DA35400BE2852 /* iOS 从源码解析Runtime (十)：聚焦cache_t objc-msg-arm64.s补充(3).md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 从源码解析Runtime (十)：聚焦cache_t objc-msg-arm64.s补充(3).md"; sourceTree = "<group>"; };
 		8EA68A6B252DA76300BE2852 /* iOS 从源码解析Runtime (十一)：聚焦objc_class(class_data_bits_t内容篇).md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 从源码解析Runtime (十一)：聚焦objc_class(class_data_bits_t内容篇).md"; sourceTree = "<group>"; };
+		8ED5F3C4255B339500B0294D /* LeftRotateString.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = LeftRotateString.cpp; sourceTree = "<group>"; };
+		8ED5F3C5255B339500B0294D /* LeftRotateString.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = LeftRotateString.hpp; sourceTree = "<group>"; };
 		8EF1A8AA253B4E7E0058AEAD /* iOS 从 libclosure-74 源码来研究 Block 实现原理(2).md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 从 libclosure-74 源码来研究 Block 实现原理(2).md"; sourceTree = "<group>"; };
 		D202B24F254E656E00D9BFBC /* FindDuplication_1.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = FindDuplication_1.cpp; sourceTree = "<group>"; };
 		D202B250254E656E00D9BFBC /* FindDuplication_1.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = FindDuplication_1.hpp; sourceTree = "<group>"; };
@@ -858,11 +861,6 @@
 		8EA593D724CDB969002785EF /* OfferReview */ = {
 			isa = PBXGroup;
 			children = (
-				D202B2EE255A63BD00D9BFBC /* 60_DicesProbability */,
-				D202B2ED255A63AA00D9BFBC /* 59_02_QueueWithMax */,
-				D202B2EC255A639C00D9BFBC /* 59_01_MaxInSlidingWindow */,
-				D202B2EB255A639000D9BFBC /* 58_02_LeftRotateString */,
-				D202B2EA255A638500D9BFBC /* 58_01_ReverseWordsInSentence */,
 				D2EB010424D91318009EAFD6 /* Sort */,
 				8EA593D824CDB969002785EF /* main.cpp */,
 				8E2572D124D304370080F598 /* 01_38 */,
@@ -892,6 +890,7 @@
 				D202B2E7255A636300D9BFBC /* 56_02_NumberAppearingOnce */,
 				D202B2E8255A637000D9BFBC /* 57_01_TwoNumbersWithSum */,
 				D202B2E9255A637A00D9BFBC /* 57_02_ContinuousSquenceWithSum */,
+				D202B2EA255A638500D9BFBC /* 58_01_ReverseWordsInSentence */,
 			);
 			path = OfferReview;
 			sourceTree = "<group>";
@@ -1094,36 +1093,10 @@
 			children = (
 				D202B310255A9D4E00D9BFBC /* ReverseWordsInSentence.cpp */,
 				D202B311255A9D4E00D9BFBC /* ReverseWordsInSentence.hpp */,
+				8ED5F3C4255B339500B0294D /* LeftRotateString.cpp */,
+				8ED5F3C5255B339500B0294D /* LeftRotateString.hpp */,
 			);
 			path = 58_01_ReverseWordsInSentence;
-			sourceTree = "<group>";
-		};
-		D202B2EB255A639000D9BFBC /* 58_02_LeftRotateString */ = {
-			isa = PBXGroup;
-			children = (
-			);
-			path = 58_02_LeftRotateString;
-			sourceTree = "<group>";
-		};
-		D202B2EC255A639C00D9BFBC /* 59_01_MaxInSlidingWindow */ = {
-			isa = PBXGroup;
-			children = (
-			);
-			path = 59_01_MaxInSlidingWindow;
-			sourceTree = "<group>";
-		};
-		D202B2ED255A63AA00D9BFBC /* 59_02_QueueWithMax */ = {
-			isa = PBXGroup;
-			children = (
-			);
-			path = 59_02_QueueWithMax;
-			sourceTree = "<group>";
-		};
-		D202B2EE255A63BD00D9BFBC /* 60_DicesProbability */ = {
-			isa = PBXGroup;
-			children = (
-			);
-			path = 60_DicesProbability;
 			sourceTree = "<group>";
 		};
 		D2090C0224CFA50E00FA4F51 /* 08_NextNodeInBinaryTrees */ = {
@@ -2424,6 +2397,7 @@
 				D2EB013024D96467009EAFD6 /* HeapSort.cpp in Sources */,
 				D227132024D1577D009B180D /* EntryNodeInListLoop.cpp in Sources */,
 				D202B260254EA1B400D9BFBC /* ConstructBinaryTree_1.cpp in Sources */,
+				8ED5F3C6255B339500B0294D /* LeftRotateString.cpp in Sources */,
 				D237C64B24D26CED001E0B21 /* PrintTreesInLines.cpp in Sources */,
 				D202B30C255A92D800D9BFBC /* TwoNumbersWithSum.cpp in Sources */,
 				D237C66624D2C730001E0B21 /* SerializeBinaryTrees.cpp in Sources */,
