@@ -674,19 +674,202 @@ int LongestSubstringWithoutDup::longestSubstringWithoutDuplication_2(const std::
 ## 面试题 49:丑数
 &emsp;题目：我们把只包含因子2、3和5的数称作丑数（Ugly Number）。求按从小到大的顺序的第1500个丑数。例如6、8都是丑数，但14不是，因为它包含因子7。习惯上我们把1当做第一个丑数。
 ```c++
-//
+namespace UglyNumber {
+bool IsUgly(int number);
+int GetUglyNumber_Solution1(int index);
+int Min(int number1, int number2, int number3);
+int GetUglyNumber_Solution2(int index);
+}
 
+// 判断一个数字是否是丑数
+bool UglyNumber::IsUgly(int number) {
+    // 任意丑数对 2/3/5 其中一个取模必是 0，
+    // 然后连续取商的话最后必是 1，即最后只需要判断 number 是否是 1 即可。
+    while (number % 2 == 0) {
+        number /= 2;
+    }
+    while (number % 3 == 0) {
+        number /= 3;
+    }
+    while (number % 5 == 0) {
+        number /= 5;
+    }
+    
+    return (number == 1) ? true: false;
+}
+
+// 从 0 开始遍历每一个整数，判断该整数是否是整数，然后记录下是第几个丑数，直到第 index 个丑数
+int UglyNumber::GetUglyNumber_Solution1(int index) {
+    if (index <= 0) {
+        return 0;
+    }
+    
+    int number = 0;
+    int uglyFound = 0;
+    while (uglyFound < index) {
+        ++number;
+        
+        if (IsUgly(number)) {
+            ++uglyFound;
+        }
+    }
+    
+    return number;
+}
+
+// 求三个数字中最小的数字
+int UglyNumber::Min(int number1, int number2, int number3) {
+    int min = (number1 < number2) ? number1: number2;
+    min = (min < number3) ? min: number3;
+    
+    return min;
+}
+
+// 准备一个 index 长度的数组，按从小到大顺序记录每个丑数，直到 index。
+int UglyNumber::GetUglyNumber_Solution2(int index) {
+    if (index <= 0) {
+        return 0;
+    }
+    
+    // 准备一个 index 长度的数组记录丑数
+    int *pUglyNumbers = new int[index];
+    // 第一个丑数从 1 开始
+    pUglyNumbers[0] = 1;
+    // 记录当前是第几个丑数
+    int nextUglyIndex = 1;
+    
+    // 三个指针分别记录当前大于已有丑数乘以 2 3 5 后的最小值
+    int* pMultiply2 = pUglyNumbers;
+    int* pMultiply3 = pUglyNumbers;
+    int* pMultiply5 = pUglyNumbers;
+    
+    // 循环直到第 index 个丑数
+    while (nextUglyIndex < index) {
+        // 当前包含 2 3 5 因子的最小丑数
+        int min = Min(*pMultiply2 * 2, *pMultiply3 * 3, *pMultiply5 * 5);
+        pUglyNumbers[nextUglyIndex] = min;
+        
+        // 2 => [2, 4, 8, 16, 32, 64, ...]
+        // 3 => [3, 6, 9, 12, 15, 18, ...]
+        // 5 => [5, 10, 15, 20, 25, 30, ...]
+        // 如上，每次从以上三个组找大于当前丑数的最小丑数
+        
+        // [1, 2, 3, 4, 5, 6, 8, 9, 10, 12, 15, 16, 18, 20, ...]
+        // 更新 3 个指针
+        while (*pMultiply2 * 2 <= pUglyNumbers[nextUglyIndex]) {
+            ++pMultiply2;
+        }
+        while (*pMultiply3 * 3 <= pUglyNumbers[nextUglyIndex]) {
+            ++pMultiply3;
+        }
+        while (*pMultiply5 * 5 <= pUglyNumbers[nextUglyIndex]) {
+            ++pMultiply5;
+        }
+        
+        // 自增 1，直到 index
+        ++nextUglyIndex;
+    }
+    
+    // 要找到丑数
+    int ugly = pUglyNumbers[nextUglyIndex - 1];
+    
+    // 释放内存
+    delete [] pUglyNumbers;
+    
+    return ugly;
+}
 ```
 ## 50:(一)字符串中第一个只出现一次的字符
 &emsp;题目：在字符串中找出第一个只出现一次的字符。如输入 "abaccdeff"，则输出 'b'。
 ```c++
-//
+namespace FirstNotRepeatingChar {
+char firstNotRepeatingChar(const char* pString);
+}
 
+char FirstNotRepeatingChar::firstNotRepeatingChar(const char* pString) {
+    if (pString == nullptr) {
+        return '\0';
+    }
+    
+    // 准备一个长度是 256 的 int 数组，每个元素初始值为 0。
+    // 数组下标对应字符的 ASCII 码 ，每个值则对应该字符出现的次数。
+    const int tableSize = 256;
+    unsigned int hashTable[tableSize];
+    for (unsigned int i = 0; i < tableSize; ++i) {
+        hashTable[i] = 0;
+    }
+    
+    // 遍历字符串，记录每个字符出现的次数
+    const char* pHashKey = pString;
+    while (*(pHashKey) != '\0') {
+        hashTable[*(pHashKey++)]++;
+    }
+    
+    // 从 pString 遍历每个字符出现的次数，找到第一个 1 时直接返回即可
+    pHashKey = pString;
+    while (*pHashKey != '\0') {
+        if (hashTable[*pHashKey] == 1) {
+            return *pHashKey;
+        }
+        
+        pHashKey++;
+    }
+    
+    return '\0';
+}
 ```
 ## 50:(二)字符流中第一个只出现一次的字符
 &emsp;题目：请实现一个函数用来找出字符流中第一个只出现一次的字符。例如，当从字符流中只读出前两个字符 "go" 时，第一个只出现一次的字符是 'g'。当从该字符流中读出前六个字符 "google" 时，第一个只出现一次的字符是 'l'。
 ```c++
-//
-
+class CharStatistics {
+public:
+    // 构造函数
+    CharStatistics() : index(0) {
+        // 初始化 occurrence 数组，-1 表示字符还没还没有找到
+        // occurrence 下标表示字符的 ASCII 码，值表示出现的位置
+        for (int i = 0; i < 256; ++i) {
+            occurrence[i] = -1;
+        }
+    }
+    
+    // 把字符流中字符的 index 记录到 occurrence 中
+    void Insert(char ch) {
+        if (occurrence[ch] == -1) {
+            // 第一次出现 occurrence[ch] 赋值为出现的位置
+            occurrence[ch] = index;
+        } else if (occurrence[ch] >= 0) {
+            // -2 表示该字符已经出现过，重复了
+            occurrence[ch] = -2;
+        }
+        
+        index++;
+    }
+    
+    // 第一个只出现一次的字符
+    char firstAppearingOnce() {
+        char ch = '\0';
+        
+        // minIndex 值初始为 int 类型数值的最大值
+        int minIndex = numeric_limits<int>::max();
+        
+        // 遍历 occurrence 找到第一个出现一次的字符，该字符的 occurrence[i] 值是它在字符流中的位置
+        for (int i = 0; i < 256; ++i) {
+            if (occurrence[i] >= 0 && occurrence[i] < minIndex) {
+                ch = (char)i;
+                minIndex = occurrence[i];
+            }
+        }
+        
+        return ch;
+    }
+    
+private:
+    // occurrence[i]: A character with ASCII value i; 字符的 ASCII 码
+    // occurrence[i] = -1: The character has not found; 未找到
+    // occurrence[i] = -2: The character has been found for mutlple times 重复
+    // occurrence[i] >= 0: The character has been found only once 出现一次
+    int occurrence[256];
+    int index;
+};
 ```
 ## 完结撒花🎉🎉，感谢陪伴！
