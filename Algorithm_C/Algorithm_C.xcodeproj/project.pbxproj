@@ -81,6 +81,17 @@
 		D202B30C255A92D800D9BFBC /* TwoNumbersWithSum.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D202B30A255A92D800D9BFBC /* TwoNumbersWithSum.cpp */; };
 		D202B30F255A95FF00D9BFBC /* ContinuousSquenceWithSum.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D202B30D255A95FF00D9BFBC /* ContinuousSquenceWithSum.cpp */; };
 		D202B312255A9D4E00D9BFBC /* ReverseWordsInSentence.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D202B310255A9D4E00D9BFBC /* ReverseWordsInSentence.cpp */; };
+		D202B318255B73C300D9BFBC /* MaxInSlidingWindow.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D202B316255B73C300D9BFBC /* MaxInSlidingWindow.cpp */; };
+		D202B31C255B88E500D9BFBC /* QueueWithMax.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D202B31A255B88E500D9BFBC /* QueueWithMax.cpp */; };
+		D202B320255B8E9A00D9BFBC /* DicesProbability.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D202B31E255B8E9A00D9BFBC /* DicesProbability.cpp */; };
+		D202B325255B916900D9BFBC /* ContinousCards.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D202B323255B916900D9BFBC /* ContinousCards.cpp */; };
+		D202B329255B962500D9BFBC /* LastNumberInCircle.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D202B327255B962500D9BFBC /* LastNumberInCircle.cpp */; };
+		D202B32D255B9B2C00D9BFBC /* MaximalProfit.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D202B32B255B9B2C00D9BFBC /* MaximalProfit.cpp */; };
+		D202B331255B9F9D00D9BFBC /* Accumulate.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D202B32F255B9F9D00D9BFBC /* Accumulate.cpp */; };
+		D202B335255BB21100D9BFBC /* AddTwoNumbers.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D202B333255BB21100D9BFBC /* AddTwoNumbers.cpp */; };
+		D202B339255BB55800D9BFBC /* ConstuctArray.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D202B337255BB55800D9BFBC /* ConstuctArray.cpp */; };
+		D202B33D255BB7C000D9BFBC /* StringToInt.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D202B33B255BB7C000D9BFBC /* StringToInt.cpp */; };
+		D202B341255BCB7100D9BFBC /* CommonParentInTree.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D202B33F255BCB7100D9BFBC /* CommonParentInTree.cpp */; };
 		D2090C0524CFA51E00FA4F51 /* NextNodeInBinaryTrees.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D2090C0324CFA51E00FA4F51 /* NextNodeInBinaryTrees.cpp */; };
 		D2090C0924CFAD4B00FA4F51 /* QueueWithTwoStacks.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D2090C0724CFAD4B00FA4F51 /* QueueWithTwoStacks.cpp */; };
 		D2090C0D24CFBCC600FA4F51 /* StackWithTwoQueues.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D2090C0B24CFBCC600FA4F51 /* StackWithTwoQueues.cpp */; };
@@ -346,6 +357,30 @@
 		D202B30E255A95FF00D9BFBC /* ContinuousSquenceWithSum.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = ContinuousSquenceWithSum.hpp; sourceTree = "<group>"; };
 		D202B310255A9D4E00D9BFBC /* ReverseWordsInSentence.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = ReverseWordsInSentence.cpp; sourceTree = "<group>"; };
 		D202B311255A9D4E00D9BFBC /* ReverseWordsInSentence.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = ReverseWordsInSentence.hpp; sourceTree = "<group>"; };
+		D202B316255B73C300D9BFBC /* MaxInSlidingWindow.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = MaxInSlidingWindow.cpp; sourceTree = "<group>"; };
+		D202B317255B73C300D9BFBC /* MaxInSlidingWindow.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = MaxInSlidingWindow.hpp; sourceTree = "<group>"; };
+		D202B31A255B88E500D9BFBC /* QueueWithMax.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = QueueWithMax.cpp; sourceTree = "<group>"; };
+		D202B31B255B88E500D9BFBC /* QueueWithMax.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = QueueWithMax.hpp; sourceTree = "<group>"; };
+		D202B31E255B8E9A00D9BFBC /* DicesProbability.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = DicesProbability.cpp; sourceTree = "<group>"; };
+		D202B31F255B8E9A00D9BFBC /* DicesProbability.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = DicesProbability.hpp; sourceTree = "<group>"; };
+		D202B321255B908E00D9BFBC /* 《剑指 Offer》面试题六十一～面试题六十八的总结.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "《剑指 Offer》面试题六十一～面试题六十八的总结.md"; sourceTree = "<group>"; };
+		D202B323255B916900D9BFBC /* ContinousCards.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = ContinousCards.cpp; sourceTree = "<group>"; };
+		D202B324255B916900D9BFBC /* ContinousCards.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = ContinousCards.hpp; sourceTree = "<group>"; };
+		D202B327255B962500D9BFBC /* LastNumberInCircle.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = LastNumberInCircle.cpp; sourceTree = "<group>"; };
+		D202B328255B962500D9BFBC /* LastNumberInCircle.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = LastNumberInCircle.hpp; sourceTree = "<group>"; };
+		D202B32B255B9B2C00D9BFBC /* MaximalProfit.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = MaximalProfit.cpp; sourceTree = "<group>"; };
+		D202B32C255B9B2C00D9BFBC /* MaximalProfit.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = MaximalProfit.hpp; sourceTree = "<group>"; };
+		D202B32F255B9F9D00D9BFBC /* Accumulate.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Accumulate.cpp; sourceTree = "<group>"; };
+		D202B330255B9F9D00D9BFBC /* Accumulate.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = Accumulate.hpp; sourceTree = "<group>"; };
+		D202B333255BB21100D9BFBC /* AddTwoNumbers.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = AddTwoNumbers.cpp; sourceTree = "<group>"; };
+		D202B334255BB21100D9BFBC /* AddTwoNumbers.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = AddTwoNumbers.hpp; sourceTree = "<group>"; };
+		D202B337255BB55800D9BFBC /* ConstuctArray.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = ConstuctArray.cpp; sourceTree = "<group>"; };
+		D202B338255BB55800D9BFBC /* ConstuctArray.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = ConstuctArray.hpp; sourceTree = "<group>"; };
+		D202B33B255BB7C000D9BFBC /* StringToInt.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = StringToInt.cpp; sourceTree = "<group>"; };
+		D202B33C255BB7C000D9BFBC /* StringToInt.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = StringToInt.hpp; sourceTree = "<group>"; };
+		D202B33F255BCB7100D9BFBC /* CommonParentInTree.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = CommonParentInTree.cpp; sourceTree = "<group>"; };
+		D202B340255BCB7100D9BFBC /* CommonParentInTree.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = CommonParentInTree.hpp; sourceTree = "<group>"; };
+		D202B342255BD48B00D9BFBC /* 线程.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "线程.md"; sourceTree = "<group>"; };
 		D2090C0324CFA51E00FA4F51 /* NextNodeInBinaryTrees.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = NextNodeInBinaryTrees.cpp; sourceTree = "<group>"; };
 		D2090C0424CFA51E00FA4F51 /* NextNodeInBinaryTrees.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = NextNodeInBinaryTrees.hpp; sourceTree = "<group>"; };
 		D2090C0724CFAD4B00FA4F51 /* QueueWithTwoStacks.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = QueueWithTwoStacks.cpp; sourceTree = "<group>"; };
@@ -861,6 +896,14 @@
 		8EA593D724CDB969002785EF /* OfferReview */ = {
 			isa = PBXGroup;
 			children = (
+				D202B33E255BCB6300D9BFBC /* 68_CommonParentInTree */,
+				D202B33A255BB7B000D9BFBC /* 67_StringToInt */,
+				D202B336255BB54800D9BFBC /* 66_ConstuctArray */,
+				D202B332255BA29300D9BFBC /* 65_AddTwoNumbers */,
+				D202B32E255B9F6700D9BFBC /* 64_Accumulate */,
+				D202B32A255B9B1200D9BFBC /* 63_MaximalProfit */,
+				D202B326255B961200D9BFBC /* 62_LastNumberInCircle */,
+				D202B322255B915200D9BFBC /* 61_ContinousCards */,
 				D2EB010424D91318009EAFD6 /* Sort */,
 				8EA593D824CDB969002785EF /* main.cpp */,
 				8E2572D124D304370080F598 /* 01_38 */,
@@ -891,6 +934,10 @@
 				D202B2E8255A637000D9BFBC /* 57_01_TwoNumbersWithSum */,
 				D202B2E9255A637A00D9BFBC /* 57_02_ContinuousSquenceWithSum */,
 				D202B2EA255A638500D9BFBC /* 58_01_ReverseWordsInSentence */,
+				D202B314255B736D00D9BFBC /* 58_02_LeftRotateString */,
+				D202B315255B739A00D9BFBC /* 59_01_MaxInSlidingWindow */,
+				D202B319255B88D200D9BFBC /* 59_02_QueueWithMax */,
+				D202B31D255B8E8800D9BFBC /* 60_DicesProbability */,
 			);
 			path = OfferReview;
 			sourceTree = "<group>";
@@ -1093,10 +1140,116 @@
 			children = (
 				D202B310255A9D4E00D9BFBC /* ReverseWordsInSentence.cpp */,
 				D202B311255A9D4E00D9BFBC /* ReverseWordsInSentence.hpp */,
+			);
+			path = 58_01_ReverseWordsInSentence;
+			sourceTree = "<group>";
+		};
+		D202B314255B736D00D9BFBC /* 58_02_LeftRotateString */ = {
+			isa = PBXGroup;
+			children = (
 				8ED5F3C4255B339500B0294D /* LeftRotateString.cpp */,
 				8ED5F3C5255B339500B0294D /* LeftRotateString.hpp */,
 			);
-			path = 58_01_ReverseWordsInSentence;
+			path = 58_02_LeftRotateString;
+			sourceTree = "<group>";
+		};
+		D202B315255B739A00D9BFBC /* 59_01_MaxInSlidingWindow */ = {
+			isa = PBXGroup;
+			children = (
+				D202B316255B73C300D9BFBC /* MaxInSlidingWindow.cpp */,
+				D202B317255B73C300D9BFBC /* MaxInSlidingWindow.hpp */,
+			);
+			path = 59_01_MaxInSlidingWindow;
+			sourceTree = "<group>";
+		};
+		D202B319255B88D200D9BFBC /* 59_02_QueueWithMax */ = {
+			isa = PBXGroup;
+			children = (
+				D202B31A255B88E500D9BFBC /* QueueWithMax.cpp */,
+				D202B31B255B88E500D9BFBC /* QueueWithMax.hpp */,
+			);
+			path = 59_02_QueueWithMax;
+			sourceTree = "<group>";
+		};
+		D202B31D255B8E8800D9BFBC /* 60_DicesProbability */ = {
+			isa = PBXGroup;
+			children = (
+				D202B31E255B8E9A00D9BFBC /* DicesProbability.cpp */,
+				D202B31F255B8E9A00D9BFBC /* DicesProbability.hpp */,
+			);
+			path = 60_DicesProbability;
+			sourceTree = "<group>";
+		};
+		D202B322255B915200D9BFBC /* 61_ContinousCards */ = {
+			isa = PBXGroup;
+			children = (
+				D202B323255B916900D9BFBC /* ContinousCards.cpp */,
+				D202B324255B916900D9BFBC /* ContinousCards.hpp */,
+			);
+			path = 61_ContinousCards;
+			sourceTree = "<group>";
+		};
+		D202B326255B961200D9BFBC /* 62_LastNumberInCircle */ = {
+			isa = PBXGroup;
+			children = (
+				D202B327255B962500D9BFBC /* LastNumberInCircle.cpp */,
+				D202B328255B962500D9BFBC /* LastNumberInCircle.hpp */,
+			);
+			path = 62_LastNumberInCircle;
+			sourceTree = "<group>";
+		};
+		D202B32A255B9B1200D9BFBC /* 63_MaximalProfit */ = {
+			isa = PBXGroup;
+			children = (
+				D202B32B255B9B2C00D9BFBC /* MaximalProfit.cpp */,
+				D202B32C255B9B2C00D9BFBC /* MaximalProfit.hpp */,
+			);
+			path = 63_MaximalProfit;
+			sourceTree = "<group>";
+		};
+		D202B32E255B9F6700D9BFBC /* 64_Accumulate */ = {
+			isa = PBXGroup;
+			children = (
+				D202B32F255B9F9D00D9BFBC /* Accumulate.cpp */,
+				D202B330255B9F9D00D9BFBC /* Accumulate.hpp */,
+			);
+			path = 64_Accumulate;
+			sourceTree = "<group>";
+		};
+		D202B332255BA29300D9BFBC /* 65_AddTwoNumbers */ = {
+			isa = PBXGroup;
+			children = (
+				D202B333255BB21100D9BFBC /* AddTwoNumbers.cpp */,
+				D202B334255BB21100D9BFBC /* AddTwoNumbers.hpp */,
+			);
+			path = 65_AddTwoNumbers;
+			sourceTree = "<group>";
+		};
+		D202B336255BB54800D9BFBC /* 66_ConstuctArray */ = {
+			isa = PBXGroup;
+			children = (
+				D202B337255BB55800D9BFBC /* ConstuctArray.cpp */,
+				D202B338255BB55800D9BFBC /* ConstuctArray.hpp */,
+			);
+			path = 66_ConstuctArray;
+			sourceTree = "<group>";
+		};
+		D202B33A255BB7B000D9BFBC /* 67_StringToInt */ = {
+			isa = PBXGroup;
+			children = (
+				D202B33B255BB7C000D9BFBC /* StringToInt.cpp */,
+				D202B33C255BB7C000D9BFBC /* StringToInt.hpp */,
+			);
+			path = 67_StringToInt;
+			sourceTree = "<group>";
+		};
+		D202B33E255BCB6300D9BFBC /* 68_CommonParentInTree */ = {
+			isa = PBXGroup;
+			children = (
+				D202B33F255BCB7100D9BFBC /* CommonParentInTree.cpp */,
+				D202B340255BCB7100D9BFBC /* CommonParentInTree.hpp */,
+			);
+			path = 68_CommonParentInTree;
 			sourceTree = "<group>";
 		};
 		D2090C0224CFA50E00FA4F51 /* 08_NextNodeInBinaryTrees */ = {
@@ -1200,6 +1353,7 @@
 				D202B2A125538DB800D9BFBC /* 《剑指 Offer》面试题三十一～面试题四十的总结.md */,
 				D202B2BB2554D81B00D9BFBC /* 《剑指 Offer》面试题四十一～面试题五十的总结.md */,
 				D202B2DA255A3F2300D9BFBC /* 《剑指 Offer》面试题五十一～面试题六十的总结.md */,
+				D202B321255B908E00D9BFBC /* 《剑指 Offer》面试题六十一～面试题六十八的总结.md */,
 				D2164F1724F3B9A20000A6AA /* iOS weak 底层实现原理(一)：SideTable|s、weak_table_t、weak_entry_t 等数据结构.md */,
 				D2164F1E24F899FA0000A6AA /* iOS weak 底层实现原理(二)：objc-weak 函数列表全解析.md */,
 				D20B5C8024EBCEFE0077EF6D /* iOS weak 底层实现原理(三)：weak变量从初始化到被置为nil 都经历了什么.md */,
@@ -1224,6 +1378,7 @@
 				D2E067692508E82E008BF0E9 /* iOS Category 底层实现原理(三)：附加+load函数超详细解析.md */,
 				D2C74D06253ED8CC0051B89F /* iOS 开发中使用的各种锁的总结.md */,
 				D202B2962552798F00D9BFBC /* GCD.md */,
+				D202B342255BD48B00D9BFBC /* 线程.md */,
 			);
 			path = "已发布";
 			sourceTree = "<group>";
@@ -2313,6 +2468,7 @@
 				D239E72724D3BDDF00DA0BE5 /* DigitsInSequence.cpp in Sources */,
 				D2090C2124D0293B00FA4F51 /* NumberOf1InBinary.cpp in Sources */,
 				8EA593E024CDBD0B002785EF /* AssignmentOperator.cpp in Sources */,
+				D202B31C255B88E500D9BFBC /* QueueWithMax.cpp in Sources */,
 				D2090C0924CFAD4B00FA4F51 /* QueueWithTwoStacks.cpp in Sources */,
 				D202B2CA255525E300D9BFBC /* KLeastNumbers_1.cpp in Sources */,
 				D239E78824D4290200DA0BE5 /* LongestSubstringWithoutDup.cpp in Sources */,
@@ -2332,6 +2488,7 @@
 				D237C65E24D2AB63001E0B21 /* ComplexList.cpp in Sources */,
 				8E2572D024D3039B0080F598 /* StringPermutation.cpp in Sources */,
 				D202B27C255125A300D9BFBC /* CPower_1.cpp in Sources */,
+				D202B341255BCB7100D9BFBC /* CommonParentInTree.cpp in Sources */,
 				D2090C1D24D01FCC00FA4F51 /* RobotMove.cpp in Sources */,
 				D237C63F24D24648001E0B21 /* StackWithMin.cpp in Sources */,
 				D202B29925527F7500D9BFBC /* ReverseList_1.cpp in Sources */,
@@ -2340,12 +2497,14 @@
 				D21B43A324CE83160078EEF9 /* FindDuplication.cpp in Sources */,
 				D227132424D165A1009B180D /* ReverseList.cpp in Sources */,
 				8E919568254EEBA80039A12E /* StackWithTwoQueues_1.cpp in Sources */,
+				D202B325255B916900D9BFBC /* ContinousCards.cpp in Sources */,
 				D202B266254FA14A00D9BFBC /* Fibonacci_1.cpp in Sources */,
 				D202B28F25525FA500D9BFBC /* ReorderArray_1.cpp in Sources */,
 				D202B2FD255A738900D9BFBC /* KthNodeInBST.cpp in Sources */,
 				D2090C1524CFF75E00FA4F51 /* MinNumberInRotatedArray.cpp in Sources */,
 				D202B309255A879000D9BFBC /* NumberAppearingOnce.cpp in Sources */,
 				D227133024D17ADA009B180D /* SubstructureInTree.cpp in Sources */,
+				D202B335255BB21100D9BFBC /* AddTwoNumbers.cpp in Sources */,
 				D227131C24D14BEB009B180D /* KthNodeFromEnd.cpp in Sources */,
 				D202B2C72555077600D9BFBC /* MoreThanHalfNumber_1.cpp in Sources */,
 				D2090C0524CFA51E00FA4F51 /* NextNodeInBinaryTrees.cpp in Sources */,
@@ -2357,6 +2516,7 @@
 				D21B43A724CEA24B0078EEF9 /* FindDuplicationNoEdit.cpp in Sources */,
 				D202B2B42553F49400D9BFBC /* PrintMatrix_1.cpp in Sources */,
 				D202B2FA255A711500D9BFBC /* IntegerIdenticalToIndex.cpp in Sources */,
+				D202B33D255BB7C000D9BFBC /* StringToInt.cpp in Sources */,
 				D21B43AB24CEB54B0078EEF9 /* FindInPartiallySortedMatrix.cpp in Sources */,
 				D202B2B12553E67100D9BFBC /* PrintMatrix.cpp in Sources */,
 				8E2572D524D304690080F598 /* MoreThanHalfNumber.cpp in Sources */,
@@ -2372,18 +2532,23 @@
 				D202B303255A77BF00D9BFBC /* BalancedBinaryTree.cpp in Sources */,
 				D202B2B72553F5E400D9BFBC /* StackPushPopOrder_1.cpp in Sources */,
 				D239E77C24D3FBF000DA0BE5 /* SortArrayForMinNumber.cpp in Sources */,
+				D202B339255BB55800D9BFBC /* ConstuctArray.cpp in Sources */,
+				D202B320255B8E9A00D9BFBC /* DicesProbability.cpp in Sources */,
 				D202B25A254E882600D9BFBC /* ReplaceSpaces_1.cpp in Sources */,
 				D227132C24D16E6B009B180D /* List.cpp in Sources */,
 				D202B28225513CDF00D9BFBC /* DeleteNodeInList_1.cpp in Sources */,
+				D202B331255B9F9D00D9BFBC /* Accumulate.cpp in Sources */,
 				8EA593D924CDB969002785EF /* main.cpp in Sources */,
 				D202B2BE2554ECB300D9BFBC /* PathInTree_1.cpp in Sources */,
 				D227130C24D11360009B180D /* DeleteDuplicatedNode.cpp in Sources */,
 				D202B2C42554FCF300D9BFBC /* ConvertBinarySearchTree_1.cpp in Sources */,
 				D2090C0D24CFBCC600FA4F51 /* StackWithTwoQueues.cpp in Sources */,
+				D202B329255B962500D9BFBC /* LastNumberInCircle.cpp in Sources */,
 				D202B29C255280F800D9BFBC /* MergeSortedLists_1.cpp in Sources */,
 				D2EB012524D95A00009EAFD6 /* QuickSort.cpp in Sources */,
 				D202B2AA2553DD2A00D9BFBC /* SymmetricalBinaryTree_1.cpp in Sources */,
 				D202B2732550EB2F00D9BFBC /* CuttingRope.cpp in Sources */,
+				D202B318255B73C300D9BFBC /* MaxInSlidingWindow.cpp in Sources */,
 				8E2572D824D304DE0080F598 /* Array.cpp in Sources */,
 				D237C65724D29F3A001E0B21 /* PathInTree.cpp in Sources */,
 				D202B27F25512BE100D9BFBC /* Print1ToMaxOfNDigits_1.cpp in Sources */,
@@ -2405,6 +2570,7 @@
 				D237C64724D265B0001E0B21 /* PrintTreeFromTopToBottom.cpp in Sources */,
 				D227131024D11DB5009B180D /* RegularExpressions.cpp in Sources */,
 				8E91958025542D020039A12E /* PrintTreesInLines_1.cpp in Sources */,
+				D202B32D255B9B2C00D9BFBC /* MaximalProfit.cpp in Sources */,
 				D202B2F7255A6DD100D9BFBC /* MissingNumber.cpp in Sources */,
 				D202B30F255A95FF00D9BFBC /* ContinuousSquenceWithSum.cpp in Sources */,
 				D2EB011E24D955D6009EAFD6 /* SelectSort.cpp in Sources */,

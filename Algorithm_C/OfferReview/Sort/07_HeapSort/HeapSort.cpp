@@ -13,7 +13,7 @@ void HeapSort::heapSort(int nums[], int count) {
 }
 
 void HeapSort::maxHeapFixdown(int nums[], int i, int n) {
-    // 
+    //
 }
 
 // 测试代码

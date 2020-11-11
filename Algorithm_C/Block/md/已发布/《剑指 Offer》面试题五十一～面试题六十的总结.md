@@ -770,6 +770,169 @@ char* LeftRotateString::leftRotateString(char* pStr, int n) {
     return pStr;
 }
 ```
+## 59:(一)滑动窗口的最大值
+&emsp;题目：给定一个数组和滑动窗口的大小，请找出所有滑动窗口里的最大值。例如，如果输入数组 {2, 3, 4, 2, 6, 2, 5, 1} 及滑动窗口的大小 3，那么一共存在 6 个滑动窗口，它们的最大值分别为 {4, 4, 6, 6, 6, 5}。
+```c++
+namespace MaxInSlidingWindow {
+vector<int> maxInWindows(const vector<int>& num, unsigned int size);
+}
+
+vector<int> MaxInSlidingWindow::maxInWindows(const vector<int>& num, unsigned int size) {
+    // 滑动窗口
+    vector<int> maxInWindows;
+    
+    if (num.size() >= size && size >= 1) {
+        
+        // 两端开口的队列 index，用来记录 num 中可能作为最大值的各元素的下标
+        deque<int> index;
+        for (unsigned int i = 0; i < size; ++i) {
+            // num[i] 大于 num[index.back()] 表示前面的数字都不可能成为滑动窗口的最大值，把它们移除
+            while (!index.empty() && num[i] >= num[index.back()]) {
+                index.pop_back();
+            }
+            
+            // 入队
+            index.push_back(i);
+        }
+        
+        for (unsigned int i = size; i < num.size(); ++i) {
+            
+            // 滑动窗口的最大值每次都是位于 index.front() 头部
+            maxInWindows.push_back(num[index.front()]);
+            
+            // 去尾
+            while (!index.empty() && num[i] >= num[index.back()]) {
+                index.pop_back();
+            }
+            
+            // 去头
+            
+            // index.front() <= (int)(i - size)
+            // 表示队列头部的数字下标 和 i 的距离大于等于滑动窗口的大小，
+            // 该位置的数字已经滑出滑动窗口了，需要把它出队
+            if (!index.empty() && index.front() <= (int)(i - size)) {
+                index.pop_front();
+            }
+            
+            // 入队
+            index.push_back(i);
+        }
+        
+        maxInWindows.push_back(num[index.front()]);
+    }
+    
+    return maxInWindows;
+}
+```
+## 59:(二)队列的最大值
+&emsp;题目：给定一个数组和滑动窗口的大小，请找出所有滑动窗口里的最大值。例如，如果输入数组 {2, 3, 4, 2, 6, 2, 5, 1} 及滑动窗口的大小 3，那么一共存在 6 个滑动窗口，它们的最大值分别为 {4, 4, 6, 6, 6, 5}。
+```c++
+template<typename T>
+class QueueWithMax {
+public:
+    QueueWithMax() : currentIndex(0) { }
+    
+    void push_back(T number) {
+        // 如果新来的数据大于 maximums 尾部的数据，表示新的数据才会成为滑动窗口的最大值
+        while (!maximums.empty() && number >= maximums.back().number) {
+            maximums.pop_back();
+        }
+        
+        // 构建 InternalData 局部变量
+        InternalData internalData = { number, currentIndex };
+        
+        // 入队
+        data.push_back(internalData);
+        maximums.push_back(internalData);
+        
+        // 自增
+        ++currentIndex;
+    }
+    
+    void pop_front() {
+        if (maximums.empty()) {
+            throw new exception();
+        }
+        
+        // 出队
+        if (maximums.front().index == data.front().index) {
+            maximums.pop_front();
+        }
+        
+        // 出队
+        data.pop_front();
+    }
+    
+    T max() const {
+        if (maximums.empty()) {
+            throw new exception();
+        }
+        
+        // maximums 队列头部记录的是滑动窗口的最大值
+        return maximums.front().number;
+    }
+
+private:
+    // InternalData 用来记录数据和其下标
+    struct InternalData {
+        T number;
+        int index;
+    };
+    
+    // data 保存原始数据
+    deque<InternalData> data;
+    // maximums 保存滑动窗口最大值
+    deque<InternalData> maximums;
+    // currentIndex 记录当前是第几个数字
+    int currentIndex;
+};
+```
+## 面试题 60: n 个骰子的点数
+&emsp;题目：把 n 个骰子扔在地上，所有骰子朝上一面的点数之和为 s。输入 n，打印出 s 的所有可能的值出现的概率。
+```c++
+namespace DicesProbability {
+
+int g_maxValue = 6;
+
+void Probability(int number, int* pProbabilities);
+void Probability(int original, int current, int sum, int* pProbabilities);
+
+void PrintProbability_Solution1(int number) {
+    if(number < 1)
+        return;
+ 
+    int maxSum = number * g_maxValue;
+    int* pProbabilities = new int[maxSum - number + 1];
+    for(int i = number; i <= maxSum; ++i)
+        pProbabilities[i - number] = 0;
+ 
+    Probability(number, pProbabilities);
+ 
+    int total = pow((double)g_maxValue, number);
+    for(int i = number; i <= maxSum; ++i) {
+        double ratio = (double)pProbabilities[i - number] / total;
+        printf("%d: %e\n", i, ratio);
+    }
+ 
+    delete[] pProbabilities;
+}
+ 
+void Probability(int number, int* pProbabilities) {
+    for(int i = 1; i <= g_maxValue; ++i)
+        Probability(number, number, i, pProbabilities);
+}
+ 
+void Probability(int original, int current, int sum, int* pProbabilities) {
+    if(current == 1) {
+        pProbabilities[sum - original]++;
+    } else {
+        for(int i = 1; i <= g_maxValue; ++i) {
+            Probability(original, current - 1, i + sum, pProbabilities);
+        }
+    }
+}
+}
+```
 ## 完结撒花🎉🎉，感谢陪伴！
 
 ## 参考链接
