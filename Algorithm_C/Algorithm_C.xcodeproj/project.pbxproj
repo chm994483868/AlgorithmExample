@@ -381,7 +381,7 @@
 		D202B33F255BCB7100D9BFBC /* CommonParentInTree.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = CommonParentInTree.cpp; sourceTree = "<group>"; };
 		D202B340255BCB7100D9BFBC /* CommonParentInTree.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = CommonParentInTree.hpp; sourceTree = "<group>"; };
 		D202B342255BD48B00D9BFBC /* iOS 多线程知识体系构建(一)：基本概念篇.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 多线程知识体系构建(一)：基本概念篇.md"; sourceTree = "<group>"; };
-		D202B343255D367500D9BFBC /* iOS 多线程知识体系构建(二)：NSThread篇.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 多线程知识体系构建(二)：NSThread篇.md"; sourceTree = "<group>"; };
+		D202B343255D367500D9BFBC /* iOS 多线程知识体系构建(二)：pthread、NSThread篇.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 多线程知识体系构建(二)：pthread、NSThread篇.md"; sourceTree = "<group>"; };
 		D2090C0324CFA51E00FA4F51 /* NextNodeInBinaryTrees.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = NextNodeInBinaryTrees.cpp; sourceTree = "<group>"; };
 		D2090C0424CFA51E00FA4F51 /* NextNodeInBinaryTrees.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = NextNodeInBinaryTrees.hpp; sourceTree = "<group>"; };
 		D2090C0724CFAD4B00FA4F51 /* QueueWithTwoStacks.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = QueueWithTwoStacks.cpp; sourceTree = "<group>"; };
@@ -1380,7 +1380,7 @@
 				D2C74D06253ED8CC0051B89F /* iOS 开发中使用的各种锁的总结.md */,
 				D202B2962552798F00D9BFBC /* GCD.md */,
 				D202B342255BD48B00D9BFBC /* iOS 多线程知识体系构建(一)：基本概念篇.md */,
-				D202B343255D367500D9BFBC /* iOS 多线程知识体系构建(二)：NSThread篇.md */,
+				D202B343255D367500D9BFBC /* iOS 多线程知识体系构建(二)：pthread、NSThread篇.md */,
 			);
 			path = "已发布";
 			sourceTree = "<group>";
