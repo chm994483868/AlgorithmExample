@@ -112,7 +112,7 @@ objc: 0x6000039da810
 
 > &emsp;在混合开发时，如果在 C 和 OC 之间传递数据，需要使用 __bridge 进行桥接，桥接的目的就是为了告诉编译器如何管理内存，MRC 中不需要使用桥接；在 OC 中，如果是 ARC 开发，编译器会在编译时，根据代码结构，自动添加 retain/release/autorelease。但是，ARC 只负责管理 OC 部分的内存管理，而不负责 C 语言 代码的内存管理。因此，开发过程中，如果使用的 C 语言框架出现 retain/create/copy/new 等字样的函数，大多都需要 release，否则会出现内存泄漏，如上面的 CFBridgingRetain 和 CFBridgingRelease 配对使用。[iOS多线程中的实际方案之一pthread](https://www.jianshu.com/p/cfc6e7d2316a)
 
-### pthread_t
+### pthread_t 定义
 &emsp;`pthread_t` 是一个指向线程的指针，在 iOS 它是: `__darwin_pthread_t`。下面看一下源码定义:
 ```c++
 typedef __darwin_pthread_t pthread_t;
@@ -132,9 +132,10 @@ struct __darwin_pthread_handler_rec {
 };
 ```
 &emsp;通过上面的代码一层一层递进：`pthread_t` 其实是 `_opaque_pthread_t` 结构体指针。
-### pthread_create
+### pthread_create 线程创建
 &emsp;`pthread_create` 是类 Unix 操作系统（Unix、Linux、Mac OS X等）的创建线程的函数。它的功能是创建线程（实际上就是确定调用该线程函数的入口点），在线程创建以后，就开始运行相关的线程函数。
 `pthread_create` 的返回值: 若成功，返回 0；若出错，返回出错编号，并且 `pthread_t * __restrict` 中的内容未定义。下面看一下它的函数声明：
+
 ```c++
 __API_AVAILABLE(macos(10.4), ios(2.0))
 #if !_PTHREAD_SWIFT_IMPORTER_NULLABILITY_COMPAT
@@ -186,6 +187,32 @@ int pthread_detach(pthread_t);
 &emsp;线程分离是将线程资源的回收工作交由系统自动来完成，也就是说当被分离的线程结束之后，系统会自动回收它的资源。因为线程分离是启动系统的自动回收机制，那么程序也就无法获得被分离线程的返回值，这就使得 `pthread_detach` 接口只要拥有一个参数就行了，那就是被分离线程句柄。
 
 &emsp;**线程合并和线程分离都是用于回收线程资源的，可以根据不同的业务场景酌情使用。不管有什么理由，你都必须选择其中一种，否则就会引发资源泄漏的问题，这个问题与内存泄漏同样可怕。**
+
+### pthread_attr_t 线程属性
+&emsp;前面调用 `pthread_create` 函数创建线程时，第二个参数是设置线程的属性我们直接传了 `NULL`。当需要设置线程属性时我们可以传入一个 `pthread_attr_t` 指针，`pthread_attr_t` 实际是 `_opaque_pthread_attr_t` 结构体。
+&emsp;我们可以使用 `pthread_attr_init` 接口初始化线程属性，使用 `pthread_attr_destroy` 接口来销毁线程属性。首先我们看一下 `pthread_attr_t` 定义。
+```c++
+typedef __darwin_pthread_attr_t pthread_attr_t;
+
+typedef struct _opaque_pthread_attr_t __darwin_pthread_attr_t;
+
+struct _opaque_pthread_attr_t {
+    long __sig;
+    char __opaque[__PTHREAD_ATTR_SIZE__];
+};
+```
+&emsp;`pthread_attr_init` 函数声明:
+```c++
+__API_AVAILABLE(macos(10.4), ios(2.0))
+int pthread_attr_init(pthread_attr_t *);
+```
+&emsp;`pthread_attr_destroy` 函数声明:
+```c++
+__API_AVAILABLE(macos(10.4), ios(2.0))
+int pthread_attr_destroy(pthread_attr_t *);
+```
+#### 绑定属性
+&emsp;
 
 
 ## 参考链接
