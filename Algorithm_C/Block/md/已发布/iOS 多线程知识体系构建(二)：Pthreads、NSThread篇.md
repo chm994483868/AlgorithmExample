@@ -189,7 +189,7 @@ int pthread_detach(pthread_t);
 &emsp;**线程合并和线程分离都是用于回收线程资源的，可以根据不同的业务场景酌情使用。不管有什么理由，你都必须选择其中一种，否则就会引发资源泄漏的问题，这个问题与内存泄漏同样可怕。**
 
 ### pthread_attr_t 线程属性
-&emsp;前面调用 `pthread_create` 函数创建线程时，第二个参数是设置线程的属性我们直接传了 `NULL`。当需要设置线程属性时我们可以传入一个 `pthread_attr_t` 指针，`pthread_attr_t` 实际是 `_opaque_pthread_attr_t` 结构体。
+&emsp;前面调用 `pthread_create` 函数创建线程时，第二个参数是设置线程的属性我们直接传了 `NULL`。当需要设置线程属性时我们可以传入一个 `pthread_attr_t` 指针（`pthread_attr_t` 实际是 `_opaque_pthread_attr_t` 结构体的别名）。
 &emsp;我们可以使用 `pthread_attr_init` 接口初始化线程属性，使用 `pthread_attr_destroy` 接口来销毁线程属性。首先我们看一下 `pthread_attr_t` 定义。
 ```c++
 typedef __darwin_pthread_attr_t pthread_attr_t;
