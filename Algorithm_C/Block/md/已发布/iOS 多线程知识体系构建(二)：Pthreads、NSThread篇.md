@@ -190,7 +190,10 @@ int pthread_detach(pthread_t);
 
 ### pthread_attr_t 线程属性
 &emsp;前面调用 `pthread_create` 函数创建线程时，第二个参数是设置线程的属性我们直接传了 `NULL`。当需要设置线程属性时我们可以传入一个 `pthread_attr_t` 指针（`pthread_attr_t` 实际是 `_opaque_pthread_attr_t` 结构体的别名）。
-&emsp;我们可以使用 `pthread_attr_init` 接口初始化线程属性，使用 `pthread_attr_destroy` 接口来销毁线程属性。首先我们看一下 `pthread_attr_t` 定义。
+
+&emsp;为了给线程设置不同的属性，POSIX 定义了一系列属性设置函数，我们可以使用 `pthread_attr_init` 接口初始化线程属性结构体，使用 `pthread_attr_destroy` 接口来销毁线程属性结构体，以及与各个属性相关的 `pthread_attr_get XXX` / `pthread_attr_set XXX` 函数。
+
+&emsp;首先我们看一下 `pthread_attr_t` 定义。
 ```c++
 typedef __darwin_pthread_attr_t pthread_attr_t;
 
@@ -211,8 +214,87 @@ int pthread_attr_init(pthread_attr_t *);
 __API_AVAILABLE(macos(10.4), ios(2.0))
 int pthread_attr_destroy(pthread_attr_t *);
 ```
-#### 绑定属性
-&emsp;
+&emsp;在设置线程属性  `pthread_attr_t` 之前，通常先调用 `pthread_attr_init` 来初始化，之后来调用相应的属性设置函数，在看具体的属性设置函数之前，我们先看一下线程都有哪些属性。
+
+&emsp;那么线程都有哪些属性呢？在 pthread.h 文件的函数列表中，我们可看到在 apple 平台（iOS/macOS）下苹果遵循 POSIX 线程标准实现了线程的如下属性:
++ 分离属性
++ 绑定属性（scope 属性）
++ 满栈警戒区属性
++ 堆栈大小属性
++ 堆栈地址
++ 调度属性（优先级）
+&emsp;下面来分别详细介绍这些属性。
+#### 分离属性
+&emsp;首先在 pthread.h 文件中能看到两个与分离属性相关的设置和读取接口: `pthread_attr_setdetachstate`、`pthread_attr_getdetachstate`。
+```c++
+__API_AVAILABLE(macos(10.4), ios(2.0))
+int pthread_attr_setdetachstate(pthread_attr_t *, int);
+
+__API_AVAILABLE(macos(10.4), ios(2.0))
+int pthread_attr_getdetachstate(const pthread_attr_t *, int *);
+```
+&emsp;前面说过线程能够被合并和分离，分离属性就是让线程在创建之前就决定它应该是分离的。如果设置了这个属性，就没有必要调用 `pthread_join` 或 `pthread_detach` 来回收线程资源了。`pthread_attr_setdetachstate` 函数的第二个参数有两个取值，`PTHREAD_CREATE_DETACHED`（分离的）和 `PTHREAD_CREATE_JOINABLE`（可合并，也是默认属性），它们是两个宏定义，定义在 pthread.h 文件顶部:
+```c++
+#define PTHREAD_CREATE_JOINABLE      1
+#define PTHREAD_CREATE_DETACHED      2
+```
+&emsp;分离属性设置示例如下:
+```c++
+...
+pthread_attr_t attr;
+pthread_attr_init(&attr);
+pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+
+int result = pthread_create(&thread, &attr, run, (__bridge void *)(objc));
+...
+```
+#### 绑定属性（scope 属性）
+&emsp;在 pthread.h 文件中与绑定属性（scope 属性）相关的 API 和宏定义如下:
+```c++
+__API_AVAILABLE(macos(10.4), ios(2.0))
+int pthread_attr_setscope(pthread_attr_t *, int); // 设置
+
+__API_AVAILABLE(macos(10.4), ios(2.0))
+int pthread_attr_getscope(const pthread_attr_t * __restrict, int * __restrict); // 读取
+
+/* We only support PTHREAD_SCOPE_SYSTEM */ // 在 iOS/macOS 下都不支持 PTHREAD_SCOPE_PROCESS
+#define PTHREAD_SCOPE_SYSTEM         1 // 绑定
+#define PTHREAD_SCOPE_PROCESS        2 // 非绑定
+```
+
+&emsp;由于目前该属性的理解有限，这边就先把 Linux 大佬的原文摘录贴出了。
+> &emsp;说到这个绑定属性，就不得不提起另外一个概念：轻进程（ Light Weight Process，简称 LWP）。轻进程和 Linux 系统的内核线程拥有相同的概念，属于内核的调度实体。一个轻进程可以控制一个或多个线程。默认情况下，对于一个拥有n个线程的程序，启动多少轻进程，由哪些轻进程来控制哪些线程由操作系统来控制，这种状态被称为非绑定的。那么绑定的含义就很好理解了，只要指定了某个线程“绑”在某个轻进程上，就可以称之为绑定的了。被绑定的线程具有较高的相应速度，因为操作系统的调度主体是轻进程，绑定线程可以保证在需要的时候它总有一个轻进程可用。绑定属性就是干这个用的。
+设置绑定属性的接口是 pthread_attr_setscope()，它的完整定义是：int pthread_attr_setscope(pthread_attr_t *attr, int scope);
+它有两个参数，第一个就是线程属性对象的指针，第二个就是绑定类型，拥有两个取值：PTHREAD_SCOPE_SYSTEM（绑定的）和 PTHREAD_SCOPE_PROCESS（非绑定的）。
+>  &emsp;不知道你是否在这里发现了本文的矛盾之处。就是这个绑定属性跟我们之前说的 NPTL 有矛盾之处。在介绍 NPTL 的时候就说过业界有一种 m:n 的线程方案，就跟这个绑定属性有关。但是笔者还说过 NPTL 因为 Linux 的“蠢”没有采取这种方案，而是采用了“1:1” 的方案。这也就是说，Linux 的线程永远都是绑定。对，Linux 的线程永远都是绑定的，所以 PTHREAD_SCOPE_PROCESS 在 Linux 中不管用，而且会返回 ENOTSUP 错误。
+既然 Linux 并不支持线程的非绑定，为什么还要提供这个接口呢？答案就是兼容！因为 Linux 的 NTPL 是号称 POSIX 标准兼容的，而绑定属性正是 POSIX 标准所要求的，所以提供了这个接口。如果读者们只是在 Linux 下编写多线程程序，可以完全忽略这个属性。如果哪天你遇到了支持这种特性的系统，别忘了我曾经跟你说起过这玩意儿：）[在Linux中使用线程](https://blog.csdn.net/jiajun2001/article/details/12624923)
+
+> &emsp;设置线程 __scope 属性。scope 属性表示线程间竞争 CPU 的范围，也就是说线程优先级的有效范围。POSIX 的标准中定义了两个值： PTHREAD_SCOPE_SYSTEM 和 PTHREAD_SCOPE_PROCESS ，前者表示与系统中所有线程一起竞争 CPU 时间，后者表示仅与同进程中的线程竞争 CPU。默认为 PTHREAD_SCOPE_PROCESS。 目前 Linux Threads 仅实现了 PTHREAD_SCOPE_SYSTEM 一值。[线程属性pthread_attr_t简介](https://blog.csdn.net/hudashi/article/details/7709413)
+#### 堆栈大小属性
+&emsp;在 pthread.h 文件中与堆栈大小属性相关的 API 如下:
+```c++
+__API_AVAILABLE(macos(10.4), ios(2.0))
+int pthread_attr_setstacksize(pthread_attr_t *, size_t);
+
+__API_AVAILABLE(macos(10.4), ios(2.0))
+int pthread_attr_getstacksize(const pthread_attr_t * __restrict, size_t * __restrict);
+```
+&emsp;从前面的这些例子中可以了解到，子线程的主函数与主线程的 `viewDidLoad` 函数有一个很相似的特性，那就是可以拥有局部变量。虽然同一个进程的线程之间是共享内存空间的，但是它的局部变量确并不共享。原因就是局部变量存储在堆栈中，而不同的线程拥有不同的堆栈。Linux 系统为每个线程默认分配了 8 MB 的堆栈空间，如果觉得这个空间不够用，可以通过修改线程的堆栈大小属性进行扩容。修改线程堆栈大小属性的接口是 `pthread_attr_setstacksize`，它的第二个参数就是堆栈大小了，以字节为单位。需要注意的是，线程堆栈不能小于 16 KB，而且尽量按 4 KB（32 位系统）或 2 MB（64 位系统）的整数倍分配，也就是内存页面大小的整数倍。此外，修改线程堆栈大小是有风险的，如果你不清楚你在做什么，最好别动它。
+#### 满栈警戒区属性
+&emsp;在 pthread.h 文件中与满栈警戒区属性相关的 API 如下:
+```c++
+__API_AVAILABLE(macos(10.4), ios(2.0))
+int pthread_attr_setguardsize(pthread_attr_t *, size_t);
+
+__API_AVAILABLE(macos(10.4), ios(2.0))
+int pthread_attr_getguardsize(const pthread_attr_t * __restrict, size_t * __restrict);
+```
+&emsp;既然线程是有堆栈的，而且还有大小限制，那么就一定会出现将堆栈用满的情况。线程的堆栈用满是非常危险的事情，因为这可能会导致对内核空间的破坏，一旦被有心人士所利用，后果也不堪设想。为了防治这类事情的发生，Linux 为线程堆栈设置了一个满栈警戒区。这个区域一般就是一个页面，属于线程堆栈的一个扩展区域。一旦有代码访问了这个区域，就会发出 SIGSEGV 信号进行通知。
+
+&emsp;虽然满栈警戒区可以起到安全作用，但是也有弊病，就是会白白浪费掉内存空间，对于内存紧张的系统会使系统变得很慢。所有就有了关闭这个警戒区的需求。同时，如果我们修改了线程堆栈的大小，那么系统会认为我们会自己管理堆栈，也会将警戒区取消掉，如果有需要就要开启它。
+修改满栈警戒区属性的接口是 `pthread_attr_setguardsize`，它的第二个参数就是警戒区大小了，以字节为单位。与设置线程堆栈大小属性相仿，应该尽量按照 4KB 或 2MB 的整数倍来分配。当设置警戒区大小为 0 时，就关闭了这个警戒区。虽然栈满警戒区需要浪费掉一点内存，但是能够极大的提高安全性，所以这点损失是值得的。而且一旦修改了线程堆栈的大小，一定要记得同时设置这个警戒区。
+#### 
+
 
 
 ## 参考链接
@@ -220,6 +302,7 @@ int pthread_attr_destroy(pthread_attr_t *);
 + [pthread-百度百科词条](https://baike.baidu.com/item/POSIX线程?fromtitle=Pthread&fromid=4623312)
 + [pthread_create-百度百科词条](https://baike.baidu.com/item/pthread_create/5139072?fr=aladdin)
 + [在Linux中使用线程](https://blog.csdn.net/jiajun2001/article/details/12624923)
++ [线程属性pthread_attr_t简介](https://blog.csdn.net/hudashi/article/details/7709413)
 + [iOS多线程：『pthread、NSThread』详尽总结](https://juejin.im/post/6844903556009443335)
 + [iOS 多线程系列 -- pthread](https://www.jianshu.com/p/291598217865)
 + [iOS底层原理总结 - pthreads](https://www.jianshu.com/p/4434f18c5a95)
