@@ -1,6 +1,6 @@
 # iOS 多线程知识体系构建(二)：Pthreads、NSThread篇
 
-> &emsp;本篇首先来学习 iOS 多线程技术中的 NSThread。⛽️⛽️
+> &emsp;本篇首先来学习 iOS 多线程技术中的 Pthreads 技术。⛽️⛽️
 
 ## Pthreads
 
@@ -222,7 +222,7 @@ int pthread_attr_destroy(pthread_attr_t *);
 + 满栈警戒区属性
 + 堆栈大小属性
 + 堆栈地址
-+ 调度属性（优先级）
++ 调度属性（包括算法、调度优先级、继承权）
 &emsp;下面来分别详细介绍这些属性。
 #### 分离属性
 &emsp;首先在 pthread.h 文件中能看到两个与分离属性相关的设置和读取接口: `pthread_attr_setdetachstate`、`pthread_attr_getdetachstate`。
@@ -293,14 +293,177 @@ int pthread_attr_getguardsize(const pthread_attr_t * __restrict, size_t * __rest
 
 &emsp;虽然满栈警戒区可以起到安全作用，但是也有弊病，就是会白白浪费掉内存空间，对于内存紧张的系统会使系统变得很慢。所有就有了关闭这个警戒区的需求。同时，如果我们修改了线程堆栈的大小，那么系统会认为我们会自己管理堆栈，也会将警戒区取消掉，如果有需要就要开启它。
 修改满栈警戒区属性的接口是 `pthread_attr_setguardsize`，它的第二个参数就是警戒区大小了，以字节为单位。与设置线程堆栈大小属性相仿，应该尽量按照 4KB 或 2MB 的整数倍来分配。当设置警戒区大小为 0 时，就关闭了这个警戒区。虽然栈满警戒区需要浪费掉一点内存，但是能够极大的提高安全性，所以这点损失是值得的。而且一旦修改了线程堆栈的大小，一定要记得同时设置这个警戒区。
-#### 
+#### 调度属性（包括算法、调度优先级、继承权）
+&emsp;在 pthread.h/pthread_impl.h 文件中与调度属性（包括算法、调度优先级、继承权）相关的 API 和宏定义 如下:
+```c++
+__API_AVAILABLE(macos(10.4), ios(2.0))
+int pthread_attr_setschedpolicy(pthread_attr_t *, int); // 设置调度算法（策略）
 
+__API_AVAILABLE(macos(10.4), ios(2.0))
+int pthread_attr_getschedpolicy(const pthread_attr_t * __restrict, int * __restrict); // 读取调度算法（策略）
 
+// 三种策略
+#define SCHED_OTHER                1 // 其它
+#define SCHED_FIFO                 4 // 先进先出
+#define SCHED_RR                   2 // 轮询
+
+```
+
+```c++
+#ifndef __POSIX_LIB__
+struct sched_param { int sched_priority;  char __opaque[__SCHED_PARAM_SIZE__]; };
+#endif
+
+__API_AVAILABLE(macos(10.4), ios(2.0))
+int pthread_attr_setschedparam(pthread_attr_t * __restrict,
+        const struct sched_param * __restrict); // 设置线程优先级
+
+__API_AVAILABLE(macos(10.4), ios(2.0))
+int pthread_attr_getschedparam(const pthread_attr_t * __restrict,
+        struct sched_param * __restrict); // 读取线程优先级
+```
+
+```c++
+__API_AVAILABLE(macos(10.4), ios(2.0))
+int pthread_attr_setinheritsched(pthread_attr_t *, int); // 设置继承权
+
+__API_AVAILABLE(macos(10.4), ios(2.0))
+int pthread_attr_getinheritsched(const pthread_attr_t * __restrict, int * __restrict); // 读取继承权
+
+#define PTHREAD_INHERIT_SCHED        1 // 拥有继承权
+#define PTHREAD_EXPLICIT_SCHED       2 // 放弃继承权
+```
+&emsp;线程的调度属性有三个，分别是：算法、优先级和继承权。
+
+&emsp;Linux 提供的线程调度算法有三个：轮询、先进先出和其它。其中轮询和先进先出调度算法是 POSIX 标准所规定，而其他则代表采用 Linux 自己认为更合适的调度算法，所以默认的调度算法也就是其它了。轮询和先进先出调度算法都属于实时调度算法。轮询指的是时间片轮转，当线程的时间片用完，系统将重新分配时间片，并将它放置在**就绪队列尾部**，这样可以保证具有相同优先级的轮询任务获得公平的 CPU 占用时间；先进先出就是先到先服务，一旦线程占用了 CPU 则一直运行，直到有更高优先级的线程出现或自己放弃。
+
+&emsp;设置线程调度算法的接口是 `pthread_attr_setschedpolicy`，它的第二个参数有三个取值：`SCHED_RR`（轮询）、`SCHED_FIFO`（先进先出）和 `SCHED_OTHER`（其它）。
+Linux 的**线程优先级**与**进程的优先级**不一样，进程优先级前面一篇有解读。Linux 的线程优先级是从 1 到 99 的数值，数值越大代表优先级越高。而且要注意的是，只有采用 `SHCED_RR` 或 `SCHED_FIFO` 调度算法时，优先级才有效。对于采用 `SCHED_OTHER` 调度算法的线程，其优先级恒为 `0`。
+
+&emsp;设置线程优先级的接口是 `pthread_attr_setschedparam`，`sched_param` 结构体的 `sched_priority` 字段就是线程的优先级了。
+
+&emsp;此外，即便采用 `SCHED_RR` 或 `SCHED_FIFO` 调度算法，线程优先级也不是随便就能设置的。首先，进程必须是以 `root` 账号运行的；其次，还需要放弃线程的继承权。什么是继承权呢？就是当创建新的线程时，新线程要继承父线程（创建者线程）的调度属性。如果不希望新线程继承父线程的调度属性，就要放弃继承权。
+
+&emsp;设置线程继承权的接口是 `pthread_attr_setinheritsched`，它的第二个参数有两个取值：`PTHREAD_INHERIT_SCHED`（拥有继承权）和 `PTHREAD_EXPLICIT_SCHED`（放弃继承权），新线程在默认情况下是拥有继承权。
+
+&emsp;好了，线程属性先介绍到这里，由于没有找到 iOS/macOS 的材料，这里借用了 Linux 下 POSIX 线程标准，尽管平台不同，但是基本理解和处理方式都是相同的，所以并不妨碍我们对线程属性进行理解和学习。下面我们继续学习 pthread.h 文件中的其它接口。
+### pthread_kill 向指定线程发送一个信号
+&emsp;`pthread_kill` 用于向指定的 thread 发送信号。在创建的线程中使用 signal(SIGKILL, sig_handler) 处理信号，如果给一个线程发送了 SIGQUIT，但线程却没有实现 signal 处理函数，则整个进程退出。函数声明如下:
+```c++
+__API_AVAILABLE(macos(10.4), ios(2.0))
+int pthread_kill(pthread_t, int);
+```
+&emsp;参数一是指定的要向它发送信号的线程，参数二表示传递的 signal 参数,一般都是大于 0 的，这时系统默认或者自定义的都是有相应的处理程序。常用信号量宏可以在 #import <signal.h> 查看，signal 为 0 时，是一个被保留的信号，一般用这个保留的信号测试线程是否存在。
+
+&emsp;`pthread_kill` 函数返回值：
++ 0: 调用成功
++ ESRCH: 线程不存在
++ EINVAL: 信号不合法
++ 测试线程是否存在/终止的方法
+
+&emsp;如果线程内不对信号进行处理，则调用默认的处理程式，如 SIGQUIT 信号会退出终止线程，SIGKILL会杀死线程等等。可以调用 `signal(SIGQUIT, sig_process_routine)` 来自定义信号的处理程序。
+### pthread_cancel 中断指定线程的运行
+&emsp;`pthread_cancel` 发送终止信号给指定的 thread 线程，如果成功则返回 0，否则为非 0 值，发送成功并不意味着 thread 会终止。函数声明如下:
+```c++
+__API_AVAILABLE(macos(10.4), ios(2.0))
+int pthread_cancel(pthread_t) __DARWIN_ALIAS(pthread_cancel);
+```
+&emsp;若是在整个程序退出时，要终止各个线程，应该在成功发送 CANCEL 指令后，使用 pthread_join 函数，等待指定的线程已经完全退出以后，再继续执行，否则，很容易产生 “段错误”。
+### pthread_setcancelstate 设置本线程对 Cancel 信号的反应
+```c++
+#define PTHREAD_CANCEL_ENABLE        0x01  /* Cancel takes place at next cancellation point // Cancel 发生在下一个取消点 */ 
+#define PTHREAD_CANCEL_DISABLE       0x00  /* Cancel postponed // Cancel 推迟 */
+
+__API_AVAILABLE(macos(10.4), ios(2.0))
+int pthread_setcancelstate(int state, int * _Nullable oldstate)
+        __DARWIN_ALIAS(pthread_setcancelstate);
+```
+&emsp;设置本线程对 Cancel 信号的反应，state 有两种值：`PTHREAD_CANCEL_ENABLE` 和 `PTHREAD_CANCEL_DISABLE`，分别表示收到信号后设为 CANCLED 状态和忽略 CANCEL 信号继续运行；old_state 如果不为 NULL 则存入原来的 Cancel 状态以便恢复。
+
+&emsp;`PTHREAD_CANCEL_ENABLE`：表示可以接收处理取消信号，设置线程状态为 CANCEl，并终止任务执行。
+&emsp;`PTHREAD_CANCEL_DISABLE`：忽略取消信号，继续执行任务。
+
+### pthread_setcanceltype 设置本线程取消动作的执行时机
+```c++
+#define PTHREAD_CANCEL_DEFERRED      0x02  /* Cancel waits until cancellation point // Cancel 等待直到取消点 */
+#define PTHREAD_CANCEL_ASYNCHRONOUS  0x00  /* Cancel occurs immediately // Cancel 立即发生*/
+
+__API_AVAILABLE(macos(10.4), ios(2.0))
+int pthread_setcanceltype(int type, int * _Nullable oldtype)
+        __DARWIN_ALIAS(pthread_setcanceltype);
+```
+&emsp;设置本线程取消动作的执行时机，type 有两种取值：`PTHREAD_CANCEL_DEFERRED` 和 `PTHREAD_CANCEL_ASYNCHRONOUS`，仅当 Cancel 状态为 Enable 时有效，分别表示收到信号后继续运行至下一个取消点再退出 （推荐做法，因为在终止线程之前必须要处理好内存回收防止内存泄漏，而手动设置取消点这种方式就可以让我们很自由的处理内存回收时机）和立即执行取消动作（退出）（不推荐这样操作,可能造成内存泄漏等问题）；oldtype 如果不为 NULL 则存入原来的取消动作类型值。
+
+&emsp;此函数应该在线程开始时执行，若线程内部有任何资源申请等操作，应该选择 `PTHREAD_CANCEL_DEFERRED` 的设定，然后在退出点（`pthread_testcancel` 用于定义退出点）进行线程退出。
+### pthread_testcancel 
+```c++
+__API_AVAILABLE(macos(10.4), ios(2.0))
+void pthread_testcancel(void) __DARWIN_ALIAS(pthread_testcancel);
+```
+&emsp;检查本线程是否处于 Canceld 状态，如果是，则进行取消动作，否则直接返回。 此函数在线程内执行，执行的位置就是线程退出的位置，在执行此函数以前，线程内部的相关资源申请一定要释放掉，否则很容易造成内存泄露。
+
+&emsp;线程取消的方法是向目标线程发 Cancel 信号，但如何处理 Cancel 信号则由目标线程自己决定，或者忽略、或者立即终止、或者继续运行至 Cancelation-point（取消点），由不同的 Cancelation 状态决定。
+
+&emsp;线程接收到 CANCEL 信号的缺省处理（即 `pthread_create` 创建线程的缺省状态）是继续运行至取消点，也就是说设置一个 CANCELED 状态，线程继续运行，只有运行至 Cancelation-point 的时候才会退出。
+
+### pthread_self 获取当前线程本身
+```c++
+__API_AVAILABLE(macos(10.4), ios(2.0))
+pthread_t pthread_self(void);
+```
+&emsp;在线程内部获取当前线程本身。如 `[NSThread currentThread]`。
+### pthread_equal 比较两个线程是否相等
+```c++
+__API_AVAILABLE(macos(10.4), ios(2.0))
+int pthread_equal(pthread_t _Nullable, pthread_t _Nullable);
+```
+&emsp;对两个线程进行对比。
+### pthread_exit 终止当前进程
+```c++
+__API_AVAILABLE(macos(10.4), ios(2.0))
+void pthread_exit(void * _Nullable) __dead2;
+```
+&emsp;线程通过调用 `pthread_exit` 函数终止执行，就如同进程在结束时调用 `exit` 函数一样。这个函数的作用是，终止调用它的线程并返回一个指向某个对象的指针。
+
+### 线程本地存储
+&emsp;在学习自动释放池对函数返回值优化、空自动释放占位等等知识点时，我们遇到过线程本地存储的概念（Thread Local Storage）。
+
+&emsp;同一进程内线程之间可以共享内存地址空间，线程之间的数据交换可以非常快捷，这是线程最显著的优点。但是多个线程访问共享数据，需要昂贵的同步开销（加锁），也容易造成与同步相关的 BUG，更麻烦的是有些数据根本就不希望被共享，这又是缺点。
+&emsp;C 程序库中的 errno 是个最典型的一个例子。errno 是一个全局变量，会保存最后一个系统调用的错误代码。在单线程环境并不会出现什么问题。但是在多线程环境，由于所有线程都会有可能修改 errno，这就很难确定 errno 代表的到底是哪个系统调用的错误代码了。这就是有名的 “非线程安全（Non Thread-Safe）” 的。
+&emsp;此外，从现代技术角度看，在很多时候使用多线程的目的并不是为了对共享数据进行并行处理。更多是由于多核心 CPU 技术的引入，为了充分利用 CPU 资源而进行并行运算（不互相干扰）。换句话说，大多数情况下每个线程只会关心自己的数据而不需要与别人同步。
+
+&emsp;为了解决这些问题，可以有很多种方案。比如使用不同名称的全局变量。但是像 errno 这种名称已经固定了的全局变量就没办法了。在前面的内容中提到在线程堆栈中分配局部变量是不在线程间共享的。但是它有一个弊病，就是线程内部的其它函数很难访问到。目前解决这个问题的简便易行的方案是线程本地存储，即 Thread Local Storage，简称 TLS。利用 TLS，errno 所反映的就是本线程内最后一个系统调用的错误代码了，也就是线程安全的了。
+Linux （iOS/macOS）提供了对 TLS 的完整支持，通过下面这些接口来实现：
+```c++
+typedef __darwin_pthread_key_t pthread_key_t;
+typedef unsigned long __darwin_pthread_key_t;
+
+__API_AVAILABLE(macos(10.4), ios(2.0))
+int pthread_key_create(pthread_key_t *, void (* _Nullable)(void *));
+
+__API_AVAILABLE(macos(10.4), ios(2.0))
+int pthread_key_delete(pthread_key_t);
+
+__API_AVAILABLE(macos(10.4), ios(2.0))
+int pthread_setspecific(pthread_key_t , const void * _Nullable);
+
+__API_AVAILABLE(macos(10.4), ios(2.0))
+void* _Nullable pthread_getspecific(pthread_key_t);
+```
+&emsp;`pthread_key_create` 接口用于创建一个线程本地存储区。第一个参数用来返回这个存储区的句柄，需要使用一个全局变量保存，以便所有线程都能访问到。第二个参数是线程本地数据的回收函数指针，如果希望自己控制线程本地数据的生命周期，这个参数可以传递 NULL。
+
+&emsp;`pthread_key_delete` 接口用于回收线程本地存储区。其唯一的参数就要回收的存储区的句柄。
+
+&emsp;`pthread_getspecific` 和 `pthread_setspecific` 这两个接口分别用于获取和设置线程本地存储区的数据。这两个接口在不同的线程下会有不同的结果不同（相同的线程下就会有相同的结果），这也就是线程本地存储的关键所在。
+
+## NSThread
+&emsp;
 
 ## 参考链接
 **参考链接:🔗**
 + [pthread-百度百科词条](https://baike.baidu.com/item/POSIX线程?fromtitle=Pthread&fromid=4623312)
 + [pthread_create-百度百科词条](https://baike.baidu.com/item/pthread_create/5139072?fr=aladdin)
++ [pthread_cancel-百度百科词条](https://baike.baidu.com/item/pthread_cancel)
 + [在Linux中使用线程](https://blog.csdn.net/jiajun2001/article/details/12624923)
 + [线程属性pthread_attr_t简介](https://blog.csdn.net/hudashi/article/details/7709413)
 + [iOS多线程：『pthread、NSThread』详尽总结](https://juejin.im/post/6844903556009443335)
@@ -308,4 +471,3 @@ int pthread_attr_getguardsize(const pthread_attr_t * __restrict, size_t * __rest
 + [iOS底层原理总结 - pthreads](https://www.jianshu.com/p/4434f18c5a95)
 + [C语言多线程pthread库相关函数说明](https://www.cnblogs.com/mq0036/p/3710475.html)
 + [iOS多线程中的实际方案之一pthread](https://www.jianshu.com/p/cfc6e7d2316a)
-
