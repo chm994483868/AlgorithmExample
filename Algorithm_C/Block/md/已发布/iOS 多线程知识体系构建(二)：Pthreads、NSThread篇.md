@@ -151,6 +151,7 @@ int pthread_create(pthread_t * __restrict,
 #endif // _PTHREAD_SWIFT_IMPORTER_NULLABILITY_COMPAT
 ```
 &emsp;当线程创建成功时，由 `pthread_t * __restrict` 指向的内存单元被设置为新创建的线程的内容，`const pthread_attr_t * __restrict` 用于指定线程属性。新创建的线程从 `void * (* _Nonnull)(void *)` 函数地址开始运行，该函数指针指向的正是线程开启后的回调函数的起始地址，最后面的 `void * _Nullable __restrict` 则是作为它的参数，如果需要的参数不止一个，那么可以传递对象来包含不同的属性值进行传递。这种设计可以在线程创建之前就帮它准备好一些专有数据，最典型的用法就是使用 C++ 编程时的 this 指针。
+
 &emsp;四个参数可精简总结如下:
 1. 第一个参数为指向线程的指针。当一个新的线程创建成功之后，就会通过这个参数将线程的句柄返回给调用者，以便对这个线程进行管理。
 2. 第二个参数用来设置线程属性，可传递 `NULL`。
@@ -381,8 +382,8 @@ int pthread_setcancelstate(int state, int * _Nullable oldstate)
 &emsp;设置本线程对 Cancel 信号的反应，state 有两种值：`PTHREAD_CANCEL_ENABLE` 和 `PTHREAD_CANCEL_DISABLE`，分别表示收到信号后设为 CANCLED 状态和忽略 CANCEL 信号继续运行；old_state 如果不为 NULL 则存入原来的 Cancel 状态以便恢复。
 
 &emsp;`PTHREAD_CANCEL_ENABLE`：表示可以接收处理取消信号，设置线程状态为 CANCEl，并终止任务执行。
-&emsp;`PTHREAD_CANCEL_DISABLE`：忽略取消信号，继续执行任务。
 
+&emsp;`PTHREAD_CANCEL_DISABLE`：忽略取消信号，继续执行任务。
 ### pthread_setcanceltype 设置本线程取消动作的执行时机
 ```c++
 #define PTHREAD_CANCEL_DEFERRED      0x02  /* Cancel waits until cancellation point // Cancel 等待直到取消点 */
@@ -405,7 +406,6 @@ void pthread_testcancel(void) __DARWIN_ALIAS(pthread_testcancel);
 &emsp;线程取消的方法是向目标线程发 Cancel 信号，但如何处理 Cancel 信号则由目标线程自己决定，或者忽略、或者立即终止、或者继续运行至 Cancelation-point（取消点），由不同的 Cancelation 状态决定。
 
 &emsp;线程接收到 CANCEL 信号的缺省处理（即 `pthread_create` 创建线程的缺省状态）是继续运行至取消点，也就是说设置一个 CANCELED 状态，线程继续运行，只有运行至 Cancelation-point 的时候才会退出。
-
 ### pthread_self 获取当前线程本身
 ```c++
 __API_AVAILABLE(macos(10.4), ios(2.0))
@@ -429,7 +429,9 @@ void pthread_exit(void * _Nullable) __dead2;
 &emsp;在学习自动释放池对函数返回值优化、空自动释放占位等等知识点时，我们遇到过线程本地存储的概念（Thread Local Storage）。
 
 &emsp;同一进程内线程之间可以共享内存地址空间，线程之间的数据交换可以非常快捷，这是线程最显著的优点。但是多个线程访问共享数据，需要昂贵的同步开销（加锁），也容易造成与同步相关的 BUG，更麻烦的是有些数据根本就不希望被共享，这又是缺点。
+
 &emsp;C 程序库中的 errno 是个最典型的一个例子。errno 是一个全局变量，会保存最后一个系统调用的错误代码。在单线程环境并不会出现什么问题。但是在多线程环境，由于所有线程都会有可能修改 errno，这就很难确定 errno 代表的到底是哪个系统调用的错误代码了。这就是有名的 “非线程安全（Non Thread-Safe）” 的。
+
 &emsp;此外，从现代技术角度看，在很多时候使用多线程的目的并不是为了对共享数据进行并行处理。更多是由于多核心 CPU 技术的引入，为了充分利用 CPU 资源而进行并行运算（不互相干扰）。换句话说，大多数情况下每个线程只会关心自己的数据而不需要与别人同步。
 
 &emsp;为了解决这些问题，可以有很多种方案。比如使用不同名称的全局变量。但是像 errno 这种名称已经固定了的全局变量就没办法了。在前面的内容中提到在线程堆栈中分配局部变量是不在线程间共享的。但是它有一个弊病，就是线程内部的其它函数很难访问到。目前解决这个问题的简便易行的方案是线程本地存储，即 Thread Local Storage，简称 TLS。利用 TLS，errno 所反映的就是本线程内最后一个系统调用的错误代码了，也就是线程安全的了。
@@ -458,11 +460,12 @@ void* _Nullable pthread_getspecific(pthread_key_t);
 
 ## NSThread
 &emsp;`NSThread` 是一个继承自 `NSObject` 并用来管理和操作线程的类。学习完 `Pthreads`，再来看 `NSThread` 真是倍感亲切呀，貌似现在看到 `NS` 前缀的类都会倍感亲切，它们几乎都是继承自 `NSObject` 的类，并且在 `ARC` 的加持下最后的释放销毁都由编译器为我们做了，我们尽管创建使用就好了，再加上它们几乎同一的使用逻辑也使我们易学习易上手易使用，这是赞呀！下面我们正式进入 `NSThread` 的学习。
+
 &emsp;一个 `NSThread` 对象会对应一个线程，与 `Pthreads` 相比，它以更加面向对象的方式来操作和管理线程，尽管还是需要我们自己手动管理线程的生命周期，但是此时仅限于创建，我们这里可以把创建线程的过程理解为创建 `NSThread` 对象，至于最后任务执行结束，线程资源的回收系统都会帮我们处理，所以相比 GCD 来说还不是最易用的，GCD 的使用和源码部分留在下篇，那么我们首先来看下 `NSThread` 的使用吧！⛽️⛽️
 
 ### NSThread 创建和启动线程
 &emsp;NSThread.h 文件中列出了所有 NSThread 创建和启动线程的方式，并且提供了以 selector 或者 block 的形式在线程中执行函数（或者说是任务），同时在文件底部还提供了一个 `NSObject` 的 `NSThreadPerformAdditions` 分类，它列举了一组实例方法，分别在主线程、后台线程或是指定线程中执行函数（或说是任务），即我们可以使用任何继承自 `NSObject` 的类的对象来使用这些与多线程相关的 API，大大方便了我们在开发中使用多线程来执行任务。下面看一下 NSThread 的使用示例：
-+ 先创建 NSThread 对象（创建线程），然后调用 `start` 函数启动线程。
++ 使用 NSThread 的 `alloc` 和 `init` 方法显式创建 NSThread 对象（创建线程），然后调用 `start` 函数启动线程。
 ```c++
 - (void)viewDidLoad {
     [super viewDidLoad];
@@ -474,6 +477,12 @@ void* _Nullable pthread_getspecific(pthread_key_t);
     
     // 1. 创建 NSThread 对象（创建线程）
     NSThread *thread = [[NSThread alloc] initWithTarget:self selector:@selector(run:) object:objc];
+    
+    // 设置线程名
+    [thread setName:@"thread"];
+    // 设置优先级，优先级从 0 到 1，1 最高
+    [thread setThreadPriority:0.9];
+    
     // 2. 启动线程
     [thread start];
     
@@ -499,7 +508,7 @@ void* _Nullable pthread_getspecific(pthread_key_t);
 2020-11-15 11:35:32.183285+0800 Simple_iOS[57531:9389593] 🙆‍♂️ <NSThread: 0x6000033ba900>{number = 8, name = (null)} ⬅️ NSThread 是子线程，看到打印时间和 🧑‍💻 相差 2 秒
 2020-11-15 11:35:33.180177+0800 Simple_iOS[57531:9389592] 🏃‍♀️ <NSThread: 0x6000033bba80>{number = 7, name = (null)} param: 0x6000024e42e0 ⬅️ NSThread 是子线程，看到是 3 秒后的打印
 ```
-+ 创建线程后，立刻自动启动线程。
++ 使用 NSThread 的类方法显式的创建线程并会立刻自动启动线程（对比上面不需要再调用 `start` 函数）。
 ```c++
 - (void)viewDidLoad {
     [super viewDidLoad];
@@ -559,7 +568,222 @@ void* _Nullable pthread_getspecific(pthread_key_t);
 2020-11-15 12:12:37.431160+0800 Simple_iOS[57919:9414023] 🏃‍♀️ <NSThread: 0x6000021132c0>{number = 6, name = (null)} param: 0x6000036648f0 ⬅️ NSThread 是子线程，看到是 3 秒后的打印
 2020-11-15 12:12:37.431515+0800 Simple_iOS[57919:9414023] 🍀🍀🍀 TEMP dealloc ⬅️ 这里传递了一个自己的类的对象，并重写了 dealloc 函数，看到 viewDidLoad 函数中的 TEMP 临时对象的销毁延迟到了 run 函数执行完毕
 ```
+&emsp;以上就是 NSThread 创建线程的方式，只有使用 NSThread 的 `alloc` 和 `init` 方法创建的线程才会返回具体的线程实例，也就是说如果想要对线程做更多的控制，比如添加线程的名字、更改优先级等操作，要使用第一种方式来创建线程，但是此种方法需要使用 `start` 方法来手动启动线程。
 
+### NSThread.h 文件 API 分析
+&emsp;下面对 NSThread.h 文件中的属性或者函数进行分析。
+#### currentThread
+```c++
+@property (class, readonly, strong) NSThread *currentThread;
+```
+&emsp;这里看到 `class` 真的被震惊到了，这个....这个....，这是类属性吗？做了这么多年 iOS 开发，第一次关注到这个属性修饰符里面竟然可以添加一个 `class` ，而且这个 `[NSThread currentThread]` 几乎每天都在使用的判断当前线程的方式，确从没关注过它是一个类属性，哭了。
+
+&emsp;返回值代表当前执行线程的线程对象。(返回值表示当前执行线程的线程对象。)
+#### isMultiThreaded
+```c++
++ (BOOL)isMultiThreaded;
+```
+&emsp;这个函数第一次遇到，它针对的是当前的应用程序，返回应用程序是否为多线程。在 main.m 文件的 `main` 函数中会返回 0，如果使用 `pthread_create` 创建一个线程则会返回 1，在 `viewDidLoad` 函数中会直接返回 1。
+
+&emsp;返回值如果应用程序是多线程，则为 YES，否则为 NO。
+
+&emsp;官方文档的解释是：如果使用 `detachNewThreadSelector:toTarget:withObject:` 或 `start` 从主线程分离了线程，则认为该应用程序是多线程的。如果使用非 Cocoa API（例如 POSIX 或 Multiprocessing Services API ）在应用程序中分离了线程，则此方法仍可能返回 NO。分离的线程不必当前正在运行，应用程序才被认为是多线程的--此方法仅指示是否已产生单个线程。
+#### threadDictionary
+```c++
+@property (readonly, retain) NSMutableDictionary *threadDictionary;
+
+// 使用示例
+// 在上面示例代码的 run 函数中添加如下代码:
+
+NSLog(@"🏃‍♀️ %@", [[NSThread currentThread] threadDictionary]);
+
+NSMutableDictionary *dic = [[NSThread currentThread] threadDictionary];
+[dic setObject:param forKey:@"KEY"];
+
+NSLog(@"🏃‍♀️ %@", [[NSThread currentThread] threadDictionary]);
+
+// 控制台打印:
+2020-11-15 15:12:58.245199+0800 Simple_iOS[59662:9494051] 🏃‍♀️ <NSThread: 0x600001c244c0>{number = 7, name = (null)} param: 0x600000baaf90
+2020-11-15 15:12:58.245562+0800 Simple_iOS[59662:9494051] 🏃‍♀️ {
+}
+2020-11-15 15:12:58.245928+0800 Simple_iOS[59662:9494051] 🏃‍♀️ {
+    KEY = "<TEMP: 0x600000baaf90>"; ⬅️ 把 param 保存在了线程的 threadDictionary 中
+}
+```
+&emsp;取得一个线程的只读的 threadDictionary，取得以后我们可以往里面保存自己的内容。
+
+&emsp;你可以使用返回的字典来存储特定于线程的数据。在对 NSThread 对象进行任何操作期​​间都不会使用线程字典，它只是一个可以存储任何有趣数据的地方。例如，Foundation 使用它来存储线程的默认 NSConnection 和 NSAssertionHandler 实例。你可以为字典定义自己的键。
+#### sleepUntilDate:
+```c++
++ (void)sleepUntilDate:(NSDate *)date;
+```
+&emsp;阻塞当前线程直到指定的时间，参数 date 也表示了线程恢复处理的时间。 线程被阻塞时，不会发生 runloop 处理。
+#### sleepForTimeInterval:
+```c++
++ (void)sleepForTimeInterval:(NSTimeInterval)ti;
+```
+&emsp;在给定的时间间隔内休眠线程。
+#### exit
+```c++
++ (void)exit;
+```
+&emsp;终止当前线程。
+
+&emsp;此方法使用于 currentThread 类方法访问的当前线程。在退出线程之前，此方法将 `NSThreadWillExitNotification` 与退出线程发送到默认通知中心。因为通知是同步传递的，所以保证 `NSThreadWillExitNotification` 的所有观察者都可以在线程退出之前接收到通知。应该避免调用此方法，因为它不会使线程有机会清理在执行过程中分配的任何资源。
+#### threadPriority
+```c++
++ (double)threadPriority;
+```
+&emsp;返回当前线程的优先级。返回值表示当前线程的优先级，由 0.0 到 1.0 之间的浮点数指定，其中 1.0 是最高优先级。
+
+&emsp;此范围内的优先级映射到操作系统的优先级值。 “typical” 线程优先级可能是 0.5，但是由于优先级是由内核确定的，因此不能保证此值实际上是多少。
+#### setThreadPriority:
+```c++
++ (BOOL)setThreadPriority:(double)p;
+```
+&emsp;设置当前线程的优先级。如果优先级分配成功，则为 YES，否则为 NO。p 使用从 0.0 到 1.0 的浮点数指定的新优先级，其中1.0是最高优先级。
+#### threadPriority
+```c++
+@property double threadPriority API_AVAILABLE(macos(10.6), ios(4.0), watchos(2.0), tvos(9.0)); // To be deprecated; use qualityOfService below
+```
+&emsp;接收者的优先级。线程的优先级，由 0.0 到 1.0 之间的浮点数指定，其中 1.0 是最高优先级。此范围内的优先级映射到操作系统的优先级值。 “typical” 线程优先级可能是 0.5，但是由于优先级是由内核确定的，因此不能保证此值实际上是多少。
+#### qualityOfService
+```c++
+@property NSQualityOfService qualityOfService API_AVAILABLE(macos(10.10), ios(8.0), watchos(2.0), tvos(9.0)); // read-only after the thread is started
+```
+#### callStackReturnAddresses
+```c++
+@property (class, readonly, copy) NSArray<NSNumber *> *callStackReturnAddresses API_AVAILABLE(macos(10.5), ios(2.0), watchos(2.0), tvos(9.0));
+```
+&emsp;返回一个包含调用堆栈返回地址的数组。包含调用堆栈返回地址的数组。每个元素都是一个包含 NSUInteger 值的NSNumber对象。
+#### callStackSymbols
+```c++
+@property (class, readonly, copy) NSArray<NSString *> *callStackSymbols API_AVAILABLE(macos(10.6), ios(4.0), watchos(2.0), tvos(9.0));
+```
+&emsp;返回一个包含调用堆栈符号的数组。返回值是包含调用堆栈符号的数组。每个元素都是一个 NSString 对象，其值的格式由 `backtrace_symbols()` 函数确定。有关更多信息，参见 backtrace_symbols(3) macOS 开发人员工具手册页。
+&emsp;返回值描述了在调用此方法时当前线程的调用堆栈回溯。
+
+#### name
+```c++
+@property (nullable, copy) NSString *name API_AVAILABLE(macos(10.5), ios(2.0), watchos(2.0), tvos(9.0));
+```
+&emsp;线程的名字。
+#### stackSize
+```c++
+@property NSUInteger stackSize API_AVAILABLE(macos(10.5), ios(2.0), watchos(2.0), tvos(9.0));
+```
+&emsp;线程的堆栈大小，以字节为单位。该值必须以字节为单位，并且为 4KB 的倍数。若要更改堆栈大小，必须在启动线程之前设置此属性。在线程启动后设置堆栈大小会更改属性大小（这由 `stackSize` 方法反映），但不会影响为线程预留的实际页面数。
+#### isMainThread
+```c++
+@property (readonly) BOOL isMainThread API_AVAILABLE(macos(10.5), ios(2.0), watchos(2.0), tvos(9.0));
+```
+&emsp;一个布尔值，指示接收方是否为主线程。如果接收方是主线程则为 YES，否则为 NO。
+#### isMainThread
+```c++
+@property (class, readonly) BOOL isMainThread API_AVAILABLE(macos(10.5), ios(2.0), watchos(2.0), tvos(9.0)); // reports whether current thread is main
+```
+&emsp;返回一个布尔值，该值指示当前线程是否为主线程。如果当前线程是主线程，则为YES，否则为NO。
+#### mainThread
+```c++
+@property (class, readonly, strong) NSThread *mainThread API_AVAILABLE(macos(10.5), ios(2.0), watchos(2.0), tvos(9.0));
+```
+&emsp;返回代表主线程的 NSThread 对象。
+#### executing
+```c++
+@property (readonly, getter=isExecuting) BOOL executing API_AVAILABLE(macos(10.5), ios(2.0), watchos(2.0), tvos(9.0));
+```
+&emsp;一个布尔值，指示接收者（线程）是否正在执行。如果接收者正在执行，则为 YES，否则为 NO。
+#### finished
+```c++
+@property (readonly, getter=isFinished) BOOL finished API_AVAILABLE(macos(10.5), ios(2.0), watchos(2.0), tvos(9.0));
+```
+&emsp;一个布尔值，指示接收方是否已完成执行。如果接收方完成执行，则为 YES，否则为 NO。
+#### cancelled
+```c++
+@property (readonly, getter=isCancelled) BOOL cancelled API_AVAILABLE(macos(10.5), ios(2.0), watchos(2.0), tvos(9.0));
+```
+&emsp;一个布尔值，指示接收者是否取消。如果已取消接收器，则为 YES，否则为 NO。如果你的线程支持取消，则它应定期检查此属性，并在返回 YES 时退出。
+#### cancel
+```c++
+- (void)cancel API_AVAILABLE(macos(10.5), ios(2.0), watchos(2.0), tvos(9.0));
+```
+&emsp;更改接收器的取消状态以指示它应该退出（标识为取消状态，并不是执行取消操作）。
+
+&emsp;此方法的语义与用于 NSOperation 的语义相同。此方法在接收器中设置状态信息，然后由 canceled 属性反映出来。支持取消的线程应定期调用 canceled 方法以确定该线程实际上是否已取消，如果已经被标识为取消则退出。有关取消和操作对象的更多信息，参见 NSOperation，NSOperation 会在下篇进行学习。
+#### start
+```c++
+- (void)start API_AVAILABLE(macos(10.5), ios(2.0), watchos(2.0), tvos(9.0));
+```
+&emsp;启动线程。（如在上面示例代码 `[thread start]` 添加 `[thread cancel]`，则 `thread` 线程不会再执行）
+
+&emsp;此方法异步产生新线程，并在新线程上调用接收者的 `main` 方法。一旦线程开始执行，则 `executing` 属性返回 YES，这可能在 `start` 方法返回之后发生。
+
+&emsp;如果使用 `target` 和 `selector` 初始化了接收器（NSThread 对象），则默认的 `main` 方法将自动调用该 `selector`。
+
+&emsp;如果此线程是应用程序中分离的第一个线程，则此方法将 object 为 nil 的 `NSWillBecomeMultiThreadedNotification` 通知发布到默认通知中心。
+#### main
+```c++
+- (void)main API_AVAILABLE(macos(10.5), ios(2.0), watchos(2.0), tvos(9.0));    // thread body method
+```
+&emsp;线程的主要入口点例程。
+
+&emsp;此方法的默认实现采用用于初始化 NSThread 的 `target` 和 `selector`，并在指定的 `target` 上调用 `selector`。如果你子类化 NSThread，则可以重写此方法并将其用于实现线程的 main body。如果这样做，则无需调用 `super`。
+
+&emsp;你永远不要直接调用此方法。你应该始终通过调用 `start` 方法来启动线程。
+
+&emsp;至此，我们的 NSThread 类的所有代码就看完了，还是挺清晰的哦。
+
+### NSObject + NSThreadPerformAdditions
+&emsp;下面是 NSObject 的一个分类，同时也是 `NSThread.h` 文件的最后一部分。其中的几个在主线程、指定线程和后台线程执行任务，还挺重要的，一起来看看吧！⛽️⛽️
+#### performSelectorOnMainThread:withObject:waitUntilDone:modes: 
+```c++
+- (void)performSelectorOnMainThread:(SEL)aSelector withObject:(nullable id)arg waitUntilDone:(BOOL)wait modes:(nullable NSArray<NSString *> *)array;
+```
+&emsp;使用指定的模式在主线程上调用接收方的方法。
+
+&emsp;`aSelector`: 一个选择器，用于标识要调用的方法。该方法不应有明显的返回值，并且应采用 id 类型的单个参数或不带参数。
+
+&emsp;`arg`: 调用时传递给 `aSelector` 的参数。如果该方法不接受参数，则传递 `nil`。
+
+&emsp;`wait`: 一个布尔值，指定当前线程是否在主线程上的接收器上执行指定的选择器之后才阻塞。指定 YES 是阻止该线程；否则，请指定 NO 以使此方法立即返回。如果当前线程也是主线程，并且你传递 YES，则立即执行该消息，否则将执行队列排队，以使其下次通过 runloop 运行。
+
+&emsp;`array`: 字符串数组，标识允许执行指定选择器的模式。该数组必须至少包含一个字符串。如果为该参数指定 nil 或空数组，则此方法将返回而不执行指定的选择器。
+
+&emsp;你可以使用此方法将消息传递到应用程序的主线程。主线程包含应用程序的主 runloop，并且是 NSApplication 对象接收事件的地方。在这种情况下，消息是您要在线程上执行的当前对象的方法。
+
+&emsp;此方法使用 array 参数中指定的 runloop 模式，将消息在主线程的 runloop 中排队。作为其正常 runloop 处理的一部分，主线程使消息出队（假定它正在以指定的模式之一运行）并调用所需的方法。假设每个选择器的关联 runloop 模式相同，那么从同一线程对该方法的多次调用会导致相应的选择器排队，并以与调用相同的顺序执行。如果为每个选择器指定不同的模式，则其关联模式与当前 runloop 模式不匹配的所有选择器都将被跳过，直到 runloop 随后在该模式下执行。
+
+&emsp;你无法取消使用此方法排队的消息。如果要取消当前线程上的消息的选项，则必须使用 `performSelector:withObject:afterDelay:` 或 `performSelector:withObject:afterDelay:inModes:` 方法。
+
+&emsp;该方法向其当前上下文的 runloop 进行注册，并依赖于定期运行的 runloop 才能正确执行。一个常见的上下文是调用 dispatch queue 时调用，可能会调用此方法并最终向不是定期自动运行的 runloop 注册。如果在一个 dispatch queue 上运行时需要这种功能，则应使用 `dispatch_after` 和相关方法来获取所需的行为。
+#### performSelectorOnMainThread:withObject:waitUntilDone:
+```c++
+- (void)performSelectorOnMainThread:(SEL)aSelector withObject:(nullable id)arg waitUntilDone:(BOOL)wait;
+// equivalent to the first method with kCFRunLoopCommonModes
+```
+&emsp;使用默认模式（`kCFRunLoopCommonModes`）在主线程上调用接收方的方法。
+#### performSelector:onThread:withObject:waitUntilDone:modes:
+```c++
+- (void)performSelector:(SEL)aSelector onThread:(NSThread *)thr withObject:(nullable id)arg waitUntilDone:(BOOL)wait modes:(nullable NSArray<NSString *> *)array API_AVAILABLE(macos(10.5), ios(2.0), watchos(2.0), tvos(9.0));
+```
+&emsp;使用指定的模式在指定的线程上调用接收方（任意的 NSObject 或其子类的对象）的方法。
+#### performSelector:onThread:withObject:waitUntilDone:
+```c++
+- (void)performSelector:(SEL)aSelector onThread:(NSThread *)thr withObject:(nullable id)arg waitUntilDone:(BOOL)wait API_AVAILABLE(macos(10.5), ios(2.0), watchos(2.0), tvos(9.0));
+// equivalent to the first method with kCFRunLoopCommonModes
+```
+&emsp;使用默认模式（`kCFRunLoopCommonModes`）在指定线程上调用接收方的方法。
+#### performSelectorInBackground:withObject:
+```c++
+- (void)performSelectorInBackground:(SEL)aSelector withObject:(nullable id)arg API_AVAILABLE(macos(10.5), ios(2.0), watchos(2.0), tvos(9.0));
+```
+&emsp;在新的后台线程上调用接收方的方法。
+
+&emsp;`aSelector`: 一个选择器，用于标识要调用的方法。该方法不应有明显的返回值，并且应采用 id 类型的单个参数或不带参数。
+
+&emsp;`arg`: 调用时传递给方法的参数。如果该方法不接受参数，则传递 `nil`。
+
+&emsp;此方法在你的应用程序中创建一个新线程，如果尚未将其置于多线程模式，则将其置于多线程模式。由 `aSelector` 表示的方法必须像在程序中创建任何其他新线程一样设置线程环境。
 
 ## 参考链接
 **参考链接:🔗**
@@ -573,3 +797,4 @@ void* _Nullable pthread_getspecific(pthread_key_t);
 + [iOS底层原理总结 - pthreads](https://www.jianshu.com/p/4434f18c5a95)
 + [C语言多线程pthread库相关函数说明](https://www.cnblogs.com/mq0036/p/3710475.html)
 + [iOS多线程中的实际方案之一pthread](https://www.jianshu.com/p/cfc6e7d2316a)
++ [iOS---多线程实现方案一 (pthread、NSThread)](https://www.cnblogs.com/fengmin/p/5548399.html)
