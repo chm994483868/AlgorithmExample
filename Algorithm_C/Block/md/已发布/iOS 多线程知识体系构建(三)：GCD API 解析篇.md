@@ -191,25 +191,15 @@ typedef NSObject<OS_dispatch_queue> * dispatch_queue_t;
 ```
 &emsp;Dispatch queues 调用提交给它们的工作项。
 
-&emsp;Dispatch queues 有多种形式，最常见的一种是调度串行队列（`dispatch_queue_serial_t`）。系统管理一个线程池，该线程池处理调度队列并调用提交给它们的工作项。
+&emsp;Dispatch queues 有多种形式，最常见的一种是调度串行队列（`dispatch_queue_serial_t`）。系统管理一个线程池，该线程池处理 dispatch queues 并调用提交给它们的工作项。从概念上讲，一个 dispatch queue 可以具有自己的执行线程，并且队列之间的交互是高度异步的。调度队列通过调用 dispatch_retain() 和 dispatch_release() 进行引用计数。提交给队列的待处理工作项也会保留对该队列的引用，直到它们完成为止。一旦释放了对队列的所有引用，系统将重新分配该队列（queue 被释放销毁）。
+#### dispatch_queue_global_t
+```c++
+DISPATCH_DECL_SUBCLASS(dispatch_queue_global, dispatch_queue);
+```
+```c++
 
+```
 
-
-/*!
- * @typedef dispatch_queue_t
- *
- * @abstract
- * Dispatch queues invoke workitems submitted to them.
- *
- * @discussion
- * Dispatch queues come in many flavors, the most common one being the dispatch serial queue (See dispatch_queue_serial_t).
- *
- * The system manages a pool of threads which process dispatch queues and invoke workitems submitted to them.
- *
- * Conceptually a dispatch queue may have its own thread of execution, and interaction between queues is highly asynchronous.
- *
- * Dispatch queues are reference counted via calls to dispatch_retain() and dispatch_release(). Pending workitems submitted to a queue also hold a reference to the queue until they have finished. Once all references to a queue have been released, the queue will be deallocated by the system.
- */
 
 
 ## 参考链接
