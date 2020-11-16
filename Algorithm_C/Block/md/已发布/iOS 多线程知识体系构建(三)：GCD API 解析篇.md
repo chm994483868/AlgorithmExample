@@ -197,10 +197,32 @@ typedef NSObject<OS_dispatch_queue> * dispatch_queue_t;
 DISPATCH_DECL_SUBCLASS(dispatch_queue_global, dispatch_queue);
 ```
 ```c++
+OS_OBJECT_DECL_SUBCLASS(dispatch_queue_global, dispatch_queue)
+```
+```c++
+@protocol OS_dispatch_queue_global <OS_dispatch_queue>
+@end
 
+typedef NSObject<OS_dispatch_queue_global> * dispatch_queue_global_t;
 ```
 
+```c++
+DISPATCH_DECL(dispatch_queue);
+OS_OBJECT_DECL_SUBCLASS(dispatch_queue, dispatch_object);
+```
+&emsp;转换宏定义后是：
+```c++
+@protocol OS_dispatch_queue <OS_dispatch_object>
+@end
 
+typedef NSObject<OS_dispatch_queue> * dispatch_queue_t;
+```
+
+#define OS_OBJECT_DECL_IMPL(name, adhere, ...) \
+        OS_OBJECT_DECL_PROTOCOL(name, __VA_ARGS__) \
+        typedef adhere<OS_OBJECT_CLASS(name)> \
+                * OS_OBJC_INDEPENDENT_CLASS name##_t
+                
 
 ## 参考链接
 **参考链接:🔗**
