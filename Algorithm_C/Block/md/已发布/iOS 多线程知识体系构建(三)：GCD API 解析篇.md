@@ -175,6 +175,8 @@ typedef NSObject<OS_dispatch_object> * dispatch_object_t;
 
 &emsp;综上可知，宏定义 `OS_OBJECT_DECL_CLASS(name)` 会定义一个继承自 `NSObject` 协议的协议，协议的名称为固定的 `name` 添加 `OS_` 前缀，并且定义一个表示遵循该协议的 `NSObject` 实例对象类型的指针的别名，名称为 `name` 添加后缀 `_t`。
 
+&emsp;由 `#define DISPATCH_DECL_SUBCLASS(name, base) OS_OBJECT_DECL_SUBCLASS(name, base)` 可知，还可以在定义一个协议时，指定其所继承的协议，但是在使用时，要保证指定的 `base` 协议是已经定义过的。
+
 
 
 
