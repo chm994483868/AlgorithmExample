@@ -100,7 +100,7 @@ typedef NSObject<OS_dispatch_queue> \
 
 typedef NSObject<OS_dispatch_queue> * dispatch_queue_t;
 ```
-&emsp;`OS_dispatch_queue` 是继承自 `OS_dispatch_object` 协议的协议，并且为遵循该协议的 `NSObject` 实例对象类型的指针定义了一个 `dispatch_queue_t` 的别名，看到这里我们恍然大悟，我们整天使用的 `dispatch_queue_t globalQueue = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0);` 获取一个全局并发对象，而这个 `globalQueue` 其实就是一个遵循 `OS_dispatch_queue` 协议的 `NSObject` 实例对象指针。
+&emsp;`OS_dispatch_queue` 是继承自 `OS_dispatch_object` 协议的协议，并且为遵循该协议的 `NSObject` 实例对象类型的指针定义了一个 `dispatch_queue_t` 的别名，看到这里我们恍然大悟，我们整天使用的 `dispatch_queue_t globalQueue = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0);` 获取一个全局并发对象，而这个 `globalQueue` 其实就是一个遵循 `OS_dispatch_queue` 协议的 `NSObject` 实例对象指针（`dispatch_queue_t` 具体是不是 NSObject 后面待确认）。
 
 &emsp;那么这个 `OS_dispatch_object` 协议怎么来的呢？可看到是来自 `OS_OBJECT_DECL_CLASS(dispatch_object);` 下面对它进行解读。
 ```c++
@@ -171,14 +171,45 @@ typedef NSObject<OS_dispatch_object> \
 
 typedef NSObject<OS_dispatch_object> * dispatch_object_t;  
 ```
-&emsp;`OS_dispatch_object` 是继承自 `NSObject` 协议的协议，并且为遵循该协议的 `NSObject` 实例对象类型的指针定义了一个 `dispatch_object_t` 的别名。
+&emsp;`OS_dispatch_object` 是继承自 `NSObject` 协议的协议，并且为遵循该协议的 `NSObject` 实例对象类型的指针定义了一个 `dispatch_object_t` 的别名。（`dispatch_object_t` 具体是不是 NSObject 后面待确认）
 
 &emsp;综上可知，宏定义 `OS_OBJECT_DECL_CLASS(name)` 会定义一个继承自 `NSObject` 协议的协议，协议的名称为固定的 `name` 添加 `OS_` 前缀，并且定义一个表示遵循该协议的 `NSObject` 实例对象类型的指针的别名，名称为 `name` 添加后缀 `_t`。
 
 &emsp;由 `#define DISPATCH_DECL_SUBCLASS(name, base) OS_OBJECT_DECL_SUBCLASS(name, base)` 可知，还可以在定义一个协议时，指定其所继承的协议，但是在使用时，要保证指定的 `base` 协议是已经定义过的。
+#### dispatch_queue_t
+&emsp;Dispatch 是用于通过简单但功能强大的 API 来表达并发性的抽象模型。在核心上，dispatch 提供了可以向其提交 blocks 的串行 FIFO 队列。提交给这些 dispatch queues 的 blocks 在系统完全管理的线程池上调用。无法保证将在哪个线程上调用 block；但是，它保证一次只调用一个提交到 FIFO dispatch queue 的 block。当多个队列有要处理的块时，系统可以自由地分配额外的线程来并发地调用这些 blocks。当队列变为空时，这些线程将自动释放。
+
+```c++
+DISPATCH_DECL(dispatch_queue);
+```
+&emsp;转换宏定义后是：
+```c++
+@protocol OS_dispatch_queue <OS_dispatch_object>
+@end
+
+typedef NSObject<OS_dispatch_queue> * dispatch_queue_t;
+```
+&emsp;Dispatch queues 调用提交给它们的工作项。
+
+&emsp;Dispatch queues 有多种形式，最常见的一种是调度串行队列（`dispatch_queue_serial_t`）。系统管理一个线程池，该线程池处理调度队列并调用提交给它们的工作项。
 
 
 
+/*!
+ * @typedef dispatch_queue_t
+ *
+ * @abstract
+ * Dispatch queues invoke workitems submitted to them.
+ *
+ * @discussion
+ * Dispatch queues come in many flavors, the most common one being the dispatch serial queue (See dispatch_queue_serial_t).
+ *
+ * The system manages a pool of threads which process dispatch queues and invoke workitems submitted to them.
+ *
+ * Conceptually a dispatch queue may have its own thread of execution, and interaction between queues is highly asynchronous.
+ *
+ * Dispatch queues are reference counted via calls to dispatch_retain() and dispatch_release(). Pending workitems submitted to a queue also hold a reference to the queue until they have finished. Once all references to a queue have been released, the queue will be deallocated by the system.
+ */
 
 
 ## 参考链接
