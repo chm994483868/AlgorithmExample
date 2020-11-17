@@ -166,7 +166,7 @@ typedef NSObject<OS_dispatch_object> \
 ```
 &emsp;连续的宏定义整理到这里 `OS_OBJECT_DECL_CLASS(dispatch_object);` 即为:
 ```c++
-@protocol OS_dispatch_object <NSObject>
+@protocol OS_dispatch_object <NSObject> 
 @end
 
 typedef NSObject<OS_dispatch_object> * dispatch_object_t;  
@@ -196,33 +196,126 @@ typedef NSObject<OS_dispatch_queue> * dispatch_queue_t;
 ```c++
 DISPATCH_DECL_SUBCLASS(dispatch_queue_global, dispatch_queue);
 ```
-```c++
-OS_OBJECT_DECL_SUBCLASS(dispatch_queue_global, dispatch_queue)
-```
+&emsp;转换宏定义后是：
 ```c++
 @protocol OS_dispatch_queue_global <OS_dispatch_queue>
 @end
 
 typedef NSObject<OS_dispatch_queue_global> * dispatch_queue_global_t;
 ```
+&emsp;`OS_dispatch_queue_global` 是继承自 `OS_dispatch_queue` 协议的协议，并且为遵循该协议的 `NSObject` 实例对象类型的指针定义了一个 `dispatch_queue_global_t` 的别名。（`dispatch_queue_global_t` 具体是不是 NSObject 后面待确认）
 
+&emsp;调度全局并发队列（dispatch global concurrent queues）是围绕系统线程池的抽象，它调用提交到调度队列的工作项。
+
+&emsp;调度全局并发队列（dispatch global concurrent queues）在系统管理的线程池之上提供优先级桶（这个大概是哈希桶，后续看源码时再分析），系统将根据需求和系统负载决定分配给这个池的线程数。特别是，系统会尝试为该资源保持良好的并发级别，并且当系统调用中有太多的现有工作线程阻塞时，将创建新线程。（NSThread 和 GCD 的一个重大区别，GCD 下线程都是系统自动创建分配的，而 NSThread 则是自己手动创建线程或者自己手动开启线程。）
+
+&emsp;全局并发队列（global concurrent queues）是共享资源，因此，此资源的每个用户都有责任不向该池提交无限数量的工作，尤其是可能阻塞的工作，因为这可能导致系统产生大量线程（又名：线程爆炸 thread explosion）。
+
+&emsp;提交到全局并发队列（global concurrent queues）的工作项相对于提交顺序没有排序保证，并且提交到这些队列的工作项可以并发调用（毕竟本质还是并发队列）。
+
+&emsp;调度全局并发队列（dispatch global concurrent queues）是由 `dispatch_get_global_queue()` 函数返回的已知全局对象，这些对象无法修改。 `dispatch_suspend()`、`dispatch_resume()`、`dispatch_set_context()` 等等函数对此类型的队列调用无效。
+#### dispatch_queue_serial_t
 ```c++
-DISPATCH_DECL(dispatch_queue);
-OS_OBJECT_DECL_SUBCLASS(dispatch_queue, dispatch_object);
+DISPATCH_DECL_SUBCLASS(dispatch_queue_serial, dispatch_queue);
 ```
 &emsp;转换宏定义后是：
 ```c++
-@protocol OS_dispatch_queue <OS_dispatch_object>
+@protocol OS_dispatch_queue_serial <OS_dispatch_queue>
 @end
 
-typedef NSObject<OS_dispatch_queue> * dispatch_queue_t;
+typedef NSObject<OS_dispatch_queue_serial> * dispatch_queue_serial_t;
+```
+&emsp;`OS_dispatch_queue_serial` 是继承自 `OS_dispatch_queue` 协议的协议，并且为遵循该协议的 `NSObject` 实例对象类型的指针定义了一个 `dispatch_queue_serial_t` 的别名。（`dispatch_queue_serial_t` 具体是不是 NSObject 后面待确认）
+
+&emsp;调度串行队列（dispatch serial queues）调用以 FIFO 顺序串行提交给它们的工作项。
+
+&emsp;调度串行队列（dispatch serial queues）是轻量级对象，可以向其提交工作项以 FIFO 顺序调用。串行队列一次只能调用一个工作项，但是独立的串行队列可以各自相对于彼此并发地调用其工作项。
+
+&emsp;串行队列可以相互定位（`dispatch_set_target_queue()`）（串行队列可以彼此作为目标）。队列层次结构底部的串行队列提供了一个排除上下文：在任何给定的时间，提交给这种层次结构中的任何队列的最多一个工作项将运行。这样的层次结构提供了一个自然的结构来组织应用程序子系统。
+
+&emsp;通过将派生自 `DISPATCH_QUEUE_SERIAL` 的调度队列属性传递给 `dispatch_queue_create_with_target()` 来创建串行队列。（串行队列的创建过程后续会通过源码来进行解读）
+#### dispatch_queue_main_t
+```c++
+DISPATCH_DECL_SUBCLASS(dispatch_queue_main, dispatch_queue_serial);
+```
+&emsp;转换宏定义后是：
+```c++
+@protocol OS_dispatch_queue_main <OS_dispatch_queue_serial>
+@end
+
+typedef NSObject<OS_dispatch_queue_main> * dispatch_queue_main_t;
+```
+&emsp;`OS_dispatch_queue_main` 是继承自 `OS_dispatch_queue_serial` 协议的协议，并且为遵循该协议的 `NSObject` 实例对象类型的指针定义了一个 `dispatch_queue_main_t` 的别名。（`dispatch_queue_main_t` 具体是不是 NSObject 后面待确认，看到这里发现主队列不愧是特殊的串行队列）
+
+&emsp;`dispatch_queue_main_t` 是绑定到主线程的默认队列的类型。
+
+&emsp;主队列是一个串行队列（`dispatch_queue_serial_t`），该队列绑定到应用程序的主线程。为了调用提交到主队列的工作项，应用程序必须调用 `dispatch_main()`，`NSApplicationMain()` 或在主线程上使用 `CFRunLoop`。
+
+&emsp;主队列是一个众所周知的全局对象，它在进程初始化期间代表主线程自动创建，并由 `dispatch_get_main_queue()` 返回，无法修改该对象。`dispatch_suspend()`、`dispatch_resume()`、`dispatch_set_context()` 等等函数对此类型的队列调用无效（主队列只有一个，全局并发队列有多个）。
+#### dispatch_queue_concurrent_t
+```c++
+DISPATCH_DECL_SUBCLASS(dispatch_queue_concurrent, dispatch_queue);
+```
+&emsp;转换宏定义后是：
+```c++
+@protocol OS_dispatch_queue_concurrent <OS_dispatch_queue>
+@end
+
+typedef NSObject<OS_dispatch_queue_concurrent> * dispatch_queue_concurrent_t;
+```
+&emsp;`OS_dispatch_queue_concurrent` 是继承自 `OS_dispatch_queue` 协议的协议，并且为遵循该协议的 `NSObject` 实例对象类型的指针定义了一个 `dispatch_queue_concurrent_t` 的别名。（`dispatch_queue_concurrent_t` 具体是不是 NSObject 后面待确认）
+
+&emsp;调度并发队列（dispatch concurrent queues）会同时调用提交给它们的工作项，并接受屏障工作项的概念（and admit a notion of barrier workitems，（barrier 屏障是指调用 `dispatch_barrier_async` 函数，向队列提交工作项。））。
+
+&emsp;调度并发队列（dispatch concurrent queues）是可以向其提交常规和屏障工作项的轻量级对象。在排除其他任何类型的工作项目（按FIFO顺序）时，将调用屏障工作项目。（提交在 barrier 工作项之前的工作项并发执行完以后才会并发执行 barrier 工作项之后的工作项）。
+
+&emsp;可以对同一并发队列以任何顺序并发调用常规工作项。但是，在调用之前提交的任何屏障工作项之前，不会调用常规工作项。
+
+&emsp;换句话说，如果在 Dispatch 世界中串行队列等效于互斥锁，则并发队列等效于 reader-writer lock，其中常规项是读取器，而屏障是写入器。
+
+&emsp;通过将派生自 `DISPATCH_QUEUE_CONCURRENT` 的调度队列属性传递给 `dispatch_queue_create_with_target()` 来创建并发队列。
+
+&emsp;注意事项：当调用优先级较低的常规工作项（readers）时，此时调度并发队列不会实现优先级反转避免，并且会阻止调用优先级较高的屏障（writer）。
+#### dispatch_block_t
+&emsp;日常使用 GCD 向队列提交的工作项都是这种名字是 `dispatch_block_t`，参数和返回值都是 `void` 的 Block。
+```c++
+typedef void (^dispatch_block_t)(void);
+```
+&emsp;提交给调度队列（dispatch queues）的 blocks 的类型，不带任何参数且没有返回值。当不使用 Objective-C ARC 进行构建时，分配到堆上或复制到堆上的 block 对象必须通过 `-[release]` 消息或 `Block_release()` 函数释放。
+
+&emsp;以字面量形式声明的 block 分配空间存储在栈上。因此如下是一个无效的构建:
+```c++
+dispatch_block_t block;
+if (x) {
+    block = ^{ printf("true\n"); };
+} else {
+    block = ^{ printf("false\n"); };
+}
+block(); // unsafe!!!
+```
+&emsp;幕后发生的事情：
+```c++
+if (x) {
+    struct Block __tmp_1 = ...; // setup details
+    block = &__tmp_1;
+} else {
+    struct Block __tmp_2 = ...; // setup details
+    block = &__tmp_2;
+}
+```
+&emsp;如示例所示，栈变量的地址正在转义其分配范围。那是一个经典的C bug。相反，必须使用 `Block_copy()` 函数或通过发送 `-[copy]` 消息将 block 复制到堆中。(看到这里对 block 内部结构比较熟悉的同学感觉应该会很亲切。)
+
+#### dispatch_async
+```c++
+#ifdef __BLOCKS__
+API_AVAILABLE(macos(10.6), ios(4.0))
+DISPATCH_EXPORT DISPATCH_NONNULL_ALL DISPATCH_NOTHROW
+void
+dispatch_async(dispatch_queue_t queue, dispatch_block_t block);
+#endif
 ```
 
-#define OS_OBJECT_DECL_IMPL(name, adhere, ...) \
-        OS_OBJECT_DECL_PROTOCOL(name, __VA_ARGS__) \
-        typedef adhere<OS_OBJECT_CLASS(name)> \
-                * OS_OBJC_INDEPENDENT_CLASS name##_t
-                
+
 
 ## 参考链接
 **参考链接:🔗**
