@@ -678,8 +678,123 @@ dispatch_queue_attr_make_with_autorelease_frequency(
         dispatch_queue_attr_make_with_autorelease_frequency(\
                 DISPATCH_QUEUE_SERIAL, DISPATCH_AUTORELEASE_FREQUENCY_WORK_ITEM)
 ```
+#### DISPATCH_QUEUE_CONCURRENT_WITH_AUTORELEASE_POOL
+&emsp;`DISPATCH_QUEUE_CONCURRENT_WITH_AUTORELEASE_POOL` 使用此属性创建的调度队列可以并发调用块，并支持使用 dispatch barrier API 提交的 barrier blocks。它还包围了异步提交给它的任何块的执行，这些块相当于一个单独的 Objective-C @autoreleasepool。
+```c++
+#define DISPATCH_QUEUE_CONCURRENT_WITH_AUTORELEASE_POOL \
+        dispatch_queue_attr_make_with_autorelease_frequency(\
+                DISPATCH_QUEUE_CONCURRENT, DISPATCH_AUTORELEASE_FREQUENCY_WORK_ITEM)
+```
+#### dispatch_qos_class_t
+&emsp;`qos_class_t` 类型的别名。
+```c++
+#if __has_include(<sys/qos.h>)
+typedef qos_class_t dispatch_qos_class_t;
+#else
+typedef unsigned int dispatch_qos_class_t;
+#endif
+```
+#### qos_class_t
+&emsp;An abstract thread quality of service (QOS) classificatio。thread quality of service（QOS）的抽象种类。
+```c++
+// __QOS_ENUM 枚举宏定义
+#define __QOS_ENUM(name, type, ...) enum { __VA_ARGS__ }; typedef type name##_t
+#define __QOS_CLASS_AVAILABLE(...)
 
+#if defined(__cplusplus) || defined(__OBJC__) || __LP64__
+#if defined(__has_feature) && defined(__has_extension)
+#if __has_feature(objc_fixed_enum) || __has_extension(cxx_strong_enums)
+#undef __QOS_ENUM
+#define __QOS_ENUM(name, type, ...) typedef enum : type { __VA_ARGS__ } name##_t
+#endif
+#endif
+#if __has_feature(enumerator_attributes)
+#undef __QOS_CLASS_AVAILABLE
+#define __QOS_CLASS_AVAILABLE __API_AVAILABLE
+#endif
+#endif
 
+// 具体的枚举值看这里
+__QOS_ENUM(qos_class, unsigned int,
+    QOS_CLASS_USER_INTERACTIVE
+            __QOS_CLASS_AVAILABLE(macos(10.10), ios(8.0)) = 0x21,
+    QOS_CLASS_USER_INITIATED
+            __QOS_CLASS_AVAILABLE(macos(10.10), ios(8.0)) = 0x19,
+    QOS_CLASS_DEFAULT
+            __QOS_CLASS_AVAILABLE(macos(10.10), ios(8.0)) = 0x15,
+    QOS_CLASS_UTILITY
+            __QOS_CLASS_AVAILABLE(macos(10.10), ios(8.0)) = 0x11,
+    QOS_CLASS_BACKGROUND
+            __QOS_CLASS_AVAILABLE(macos(10.10), ios(8.0)) = 0x09,
+    QOS_CLASS_UNSPECIFIED
+            __QOS_CLASS_AVAILABLE(macos(10.10), ios(8.0)) = 0x00,
+);
+```
+&emsp;为了便于记忆，姑且把 thread quality of service 翻译为线程服务质量。
+
+&emsp;线程服务质量（QOS）类是 pthread、dispatch queue 或 NSOperation 预期执行的工作性质的有序抽象表示。每个类指定该频带的最大线程调度优先级（可与频带内的相对优先级偏移结合使用），以及计时器延迟、CPU吞吐量、I/O吞吐量、网络套接字流量管理行为等的服务质量特征。
+
+&emsp;尽最大努力将可用的系统资源分配给每个 QOS 类。服务质量（Quality of service）降低仅发生在系统资源争用期间，与 QOS 等级成比例。也就是说，QOS 类代表用户发起的工作试图达到峰值吞吐量，而 QOS 类则试图实现峰值能量和热效率，即使在没有争用的情况下。最后，QOS 类的使用不允许线程取代可能应用于整个进程的任何限制。
+
+&emsp;`QOS_CLASS_USER_INTERACTIVE`：
+
+/*!
+ * @constant QOS_CLASS_USER_INTERACTIVE
+ * @abstract A QOS class which indicates work performed by this thread is interactive with the user.
+ 
+ * @discussion Such work is requested to run at high priority relative to other work on the system. Specifying this QOS class is a request to run with nearly all available system CPU and I/O bandwidth even under contention. This is not an energy-efficient QOS class to use for large tasks. The use of this QOS class should be limited to critical interaction with the user such as handling events on the main event loop, view drawing, animation, etc.
+ 
+ * @constant QOS_CLASS_USER_INITIATED
+ * @abstract A QOS class which indicates work performed by this thread was initiated by the user and that the user is likely waiting for the results.
+ 
+ * @discussion Such work is requested to run at a priority below critical user-interactive work, but relatively higher than other work on the system. This is not an energy-efficient QOS class to use for large tasks. Its use should be limited to operations of short enough duration that the user is unlikely to switch tasks while waiting for the results. Typical user-initiated work will have progress indicated by the display of placeholder content or modal user interface.
+ 
+ * @constant QOS_CLASS_DEFAULT
+ * @abstract A default QOS class used by the system in cases where more specific
+ * QOS class information is not available.
+ * @discussion Such work is requested to run at a priority below critical user-
+ * interactive and user-initiated work, but relatively higher than utility and
+ * background tasks. Threads created by pthread_create() without an attribute
+ * specifying a QOS class will default to QOS_CLASS_DEFAULT. This QOS class
+ * value is not intended to be used as a work classification, it should only be
+ * set when propagating or restoring QOS class values provided by the system.
+ *
+ * @constant QOS_CLASS_UTILITY
+ * @abstract A QOS class which indicates work performed by this thread
+ * may or may not be initiated by the user and that the user is unlikely to be
+ * immediately waiting for the results.
+ * @discussion Such work is requested to run at a priority below critical user-
+ * interactive and user-initiated work, but relatively higher than low-level
+ * system maintenance tasks. The use of this QOS class indicates the work
+ * should be run in an energy and thermally-efficient manner. The progress of
+ * utility work may or may not be indicated to the user, but the effect of such
+ * work is user-visible.
+ *
+ * @constant QOS_CLASS_BACKGROUND
+ * @abstract A QOS class which indicates work performed by this thread was not
+ * initiated by the user and that the user may be unaware of the results.
+ * @discussion Such work is requested to run at a priority below other work.
+ * The use of this QOS class indicates the work should be run in the most energy
+ * and thermally-efficient manner.
+ *
+ * @constant QOS_CLASS_UNSPECIFIED
+ * @abstract A QOS class value which indicates the absence or removal of QOS
+ * class information.
+ * @discussion As an API return value, may indicate that threads or pthread
+ * attributes were configured with legacy API incompatible or in conflict with
+ * the QOS class system.
+ */
+
+#### dispatch_queue_attr_make_with_qos_class
+&emsp;
+```c++
+API_AVAILABLE(macos(10.10), ios(8.0))
+DISPATCH_EXPORT DISPATCH_WARN_RESULT DISPATCH_PURE DISPATCH_NOTHROW
+dispatch_queue_attr_t
+dispatch_queue_attr_make_with_qos_class(dispatch_queue_attr_t _Nullable attr,
+        dispatch_qos_class_t qos_class, int relative_priority);
+```
+&emsp;
 
 
 
