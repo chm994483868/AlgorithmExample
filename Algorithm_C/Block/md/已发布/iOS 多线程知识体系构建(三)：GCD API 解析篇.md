@@ -306,6 +306,7 @@ if (x) {
 &emsp;如示例所示，栈变量的地址正在转义其分配范围。那是一个经典的C bug。相反，必须使用 `Block_copy()` 函数或通过发送 `-[copy]` 消息将 block 复制到堆中。(看到这里对 block 内部结构比较熟悉的同学感觉应该会很亲切。)
 
 #### dispatch_async
+&emsp;`dispatch_async` 提交一个 block 以在调度队列上异步执行。
 ```c++
 #ifdef __BLOCKS__
 API_AVAILABLE(macos(10.6), ios(4.0))
@@ -314,8 +315,79 @@ void
 dispatch_async(dispatch_queue_t queue, dispatch_block_t block);
 #endif
 ```
+&emsp;`dispatch_async` 函数是用于将 block 提交到调度队列的基本机制。对 `dispatch_async` 函数的调用总是在 block 被提交后立即返回，而从不等待 block 被调用。（即我们熟悉的异步调用不会阻塞当前线程，因为 `dispatch_async` 函数提交 block 以后就立即返回了，对应的 `dispatch_sync` 函数调用则是等 block 执行结束以后才会返回。我们潜意识里可能觉的 `dispatch_async` 函数所提交的队列类型不同会影响该函数是否立即返回 ，这里 `dispatch_async` 函数是否立即返回和提交的队列类型是完全无关的，`dispatch_async` 函数不管是提交 block 到并发队列还是串行队列都会立即返回，不会阻塞当前线程。)
 
+&emsp;目标队列（`dispatch_queue_t queue`）决定是串行调用该块还是同时调用提交到同一队列的其它块。（当 queue 是并发队列时会开启多条线程并发执行所有的 block，如果 queue 是串行队列（除了主队列）的话则是仅开辟一条线程串行执行所有的 block，如果主队列的话则是不开启线程直接在主线程中串行执行所有的 block），`dispatch_async` 函数提交 `block` 到不同的串行队列，则这些串行队列是相互并行处理的。（它们在不同的线程中并发执行串行队列中的 block）
 
+&emsp;`queue`：block 提交到的目标调度队列。系统将在目标队列上保留引用，直到该 block 调用完成为止。在此参数中传递 `NULL` 的结果是不确定的。
+
+&emsp;`block`：提交到目标调度队列的 block。该函数代表调用者执行 `Block_copy()` 和 `Block_release()` 函数。在此参数中传递 `NULL` 的结果是不确定的。
+#### dispatch_function_t
+&emsp;`dispatch_function_t` 是一个返回值是 void 参数是 void *（可空）的函数指针。
+```c++
+typedef void (*dispatch_function_t)(void *_Nullable);
+```
+#### dispatch_async_f
+&emsp;`dispatch_async_f` 提交一个函数以在调度队列上异步执行。
+```c++
+API_AVAILABLE(macos(10.6), ios(4.0))
+DISPATCH_EXPORT DISPATCH_NONNULL1 DISPATCH_NONNULL3 DISPATCH_NOTHROW
+void
+dispatch_async_f(dispatch_queue_t queue,
+        void *_Nullable context, dispatch_function_t work);
+```
+&emsp;详细信息同上 `dispatch_async`。
+
+&emsp;`queue`：函数被提交到的目标调度队列。系统将在目标队列上保留引用，直到函数执行完返回。在此参数中传递 `NULL` 的结果是不确定的。
+
+&emsp;`context`：应用程序定义的上下文参数，以传递给函数，作为 `work` 函数执行时的参数。
+
+&emsp;`work`：在目标队列上调用的应用程序定义的函数。传递给此函数的第一个参数是提供给 `dispatch_async_f` 的 `context` 参数。在此参数中传递 `NULL` 的结果是不确定的。
+#### dispatch_sync
+&emsp;`dispatch_sync` 提交一个 block 以在调度队列上同步执行。
+```c++
+#ifdef __BLOCKS__
+API_AVAILABLE(macos(10.6), ios(4.0))
+DISPATCH_EXPORT DISPATCH_NONNULL_ALL DISPATCH_NOTHROW
+void
+dispatch_sync(dispatch_queue_t queue, DISPATCH_NOESCAPE dispatch_block_t block);
+#endif
+```
+&emsp;`dispatch_sync` 函数用于将工作项提交到一个 dispatch queue，像 `dispatch_async` 函数一样，但是 `dispatch_sync` 在工作项完成之前不会返回。(即 `dispatch_sync` 函数只有在提交到队列的 block 执行完成以后才会返回，会阻塞当前线程)。
+
+&emsp;使用 `dispatch_sync` 函数提交到队列的工作项在调用时不会遵守该队列的某些队列属性（例如自动释放频率和 QOS 类）。
+
+&emsp;针对当前队列调用 `dispatch_sync` 将导致死锁（dead-lock）（如在任何串行队列（包括主线程）中调用 `dispatch_sync` 函数提交 block 到当前串行队列，必死锁）。使用 `dispatch_sync` 也会遇到由于使用互斥锁而导致的多方死锁（multi-party dead-lock）问题，最好使用 `dispatch_async`。
+
+&emsp;与 `dispatch_async` 不同，在目标队列上不执行保留。因为对这个函数的调用是同步的，所以dispatch_sync（）会 “借用” 调用者的引用。
+
+&emsp;作为一种优化，`dispatch_sync` 在提交该工作项的线程上调用该工作项，除非所传递的队列是主队列或以其为目标的队列（参见 `dispatch_queue_main_t`，`dispatch_set_target_queue`）。
+
+&emsp;`queue`：block 提交到的目标调度队列。在此参数中传递 `NULL` 的结果是不确定的。
+
+&emsp;`block`：在目标调度队列上要调用的 block。在此参数中传递 `NULL` 的结果是不确定的。
+#### dispatch_sync_f
+&emsp;`dispatch_sync_f` 提交一个函数以在调度队列上同步执行。
+```c++
+API_AVAILABLE(macos(10.6), ios(4.0))
+DISPATCH_EXPORT DISPATCH_NONNULL1 DISPATCH_NONNULL3 DISPATCH_NOTHROW
+void
+dispatch_sync_f(dispatch_queue_t queue,
+        void *_Nullable context, dispatch_function_t work);
+```
+&emsp;详细信息同上 `dispatch_sync`。
+
+&emsp;`queue`：函数提交到的目标调度队列。在此参数中传递 `NULL` 的结果是不确定的。
+
+&emsp;`context`：应用程序定义的上下文参数，以传递给函数，作为 `work` 函数执行时的参数。
+
+&emsp;`work`：在目标队列上调用的应用程序定义的函数。传递给此函数的第一个参数是提供给 `dispatch_sync_f` 的 `context` 参数。在此参数中传递 `NULL` 的结果是不确定的。
+#### dispatch_async_and_wait
+&emsp;
+
+```c++
+
+```
 
 ## 参考链接
 **参考链接:🔗**
