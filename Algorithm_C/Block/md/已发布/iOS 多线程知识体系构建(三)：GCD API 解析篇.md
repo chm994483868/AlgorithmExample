@@ -575,7 +575,6 @@ DISPATCH_DECL(dispatch_queue_attr);
 typedef NSObject<OS_dispatch_queue_attr> * dispatch_queue_attr_t;
 ```
 &emsp;`OS_dispatch_queue_attr` 是继承自 `OS_dispatch_object` 协议的协议，并且为遵循该协议的 `NSObject` 实例对象类型的指针定义了一个 `dispatch_queue_attr_t` 的别名。（`dispatch_queue_attr_t` 具体是不是 NSObject 后面待确认）
-
 #### dispatch_queue_attr_make_initially_inactive
 &emsp;`dispatch_queue_attr_make_initially_inactive` 返回一个属性值，该值可提供给 `dispatch_queue_create` 或 `dispatch_queue_create_with_target`，以便使创建的队列最初处于非活动状态。
 ```c++
@@ -626,25 +625,59 @@ struct dispatch_queue_attr_s _dispatch_queue_attr_concurrent; // 这里有一个
 #define DISPATCH_QUEUE_CONCURRENT_INACTIVE \
         dispatch_queue_attr_make_initially_inactive(DISPATCH_QUEUE_CONCURRENT)
 ```
+#### dispatch_autorelease_frequency_t
+&emsp;`dispatch_autorelease_frequency_t` 传递给 `dispatch_queue_attr_make_with_autorelease_frequency()` 函数的值。
+```c++
+// 枚举宏定义
+#define DISPATCH_ENUM(name, type, ...) \
+typedef enum : type { __VA_ARGS__ } __DISPATCH_ENUM_ATTR name##_t
 
+DISPATCH_ENUM(dispatch_autorelease_frequency, unsigned long,
+    DISPATCH_AUTORELEASE_FREQUENCY_INHERIT DISPATCH_ENUM_API_AVAILABLE(
+            macos(10.12), ios(10.0), tvos(10.0), watchos(3.0)) = 0,
+    DISPATCH_AUTORELEASE_FREQUENCY_WORK_ITEM DISPATCH_ENUM_API_AVAILABLE(
+            macos(10.12), ios(10.0), tvos(10.0), watchos(3.0)) = 1,
+    DISPATCH_AUTORELEASE_FREQUENCY_NEVER DISPATCH_ENUM_API_AVAILABLE(
+            macos(10.12), ios(10.0), tvos(10.0), watchos(3.0)) = 2,
+);
+```
+&emsp;`DISPATCH_AUTORELEASE_FREQUENCY_INHERIT`：具有这种自动释放频率（autorelease frequency）的调度队列将从其目标队列继承行为，这是手动创建的队列的默认行为。
 
+&emsp;`DISPATCH_AUTORELEASE_FREQUENCY_WORK_ITEM`：具有这种自动释放频率（autorelease frequency）的调度队列在异步提交给它的每个块的执行周围 push 和 pop 一个自动释放池。参考 `dispatch_queue_attr_make_with_autorelease_frequency()`。
 
+&emsp;`DISPATCH_AUTORELEASE_FREQUENCY_NEVER`：具有这种自动释放频率（autorelease frequency）的调度队列永远不会围绕异步执行提交给它的块的执行设置单个自动释放池，这是全局并发队列的行为。
+#### dispatch_queue_attr_make_with_autorelease_frequency
+&emsp;`dispatch_queue_attr_make_with_autorelease_frequency` 返回自动释放频率（autorelease frequency）设置为指定值的调度队列属性值。
+```c++
+API_AVAILABLE(macos(10.12), ios(10.0), tvos(10.0), watchos(3.0))
+DISPATCH_EXPORT DISPATCH_WARN_RESULT DISPATCH_PURE DISPATCH_NOTHROW
+dispatch_queue_attr_t
+dispatch_queue_attr_make_with_autorelease_frequency(
+        dispatch_queue_attr_t _Nullable attr,
+        dispatch_autorelease_frequency_t frequency);
+```
+&emsp;当队列使用按工作项自动释放的频率（直接或从其目标队列继承）时，将异步提交到此队列的任何块（通过dispatch_async（），dispatch_barrier_async（），dispatch_group_notify（）等）执行。如果被单个Objective-C @autoreleasepool 范围包围。
+
+&emsp;当队列使用每个工作项自动释放频率（直接或从其目标队列继承）时，异步提交到此队列的任何块（通过 `dispatch_async`、`dispatch_barrier_async`、`dispatch_group_notify` 等）都将被执行，就像被单独的 Objective-C `@autoreleasepool` 作用域包围一样。
+
+&emsp;自动释放频率对同步提交到队列（通过 `dispatch_sync`，`dispatch_barrier_sync`）的块没有影响。
+
+&emsp;全局并发队列具有 `DISPATCH_AUTORELEASE_FREQUENCY_NEVER` 行为。手动创建的调度队列默认情况下使用 `DISPATCH_AUTORELEASE_FREQUENCY_INHERIT`。
+
+&emsp;使用此属性创建的队列在激活后无法更改目标队列。参考 `dispatch_set_target_queue` 和 `dispatch_activate`。
+
+&emsp;`attr`：要与指定的自动释放频率或 `NULL` 组合的队列属性值。
+
+&emsp;`frequency`：请求的自动释放频率。
+
+&emsp;`return`：返回可以提供给 `dispatch_queue_create` 的属性值，如果请求的自动释放频率无效，则为 `NULL`。这个新值结合了 “ attr” 参数指定的属性和所选的自动释放频率。
 #### DISPATCH_QUEUE_SERIAL_WITH_AUTORELEASE_POOL
-&emsp;
+&emsp;`DISPATCH_QUEUE_SERIAL_WITH_AUTORELEASE_POOL` 使用此属性创建的调度队列按 FIFO 顺序串行调用块，并用相当于单个 Objective-C @autoreleasepool 作用域来包围异步提交给它的任何块的执行。
 ```c++
 #define DISPATCH_QUEUE_SERIAL_WITH_AUTORELEASE_POOL \
         dispatch_queue_attr_make_with_autorelease_frequency(\
                 DISPATCH_QUEUE_SERIAL, DISPATCH_AUTORELEASE_FREQUENCY_WORK_ITEM)
 ```
-
-/*!
-* @const DISPATCH_QUEUE_SERIAL_WITH_AUTORELEASE_POOL
-*
-* @discussion
-* A dispatch queue created with this attribute invokes blocks serially in FIFO order, and surrounds execution of any block submitted asynchronously to it with the equivalent of a individual Objective-C <code>@autoreleasepool</code> scope.
-*
-* See dispatch_queue_attr_make_with_autorelease_frequency().
-*/
 
 
 
