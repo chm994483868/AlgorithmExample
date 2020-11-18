@@ -382,7 +382,7 @@
 		D202B340255BCB7100D9BFBC /* CommonParentInTree.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = CommonParentInTree.hpp; sourceTree = "<group>"; };
 		D202B342255BD48B00D9BFBC /* iOS 多线程知识体系构建(一)：基本概念篇.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 多线程知识体系构建(一)：基本概念篇.md"; sourceTree = "<group>"; };
 		D202B343255D367500D9BFBC /* iOS 多线程知识体系构建(二)：Pthreads、NSThread篇.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 多线程知识体系构建(二)：Pthreads、NSThread篇.md"; sourceTree = "<group>"; };
-		D202B347256135DD00D9BFBC /* iOS 多线程知识体系构建(三)：GCD API 全解析篇.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 多线程知识体系构建(三)：GCD API 全解析篇.md"; sourceTree = "<group>"; };
+		D202B347256135DD00D9BFBC /* iOS 多线程知识体系构建(三)：GCD API（queue.h）解析篇.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 多线程知识体系构建(三)：GCD API（queue.h）解析篇.md"; sourceTree = "<group>"; };
 		D2090C0324CFA51E00FA4F51 /* NextNodeInBinaryTrees.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = NextNodeInBinaryTrees.cpp; sourceTree = "<group>"; };
 		D2090C0424CFA51E00FA4F51 /* NextNodeInBinaryTrees.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = NextNodeInBinaryTrees.hpp; sourceTree = "<group>"; };
 		D2090C0724CFAD4B00FA4F51 /* QueueWithTwoStacks.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = QueueWithTwoStacks.cpp; sourceTree = "<group>"; };
@@ -549,6 +549,7 @@
 		D2EB014024DB7A5C009EAFD6 /* Block */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = Block; sourceTree = BUILT_PRODUCTS_DIR; };
 		D2EB014224DB7A5C009EAFD6 /* main.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = main.m; sourceTree = "<group>"; };
 		D2EB014724DB7B3A009EAFD6 /* iOS 从 libclosure-74 源码来研究 Block 实现原理(1).md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 从 libclosure-74 源码来研究 Block 实现原理(1).md"; sourceTree = "<group>"; };
+		D2F0AF712565151E00DCE258 /* iOS 多线程知识体系构建(四)：GCD API（object.h）解析篇.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 多线程知识体系构建(四)：GCD API（object.h）解析篇.md"; sourceTree = "<group>"; };
 		D2F305B324DF90890020A5C2 /* NSObject+ArcDebugRetainCount.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "NSObject+ArcDebugRetainCount.h"; sourceTree = "<group>"; };
 		D2F305B424DF90890020A5C2 /* NSObject+ArcDebugRetainCount.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = "NSObject+ArcDebugRetainCount.m"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -1382,7 +1383,8 @@
 				D202B2962552798F00D9BFBC /* GCD.md */,
 				D202B342255BD48B00D9BFBC /* iOS 多线程知识体系构建(一)：基本概念篇.md */,
 				D202B343255D367500D9BFBC /* iOS 多线程知识体系构建(二)：Pthreads、NSThread篇.md */,
-				D202B347256135DD00D9BFBC /* iOS 多线程知识体系构建(三)：GCD API 全解析篇.md */,
+				D202B347256135DD00D9BFBC /* iOS 多线程知识体系构建(三)：GCD API（queue.h）解析篇.md */,
+				D2F0AF712565151E00DCE258 /* iOS 多线程知识体系构建(四)：GCD API（object.h）解析篇.md */,
 			);
 			path = "已发布";
 			sourceTree = "<group>";

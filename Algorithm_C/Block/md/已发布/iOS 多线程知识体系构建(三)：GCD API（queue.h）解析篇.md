@@ -1,4 +1,4 @@
-# iOS 多线程知识体系构建(三)：GCD API 全解析篇
+# iOS 多线程知识体系构建(三)：GCD API（queue.h）解析篇
 
 > &emsp;Grand Central Dispatch (GCD) 是 Apple 开发的一个多核编程的较新的解决方法。
 
@@ -912,6 +912,11 @@ dispatch_main(void);
 &emsp;此函数 “驻留” 主线程，并等待将块提交到主队列，该函数从不返回。
 
 &emsp;在主线程上调用 `NSApplicationMain` 或 `CFRunLoopRun` 的应用程序无需调用 `dispatch_main`。
+#### dispatch_time_t
+&emsp;`dispatch_time_t` 时间的某种抽象表示；其中零表示 “现在”，而 `DISPATCH_TIME_FOREVER` 表示 “无穷大”，其间的每个值都是不透明的编码。
+```c++
+typedef uint64_t dispatch_time_t;
+```
 #### dispatch_after
 &emsp;`dispatch_after` 安排一个 block 在指定时间后在给定队列上执行。
 ```c++
@@ -922,28 +927,202 @@ void
 dispatch_after(dispatch_time_t when, dispatch_queue_t queue,
         dispatch_block_t block);
 #endif
+
+// 示例：
+// 在 serialQueue 队列中 2 秒后执行
+dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 2 * NSEC_PER_SEC), serialQueue, ^{
+    NSLog(@"🚥🚥 %@", [NSThread currentThread]);
+});
 ```
 &emsp;支持将 `DISPATCH_TIME_NOW` 作为 “when” 参数传递，但不如调用 `dispatch_async` 那样理想。传递 `DISPATCH_TIME_FOREVER` 是不确定的。
 
-&emsp;`when`：
+&emsp;`when`：`dispatch_time` 或 `dispatch_walltime` 返回的时间里程碑。
 
-/*!
-*
-* @discussion
-* Passing DISPATCH_TIME_NOW as the "when" parameter is supported, but not as optimal as calling dispatch_async() instead. Passing DISPATCH_TIME_FOREVER is undefined.
+&emsp;`queue`：给定块将在指定时间提交到的队列。在此参数中传递 `NULL` 的结果是不确定的。
 
-* @param when
-* A temporal milestone returned by dispatch_time() or dispatch_walltime().
-*
-* @param queue
-* A queue to which the given block will be submitted at the specified time.
-* The result of passing NULL in this parameter is undefined.
-*
-* @param block
-* The block of code to execute.
-* The result of passing NULL in this parameter is undefined.
-*/
+&emsp;`block`：要执行的代码块。在此参数中传递 `NULL` 的结果是不确定的。
+#### dispatch_after_f
+&emsp;`dispatch_after_f` 安排一个函数在指定时间后在给定队列上执行，`context` 做为其参数。
+```c++
+API_AVAILABLE(macos(10.6), ios(4.0))
+DISPATCH_EXPORT DISPATCH_NONNULL2 DISPATCH_NONNULL4 DISPATCH_NOTHROW
+void
+dispatch_after_f(dispatch_time_t when, dispatch_queue_t queue,
+        void *_Nullable context, dispatch_function_t work);
+```
+&emsp;可参考 `dispatch_after` 函数，只是把 block 换成了函数。 
+#### Dispatch Barrier API
+&emsp;Dispatch barrier API 是一种机制，用于将屏障块（barrier blocks）提交给调度队列，类似于 dispatch_async/dispatch_sync API。它可以实现有效的读取器/写入器方案。
+&emsp;屏障块仅在​​提交给使用 `DISPATCH_QUEUE_CONCURRENT` 属性创建的队列时才表现出特殊的行为。在这样的队列上，屏障块将不会运行，直到更早提交给队列的所有块都已完成，并且屏障块之后提交给队列的任何块都将不会运行，直到屏障块已完成。
+&emsp;当提交到**全局队列**或未使用 `DISPATCH_QUEUE_CONCURRENT` 属性创建的队列时，屏障块的行为与使用 dispatch_async/dispatch_sync API 提交的块相同。（如果使用 `dispatch_async` 和 `dispatch_barrier_async` 提交到 `dispatch_get_global_queue` 取得的 queue，则并发执行，失去屏障的功能。）
+#### dispatch_barrier_async
+&emsp;`dispatch_barrier_async` 提交 barrier block 以在调度队列上异步执行。（同 `dispatch_async` 不会阻塞当前线程，直接返回执行接下来的语句，但是后添加的 block 则是等到 barrier block 执行完成后才会开始执行。）
+```c++
+#ifdef __BLOCKS__
+API_AVAILABLE(macos(10.7), ios(4.3))
+DISPATCH_EXPORT DISPATCH_NONNULL_ALL DISPATCH_NOTHROW
+void
+dispatch_barrier_async(dispatch_queue_t queue, dispatch_block_t block);
+#endif
+```
+&emsp;将一个块提交到诸如 `dispatch_async` 之类的调度队列中，但将该块标记为屏障（barrier）（仅与 `DISPATCH_QUEUE_CONCURRENT` 队列相关）。
 
+&emsp;`queue`：块提交到的目标调度队列。系统将在目标队列上保留引用，直到该块完成为止。在此参数中传递 `NULL` 的结果是不确定的。
+
+&emsp;`block`：提交到目标调度队列的块。该函数代表调用者执行 `Block_copy` 和 `Block_release`。在此参数中传递 `NULL` 的结果是不确定的。
+#### dispatch_barrier_async_f
+&emsp;`dispatch_barrier_async_f` 同上，只是把 `block` 换成了函数。
+```c++
+API_AVAILABLE(macos(10.7), ios(4.3))
+DISPATCH_EXPORT DISPATCH_NONNULL1 DISPATCH_NONNULL3 DISPATCH_NOTHROW
+void
+dispatch_barrier_async_f(dispatch_queue_t queue,
+        void *_Nullable context, dispatch_function_t work);
+```
+#### dispatch_barrier_sync
+&emsp;`dispatch_barrier_sync` 提交屏障块（barrier block）以在调度队列上**同步执行**（会阻塞当前线程，直到 barrier block 执行完成才会返回）。
+```c++
+#ifdef __BLOCKS__
+API_AVAILABLE(macos(10.7), ios(4.3))
+DISPATCH_EXPORT DISPATCH_NONNULL_ALL DISPATCH_NOTHROW
+void
+dispatch_barrier_sync(dispatch_queue_t queue,
+        DISPATCH_NOESCAPE dispatch_block_t block);
+#endif
+```
+&emsp;将一个块提交到诸如 `dispatch_sync`之类的调度队列中（阻塞当前线程，直到 block 执行完毕才会返回），但将该块标记为屏障（仅与 `DISPATCH_QUEUE_CONCURRENT` 队列相关）。
+
+&emsp;`queue`：块提交到的目标调度队列。在此参数中传递 `NULL` 的结果是不确定的。
+
+&emsp;`block`：在目标调度队列上要调用的块。在此参数中传递 `NULL` 的结果是不确定的。
+#### dispatch_barrier_sync_f
+&emsp;同 `dispatch_barrier_sync`，仅是把 block 替换为了函数。
+```c++
+API_AVAILABLE(macos(10.7), ios(4.3))
+DISPATCH_EXPORT DISPATCH_NONNULL1 DISPATCH_NONNULL3 DISPATCH_NOTHROW
+void
+dispatch_barrier_sync_f(dispatch_queue_t queue,
+        void *_Nullable context, dispatch_function_t work);
+```
+#### dispatch_barrier_async_and_wait
+&emsp;`dispatch_barrier_async_and_wait` 提交一个块以在调度队列上同步执行。
+```c++
+#ifdef __BLOCKS__
+API_AVAILABLE(macos(10.14), ios(12.0), tvos(12.0), watchos(5.0))
+DISPATCH_EXPORT DISPATCH_NONNULL_ALL DISPATCH_NOTHROW
+void
+dispatch_barrier_async_and_wait(dispatch_queue_t queue,
+        DISPATCH_NOESCAPE dispatch_block_t block);
+#endif
+```
+&emsp;将一个块提交到诸如 `dispatch_async_and_wait` 之类的调度队列中，但将该块标记为屏障（barrier）（仅与 `DISPATCH_QUEUE_CONCURRENT` 队列相关）。
+#### dispatch_barrier_async_and_wait_f
+&emsp;同 `dispatch_barrier_async_and_wait`，仅是把 block 替换为了函数。 
+```c++
+API_AVAILABLE(macos(10.14), ios(12.0), tvos(12.0), watchos(5.0))
+DISPATCH_EXPORT DISPATCH_NONNULL1 DISPATCH_NONNULL3 DISPATCH_NOTHROW
+void
+dispatch_barrier_async_and_wait_f(dispatch_queue_t queue,
+        void *_Nullable context, dispatch_function_t work);
+```
+#### Dispatch queue-specific contexts
+&emsp;这个API允许不同的子系统将上下文与共享队列关联起来，而不会有冲突的风险，并且可以从目标队列层次结构中该队列或其任何子队列上执行的块检索上下文。
+#### dispatch_queue_set_specific
+&emsp;`dispatch_queue_set_specific` 将子系统特定的上下文与调度队列相关联，以获得子系统特有的 key（这里 key 参数类型是 `const void *` （指针指向可以变，但是指向的内容不能通过该指针修改））。
+```c++
+API_AVAILABLE(macos(10.7), ios(5.0))
+DISPATCH_EXPORT DISPATCH_NONNULL1 DISPATCH_NOTHROW
+void
+dispatch_queue_set_specific(dispatch_queue_t queue, const void *key,
+        void *_Nullable context, dispatch_function_t _Nullable destructor);
+```
+&emsp;当为同一个 key 设置了新的上下文时，或者在释放了对队列的所有引用之后，将使用默认优先级全局并发队列上的上下文调用指定的析构函数。
+ 
+&emsp;`queue`：调度队列进行修改。在此参数中传递 `NULL` 的结果是不确定的。
+
+&emsp;`key`：要为其设置上下文的键，通常是指向特定于子系统的静态变量的指针。 key 只作为指针进行比较，从不取消引用。不建议直接传递字符串常量，保留 `NULL` 键，并忽略为其设置上下文的尝试。
+
+&emsp;`context`：对象的新的特定于子系统的上下文。这可能为 `NULL`。
+
+&emsp;`destructor`：析构函数的指针。这可以为 `NULL`，如果 `context` 为 `NULL`，则将其忽略。
+#### dispatch_queue_get_specific
+&emsp;`dispatch_queue_get_specific` 返回与调度队列相关联的子系统特定上下文，用于子系统唯一的键。
+```c++
+API_AVAILABLE(macos(10.7), ios(5.0))
+DISPATCH_EXPORT DISPATCH_NONNULL1 DISPATCH_PURE DISPATCH_WARN_RESULT
+DISPATCH_NOTHROW
+void *_Nullable
+dispatch_queue_get_specific(dispatch_queue_t queue, const void *key);
+```
+&emsp;如果已在指定队列上设置了指定键，则返回该键的上下文。
+
+&emsp;`key`：获取上下文的键，通常是指向特定于子系统的静态变量的指针。key 仅作为指针进行比较，而不会取消引用，不建议直接传递字符串常量。
+
+&emsp;`result`：指定键的上下文；如果未找到上下文，则为 `NULL`。
+#### dispatch_get_specific
+&emsp;`dispatch_get_specific` 返回子系统唯一的 key 的当前特定于子系统的上下文。
+```c++
+API_AVAILABLE(macos(10.7), ios(5.0))
+DISPATCH_EXPORT DISPATCH_PURE DISPATCH_WARN_RESULT DISPATCH_NOTHROW
+void *_Nullable
+dispatch_get_specific(const void *key);
+```
+&emsp;从队列上执行的块调用时，如果指定键已在队列上设置，则返回该键的上下文；否则，返回在队列的目标队列上执行的 `dispatch_get_specific` 的结果；如果当前队列是全局并发队列，则返回 `NULL`。
+
+&emsp;`key`：获取上下文的键，通常是指向特定于子系统的静态变量的指针。key 仅作为指针进行比较，而不会取消引用，不建议直接传递字符串常量。
+
+&emsp;`result`: 指定 key 的上下文；如果未找到上下文，则为 `NULL`。
+#### Dispatch assertion API
+&emsp;Dispatch assertion API 在运行时断言代码正在给定队列的上下文中执行（或从其执行）。它可用于从保护资源的适当队列中检查访问资源的块是否这样做。它还可以用于验证如果在给定队列上运行可能导致死锁的块永远不会在该队列上执行。
+#### dispatch_assert_queue
+&emsp;`dispatch_assert_queue` 验证当前块是否在给定的调度队列上执行。
+```c++
+API_AVAILABLE(macos(10.12), ios(10.0), tvos(10.0), watchos(3.0))
+DISPATCH_EXPORT DISPATCH_NONNULL1
+void
+dispatch_assert_queue(dispatch_queue_t queue)
+        DISPATCH_ALIAS_V2(dispatch_assert_queue);
+```
+&emsp;某些代码希望在特定的调度队列上运行，此函数验证该期望为真。
+
+&emsp;如果当前正在执行的块已提交给​​指定队列或任何以它为目标的队列（参阅 `dispatch_set_target_queue`），则此函数返回。
+
+&emsp;如果当前执行的块是使用同步 API 提交的（`dispatch_sync`，`dispatch_barrier_sync` 等），则也会（递归地）评估提交块的上下文。如果发现同步提交的块本身已提交到指定队列或任何以它为目标的队列，则此函数返回。
+
+&emsp;否则，此函数将声明：将解释记录到系统日志并终止应用程序。
+
+&emsp;将 `dispatch_get_main_queue` 的结果传递给此函数可验证当前块是否已提交到主队列或提交给它的队列，或者是否正在主线程上运行（在任何上下文中）。
+
+&emsp;当在提交的块的上下文之外（例如，从使用 `pthread_create` 手动创建的线程的上下文中）调用 `dispatch_assert_queue` 时，此函数还将声明并终止应用程序。
+
+&emsp;`queue`：当前块应在其上运行的调度队列。在此参数中传递 `NULL` 的结果是不确定的。
+#### dispatch_assert_queue_barrier
+&emsp;`dispatch_assert_queue_barrier` 验证当前块是否在给定的调度队列上执行，并且该块充当该队列上的屏障（barrier）。
+```c++
+API_AVAILABLE(macos(10.12), ios(10.0), tvos(10.0), watchos(3.0))
+DISPATCH_EXPORT DISPATCH_NONNULL1
+void
+dispatch_assert_queue_barrier(dispatch_queue_t queue);
+```
+&emsp;行为与 `dispatch_assert_queue` 完全一样，另外还要检查当前块是否充当指定队列上的屏障，如果指定队列是串行的，则始终为 true（参见 `DISPATCH_BLOCK_BARRIER` 或 `dispatch_barrier_async`）。
+
+&emsp;`queue`：当前块应作为屏障运行的调度队列。在此参数中传递 `NULL` 的结果是不确定的。
+#### dispatch_assert_queue_not
+&emsp;`dispatch_assert_queue_not` 验证当前块不在给定调度队列上执行。
+```c++
+API_AVAILABLE(macos(10.12), ios(10.0), tvos(10.0), watchos(3.0))
+DISPATCH_EXPORT DISPATCH_NONNULL1
+void
+dispatch_assert_queue_not(dispatch_queue_t queue)
+        DISPATCH_ALIAS_V2(dispatch_assert_queue_not);
+```
+&emsp;等效于 `dispatch_assert_queue`，但相等性测试却相反。这意味着它将在 `dispatch_assert_queue` 返回时终止应用程序，反之亦然。
+ 
+&emsp;`queue`：当前块不应在其上运行的调度队列。在此参数中传递 `NULL` 的结果是不确定的。
+ 
+&emsp;`dispatch_assert_queue_debug`、`dispatch_assert_queue_barrier_debug`、`dispatch_assert_queue_not_debug` 仅在 `DEBUG` 模式下可用。
+
+&emsp;至此 queue.h 文件终于看完了，作为 dispatch 中最大的一个文件，包含的信息还是挺多的，需要耐心学习。⛽️⛽️
 
 ## 参考链接
 **参考链接:🔗**
