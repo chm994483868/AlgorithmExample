@@ -1,4 +1,4 @@
-# iOS 多线程知识体系构建(三)：GCD API 解析篇
+# iOS 多线程知识体系构建(三)：GCD API 全解析篇
 
 > &emsp;Grand Central Dispatch (GCD) 是 Apple 开发的一个多核编程的较新的解决方法。
 
@@ -736,57 +736,19 @@ __QOS_ENUM(qos_class, unsigned int,
 
 &emsp;尽最大努力将可用的系统资源分配给每个 QOS 类。服务质量（Quality of service）降低仅发生在系统资源争用期间，与 QOS 等级成比例。也就是说，QOS 类代表用户发起的工作试图达到峰值吞吐量，而 QOS 类则试图实现峰值能量和热效率，即使在没有争用的情况下。最后，QOS 类的使用不允许线程取代可能应用于整个进程的任何限制。
 
-&emsp;`QOS_CLASS_USER_INTERACTIVE`：
-
-/*!
- * @constant QOS_CLASS_USER_INTERACTIVE
- * @abstract A QOS class which indicates work performed by this thread is interactive with the user.
- 
- * @discussion Such work is requested to run at high priority relative to other work on the system. Specifying this QOS class is a request to run with nearly all available system CPU and I/O bandwidth even under contention. This is not an energy-efficient QOS class to use for large tasks. The use of this QOS class should be limited to critical interaction with the user such as handling events on the main event loop, view drawing, animation, etc.
- 
- * @constant QOS_CLASS_USER_INITIATED
- * @abstract A QOS class which indicates work performed by this thread was initiated by the user and that the user is likely waiting for the results.
- 
- * @discussion Such work is requested to run at a priority below critical user-interactive work, but relatively higher than other work on the system. This is not an energy-efficient QOS class to use for large tasks. Its use should be limited to operations of short enough duration that the user is unlikely to switch tasks while waiting for the results. Typical user-initiated work will have progress indicated by the display of placeholder content or modal user interface.
- 
- * @constant QOS_CLASS_DEFAULT
- * @abstract A default QOS class used by the system in cases where more specific
- * QOS class information is not available.
- * @discussion Such work is requested to run at a priority below critical user-
- * interactive and user-initiated work, but relatively higher than utility and
- * background tasks. Threads created by pthread_create() without an attribute
- * specifying a QOS class will default to QOS_CLASS_DEFAULT. This QOS class
- * value is not intended to be used as a work classification, it should only be
- * set when propagating or restoring QOS class values provided by the system.
- *
- * @constant QOS_CLASS_UTILITY
- * @abstract A QOS class which indicates work performed by this thread
- * may or may not be initiated by the user and that the user is unlikely to be
- * immediately waiting for the results.
- * @discussion Such work is requested to run at a priority below critical user-
- * interactive and user-initiated work, but relatively higher than low-level
- * system maintenance tasks. The use of this QOS class indicates the work
- * should be run in an energy and thermally-efficient manner. The progress of
- * utility work may or may not be indicated to the user, but the effect of such
- * work is user-visible.
- *
- * @constant QOS_CLASS_BACKGROUND
- * @abstract A QOS class which indicates work performed by this thread was not
- * initiated by the user and that the user may be unaware of the results.
- * @discussion Such work is requested to run at a priority below other work.
- * The use of this QOS class indicates the work should be run in the most energy
- * and thermally-efficient manner.
- *
- * @constant QOS_CLASS_UNSPECIFIED
- * @abstract A QOS class value which indicates the absence or removal of QOS
- * class information.
- * @discussion As an API return value, may indicate that threads or pthread
- * attributes were configured with legacy API incompatible or in conflict with
- * the QOS class system.
- */
-
++ `QOS_CLASS_USER_INTERACTIVE`：指示此线程执行的工作是用户交互。要求此类工作相对于系统上的其他工作具有较高的优先级。指定此QOS类是一个请求，要求即使在竞争中也要使用几乎所有可用的系统 CPU 和 I/O 带宽运行。这不是用于大型任务的高能效 QOS 类。该 QOS 类的使用应限于与用户的关键交互，如处理主事件循环上的事件、视图绘制、动画等。(可以直白的理解为告诉系统更高优先级的处理用户的交互事件)
++ `QOS_CLASS_USER_INITIATED`：指示此线程执行的工作是由用户启动的，并且用户可能正在等待结果。要求此类工作在低于关键用户交互性工作的优先级下运行，但要相对于系统上的其他工作更高。这不是用于大型任务的高能效 QOS 类。它的使用应限于持续时间足够短的操作，以使用户在等待结果时不太可能切换任务。典型的用户启动的工作将通过占位符内容或模式用户界面的显示来指示进度。
++ `QOS_CLASS_DEFAULT`：在没有更具体的 QOS 类信息的情况下，系统使用的默认 QOS 类。要求此类工作的优先级低于关键用户交互性（INTERACTIVE）和用户启动（INITIATED）的工作，但相对高于实用程序（UTILITY）和后台（BACKGROUND）任务。`pthread_create` 创建的没有指定 QOS 类属性的线程将默认为 `QOS_CLASS_DEFAULT`。此 QOS 类值不打算用作工作分类，它只应在传播或恢复系统提供的 QOS 类值时设置。
++ `QOS_CLASS_UTILITY`：指示由该线程执行的工作的 QOS 类可能由用户启动或未启动，并且用户不太可能立即等待结果。要求此类工作的优先级低于关键的用户交互性（INTERACTIVE）和用户启动（INITIATED）的工作，但要比低级别的系统维护任务高。使用此 QOS 类**表示工作应以节能高效的方式进行**。实用程序工作的进度可能会显示给用户，也可能不会显示给用户，但是这种工作的效果是用户可见的。
++ `QOS_CLASS_BACKGROUND`：指示该线程执行的工作的 QOS 类不是由用户启动的，并且用户可能不知道结果。这类工作要求优先于其他工作，这个 QOS 类的使用表明工作应该以最节能和最高效的方式运行。
++ `QOS_CLASS_UNSPECIFIED`：指示 QOS 类信息的缺失或删除。作为 API 返回值，可能表示线程或 pthread 属性配置为旧 API 不兼容或与 QOS 类系统冲突。
+#### QOS_MIN_RELATIVE_PRIORITY
+&emsp;可以在 QOS 类中指定的最小相对优先级。这些优先级仅在给定的 QOS 类内是相对的，并且仅对当前过程有意义。
+```c++
+#define QOS_MIN_RELATIVE_PRIORITY (-15)
+```
 #### dispatch_queue_attr_make_with_qos_class
-&emsp;
+&emsp;`dispatch_queue_attr_make_with_qos_class` 返回可以提供给 `dispatch_queue_create` 或 `dispatch_queue_create_with_target` 的属性值，以便为队列分配 QOS 类（形参：qos_class）和相对优先级（形参：relative_priority）。
 ```c++
 API_AVAILABLE(macos(10.10), ios(8.0))
 DISPATCH_EXPORT DISPATCH_WARN_RESULT DISPATCH_PURE DISPATCH_NOTHROW
@@ -794,10 +756,193 @@ dispatch_queue_attr_t
 dispatch_queue_attr_make_with_qos_class(dispatch_queue_attr_t _Nullable attr,
         dispatch_qos_class_t qos_class, int relative_priority);
 ```
-&emsp;
+&emsp;如果以此方式指定，则 QOS 类和相对优先级优先于从调度队列的目标队列（如果有）继承的优先级，只要不会导致较低的 QOS 类和相对优先级即可。
 
+&emsp;全局队列优先级映射到以下 QOS 类：
++ `DISPATCH_QUEUE_PRIORITY_HIGH`: `QOS_CLASS_USER_INITIATED`
++ `DISPATCH_QUEUE_PRIORITY_DEFAULT`: `QOS_CLASS_DEFAULT`
++ `DISPATCH_QUEUE_PRIORITY_LOW`: `QOS_CLASS_UTILITY`
++ `DISPATCH_QUEUE_PRIORITY_BACKGROUND`: `QOS_CLASS_BACKGROUND`
 
+&emsp;例如：
+```c++
+dispatch_queue_t queue;
+dispatch_queue_attr_t attr;
 
+// 实参是 DISPATCH_QUEUE_SERIAL 和 QOS_CLASS_UTILITY
+attr = dispatch_queue_attr_make_with_qos_class(DISPATCH_QUEUE_SERIAL, QOS_CLASS_UTILITY, 0);
+
+queue = dispatch_queue_create("com.example.myqueue", attr);
+```
+&emsp;以这种方式在队列上设置的 QOS 类和相对优先级对同步提交到队列的块没有影响（通过 `dispatch_sync`、`dispatch_barrier_sync`）。
+
+&emsp;`attr`：要与 QOS 类组合的队列属性值，或者为 `NULL`。
+
+&emsp;`qos_class`：QOS 类值，只能传递上面现有的枚举值，传递任何其他值都会导致返回 `NULL`。
+
+&emsp;`relative_priority`：QOS 类中的相对优先级。该值是给定类别与最大支持的调度程序优先级的负偏移量，传递大于零或小于 `QOS_MIN_RELATIVE_PRIORITY`（-15）的值将导致返回 `NULL`。
+
+&emsp;`return`：返回可以提供给 `dispatch_queue_create` 和 `dispatch_queue_create_with_target` 的属性值；如果请求了无效的 `QOS` 类，则返回 `NULL`。新值结合了 “attr” 参数指定的属性，新的 `QOS` 类（形参：qos_class）和相对优先级（形参：relative_priority）。
+#### DISPATCH_TARGET_QUEUE_DEFAULT
+&emsp;`DISPATCH_TARGET_QUEUE_DEFAULT` 传递给 `dispatch_queue_create_with_target`、`dispatch_set_target_queue` 和 `dispatch_source_create` 函数的常量，以指示应使用相关对象类型的默认目标队列。
+```c++
+#define DISPATCH_TARGET_QUEUE_DEFAULT NULL
+```
+#### dispatch_queue_create_with_target
+&emsp;`dispatch_queue_create_with_target` 用指定的目标队列创建一个新的调度队列。（这个目标队列是什么作用?）
+```c++
+API_AVAILABLE(macos(10.12), ios(10.0), tvos(10.0), watchos(3.0))
+DISPATCH_EXPORT DISPATCH_MALLOC DISPATCH_RETURNS_RETAINED DISPATCH_WARN_RESULT
+DISPATCH_NOTHROW
+dispatch_queue_t
+dispatch_queue_create_with_target(const char *_Nullable label,
+        dispatch_queue_attr_t _Nullable attr, dispatch_queue_t _Nullable target)
+        DISPATCH_ALIAS_V2(dispatch_queue_create_with_target);
+```
+&emsp;使用 `DISPATCH_QUEUE_SERIAL` 或 `NULL` 属性创建的调度队列按 `FIFO` 顺序依次调用块。(串行队列)
+
+&emsp;使用 `DISPATCH_QUEUE_CONCURRENT` 属性创建的调度队列可以并发调用块（类似于全局并发队列（`dispatch_get_global_queue` 函数获取的队列），但可能会有更多开销），并支持通过调度屏障 API （`dispatch_barrier_async` 函数）提交的屏障块（blocks），例如实现有效的读写器方案（多读单写模型）。
+
+&emsp;当不再需要调度队列时，应使用 `dispatch_release` 释放它。请注意，异步提交到队列的任何待处理块（pending blocks）都将保存对该队列的引用。因此，在所有待处理块（pending blocks）都完成之前，不会释放队列。
+
+&emsp;使用 `dispatch_queue_create_with_target` 创建的队列不能更改其目标队列，除非创建的队列处于非活动状态（参阅 `dispatch_queue_attr_make_initially_inactive`），在这种情况下，可以更改目标队列，直到使用 `dispatch_activate` 激活新创建的队列为止。
+
+&emsp;`label`：附加到队列的字符串标签，此参数是可选的，可以为 `NULL`。
+
+&emsp;`attr`：预定义的属性，例如 `DISPATCH_QUEUE_SERIAL`，`DISPATCH_QUEUE_CONCURRENT` 或调用 `dispatch_queue_attr_make_with_ *` 函数的结果。
+
+&emsp;`target`：新创建的队列的目标队列。目标队列被保留（retained），如果此参数为 `DISPATCH_TARGET_QUEUE_DEFAULT`，则将队列的目标队列设置为给定队列类型的默认目标队列。
+#### dispatch_queue_create
+&emsp;`dispatch_queue_create` 创建一个新的调度队列，可以向其提交块（blocks）。
+```c++
+API_AVAILABLE(macos(10.6), ios(4.0))
+DISPATCH_EXPORT DISPATCH_MALLOC DISPATCH_RETURNS_RETAINED DISPATCH_WARN_RESULT
+DISPATCH_NOTHROW
+dispatch_queue_t
+dispatch_queue_create(const char *_Nullable label,
+        dispatch_queue_attr_t _Nullable attr);
+```
+&emsp;使用 `DISPATCH_QUEUE_SERIAL` 或 `NULL` 属性创建的调度队列按 FIFO 顺序依次调用块。
+
+&emsp;使用 `DISPATCH_QUEUE_CONCURRENT` 属性创建的调度队列可以并发调用块（类似于全局并发队列（`dispatch_get_global_queue` 函数获取的队列），但可能会有更多开销），并支持通过调度屏障 API （`dispatch_barrier_async` 函数）提交的屏障块（blocks），例如实现有效的读写器方案（多读单写模型）。
+
+&emsp;当不再需要调度队列时，应使用 `dispatch_release` 释放它。请注意，异步提交到队列的任何待处理块（pending blocks）都将保存对该队列的引用。因此，在所有待处理块（pending blocks）都完成之前，不会释放队列。
+
+&emsp;通过将`dispatch_queue_attr_make_with_qos_class` 函数的结果传递给此函数的 attr 参数，可以为新创建的队列指定服务质量类（`dispatch_qos_class_t qos_class`）和相对优先级（`int relative_priority`）。这样指定的服务质量等级优先于新创建的调度队列的目标队列（如果有）的服务质量等级，只要这不会导致较低的 QOS 类和相对优先级。
+
+&emsp;如果未指定服务质量等级，则新创建的调度队列的目标队列是**默认优先级的全局并发队列**。
+
+&emsp;`label`：附加到队列的字符串标签。此参数是可选的，可以为 `NULL`。
+
+&emsp;`attr`：预定义的属性，例如 `DISPATCH_QUEUE_SERIAL`，`DISPATCH_QUEUE_CONCURRENT` 或调用 `dispatch_queue_attr_make_with_ *` 函数的结果。
+
+&emsp;`result`：返回新创建的 dispatch queue。
+#### DISPATCH_CURRENT_QUEUE_LABEL
+&emsp;传递给 `dispatch_queue_get_label` 函数的常量，以检索当前队列的标签。
+```c++
+#define DISPATCH_CURRENT_QUEUE_LABEL NULL
+```
+#### dispatch_queue_get_label
+&emsp;`dispatch_queue_get_label` 返回在创建队列时指定的给定队列的标签，如果指定了 `NULL` 标签，则返回空字符串。
+```c++
+API_AVAILABLE(macos(10.6), ios(4.0))
+DISPATCH_EXPORT DISPATCH_PURE DISPATCH_WARN_RESULT DISPATCH_NOTHROW
+const char *
+dispatch_queue_get_label(dispatch_queue_t _Nullable queue);
+```
+&emsp;传递 `DISPATCH_CURRENT_QUEUE_LABEL` 将返回当前队列的标签。
+
+&emsp;`queue` 要查询的队列，或 `DISPATCH_CURRENT_QUEUE_LABEL`。
+#### dispatch_queue_get_qos_class
+&emsp;`dispatch_queue_get_qos_class` 返回给定队列的 QOS 类和相对优先级（传入一个 `int` 指针 `relative_priority_ptr` 来获取相对优先级，QOS 类则是函数返回 `dispatch_qos_class_t` 类型的值）。
+```c++
+API_AVAILABLE(macos(10.10), ios(8.0))
+DISPATCH_EXPORT DISPATCH_WARN_RESULT DISPATCH_NONNULL1 DISPATCH_NOTHROW
+dispatch_qos_class_t
+dispatch_queue_get_qos_class(dispatch_queue_t queue,
+        int *_Nullable relative_priority_ptr);
+```
+&emsp;如果给定队列是使用从 `dispatch_queue_attr_make_with_qos_class` 返回的属性值创建的，则此函数返回当时指定的 QOS 类和相对优先级；对于任何其他属性值，它将返回 `QOS_CLASS_UNSPECIFIED` 的 QOS 类和相对优先级 0。
+
+&emsp;如果给定队列是全局队列之一，则此函数返回在 `dispatch_get_global_queue` 下记录的已分配 QOS 类值，相对优先级为 0；否则，返回 0。对于主队列，它返回由 `qos_class_main` 提供的 QOS 值和相对优先级 0。
+
+&emsp;`queue`：要查询的队列。
+
+&emsp;`relative_priority_ptr`：指向 `int` 变量的指针，该变量将用 QOS 类中的相对优先级偏移或 `NULL` 填充。
+#### dispatch_set_target_queue
+&emsp;`dispatch_set_target_queue` 设置给定对象的目标队列。
+```c++
+API_AVAILABLE(macos(10.6), ios(4.0))
+DISPATCH_EXPORT DISPATCH_NOTHROW
+void
+dispatch_set_target_queue(dispatch_object_t object,
+        dispatch_queue_t _Nullable queue);
+```
+&emsp;对象的目标队列负责处理对象。
+
+&emsp;如果在创建时未为调度队列指定服务质量等级和相对优先级，则调度队列的服务质量等级将从其目标队列继承。 `dispatch_get_global_queue` 函数可用于获取特定服务质量类的目标队列，但是建议改为使用 `dispatch_queue_attr_make_with_qos_class`。
+
+&emsp;提交到目标队列是另一个串行队列的串行队列的块不会与提交到目标队列或具有相同目标队列的任何其他队列的块同时调用。
+
+&emsp;将循环引入目标队列的层次结构的结果是不确定的。
+
+&emsp;调度源的目标队列指定将其**事件处理程序**和**取消处理程序**块提交到的位置。
+
+&emsp;调度 I/O 通道的目标队列指定在何处执行其 I/O 操作。如果通道的目标队列的优先级设置为 `DISPATCH_QUEUE_PRIORITY_BACKGROUND`，则当存在 I/O 争用时，将限制该队列上 `dispatch_io_read` 或 `dispatch_io_write` 执行的 I/O 操作。
+
+&emsp;对于所有其他调度对象类型，目标队列的唯一功能是确定在何处调用对象的终结函数（object's finalizer function）。
+
+&emsp;通常，更改对象的目标队列是异步操作，不会立即生效，也不会影响已经与指定对象关联的块。
+
+&emsp;但是，如果在调用 `dispatch_set_target_queue` 时某个对象处于非活动状态，则目标队列更改将立即生效，并将影响已经与指定对象关联的块。激活最初不活动的对象后，调用 `dispatch_set_target_queue` 会导致声明并终止过程。
+
+&emsp;如果调度队列处于活动状态并被其他调度对象作为目标，则更改其目标队列将导致未定义的行为。
+
+&emsp;`object`：要修改的对象。在此参数中传递 `NULL` 的结果是不确定的。
+
+&emsp;`queue`：对象的新目标队列。保留队列，并释放先前的目标队列（如果有）。如果 `queue` 是 `DISPATCH_TARGET_QUEUE_DEFAULT`，则将给定对象类型的对象目标队列设置为默认目标队列。
+#### dispatch_main
+&emsp;`dispatch_main` 执行提交到主队列的块。
+```c++
+API_AVAILABLE(macos(10.6), ios(4.0))
+DISPATCH_EXPORT DISPATCH_NOTHROW DISPATCH_NORETURN
+void
+dispatch_main(void);
+```
+&emsp;此函数 “驻留” 主线程，并等待将块提交到主队列，该函数从不返回。
+
+&emsp;在主线程上调用 `NSApplicationMain` 或 `CFRunLoopRun` 的应用程序无需调用 `dispatch_main`。
+#### dispatch_after
+&emsp;`dispatch_after` 安排一个 block 在指定时间后在给定队列上执行。
+```c++
+#ifdef __BLOCKS__
+API_AVAILABLE(macos(10.6), ios(4.0))
+DISPATCH_EXPORT DISPATCH_NONNULL2 DISPATCH_NONNULL3 DISPATCH_NOTHROW
+void
+dispatch_after(dispatch_time_t when, dispatch_queue_t queue,
+        dispatch_block_t block);
+#endif
+```
+&emsp;支持将 `DISPATCH_TIME_NOW` 作为 “when” 参数传递，但不如调用 `dispatch_async` 那样理想。传递 `DISPATCH_TIME_FOREVER` 是不确定的。
+
+&emsp;`when`：
+
+/*!
+*
+* @discussion
+* Passing DISPATCH_TIME_NOW as the "when" parameter is supported, but not as optimal as calling dispatch_async() instead. Passing DISPATCH_TIME_FOREVER is undefined.
+
+* @param when
+* A temporal milestone returned by dispatch_time() or dispatch_walltime().
+*
+* @param queue
+* A queue to which the given block will be submitted at the specified time.
+* The result of passing NULL in this parameter is undefined.
+*
+* @param block
+* The block of code to execute.
+* The result of passing NULL in this parameter is undefined.
+*/
 
 
 ## 参考链接
