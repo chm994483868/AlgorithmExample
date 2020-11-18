@@ -16,6 +16,7 @@ OS_OBJECT_DECL_CLASS(dispatch_object);
 typedef NSObject<OS_dispatch_object> * dispatch_object_t;  
 ```
 &emsp;`OS_dispatch_object` 是继承自 `NSObject` 协议的协议，并且为遵循该协议的 `NSObject` 实例对象类型的指针定义了一个 `dispatch_object_t` 的别名。（`dispatch_object_t` 具体是不是 NSObject 后面待确认）
+
 &emsp;下面看一下 <os/object.h> 文件。
 ## <os/object.h> 文件
 >
@@ -49,13 +50,50 @@ typedef NSObject<OS_dispatch_object> * dispatch_object_t;
 
 &emsp;然后中间是一段针对 Swift 和 Objective-C 已经类型定义的一些宏，都比较简单可以
 
-/*
-* To provide backward deployment of ObjC objects in Swift on pre-10.12 SDKs, OS_object classes can be marked as OS_OBJECT_OBJC_RUNTIME_VISIBLE. When compiling with a deployment target earlier than OS X 10.12 (iOS 10.0, tvOS 10.0, watchOS 3.0) the Swift compiler will only refer to this type at runtime (using the ObjC runtime).
-*/
+### os_retain
+&emsp;`os_retain` 增加 os_object 的引用计数。
+```c++
+API_AVAILABLE(macos(10.10), ios(8.0))
+OS_EXPORT OS_SWIFT_UNAVAILABLE("Can't be used with ARC")
+void*
+os_retain(void *object);
+#if OS_OBJECT_USE_OBJC
+#undef os_retain
+#define os_retain(object) [object retain]
+#endif
+```
+&emsp;在具有现代 Objective-C 运行时的平台上，这完全等同于向对象发送 -[retain] 消息。
 
-## os_retain
+&emsp;`object` 要 retain 的对象。
 
+&emsp;`result` return 保留的对象。
+### os_release
+&emsp;`os_release` 减少 os_object 的引用计数。
+```c++
+API_AVAILABLE(macos(10.10), ios(8.0))
+OS_EXPORT
+void OS_SWIFT_UNAVAILABLE("Can't be used with ARC")
+os_release(void *object);
+#if OS_OBJECT_USE_OBJC
+#undef os_release
+#define os_release(object) [object release]
+#endif
+```
+&emsp;在具有现代 Objective-C 运行时的平台上，这完全等同于向对象发送 -[release] 消息。
 
+&emsp;`object` 要释放的对象。
+## _dispatch_object_validate
+&emsp;
+```c++
+DISPATCH_INLINE DISPATCH_ALWAYS_INLINE DISPATCH_NONNULL_ALL DISPATCH_NOTHROW
+void
+_dispatch_object_validate(dispatch_object_t object)
+{
+    void *isa = *(void *volatile*)(OS_OBJECT_BRIDGE void*)object;
+    (void)isa;
+}
+```
+&emsp;
 
 
 ## 参考链接
