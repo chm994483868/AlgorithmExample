@@ -239,7 +239,7 @@ os_release(void *object);
 &emsp;<os/object.h> 文件到这里就全部结束了，下面我们接着看 <dispatch/object.h> 文件。
 
 &emsp;接下来是分别针对不同的情况（Swift/Objective-C/C++/C）定义了一些 DISPATCH 前缀开头的宏，而宏定义的内容其中 Swift/Objective-C 相关部分来自 <os/object.h> 中的宏，C++/C 部分是来自它们的语言环境。（例如 C++ 下的 `static_cast` 函数的调用、结构体的继承等，C 下的直接取地址强制转换、联合体的使用等）
-## DISPATCH_DECL/DISPATCH_DECL_SUBCLASS
+## DISPATCH_DECL/DISPATCH_DECL_SUBCLASS/DISPATCH_GLOBAL_OBJECT
 &emsp;`DISPATCH_DECL` 默认使用 `dispatch_object` 作为继承的父类，`DISPATCH_DECL_SUBCLASS` 则是自行指定父类，并且针对不同的语言环境作了不同的定义。
 
 &emsp;这里我们看 C++ 和 C 环境下（GCD 源码内部是此环境）。
@@ -270,16 +270,8 @@ typedef struct name##_s : public base##_s {} *name##_t
 #define DISPATCH_GLOBAL_OBJECT(type, object) ((type)&(object))
 ```
 &emsp;`DISPATCH_DECL_SUBCLASS` 指定指针指向类型，`DISPATCH_GLOBAL_OBJECT` 则是直接取地址后强制指针类型转换。
-
-
-## DISPATCH_GLOBAL_OBJECT
-&emsp;在 C++ 环境下是调用 `static_cast` 函数直接进行强制类型转换，OC 下则是进行桥接转换。
-```c++
-#define DISPATCH_GLOBAL_OBJECT(type, object) (static_cast<type>(&(object)))
-```
-
 ## _dispatch_object_validate
-&emsp;
+&emsp;这个函数的目的是把传进来的 `object` 的首地址取出来，然后强转为 `void *`。
 ```c++
 DISPATCH_INLINE DISPATCH_ALWAYS_INLINE DISPATCH_NONNULL_ALL DISPATCH_NOTHROW
 void
@@ -289,7 +281,42 @@ _dispatch_object_validate(dispatch_object_t object)
     (void)isa;
 }
 ```
+## dispatch_retain
+&emsp;`dispatch_retain` 增加调度对象（dispatch object）的引用计数。
+```c++
+API_AVAILABLE(macos(10.6), ios(4.0))
+DISPATCH_EXPORT DISPATCH_NONNULL_ALL DISPATCH_NOTHROW
+DISPATCH_SWIFT_UNAVAILABLE("Can't be used with ARC")
+void
+dispatch_retain(dispatch_object_t object);
+#if OS_OBJECT_USE_OBJC_RETAIN_RELEASE
+#undef dispatch_retain
+// 调用 retain 函数
+#define dispatch_retain(object) \
+        __extension__({ dispatch_object_t _o = (object); \
+        _dispatch_object_validate(_o); (void)[_o retain]; })
+#endif
+```
 &emsp;
+
+
+
+/*!
+* @function dispatch_retain
+*
+* @abstract
+* Increment the reference count of a dispatch object.
+*
+* @discussion
+* Calls to dispatch_retain() must be balanced with calls to
+* dispatch_release().
+*
+* @param object
+* The object to retain.
+* The result of passing NULL in this parameter is undefined.
+*/
+
+
 
 
 ## 参考链接
