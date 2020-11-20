@@ -661,8 +661,8 @@ NSLog(@"🏃‍♀️ %@", [[NSThread currentThread] threadDictionary]);
 @property (class, readonly, copy) NSArray<NSString *> *callStackSymbols API_AVAILABLE(macos(10.6), ios(4.0), watchos(2.0), tvos(9.0));
 ```
 &emsp;返回一个包含调用堆栈符号的数组。返回值是包含调用堆栈符号的数组。每个元素都是一个 NSString 对象，其值的格式由 `backtrace_symbols()` 函数确定。有关更多信息，参见 backtrace_symbols(3) macOS 开发人员工具手册页。
-&emsp;返回值描述了在调用此方法时当前线程的调用堆栈回溯。
 
+&emsp;返回值描述了在调用此方法时当前线程的调用堆栈回溯。
 #### name
 ```c++
 @property (nullable, copy) NSString *name API_AVAILABLE(macos(10.5), ios(2.0), watchos(2.0), tvos(9.0));

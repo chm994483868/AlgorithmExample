@@ -3,13 +3,13 @@
 > &emsp;Grand Central Dispatch (GCD) 是 Apple 开发的一个多核编程的较新的解决方法。
 
 > &emsp;Execute code concurrently on multicore hardware by submitting work to dispatch queues managed by the system.
-> &emsp;通过提交工作到 dispatch 系统管理的队列（dispatch queues），在多核硬件上同时执行代码。主要用于优化应用程序以支持多核处理器以及其他对称多处理系统。可以理解为 Dispatch 队列封装了底层多核系统调度的操作，我们只需要关心对 Dispatch 队列的操作，不需要关心任务到底分配给哪个核心，甚至不需要关心任务在哪个线程执行（主线程和其它子线程需要关注）。
+> &emsp;通过提交工作到 dispatch 系统管理的队列（dispatch queues），在多核硬件上同时执行代码。主要用于优化应用程序以支持多核处理器以及其他对称多处理系统。可以理解为 Dispatch 队列封装了底层多核系统调度的操作，我们只需要关心对 Dispatch 队列的操作，不需要关心任务到底分配给哪个核心，甚至不需要关心任务在哪个线程执行（当然为了深入学习主线程和子线程是一定要研究的）。
 
 ## Grand Central Dispatch（GCD）
 ### GCD 概述
 &emsp;Dispatch，也称为 Grand Central Dispatch（GCD），包含语言功能、运行时库和系统增强功能，这些功能为支持 macOS、iOS、watchOS 和 tvOS 中的多核硬件上的并发代码执行提供了系统的、全面的改进。
 
-&emsp;对 BSD子系统、Core Foundation 和 cococoa api 都进行了扩展，以使用这些增强功能来帮助系统和应用程序更快、更高效地运行，并提高响应能力。考虑一下单个应用程序有效地使用多个核心有多困难，更不用说在具有不同计算核心数量的不同计算机上或在多个应用程序竞争这些核心的环境中这样做有多困难。GCD 在系统级运行，可以更好地满足所有运行的应用程序的需求，以平衡的方式将它们与可用的系统资源相匹配。
+&emsp;对 BSD 子系统、Core Foundation 和 cococoa api 都进行了扩展，以使用这些增强功能来帮助系统和应用程序更快、更高效地运行，并提高响应能力。考虑一下单个应用程序有效地使用多个核心有多困难，更不用说在具有不同计算核心数量的不同计算机上或在多个应用程序竞争这些核心的环境中这样做有多困难。GCD 在系统级运行，可以更好地满足所有运行的应用程序的需求，以平衡的方式将它们与可用的系统资源相匹配。
 ### Dispatch Objects and ARC
 > &emsp;GCD 的源码是开源的，我们首先学习完 GCD 的 API 使用以后，再直接深入它的源码一探究竟，这里先有个大致的认知概念就行。
 
@@ -26,7 +26,8 @@
 ### GCD 中的类型
 &emsp;为了深入理解 GCD，首先从我们日常使用 GCD API 中常见的类型入手，搞懂这些类型的具体定义有助于我们理解 GCD 的使用方式以及内部的实现逻辑。首先按住 command 点击 `dispatch_queue_t` 看到 queue.h 文件中的 `dispatch_queue_t` 是一个宏定义：`DISPATCH_DECL(dispatch_queue);`，看到小括号内没有 `_t`，那这个 `_t` 的小尾巴是从哪里来的呢？下面我们沿着 `DISPATCH_DECL` 宏的具体内容来看一下，涉及到的一系列宏都定义在 `usr/include/os/object.h` 文件中。
 
-&emsp;这里为了便于理解我们只看 Objective-C 语言下的 GCD。
+&emsp;**这里为了便于理解我们暂时只看 Objective-C 语言下的 GCD**。（下篇会把 Swift/C++/C 环境下的转换也都补上）
+
 + `DISPATCH_DECL` 宏定义：
 ```c++
 #define DISPATCH_DECL(name) OS_OBJECT_DECL_SUBCLASS(name, dispatch_object)
@@ -100,9 +101,9 @@ typedef NSObject<OS_dispatch_queue> \
 
 typedef NSObject<OS_dispatch_queue> * dispatch_queue_t;
 ```
-&emsp;`OS_dispatch_queue` 是继承自 `OS_dispatch_object` 协议的协议，并且为遵循该协议的 `NSObject` 实例对象类型的指针定义了一个 `dispatch_queue_t` 的别名，看到这里我们恍然大悟，我们整天使用的 `dispatch_queue_t globalQueue = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0);` 获取一个全局并发对象，而这个 `globalQueue` 其实就是一个遵循 `OS_dispatch_queue` 协议的 `NSObject` 实例对象指针（OC 下：`dispatch_queue_t` 是 NSObject）。
+&emsp;`OS_dispatch_queue` 是继承自 `OS_dispatch_object` 协议的协议，并且为遵循该协议的 `NSObject` 实例对象类型的指针定义了一个 `dispatch_queue_t` 的别名，看到这里我们恍然大悟，例如我们整天使用的 `dispatch_queue_t globalQueue = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0);` 获取一个全局并发对象，而这个 `globalQueue` 其实就是一个遵循 `OS_dispatch_queue` 协议的 `NSObject` 实例对象指针（OC 下：`dispatch_queue_t` 是 NSObject 指针）。
 
-&emsp;那么这个 `OS_dispatch_object` 协议怎么来的呢？可看到是来自 `OS_OBJECT_DECL_CLASS(dispatch_object);` 下面对它进行解读。
+&emsp;那么这个 `OS_dispatch_object` 协议怎么来的呢？可看到是来自 `OS_OBJECT_DECL_CLASS(dispatch_object);` 宏，下面对它所代表的具体内容进行解读。
 ```c++
 /*
 * By default, dispatch objects are declared as Objective-C types when building
@@ -119,11 +120,13 @@ typedef NSObject<OS_dispatch_queue> * dispatch_queue_t;
  */
 OS_OBJECT_DECL_CLASS(dispatch_object);
 
-// 如下代码验证:
+// 如下代码验证 dispatch_queue_t 添加到 OC 集合中:
 dispatch_queue_t globalQueue = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0);
 NSMutableArray *array = [NSMutableArray array];
 [array addObject:globalQueue];
 NSLog(@"array:  %@", array);
+
+// 调用 isKindOfClass 判断类型
 NSLog(@"🍑🍑 %d", [globalQueue isKindOfClass:[NSObject class]]);
 // 控制台如下打印：
 
@@ -171,16 +174,16 @@ typedef NSObject<OS_dispatch_object> \
 
 typedef NSObject<OS_dispatch_object> * dispatch_object_t;  
 ```
-&emsp;`OS_dispatch_object` 是继承自 `NSObject` 协议的协议，并且为遵循该协议的 `NSObject` 实例对象类型的指针定义了一个 `dispatch_object_t` 的别名。（`dispatch_object_t` 具体是不是 NSObject 后面待确认）
+&emsp;`OS_dispatch_object` 是继承自 `NSObject` 协议的协议，并且为遵循该协议的 `NSObject` 实例对象类型的指针定义了一个 `dispatch_object_t` 的别名。（OC 下：`dispatch_object_t` 是 NSObject 指针）
 
 &emsp;综上可知，宏定义 `OS_OBJECT_DECL_CLASS(name)` 会定义一个继承自 `NSObject` 协议的协议，协议的名称为固定的 `name` 添加 `OS_` 前缀，并且定义一个表示遵循该协议的 `NSObject` 实例对象类型的指针的别名，名称为 `name` 添加后缀 `_t`。
 
-&emsp;由 `#define DISPATCH_DECL_SUBCLASS(name, base) OS_OBJECT_DECL_SUBCLASS(name, base)` 可知，还可以在定义一个协议时，指定其所继承的协议，但是在使用时，要保证指定的 `base` 协议是已经定义过的。
+&emsp;由 `#define DISPATCH_DECL_SUBCLASS(name, base) OS_OBJECT_DECL_SUBCLASS(name, base)` 可知，还可以在定义一个协议时，指定其所继承的协议（上面两个则是默认继承自 `NSObject` 协议和 `OS_dispatch_object` 协议），但是在使用时，要保证指定的 `base` 协议是已经定义过的。
 
-&emsp;以下基于 ObjC 环境解读。
+&emsp;**以下基于 Objective-C 环境解读。**（下篇会把 Swift/C++/C 环境下的转换也都补上）
 
 #### dispatch_queue_t
-&emsp;Dispatch 是用于通过简单但功能强大的 API 来表达并发性的抽象模型。在核心上，dispatch 提供了可以向其提交 blocks 的串行 FIFO 队列。提交给这些 dispatch queues 的 blocks 在系统完全管理的线程池上调用。无法保证将在哪个线程上调用 block；但是，它保证一次只调用一个提交到 FIFO dispatch queue 的 block。当多个队列有要处理的块时，系统可以自由地分配额外的线程来并发地调用这些 blocks。当队列变为空时，这些线程将自动释放。
+&emsp;Dispatch 是用于通过简单但功能强大的 API 来表达并发性的抽象模型。在核心上，dispatch 提供了可以向其提交 blocks 的串行 FIFO 队列。提交给这些 dispatch queues 的 blocks 在系统完全管理的线程池上调用，无法保证将在哪个线程上调用 block（系统会自行从线程池取可用的线程）；但是，它保证一次只调用一个提交到 FIFO dispatch queue 的 block。当多个队列有要处理的块时，系统可以自由地分配额外的线程来并发地调用这些 blocks。当队列变为空时，这些线程将自动释放。
 
 ```c++
 DISPATCH_DECL(dispatch_queue);
@@ -206,7 +209,7 @@ DISPATCH_DECL_SUBCLASS(dispatch_queue_global, dispatch_queue);
 
 typedef NSObject<OS_dispatch_queue_global> * dispatch_queue_global_t;
 ```
-&emsp;`OS_dispatch_queue_global` 是继承自 `OS_dispatch_queue` 协议的协议，并且为遵循该协议的 `NSObject` 实例对象类型的指针定义了一个 `dispatch_queue_global_t` 的别名。（`dispatch_queue_global_t` 具体是不是 NSObject 后面待确认）
+&emsp;`OS_dispatch_queue_global` 是继承自 `OS_dispatch_queue` 协议的协议，并且为遵循该协议的 `NSObject` 实例对象类型的指针定义了一个 `dispatch_queue_global_t` 的别名。
 
 &emsp;调度全局并发队列（dispatch global concurrent queues）是围绕系统线程池的抽象，它调用提交到调度队列的工作项。
 
@@ -228,7 +231,7 @@ DISPATCH_DECL_SUBCLASS(dispatch_queue_serial, dispatch_queue);
 
 typedef NSObject<OS_dispatch_queue_serial> * dispatch_queue_serial_t;
 ```
-&emsp;`OS_dispatch_queue_serial` 是继承自 `OS_dispatch_queue` 协议的协议，并且为遵循该协议的 `NSObject` 实例对象类型的指针定义了一个 `dispatch_queue_serial_t` 的别名。（`dispatch_queue_serial_t` 具体是不是 NSObject 后面待确认）
+&emsp;`OS_dispatch_queue_serial` 是继承自 `OS_dispatch_queue` 协议的协议，并且为遵循该协议的 `NSObject` 实例对象类型的指针定义了一个 `dispatch_queue_serial_t` 的别名。
 
 &emsp;调度串行队列（dispatch serial queues）调用以 FIFO 顺序串行提交给它们的工作项。
 
@@ -248,7 +251,7 @@ DISPATCH_DECL_SUBCLASS(dispatch_queue_main, dispatch_queue_serial);
 
 typedef NSObject<OS_dispatch_queue_main> * dispatch_queue_main_t;
 ```
-&emsp;`OS_dispatch_queue_main` 是继承自 `OS_dispatch_queue_serial` 协议的协议，并且为遵循该协议的 `NSObject` 实例对象类型的指针定义了一个 `dispatch_queue_main_t` 的别名。（`dispatch_queue_main_t` 具体是不是 NSObject 后面待确认，看到这里发现主队列不愧是特殊的串行队列）
+&emsp;`OS_dispatch_queue_main` 是继承自 `OS_dispatch_queue_serial` 协议的协议，并且为遵循该协议的 `NSObject` 实例对象类型的指针定义了一个 `dispatch_queue_main_t` 的别名。（看到这里发现主队列不愧是特殊的串行队列）
 
 &emsp;`dispatch_queue_main_t` 是绑定到主线程的默认队列的类型。
 
@@ -266,11 +269,11 @@ DISPATCH_DECL_SUBCLASS(dispatch_queue_concurrent, dispatch_queue);
 
 typedef NSObject<OS_dispatch_queue_concurrent> * dispatch_queue_concurrent_t;
 ```
-&emsp;`OS_dispatch_queue_concurrent` 是继承自 `OS_dispatch_queue` 协议的协议，并且为遵循该协议的 `NSObject` 实例对象类型的指针定义了一个 `dispatch_queue_concurrent_t` 的别名。（`dispatch_queue_concurrent_t` 具体是不是 NSObject 后面待确认）
+&emsp;`OS_dispatch_queue_concurrent` 是继承自 `OS_dispatch_queue` 协议的协议，并且为遵循该协议的 `NSObject` 实例对象类型的指针定义了一个 `dispatch_queue_concurrent_t` 的别名。
 
 &emsp;调度并发队列（dispatch concurrent queues）会同时调用提交给它们的工作项，并接受屏障工作项的概念（and admit a notion of barrier workitems，（barrier 屏障是指调用 `dispatch_barrier_async` 函数，向队列提交工作项。））。
 
-&emsp;调度并发队列（dispatch concurrent queues）是可以向其提交常规和屏障工作项的轻量级对象。在排除其他任何类型的工作项目（按FIFO顺序）时，将调用屏障工作项目。（提交在 barrier 工作项之前的工作项并发执行完以后才会并发执行 barrier 工作项之后的工作项）。
+&emsp;调度并发队列（dispatch concurrent queues）是可以向其提交常规和屏障工作项的轻量级对象。在排除其他任何类型的工作项目（按 FIFO 顺序）时，将调用屏障工作项目。（提交在 barrier 工作项之前的工作项并发执行完以后才会并发执行 barrier 工作项之后的工作项）。
 
 &emsp;可以对同一并发队列以任何顺序并发调用常规工作项。但是，在调用之前提交的任何屏障工作项之前，不会调用常规工作项。
 
@@ -280,7 +283,7 @@ typedef NSObject<OS_dispatch_queue_concurrent> * dispatch_queue_concurrent_t;
 
 &emsp;注意事项：当调用优先级较低的常规工作项（readers）时，此时调度并发队列不会实现优先级反转避免，并且会阻止调用优先级较高的屏障（writer）。
 #### dispatch_block_t
-&emsp;日常使用 GCD 向队列提交的工作项都是这种名字是 `dispatch_block_t`，参数和返回值都是 `void` 的 Block。
+&emsp;日常使用 GCD 向队列提交的工作项都是这种名字是 `dispatch_block_t` 参数和返回值都是 `void` 的 Block。
 ```c++
 typedef void (^dispatch_block_t)(void);
 ```
@@ -1125,7 +1128,7 @@ dispatch_assert_queue_not(dispatch_queue_t queue)
  
 &emsp;`dispatch_assert_queue_debug`、`dispatch_assert_queue_barrier_debug`、`dispatch_assert_queue_not_debug` 仅在 `DEBUG` 模式下可用。
 
-&emsp;至此 queue.h 文件终于看完了，作为 dispatch 中最大的一个文件，包含的信息还是挺多的，需要耐心学习。⛽️⛽️
+&emsp;至此 <dispatch/queue.h> 文件看完了，作为 dispatch 中最大的一个文件，包含的信息还是挺多的，需要耐心学习。⛽️⛽️
 
 ## 参考链接
 **参考链接:🔗**

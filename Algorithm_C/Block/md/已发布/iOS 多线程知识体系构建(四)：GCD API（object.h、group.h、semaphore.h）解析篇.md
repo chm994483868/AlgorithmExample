@@ -1,6 +1,6 @@
-# iOS 多线程知识体系构建(四)：GCD API（object.h、group.h）解析篇
+# iOS 多线程知识体系构建(四)：GCD API（object.h、group.h、semaphore.h）解析篇
 
-> &emsp;那么继续学习 dispath 中也挺重要的 object.h 文件。
+> &emsp;那么继续学习 dispath 中也挺重要的 <dispatch/object.h> 文件。
 
 ## dispatch_object_t
 &emsp;`dispatch_object_t` 是所有调度对象（dispatch objects）的抽象基类型，且 `dispatch_object_t` 的具体定义在特定语言（Swift/Objective-C/C）下不同。调度对象通过调用 `dispatch_retain` 和 `dispatch_release` 进行引用计数管理。
@@ -13,7 +13,7 @@
 ```c++
 OS_OBJECT_DECL_CLASS(dispatch_object);
 ```
-+ 在 Swift 下宏定义展开是:
++ 在 Swift（在 Swift 中使用 Objective-C）下宏定义展开是:
 ```c++
 OS_EXPORT OS_OBJECT_OBJC_RUNTIME_VISIBLE
 @interface OS_dispatch_object : OS_object
@@ -513,7 +513,7 @@ dispatch_debug(dispatch_object_t object, const char *message, ...);
 ```c++
 DISPATCH_DECL(dispatch_group);
 ```
-+ 在 Swift 下宏定义展开是:
++ 在 Swift （在 Swift 中使用 Objective-C）下宏定义展开是:
 ```c++
 OS_EXPORT OS_OBJECT_OBJC_RUNTIME_VISIBLE
 @interface OS_dispatch_group : OS_dispatch_object
@@ -661,6 +661,84 @@ dispatch_group_leave(dispatch_group_t group);
 
 &emsp;`group`：要更新的调度组。在此参数中传递 `NULL` 的结果是未定义的。
 
+&emsp;<dispatch/group.h> 文件到这里就全部看完了。下面接着看另一个较简单的文件 <dispatch/semaphore.h>。
+## <dispatch/semaphore.h>
+&emsp;<dispatch/semaphore.h> 文件的内容不多，仅仅包含几个与 `dispatch_semaphore_t` 相关的函数，下面一起看一下吧。
+### dispatch_semaphore_t
+&emsp;`dispatch_semaphore_t` 表示计数信号量。主要用来控制并发任务的数量。
+```c++
+DISPATCH_DECL(dispatch_semaphore); // DISPATCH_DECL(dispatch_group);
+```
++ 在 Swift（在 Swift 中使用 Objective-C） 下宏定义展开是:
+```c++
+OS_EXPORT OS_OBJECT_OBJC_RUNTIME_VISIBLE
+@interface OS_dispatch_semaphore : OS_dispatch_object
+- (instancetype)init OS_SWIFT_UNAVAILABLE("Unavailable in Swift");
+@end
+typedef OS_dispatch_semaphore * dispatch_semaphore_t;
+```
+&emsp;`OS_dispatch_semaphore` 是继承自 `OS_dispatch_object` 的类，然后 `dispatch_semaphore_t` 是一个指向 `OS_dispatch_semaphore` 的指针。
++ 在 Objective-C 下宏定义展开是:
+```c++
+@protocol OS_dispatch_semaphore <OS_dispatch_object>
+@end
+typedef NSObject<OS_dispatch_semaphore> * dispatch_semaphore_t;
+```
+&emsp;`OS_dispatch_semaphore` 是继承自 `OS_dispatch_object` 协议的协议，并且为遵循该协议的 `NSObject` 实例对象类型的指针定义了一个 `dispatch_semaphore_t` 的别名。
++ 在 C++ 下宏定义展开是:
+```c++
+typedef struct dispatch_semaphore_s : public dispatch_object_s {} * dispatch_semaphore_t;
+```
+&emsp;`dispatch_semaphore_t` 是一个指向 `dispatch_semaphore_s` 结构体的指针。
++ 在 C（Plain C）下宏定义展开是:
+```c++
+typedef struct dispatch_semaphore_s *dispatch_semaphore_t
+```
+&emsp;`dispatch_semaphore_t` 是指向 `struct dispatch_semaphore_s` 的指针。
+### dispatch_semaphore_create
+&emsp;`dispatch_semaphore_create` 用初始值（`long value`）创建新的计数信号量。
+```c++
+API_AVAILABLE(macos(10.6), ios(4.0))
+DISPATCH_EXPORT DISPATCH_MALLOC DISPATCH_RETURNS_RETAINED DISPATCH_WARN_RESULT
+DISPATCH_NOTHROW
+dispatch_semaphore_t
+dispatch_semaphore_create(long value);
+```
+&emsp;当两个线程需要协调特定事件的完成时，将值传递为零非常有用。传递大于零的值对于管理有限的资源池非常有用，该资源池的大小等于该值。
+
+&emsp;`value`：信号量的起始值。传递小于零的值将导致返回 `NULL`。
+
+&emsp;`result`：新创建的信号量，失败时为 `NULL`。
+### dispatch_semaphore_wait
+&emsp;`dispatch_semaphore_wait` 等待（减少）信号量。
+```c++
+API_AVAILABLE(macos(10.6), ios(4.0))
+DISPATCH_EXPORT DISPATCH_NONNULL_ALL DISPATCH_NOTHROW
+long
+dispatch_semaphore_wait(dispatch_semaphore_t dsema, dispatch_time_t timeout);
+```
+&emsp;减少计数信号量。如果结果值小于零，此函数将等待信号出现，然后返回。（可以使总信号量减 1，信号总量小于 0 时就会一直等待（阻塞所在线程），否则就可以正常执行。）
+
+&emsp;`dsema`：信号量。在此参数中传递 `NULL` 的结果是未定义的。
+
+&emsp;`timeout`：何时超时（dispatch_time）。为方便起见，有 `DISPATCH_TIME_NOW` 和 `DISPATCH_TIME_FOREVER` 常量。
+
+&emsp;`result`：成功返回零，如果发生超时则返回非零。
+### dispatch_semaphore_signal
+&emsp;`dispatch_semaphore_signal` 发信号（增加）信号量。
+```c++
+API_AVAILABLE(macos(10.6), ios(4.0))
+DISPATCH_EXPORT DISPATCH_NONNULL_ALL DISPATCH_NOTHROW
+long
+dispatch_semaphore_signal(dispatch_semaphore_t dsema);
+```
+&emsp;增加计数信号量。如果先前的值小于零，则此函数在返回之前唤醒等待的线程。
+
+&emsp;`dsema`：在此参数中传递 `NULL` 的结果是未定义的。
+
+&emsp;`result`：如果线程被唤醒，此函数将返回非零值。否则，返回零。
+
+&emsp;<dispatch/semaphore.h> 文件到这里就全部看完了。
 
 ## 参考链接
 **参考链接:🔗**
