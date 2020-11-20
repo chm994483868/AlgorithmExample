@@ -420,6 +420,37 @@ void
 dispatch_source_merge_data(dispatch_source_t source, unsigned long value);
 ```
 &emsp;`value`：使用调度源类型指定的逻辑 OR 或 ADD 与待处理数据合并的值。零值无效并且也不会导致事件处理程序块的提交。
+### dispatch_time
+&emsp;相对于默认时钟或 wall time clock（墙上时钟）的当前值，创建一个 `dispatch_time_t`，或修改现有的 `dispatch_time_t`。
+```c++
+API_AVAILABLE(macos(10.6), ios(4.0))
+DISPATCH_EXPORT DISPATCH_WARN_RESULT DISPATCH_NOTHROW
+dispatch_time_t
+dispatch_time(dispatch_time_t when, int64_t delta);
+```
+&emsp;在 Apple 平台上，默认时钟基于 `mach_absolute_time`。
+
+&emsp;`when`：可选的 `dispatch_time_t`，用于添加纳秒。如果传递了 `DISPATCH_TIME_NOW`，则 `dispatch_time` 将使用默认时钟（该时钟基于 Apple 平台上的 `mach_absolute_time`）。如果使用 `DISPATCH_WALLTIME_NOW`，则 `dispatch_time` 将使用 `gettimeofday(3)` 返回的值。 `dispatch_time(DISPATCH_WALLTIME_NOW，delta)` 等效于 `dispatch_walltime(NULL，delta)`。
+
+&emsp;`delta`：纳秒级添加。
+### dispatch_walltime
+&emsp;使用壁钟（wall clock）创建一个 `dispatch_time_t`。
+```c++
+
+_STRUCT_TIMESPEC
+{
+    __darwin_time_t tv_sec;
+    long            tv_nsec;
+};
+
+API_AVAILABLE(macos(10.6), ios(4.0))
+DISPATCH_EXPORT DISPATCH_WARN_RESULT DISPATCH_NOTHROW
+dispatch_time_t
+dispatch_walltime(const struct timespec *_Nullable when, int64_t delta);
+```
+&emsp;在 macOS 上，wall clock 基于 `gettimeofday(3)`。
+
+&emsp;`when`：要添加时间的结构 `timespec`。如果传递了 `NULL`，则 `dispatch_walltime` 将使用 `gettimeofday(3)` 的结果。`dispatch_walltime(NULL，delta)` 返回与 `dispatch_time(DISPATCH_WALLTIME_NOW，delta)` 相同的值。
 ### dispatch_source_set_timer
 &emsp;设置 timer source 的开始时间，间隔和回程值（leeway value）。
 ```c++
@@ -443,7 +474,7 @@ dispatch_source_set_timer(dispatch_source_t source,
 
 &emsp;如果 timer source 已被取消，则调用此函数无效。
 
-&emsp;`start`：计时器的开始时间。
+&emsp;`start`：计时器的开始时间。参考 `dispatch_time()` 和 `dispatch_walltime()`。
 
 &emsp;`interval`：计时器的纳秒间隔。将 `DISPATCH_TIME_FOREVER` 用于一键式计时器（a one-shot timer）。
 
