@@ -1,4 +1,4 @@
-# iOS 多线程知识体系构建(五)：GCD API（source.h）解析篇
+# iOS 多线程知识体系构建(五)：GCD API（source.h、workloop.h、data.h）解析篇
 
 > &emsp;那么继续学习 dispath 中也挺重要的 <dispatch/source.h> 文件。
 
@@ -420,6 +420,8 @@ void
 dispatch_source_merge_data(dispatch_source_t source, unsigned long value);
 ```
 &emsp;`value`：使用调度源类型指定的逻辑 OR 或 ADD 与待处理数据合并的值。零值无效并且也不会导致事件处理程序块的提交。
+
+&emsp;这里插入一下，看一下 <dispatch/time.h> 文件的两个函数。
 ### dispatch_time
 &emsp;相对于默认时钟或 wall time clock（墙上时钟）的当前值，创建一个 `dispatch_time_t`，或修改现有的 `dispatch_time_t`。
 ```c++
@@ -506,6 +508,319 @@ dispatch_source_set_registration_handler_f(dispatch_source_t source,
 ```
 &emsp;同上 `dispatch_source_set_registration_handler`。
 
+&emsp;<dispatch/source.h> 文件到这里就全部看完了。下面接着看另一个文件 <dispatch/workloop.h>。
+## <dispatch/workloop.h>
+&emsp;调度工作循环（dispatch workloops），是 `dispatch_queue_t` 的子类。
+### dispatch_workloop_t
+&emsp;调度工作循环（dispatch workloops）按优先级调用提交给它们的工作项。（`dispatch_workloop_t` 继承自 `dispatch_queue_t`）。
+```c++
+DISPATCH_DECL_SUBCLASS(dispatch_workloop, dispatch_queue);
+```
++ 在 Swift （在 Swift 中使用 Objective-C）下宏定义展开是:
+```c++
+OS_EXPORT OS_OBJECT_OBJC_RUNTIME_VISIBLE
+@interface OS_dispatch_workloop : OS_dispatch_queue
+- (instancetype)init OS_SWIFT_UNAVAILABLE("Unavailable in Swift");
+@end
+
+typedef OS_dispatch_workloop * dispatch_workloop_t;
+```
+&emsp;`OS_dispatch_workloop` 是继承自 `OS_dispatch_queue` 的类，然后 `dispatch_workloop_t` 是指向 `OS_dispatch_workloop` 的指针。
++ 在 Objective-C 下宏定义展开是:
+```c++
+@protocol OS_dispatch_workloop <OS_dispatch_queue>
+@end
+
+typedef NSObject<OS_dispatch_workloop> * dispatch_workloop_t;
+```
+&emsp;`OS_dispatch_workloop` 是继承自 `OS_dispatch_queue` 协议的协议，并且为遵循该协议的 `NSObject` 实例对象类型的指针定义了一个 `dispatch_workloop_t` 的别名。
++ 在 C++ 下宏定义展开是:
+```c++
+typedef struct dispatch_workloop_s : public dispatch_queue_s {} *dispatch_workloop_t;
+```
+&emsp;`dispatch_workloop_t` 是一个指向 `dispatch_workloop_s` 结构体的指针。
++ 在 C（Plain C）下宏定义展开是:
+```c++
+typedef struct dispatch_queue_t *dispatch_workloop_t
+```
+&emsp;`dispatch_group_t` 是指向 `struct dispatch_group_s` 的指针。
+
+&emsp;调度工作循环（dispatch workloop）是 `dispatch_queue_t` 的一种形式，它是优先排序的队列（使用提交的工作项的 QOS 类作为排序依据）。
+
+&emsp;在每次调用 workitem 之间，workloop 将评估是否有更高优先级的工作项直接提交给 workloop 或任何以 workloop 为目标的队列，并首先执行这些工作项。
+
+&emsp;针对 workloop 的 serial queues 维护其工作项的 FIFO 执行。但是，workloop 可以基于它们的优先级，将提交给以其为目标的独立串行队列（independent serial queues）的工作项彼此重新排序，同时保留关于每个串行队列的 FIFO 执行。
+
+&emsp;dispatch workloop 是 `dispatch_queue_t` 的 “subclass” ，可以将其传递给所有接受 dispatch queue 的 API，但 `dispatch_sync` 系列中的函数除外。 `dispatch_async_and_wait` 必须用于 workloop 对象。以 workloop 为目标的队列上的 `dispatch_sync` 系列函数仍被允许，但出于性能原因不建议使用。
+### dispatch_workloop_create
+&emsp;创建一个新的调度工作循环（dispatch workloop），可以向其提交工作项（workitems）。
+```c++
+API_AVAILABLE(macos(10.14), ios(12.0), tvos(12.0), watchos(5.0))
+DISPATCH_EXPORT DISPATCH_MALLOC DISPATCH_RETURNS_RETAINED DISPATCH_WARN_RESULT
+DISPATCH_NOTHROW
+dispatch_workloop_t
+dispatch_workloop_create(const char *_Nullable label);
+```
+&emsp;`label`：附加到工作循环（workloop）的字符串标签。
+
+&emsp;`result`：新创建的调度工作循环（dispatch workloop）。
+### dispatch_workloop_create_inactive
+&emsp;创建一个可以设置后续激活（setup and then activated）的新的非活动调度工作循环（dispatch workloop）。
+```c++
+API_AVAILABLE(macos(10.14), ios(12.0), tvos(12.0), watchos(5.0))
+DISPATCH_EXPORT DISPATCH_MALLOC DISPATCH_RETURNS_RETAINED DISPATCH_WARN_RESULT
+DISPATCH_NOTHROW
+dispatch_workloop_t
+dispatch_workloop_create_inactive(const char *_Nullable label);
+```
+&emsp;创建一个不活动的 workloop 可以使其在激活之前接受进一步的配置，并可以向其提交工作项。
+
+&emsp;将工作项（workitems）提交到无效的工作循环（inactive workloop）是未定义的，这将导致过程终止。
+
+&emsp;`label`：附加到 workloop 的字符串标签。
+
+&emsp;`result`：新创建的调度工作循环。
+### dispatch_workloop_set_autorelease_frequency
+&emsp;设置 workloop 的自动释放频率（autorelease frequency）。
+```c++
+API_AVAILABLE(macos(10.14), ios(12.0), tvos(12.0), watchos(5.0))
+DISPATCH_EXPORT DISPATCH_NONNULL_ALL DISPATCH_NOTHROW
+void
+dispatch_workloop_set_autorelease_frequency(dispatch_workloop_t workloop,
+        dispatch_autorelease_frequency_t frequency);
+```
+&emsp;可参考 `dispatch_queue_attr_make_with_autorelease_frequency`，workloop 的默认策略是 `DISPATCH_AUTORELEASE_FREQUENCY_WORK_ITEM`。
+
+&emsp;`workloop`：dispatch workloop 进行修改。该 workloop 必须是非活动的，传递激活的对象是不确定的，并且将导致进程终止。
+
+&emsp;<dispatch/workloop.h> 文件到这里就全部看完了。下面接着看另一个文件 <dispatch/once.h>。
+## <dispatch/once.h>
+&emsp;
+### dispatch_once_t
+&emsp;看到 `dispatch_once_t` 仅是 long 的别名。
+```c++
+typedef __darwin_intptr_t       intptr_t;
+typedef long                    __darwin_intptr_t;
+
+DISPATCH_SWIFT3_UNAVAILABLE("Use lazily initialized globals instead")
+typedef intptr_t dispatch_once_t;
+```
+&emsp;与 `dispatch_once` 一起使用的谓词，必须将其初始化为零。注意：静态和全局变量默认为零。
+### dispatch_once
+&emsp;一次只能执行一次块（block）。
+```c++
+#ifdef __BLOCKS__
+API_AVAILABLE(macos(10.6), ios(4.0))
+DISPATCH_EXPORT DISPATCH_NONNULL_ALL DISPATCH_NOTHROW
+DISPATCH_SWIFT3_UNAVAILABLE("Use lazily initialized globals instead")
+void
+dispatch_once(dispatch_once_t *predicate,
+        DISPATCH_NOESCAPE dispatch_block_t block);
+```
+&emsp;`prddicate`：指向 `dispatch_once_t` 的指针，用于测试该 block 是否已完成。（这里我们常使用 `static onceToken;` 静态和全局变量默认为零。）
+
+&emsp;`block`：该 block 全局仅执行一次。
+
+&emsp;在使用或测试由该块初始化的任何变量之前，请始终调用 `dispatch_once`。
+
+#### DISPATCH_ONCE_INLINE_FASTPATH
+&emsp;在目前的 Mac iPhone 主流机器，（或者 apple 的主流平台下）下此值应该都是 1，那么将使用如下的内联 `_dispatch_once`。
+
+#### DISPATCH_EXPECT/dispatch_compiler_barrier
+&emsp;`__builtin_expect` 这个指令是 GCC 引入的，作用是允许程序员将最有可能执行的分支告诉编译器，这个指令的写法为：`__builtin_expect(EXP, N)`，意思是：`EXP == N` 的概率很大，然后 CPU 会预取该分支的指令，这样 CPU 流水线就会很大概率减少了 CPU 等待取指令的耗时，从而提高 CPU 的效率。
+&emsp;`dispatch_compiler_barrier` 内存屏障。
+```c++
+#if __GNUC__
+#define DISPATCH_EXPECT(x, v) __builtin_expect((x), (v)) 
+#define dispatch_compiler_barrier()  __asm__ __volatile__("" ::: "memory")
+#else
+#define DISPATCH_EXPECT(x, v) (x)
+#define dispatch_compiler_barrier()  do { } while (0)
+#endif
+```
+#### DISPATCH_COMPILER_CAN_ASSUME
+```c++
+#if __has_builtin(__builtin_assume)
+#define DISPATCH_COMPILER_CAN_ASSUME(expr) __builtin_assume(expr)
+#else
+#define DISPATCH_COMPILER_CAN_ASSUME(expr) ((void)(expr))
+#endif
+```
+#### _dispatch_once
+```c++
+#if defined(__x86_64__) || defined(__i386__) || defined(__s390x__)
+#define DISPATCH_ONCE_INLINE_FASTPATH 1 
+#elif defined(__APPLE__)
+#define DISPATCH_ONCE_INLINE_FASTPATH 1
+#else
+#define DISPATCH_ONCE_INLINE_FASTPATH 0
+#endif
+
+#if DISPATCH_ONCE_INLINE_FASTPATH
+DISPATCH_INLINE DISPATCH_ALWAYS_INLINE DISPATCH_NONNULL_ALL DISPATCH_NOTHROW
+DISPATCH_SWIFT3_UNAVAILABLE("Use lazily initialized globals instead")
+void
+_dispatch_once(dispatch_once_t *predicate,
+        DISPATCH_NOESCAPE dispatch_block_t block)
+{
+    // DISPATCH_EXPECT(*predicate, ~0l) 表示很大概率 *predicate 的值是 ~0l，并返回 *predicate 的值
+    if (DISPATCH_EXPECT(*predicate, ~0l) != ~0l) {
+        // 当 *predicate 等于 0 时，调用 dispatch_once 函数
+        dispatch_once(predicate, block);
+    } else {
+        // 否则，执行这里仅是 
+        dispatch_compiler_barrier();
+    }
+    DISPATCH_COMPILER_CAN_ASSUME(*predicate == ~0l);
+}
+#undef dispatch_once
+#define dispatch_once _dispatch_once
+#endif
+#endif
+```
+&emsp;后面的 `dispatch_once_f` 和 `_dispatch_once_f` 仅是把 `dispatch_block_t` 更换为 `dispatch_function_t`，执行逻辑与 `dispatch_once` 完全相同。
+
+&emsp;<dispatch/once.h> 文件到这里就全部看完了。下面接着看另一个文件 <dispatch/data.h>。
+## <dispatch/data.h>
+&emsp;调度数据对象（dispatch data objects）描述了可以由系统或应用程序管理的内存的连续或稀疏区域。调度数据对象（Dispatch data objects）是不可变的，任何直接访问由调度对象表示的内存区域都不得修改该内存。
+### dispatch_data_t
+&emsp;代表内存区域（memory regions）的调度对象（dispatch object）。
+```c++
+DISPATCH_DATA_DECL(dispatch_data);
+```
++ 在 Swift（在 Swift 中使用 Objective-C）下宏定义展开是:
+```c++
+OS_EXPORT OS_OBJECT_OBJC_RUNTIME_VISIBLE
+@interface OS_dispatch_data : NSObject
+- (instancetype)init OS_SWIFT_UNAVAILABLE("Unavailable in Swift");
+@end
+
+typedef OS_dispatch_data * dispatch_data_t;
+```
+&emsp;`OS_dispatch_data` 是继承自 `NSObject` 的类，然后 `dispatch_data_t` 是指向 `OS_dispatch_data` 的指针。
++ 在 Objective-C 下宏定义展开是:
+```c++
+@protocol OS_dispatch_data <OS_dispatch_object>
+@end
+
+typedef NSObject<OS_dispatch_data> * dispatch_data_t;
+```
+&emsp;`OS_dispatch_data` 是继承自 `OS_dispatch_object` 协议的协议，并且为遵循该协议的 `NSObject` 实例对象类型的指针定义了一个 `dispatch_data_t` 的别名。
++ 在 C++ 下宏定义展开是:
+```c++
+typedef struct dispatch_data_s : public dispatch_object_s {} *dispatch_data_t;
+```
+&emsp;`dispatch_data_t` 是一个指向 `dispatch_data_s` 结构体的指针。
++ 在 C（Plain C）下宏定义展开是:
+```c++
+typedef struct dispatch_data_s *dispatch_data_t;
+```
+&emsp;`dispatch_data_t` 是指向 `struct dispatch_data_s` 的指针。
+### dispatch_data_empty
+&emsp;表示零长度（zero-length）存储区域（memory region）的单例分发数据对象（singleton dispatch data object）。
+```c++
+#define dispatch_data_empty \
+        DISPATCH_GLOBAL_OBJECT(dispatch_data_t, _dispatch_data_empty)
+API_AVAILABLE(macos(10.7), ios(5.0))
+DISPATCH_EXPORT struct dispatch_data_s _dispatch_data_empty;
+```
+### DISPATCH_DATA_DESTRUCTOR_DEFAULT
+&emsp;调度数据对象（dispatch data objects）的默认析构函数。在创建数据对象（data object）时使用，以指示应将提供的缓冲区复制到系统管理的内部存储器中。
+```c++
+#define DISPATCH_DATA_DESTRUCTOR_DEFAULT NULL
+```
+### DISPATCH_DATA_DESTRUCTOR_TYPE_DECL
+&emsp;根据是否是 `__BLOCKS__` 环境来转换 `_dispatch_data_destructor_##name` 为 `dispatch_block_t` 或者 `dispatch_function_t`。
+```c++
+#ifdef __BLOCKS__
+/*! @parseOnly */
+#define DISPATCH_DATA_DESTRUCTOR_TYPE_DECL(name) \
+    DISPATCH_EXPORT const dispatch_block_t _dispatch_data_destructor_##name
+#else
+#define DISPATCH_DATA_DESTRUCTOR_TYPE_DECL(name) \
+    DISPATCH_EXPORT const dispatch_function_t \
+    _dispatch_data_destructor_##name
+#endif /* __BLOCKS__ */
+```
+### DISPATCH_DATA_DESTRUCTOR_FREE
+&emsp;从 malloc 的缓冲区创建的调度数据对象（dispatch data objects）的析构函数。在创建数据对象（data object）时使用，以指示所提供的缓冲区是由 `malloc` 系列函数分配的，应使用 `free` 销毁。
+```c++
+#define DISPATCH_DATA_DESTRUCTOR_FREE (_dispatch_data_destructor_free)
+API_AVAILABLE(macos(10.7), ios(5.0))
+DISPATCH_DATA_DESTRUCTOR_TYPE_DECL(free);
+```
+### DISPATCH_DATA_DESTRUCTOR_MUNMAP
+&emsp;从需要使用 `munmap` 释放的缓冲区，创建的调度数据对象（dispatch data objects）的析构函数。
+```c++
+#define DISPATCH_DATA_DESTRUCTOR_MUNMAP (_dispatch_data_destructor_munmap)
+API_AVAILABLE(macos(10.9), ios(7.0))
+DISPATCH_DATA_DESTRUCTOR_TYPE_DECL(munmap);
+```
+### dispatch_data_create
+&emsp;从给定的连续内存缓冲区（buffer）中创建一个调度数据对象（dispatch data object）。如果提供了非默认的析构函数（non-default destructor），则缓冲区所有权归调用者所有（即不会复制字节）。数据对象（data object）的最新（last release）版本将导致在指定队列上调用指定的析构函数以释放缓冲区。
+```c++
+API_AVAILABLE(macos(10.7), ios(5.0))
+DISPATCH_EXPORT DISPATCH_RETURNS_RETAINED DISPATCH_WARN_RESULT DISPATCH_NOTHROW
+dispatch_data_t
+dispatch_data_create(const void *buffer,
+    size_t size,
+    dispatch_queue_t _Nullable queue,
+    dispatch_block_t _Nullable destructor);
+#endif /* __BLOCKS__ */
+```
+&emsp;如果提供了 `DISPATCH_DATA_DESTRUCTOR_FREE` 析构函数，则将通过 `free` 释放缓冲区，并且忽略队列参数。
+
+&emsp;如果提供了 `DISPATCH_DATA_DESTRUCTOR_DEFAULT` 析构函数，则数据对象的创建会将缓冲区复制到系统管理的内部存储器中。
+
+&emsp;`buffer`：连续的数据缓冲区。
+
+&emsp;`size`：连续数据缓冲区的大小。
+
+&emsp;`queue`：析构函数应提交的队列。
+
+&emsp;`destructor`：析构函数负责在不再需要时释放数据。
+
+&emsp;`result`：新创建的调度数据对象。
+### dispatch_data_get_size
+&emsp;返回由指定调度数据对象（dispatch data object）表示的内存区域的逻辑大小。
+```c++
+API_AVAILABLE(macos(10.7), ios(5.0))
+DISPATCH_EXPORT DISPATCH_PURE DISPATCH_NONNULL1 DISPATCH_NOTHROW
+size_t
+dispatch_data_get_size(dispatch_data_t data);
+```
+&emsp;`data`：要查询的调度数据对象（dispatch data object）。
+
+&emsp;`result`：数据对象（data object）表示的字节数。
+### dispatch_data_create_map
+```c++
+API_AVAILABLE(macos(10.7), ios(5.0))
+DISPATCH_EXPORT DISPATCH_NONNULL1 DISPATCH_RETURNS_RETAINED
+DISPATCH_WARN_RESULT DISPATCH_NOTHROW
+dispatch_data_t
+dispatch_data_create_map(dispatch_data_t data,
+    const void *_Nullable *_Nullable buffer_ptr,
+    size_t *_Nullable size_ptr);
+```
+&emsp;将指定的调度数据对象（dispatch data object）表示的内存映射为单个连续的内存区域，并返回表示该内存区域的新数据对象。如果提供了对指针和大小变量的非 `NULL` 引用，则将使用该区域的位置和范围填充它们。这些允许对表示的内存进行直接读取访问，但是仅在释放返回的对象之前才有效。在 ARC 下，如果对象被保存在一个自动存储的变量（局部变量）中，则需要注意确保在通过指针访问内存之前编译器不会释放它。
+
+&emsp;`data`：要映射的调度数据对象（dispatch data object）。
+
+&emsp;`buffer_ptr`：指向指针变量的指针，该指针变量将使用映射的连续内存区域的位置或 `NULL` 填充。
+
+&emsp;`size_ptr`：指向要用映射的连续内存区域的大小或 `NULL` 填充的 size_t 变量的指针。
+
+&emsp;`result`：新创建的调度数据对象（dispatch data object）。
+
+
+
+
+
+
+
+
+
+
 
 ## 参考链接
 **参考链接:🔗**
@@ -518,3 +833,5 @@ dispatch_source_set_registration_handler_f(dispatch_source_t source,
 + [GCD 中的类型](https://blog.csdn.net/u011374318/article/details/87870585)
 + [iOS Objective-C GCD之queue（队列）篇](https://www.jianshu.com/p/d0017f74f9ca)
 + [变态的libDispatch结构分析-object结构](https://blog.csdn.net/passerbysrs/article/details/18223845)
++ [__builtin_expect 说明](https://www.jianshu.com/p/2684613a300f)
++ [内存屏障(__asm__ __volatile__("": : :"memory"))](https://blog.csdn.net/whycold/article/details/24549571)

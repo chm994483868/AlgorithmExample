@@ -550,7 +550,8 @@
 		D2EB014224DB7A5C009EAFD6 /* main.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = main.m; sourceTree = "<group>"; };
 		D2EB014724DB7B3A009EAFD6 /* iOS 从 libclosure-74 源码来研究 Block 实现原理(1).md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 从 libclosure-74 源码来研究 Block 实现原理(1).md"; sourceTree = "<group>"; };
 		D2F0AF712565151E00DCE258 /* iOS 多线程知识体系构建(四)：GCD API（object.h、group.h、semaphore.h）解析篇.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 多线程知识体系构建(四)：GCD API（object.h、group.h、semaphore.h）解析篇.md"; sourceTree = "<group>"; };
-		D2F0AF7225675FFF00DCE258 /* iOS 多线程知识体系构建(五)：GCD API（source.h）解析篇.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 多线程知识体系构建(五)：GCD API（source.h）解析篇.md"; sourceTree = "<group>"; };
+		D2F0AF7225675FFF00DCE258 /* iOS 多线程知识体系构建(五)：GCD API（source.h、workloop.h、data.h）解析篇.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 多线程知识体系构建(五)：GCD API（source.h、workloop.h、data.h）解析篇.md"; sourceTree = "<group>"; };
+		D2F0AF73256904A500DCE258 /* iOS 多线程知识体系构建(六)：GCD API（block.h、io.h）解析篇.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 多线程知识体系构建(六)：GCD API（block.h、io.h）解析篇.md"; sourceTree = "<group>"; };
 		D2F305B324DF90890020A5C2 /* NSObject+ArcDebugRetainCount.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "NSObject+ArcDebugRetainCount.h"; sourceTree = "<group>"; };
 		D2F305B424DF90890020A5C2 /* NSObject+ArcDebugRetainCount.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = "NSObject+ArcDebugRetainCount.m"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -1386,7 +1387,8 @@
 				D202B343255D367500D9BFBC /* iOS 多线程知识体系构建(二)：Pthreads、NSThread篇.md */,
 				D202B347256135DD00D9BFBC /* iOS 多线程知识体系构建(三)：GCD API（queue.h）解析篇.md */,
 				D2F0AF712565151E00DCE258 /* iOS 多线程知识体系构建(四)：GCD API（object.h、group.h、semaphore.h）解析篇.md */,
-				D2F0AF7225675FFF00DCE258 /* iOS 多线程知识体系构建(五)：GCD API（source.h）解析篇.md */,
+				D2F0AF7225675FFF00DCE258 /* iOS 多线程知识体系构建(五)：GCD API（source.h、workloop.h、data.h）解析篇.md */,
+				D2F0AF73256904A500DCE258 /* iOS 多线程知识体系构建(六)：GCD API（block.h、io.h）解析篇.md */,
 			);
 			path = "已发布";
 			sourceTree = "<group>";
