@@ -811,16 +811,92 @@ dispatch_data_create_map(dispatch_data_t data,
 &emsp;`size_ptr`：指向要用映射的连续内存区域的大小或 `NULL` 填充的 size_t 变量的指针。
 
 &emsp;`result`：新创建的调度数据对象（dispatch data object）。
+### dispatch_data_create_concat
+&emsp;返回一个表示**指定数据对象（data objects）的串联**的新调度数据对象（dispatch data objec）。调用返回后，这些对象可以由应用程序释放（但是，在新创建的对象也被释放之前，系统可能不会释放由它们描述的内存区域）。
+```c++
+API_AVAILABLE(macos(10.7), ios(5.0))
+DISPATCH_EXPORT DISPATCH_NONNULL_ALL DISPATCH_RETURNS_RETAINED
+DISPATCH_WARN_RESULT DISPATCH_NOTHROW
+dispatch_data_t
+dispatch_data_create_concat(dispatch_data_t data1, dispatch_data_t data2);
+```
+&emsp;`data1`：表示要放置在新创建对象内存区域开头的数据对象。
 
+&emsp;`data2`：表示要放置在新创建对象内存区域末尾的数据对象。
 
+&emsp;`result`：一个新创建的对象，表示 `data1` 和 `data2` 对象的串联。
+### dispatch_data_create_subrange
+&emsp;返回表示指定数据对象子范围的新调度数据对象（dispatch data object），该对象可能在调用返回后由应用程序释放（但是，在新创建的对象也已释放之前，系统可能不会释放该对象描述的内存区域）。
+```c++
+API_AVAILABLE(macos(10.7), ios(5.0))
+DISPATCH_EXPORT DISPATCH_NONNULL1 DISPATCH_RETURNS_RETAINED
+DISPATCH_WARN_RESULT DISPATCH_NOTHROW
+dispatch_data_t
+dispatch_data_create_subrange(dispatch_data_t data,
+    size_t offset,
+    size_t length);
+```
+&emsp;`data`：表示要创建其内存区域子范围的数据对象。
 
+&emsp;`offset`：数据对象的偏移量表示子范围开始处。
 
+&emsp;`length`：范围的长度。
 
+&emsp;`result`：一个新创建的对象，代表数据对象的指定子范围。
+### dispatch_data_applier_t
+&emsp;表示为一个数据对象（data object）中的每个连续内存区域调用的块。
+```c++
+typedef bool (^dispatch_data_applier_t)(dispatch_data_t region,
+    size_t offset,
+    const void *buffer,
+    size_t size);
+```
+&emsp;`region`：表示当前区域的数据对象。
 
+&emsp;`offset`：当前区域到数据对象开始的逻辑偏移量。
 
+&emsp;`buffer`：当前区域的内存位置。
 
+&emsp;`size`：当前区域的内存大小。
 
+&emsp;`result`：一个布尔值，指示是否应继续遍历。
+### dispatch_data_apply
+&emsp;以逻辑顺序遍历指定的调度数据对象（dispatch data object）表示的内存区域，并为遇到的每个连续内存区域调用一次指定的块（block）。
+```c++
+API_AVAILABLE(macos(10.7), ios(5.0))
+DISPATCH_EXPORT DISPATCH_NONNULL_ALL DISPATCH_NOTHROW
+bool
+dispatch_data_apply(dispatch_data_t data,
+    DISPATCH_NOESCAPE dispatch_data_applier_t applier);
+#endif /* __BLOCKS__ */
+```
+&emsp;块的每次调用都会传递一个数据对象，该对象表示当前区域及其逻辑偏移量，以及该区域的存储位置和范围。它们允许对内存区域的直接读取访问，但是仅在释放传入的区域对象之前才有效。请注意，区域对象在块返回时由系统释放，如果块返回后需要区域对象或关联的内存位置，则应用程序有责任保留该对象。
 
+&emsp;`data`：要遍历的数据对象。
+
+&emsp;`applier`：数据对象中每个连续存储区域要调用的块。
+
+&emsp;`result`：一个布尔值，指示遍历是否成功完成。
+### dispatch_data_copy_region
+&emsp;在由指定对象（`data`）表示的区域中查找包含指定位置（location）的连续内存区域，并返回表示该区域的内部调度数据对象（dispatch data object）的副本（函数返回值）及其在指定对象中的逻辑偏移量（用一个 size_t * 记录）。
+```c++
+API_AVAILABLE(macos(10.7), ios(5.0))
+DISPATCH_EXPORT DISPATCH_NONNULL1 DISPATCH_NONNULL3 DISPATCH_RETURNS_RETAINED
+DISPATCH_WARN_RESULT DISPATCH_NOTHROW
+dispatch_data_t
+dispatch_data_copy_region(dispatch_data_t data,
+    size_t location,
+    size_t *offset_ptr);
+```
+&emsp;`data`：要查询的调度数据对象。
+
+&emsp;`location`：要查询的数据对象中的逻辑位置。
+
+&emsp;`offset_ptr`：指向 size_t 变量的指针，指针包含的值是返回的区域对象到查询的数据对象的起始位置的逻辑偏移量。
+
+&emsp;`result`：新创建的调度数据对象（dispatch data object）。
+
+&emsp;<dispatch/data.h> 文件到这里就全部看完了。下面接着看另一个文件 <dispatch/block.h>，下面一篇就是 GCD API 的最后一篇了，然后就开始扣源码了，其实看到这里我自己也不知道在看什么，看懂的大概就是函数命名、函数参数或者说是仅看懂了函数声明，很多 API 的注释都是不知道在说什么，因为从来都没有用过，貌似只有第一篇中我们比较常用 API 能看懂，可能是强迫症吧必须把 API 都看一遍，或者是还不知道怎么开始扣 GCD 的源码，这里想到了之前刚开始扣 objc4-781 源码的时候，也是不知道怎么看怎么规划，然后就找博客找文章几乎把相关的都看了一遍，后来就未知未觉的进入 objc4 的源码世界。总之，加油！加油！一定要搞清楚线程、队列、任务、以及它们之间的协作和调度关系。⛽️⛽️
 
 ## 参考链接
 **参考链接:🔗**
