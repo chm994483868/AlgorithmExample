@@ -12,7 +12,7 @@
 ```
 &emsp;这是 `DISPATCH_DECL` 在 C（Plain C）环境下的宏定义，其中还有 C++/Objective-c/Swift 环境下的，但这里我们仅看 C 环境下的。前面几篇文章在 .h 中我们只看到的结构体的名字而完全没有看到它们的具体定义，那么就去 libdispatch 源码中找它们的具体定义吧！
 ## dispatch_object_s 
-&emsp;`dispatch_object_s` 是 GCD 的基础结构体，其中涉及连续的多个宏定义（看宏定义真的好烦），下面一起来看一下。
+&emsp;`dispatch_object_s` 是 GCD 的基础结构体。其中涉及连续的多个宏定义（看宏定义真的好烦），下面一起来看一下。
 ```c++
 struct dispatch_object_s {
     _DISPATCH_OBJECT_HEADER(object);
@@ -47,7 +47,7 @@ void *do_finalizer
     const struct x##_vtable_s *do_vtable
 #else
 
-// ⬇️ 当前平台下取这里 iOS 和 x86_64 下
+// ⬇️ 当前平台下取这里（iOS 和 x86_64 下）
 #define OS_OBJECT_STRUCT_HEADER(x) \
     _OS_OBJECT_HEADER(\
     const struct x##_vtable_s *do_vtable, \
@@ -67,15 +67,41 @@ int volatile xref_cnt // 外部引用计数，两者都为 0 时，对象才能�
 struct dispatch_object_s {
     struct _os_object_s _as_os_obj[0]; // 长度为 0 的数组，这里可忽略
     
+    // do_vtable 包含了 dispatch_object_s 的操作函数
     const struct dispatch_object_vtable_s *do_vtable; /* must be pointer-sized */
-    int volatile do_ref_cnt;
-    int volatile do_xref_cnt;
     
+    int volatile do_ref_cnt; // 引用计数
+    int volatile do_xref_cnt; // 外部引用计数
+    
+    // do_next 表示链表的 next
     struct dispatch_object_s *volatile do_next;
+    
+    // 目标队列，表示当前任务要在这个队列运行
     struct dispatch_queue_s *do_targetq;
+    
+    // 上下文，即运行任务（其实是一个函数）的参数
     void *do_ctxt;
+    
+    // 最终销毁时调用的函数
     void *do_finalizer
 };
+```
+### dispatch_object_t
+```c++
+typedef union {
+    struct _os_object_s *_os_obj;
+    struct dispatch_object_s *_do;
+    struct dispatch_queue_s *_dq;
+    struct dispatch_queue_attr_s *_dqa;
+    struct dispatch_group_s *_dg;
+    struct dispatch_source_s *_ds;
+    struct dispatch_channel_s *_dch;
+    struct dispatch_mach_s *_dm;
+    struct dispatch_mach_msg_s *_dmsg;
+    struct dispatch_semaphore_s *_dsema;
+    struct dispatch_data_s *_ddata;
+    struct dispatch_io_s *_dchannel;
+} dispatch_object_t DISPATCH_TRANSPARENT_UNION;
 ```
 
 
