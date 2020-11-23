@@ -10,8 +10,67 @@
 ```c++
 #define DISPATCH_DECL(name) typedef struct name##_s *name##_t
 ```
-&emsp;这是 `DISPATCH_DECL` 在 C（Plain C）环境下的宏定义，其中还有 C++/Objective-c/Swift 环境下的，但这里我们仅看 C 环境下的。前面几篇文章在 .h 中我们只看到的结构体的名字而完全没有看到它们的具体定义，那么就去 libdispatch 源码中找它们的具体定义吧！ 
-## dispatch_object_t
+&emsp;这是 `DISPATCH_DECL` 在 C（Plain C）环境下的宏定义，其中还有 C++/Objective-c/Swift 环境下的，但这里我们仅看 C 环境下的。前面几篇文章在 .h 中我们只看到的结构体的名字而完全没有看到它们的具体定义，那么就去 libdispatch 源码中找它们的具体定义吧！
+## dispatch_object_s 
+&emsp;`dispatch_object_s` 是 GCD 的基础结构体，其中涉及连续的多个宏定义（好烦），下面一起来看一下。
+```c++
+struct dispatch_object_s {
+    _DISPATCH_OBJECT_HEADER(object);
+};
+```
+### _DISPATCH_OBJECT_HEADER
+```c++
+#define _DISPATCH_OBJECT_HEADER(x) \
+struct _os_object_s _as_os_obj[0]; \
+
+OS_OBJECT_STRUCT_HEADER(dispatch_##x); \ ⬅️ 需要 OS_OBJECT_STRUCT_HEADER 宏展开
+
+struct dispatch_##x##_s *volatile do_next; \
+struct dispatch_queue_s *do_targetq; \
+void *do_ctxt; \
+void *do_finalizer
+```
+### OS_OBJECT_STRUCT_HEADER
+```c++
+#if OS_OBJECT_HAVE_OBJC1
+#define OS_OBJECT_STRUCT_HEADER(x) \
+    _OS_OBJECT_HEADER(\
+    const void *_objc_isa, \
+    do_ref_cnt, \
+    do_xref_cnt); \
+    const struct x##_vtable_s *do_vtable
+#else
+#define OS_OBJECT_STRUCT_HEADER(x) \
+    _OS_OBJECT_HEADER(\
+    const struct x##_vtable_s *do_vtable, \
+    do_ref_cnt, \
+    do_xref_cnt)
+#endif
+```
+### _OS_OBJECT_HEADER
+```c++
+#define _OS_OBJECT_HEADER(isa, ref_cnt, xref_cnt) \
+isa; /* must be pointer-sized */ \ // isa
+int volatile ref_cnt; \ // 引用计数
+int volatile xref_cnt // 外部引用计数，两者都为 0 时，对象才能释放
+```
+&emsp;把上面的宏定义内容全部展开后，`dispatch_object_s` 结构体定义如下:
+```c++
+struct dispatch_object_s {
+    struct _os_object_s _as_os_obj[0]; // 长度为 0 的数组，这里可忽略
+    
+    const struct dispatch_object_vtable_s *do_vtable; /* must be pointer-sized */
+    int volatile do_ref_cnt;
+    int volatile do_xref_cnt;
+    
+    struct dispatch_object_s *volatile do_next;
+    struct dispatch_queue_s *do_targetq;
+    void *do_ctxt;
+    void *do_finalizer
+};
+```
+
+
 
 
 
@@ -24,12 +83,12 @@
 + [关于GCD开发的一些事儿](https://www.jianshu.com/p/f9e01c69a46f)
 + [GCD 深入理解：第一部分](https://github.com/nixzhu/dev-blog/blob/master/2014-04-19-grand-central-dispatch-in-depth-part-1.md)
 + [dispatch_once 详解](https://www.jianshu.com/p/4fd27f1db63d)
++ [透明联合类型](http://nanjingabcdefg.is-programmer.com/posts/23951.html)
++ [变态的libDispatch结构分析-dispatch_object_s](https://blog.csdn.net/passerbysrs/article/details/18228333?utm_source=blogxgwz2)
 
 
 + [深入浅出 GCD 之基础篇](https://xiaozhuanlan.com/topic/9168375240)
 + [从源码分析Swift多线程—DispatchGroup](http://leevcan.com/2020/05/30/从源码分析Swift多线程—DispatchGroup/)
-
-
 
 
 &emsp;<dispatch/block.h> 文件到这里就全部看完了。下面接着看另一个文件 <dispatch/io.h>，
