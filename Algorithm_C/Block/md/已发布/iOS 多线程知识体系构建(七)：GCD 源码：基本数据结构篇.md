@@ -12,7 +12,7 @@
 ```
 &emsp;这是 `DISPATCH_DECL` 在 C（Plain C）环境下的宏定义，其中还有 C++/Objective-c/Swift 环境下的，但这里我们仅看 C 环境下的。前面几篇文章在 .h 中我们只看到的结构体的名字而完全没有看到它们的具体定义，那么就去 libdispatch 源码中找它们的具体定义吧！
 ## dispatch_object_s 
-&emsp;`dispatch_object_s` 是 GCD 的基础结构体，其中涉及连续的多个宏定义（好烦），下面一起来看一下。
+&emsp;`dispatch_object_s` 是 GCD 的基础结构体，其中涉及连续的多个宏定义（看宏定义真的好烦），下面一起来看一下。
 ```c++
 struct dispatch_object_s {
     _DISPATCH_OBJECT_HEADER(object);
@@ -21,9 +21,9 @@ struct dispatch_object_s {
 ### _DISPATCH_OBJECT_HEADER
 ```c++
 #define _DISPATCH_OBJECT_HEADER(x) \
-struct _os_object_s _as_os_obj[0]; \
+struct _os_object_s _as_os_obj[0]; \ ⬅️ 这里是一个长度为 0 的数组，不占用任何内存，暂时可以忽略
 
-OS_OBJECT_STRUCT_HEADER(dispatch_##x); \ ⬅️ 需要 OS_OBJECT_STRUCT_HEADER 宏展开
+OS_OBJECT_STRUCT_HEADER(dispatch_##x); \ ⬅️ 这里需要 OS_OBJECT_STRUCT_HEADER 宏展开
 
 struct dispatch_##x##_s *volatile do_next; \
 struct dispatch_queue_s *do_targetq; \
@@ -32,6 +32,12 @@ void *do_finalizer
 ```
 ### OS_OBJECT_STRUCT_HEADER
 ```c++
+#if TARGET_OS_MAC && !TARGET_OS_SIMULATOR && defined(__i386__)
+#define OS_OBJECT_HAVE_OBJC1 1
+#else
+#define OS_OBJECT_HAVE_OBJC1 0 // ⬅️ 当前 x86_64 平台下
+#endif
+
 #if OS_OBJECT_HAVE_OBJC1
 #define OS_OBJECT_STRUCT_HEADER(x) \
     _OS_OBJECT_HEADER(\
@@ -40,6 +46,8 @@ void *do_finalizer
     do_xref_cnt); \
     const struct x##_vtable_s *do_vtable
 #else
+
+// ⬇️ 当前平台下取这里 iOS 和 x86_64 下
 #define OS_OBJECT_STRUCT_HEADER(x) \
     _OS_OBJECT_HEADER(\
     const struct x##_vtable_s *do_vtable, \
@@ -50,7 +58,7 @@ void *do_finalizer
 ### _OS_OBJECT_HEADER
 ```c++
 #define _OS_OBJECT_HEADER(isa, ref_cnt, xref_cnt) \
-isa; /* must be pointer-sized */ \ // isa
+isa; /* must be pointer-sized */ \ // isa 必须是指针大小
 int volatile ref_cnt; \ // 引用计数
 int volatile xref_cnt // 外部引用计数，两者都为 0 时，对象才能释放
 ```

@@ -212,7 +212,6 @@ dispatch_block_testcancel(dispatch_block_t block);
 &emsp;`result`：如果取消，则返回非零；如果未取消，返回零。
 
 &emsp;<dispatch/block.h> 文件到这里就全部看完了。
-
 ## 参考链接
 **参考链接:🔗**
 + [swift-corelibs-libdispatch-main](https://github.com/apple/swift-corelibs-libdispatch)
