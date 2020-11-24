@@ -305,7 +305,7 @@ union {
 &emsp;以上是 `dispatch_queue_s` 结构中涉及的宏定义，下面全部展开看下 `dispatch_queue_s` 包含的内容：
 ```c++
 struct dispatch_queue_s {
-    struct dispatch_object_s _as_do[0];
+    struct dispatch_object_s _as_do[0]; // 长度为 0 的数组，可忽略，同时也在暗示着结构体内存空间中的数据类型
     struct _os_object_s _as_os_obj[0];
 
     const struct dispatch_queue_vtable_s *do_vtable; /* must be pointer-sized */
@@ -316,29 +316,29 @@ struct dispatch_queue_s {
     struct dispatch_queue_s *do_targetq;
     void *do_ctxt;
     void *do_finalizer
-
+    
+    // ⬆️
+    // DISPATCH_OBJECT_HEADER(queue); 这里是分界，以上内容继承自 dispatch_object_s 
+    
     void *__dq_opaque1;
-    
     union { 
-            uint64_t volatile dq_state;
-            struct {
-                dispatch_lock dq_state_lock;
-                uint32_t dq_state_bits;
-            };
-          }
-    /* LP64 global queue cacheline boundary */ 
+        uint64_t volatile dq_state;
+        struct {
+            dispatch_lock dq_state_lock;
+            uint32_t dq_state_bits;
+        };
+    };
     
+    /* LP64 global queue cacheline boundary */ 
     unsigned long dq_serialnum;
     const char *dq_label;
-    
     union { 
-            uint32_t volatile dq_atomic_flags;
-            struct {
-                const uint16_t dq_width;
-                const uint16_t __dq_opaque2;
-            };
-          }
-    
+        uint32_t volatile dq_atomic_flags;
+        struct {
+            const uint16_t dq_width;
+            const uint16_t __dq_opaque2;
+        };
+    };
     dispatch_priority_t dq_priority;
     union {
         struct dispatch_queue_specific_head_s *dq_specific_head;
@@ -347,12 +347,12 @@ struct dispatch_queue_s {
         struct dispatch_mach_recv_refs_s *dm_recv_refs;
         struct dispatch_channel_callbacks_s const *dch_callbacks;
     };
-    int volatile dq_sref_cnt
+    int volatile dq_sref_cnt;
     
     /* 32bit hole on LP64 */
 } DISPATCH_ATOMIC64_ALIGN;
 ```
-&emsp;前面部分几个成员变量完全照搬 `dispatch_object_s` 结构体的成员变量，
+&emsp;细心观察会发现前面几个成员变量几乎和 `dispatch_object_s` 结构体的成员变量相同，它们都是来自 `_DISPATCH_OBJECT_HEADER` 的宏展开，一个是 `_DISPATCH_OBJECT_HEADER(object)` 一个是 `_DISPATCH_OBJECT_HEADER(queue)`，可能看它的命名大概也看出了一些端倪“调度对象头部”，其实这里大概是在模拟继承，如 `dispatch_queue_s` 继承自 `dispatch_object_s`，那么头部的一些成员变量自然也要继承自 `dispatch_object_s` 了。
 
 
 
