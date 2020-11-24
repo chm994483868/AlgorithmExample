@@ -221,16 +221,53 @@ DISPATCH_UNION_LE(uint64_t volatile dq_state, \
 ```
 &emsp;看到这里有些领悟，`dispatch_queue_s` 结构体的前面几个成员变量的布局用到的宏定义和我们上面学习 `dispatch_object_s` 结构体时用到的是一样。即等下 `dispatch_queue_s` 结构体展开其前面几个成员变量和 `dispatch_object_s` 如出一辙的，这里类似是在模拟继承机制，例如可以这样理解 `dispatch_queue_s` 前面的几个成员变量继承自 `dispatch_object_s`。
 ### DISPATCH_UNION_LE
-&emsp;`DISPATCH_UNION_LE` 宏定义包含的内容有两层的，首先是进行一个断言，然后是生成一个联合体。
+&emsp;`DISPATCH_UNION_LE` 宏定义包含的内容有两层的，首先是进行一个断言，然后是生成一个联合体，断言和下面的联合体内部转换几乎是相同的，都是使用相同的宏定义内容。
 ```c++
 #define DISPATCH_UNION_LE(alias, ...) \
-DISPATCH_UNION_ASSERT(alias, DISPATCH_CONCAT(DISPATCH_STRUCT_LE, DISPATCH_COUNT_ARGS(__VA_ARGS__))(__VA_ARGS__)) \
-union { alias; DISPATCH_CONCAT(DISPATCH_STRUCT_LE, DISPATCH_COUNT_ARGS(__VA_ARGS__))(__VA_ARGS__); }
+        DISPATCH_UNION_ASSERT(alias, DISPATCH_CONCAT(DISPATCH_STRUCT_LE, \
+                DISPATCH_COUNT_ARGS(__VA_ARGS__))(__VA_ARGS__)) \
+        union { alias; DISPATCH_CONCAT(DISPATCH_STRUCT_LE, \
+                DISPATCH_COUNT_ARGS(__VA_ARGS__))(__VA_ARGS__); }
 
-// 假设 __VA_ARGS__ 包含两个参数的情况，把 DISPATCH_UNION_LE 内部的宏定义展开以后如下:
-#define DISPATCH_UNION_LE(alias, ...) \
+// DISPATCH_UNION_LE 内部嵌套的宏定义过多，这里我们以一个例子分析一下：
+// DISPATCH_UNION_LE(uint64_t volatile dq_state, dispatch_lock dq_state_lock, uint32_t dq_state_bits)
+
+// 1. DISPATCH_UNION_LE 里面的 DISPATCH_COUNT_ARGS(__VA_ARGS__) 是统计参数个数，
+//    然后返回一个 _参数个数，假设参数个数是 2，可直接把 DISPATCH_COUNT_ARGS(__VA_ARGS__) 转换为 _2 如下：（暂时保留 __VA_ARGS__ 和 alias）
+
+DISPATCH_UNION_ASSERT(alias, DISPATCH_CONCAT(DISPATCH_STRUCT_LE, _2)(__VA_ARGS__)) \
+union { alias; DISPATCH_CONCAT(DISPATCH_STRUCT_LE, _2)(__VA_ARGS__); }
+
+// 2. 然后是 DISPATCH_CONCAT(DISPATCH_STRUCT_LE, _2)，它是较简单的只是进行参数拼接，可继续转换如下：（暂时保留 __VA_ARGS__ 和 alias）
+
 DISPATCH_UNION_ASSERT(alias, DISPATCH_STRUCT_LE_2(__VA_ARGS__)) \
 union { alias; DISPATCH_STRUCT_LE_2(__VA_ARGS__); }
+        
+// 3. 然后是 DISPATCH_STRUCT_LE_2(__VA_ARGS__)，这里开始替换 __VA_ARGS__，可继续转换如下：
+
+DISPATCH_UNION_ASSERT(uint64_t volatile dq_state,         
+                      struct {
+                          dispatch_lock dq_state_lock;
+                          uint32_t dq_state_bits;
+                      };
+                     )
+                     
+union { 
+        uint64_t volatile dq_state;
+        struct {
+            dispatch_lock dq_state_lock;
+            uint32_t dq_state_bits;
+        };
+      }
+
+// 4. DISPATCH_UNION_ASSERT 仅是一个断言，且 typedef uint32_t dispatch_lock; 即双方都是 64 位，8 个字节，那么宏定义全部展开就只剩下:
+union { 
+        uint64_t volatile dq_state;
+        struct {
+            dispatch_lock dq_state_lock;
+            uint32_t dq_state_bits;
+        };
+      }
 ```
 ### DISPATCH_STRUCT_LE_2
 ```c++
@@ -244,7 +281,6 @@ union { alias; DISPATCH_STRUCT_LE_2(__VA_ARGS__); }
 #define DISPATCH_STRUCT_LE_4(a, b, c, d)  struct { d; c; b; a; }
 #endif
 ```
-
 ### DISPATCH_UNION_ASSERT
 &emsp;`DISPATCH_UNION_ASSERT` 是一个断言联合体，断言的内容是判断仅有一个成员变量 `alias` 的结构体内存字节长度是否等于 `st` 的内存字节长度。
 ```c++
@@ -268,14 +304,6 @@ union { alias; DISPATCH_STRUCT_LE_2(__VA_ARGS__); }
 ```
 &emsp;以上是 `dispatch_queue_s` 结构中涉及的宏定义，下面全部展开看下 `dispatch_queue_s` 包含的内容：
 ```c++
-
-struct dispatch_queue_s {
-    DISPATCH_QUEUE_CLASS_HEADER(queue, void *__dq_opaque1);
-    /* 32bit hole on LP64 */
-} DISPATCH_ATOMIC64_ALIGN;
-
-111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111
-
 struct dispatch_queue_s {
     struct dispatch_object_s _as_do[0];
     struct _os_object_s _as_os_obj[0];
@@ -290,24 +318,26 @@ struct dispatch_queue_s {
     void *do_finalizer
 
     void *__dq_opaque1;
-
-    // ⬇️
-    DISPATCH_UNION_LE(uint64_t volatile dq_state, \
-            dispatch_lock dq_state_lock, \
-            uint32_t dq_state_bits \
-    )
-    // ⬆️
     
+    union { 
+            uint64_t volatile dq_state;
+            struct {
+                dispatch_lock dq_state_lock;
+                uint32_t dq_state_bits;
+            };
+          }
     /* LP64 global queue cacheline boundary */ 
+    
     unsigned long dq_serialnum;
     const char *dq_label;
     
-    // ⬇️
-    DISPATCH_UNION_LE(uint32_t volatile dq_atomic_flags, \
-        const uint16_t dq_width, \
-        const uint16_t __dq_opaque2 \
-    );
-    // ⬆️
+    union { 
+            uint32_t volatile dq_atomic_flags;
+            struct {
+                const uint16_t dq_width;
+                const uint16_t __dq_opaque2;
+            };
+          }
     
     dispatch_priority_t dq_priority;
     union {
@@ -321,43 +351,8 @@ struct dispatch_queue_s {
     
     /* 32bit hole on LP64 */
 } DISPATCH_ATOMIC64_ALIGN;
-
-2222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222
-// 1⃣️ 的展开
-
-struct dispatch_object_s _as_do[0];
-struct _os_object_s _as_os_obj[0];
-
-const struct dispatch_queue_vtable_s *do_vtable; /* must be pointer-sized */
-int volatile do_ref_cnt;
-int volatile do_xref_cnt;
-
-struct dispatch_queue_s *volatile do_next;
-struct dispatch_queue_s *do_targetq;
-void *do_ctxt;
-void *do_finalizer
-
-void *__dq_opaque1;
-
-// ⬇️
-DISPATCH_UNION_LE(uint64_t volatile dq_state, \
-        dispatch_lock dq_state_lock, \
-        uint32_t dq_state_bits \
-)
-// ⬆️
-
-3333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333
-
-DISPATCH_UNION_LE(uint64_t volatile dq_state, \
-        dispatch_lock dq_state_lock, \
-        uint32_t dq_state_bits \
-)
-
-// 2⃣️ 的展开
-typedef uint32_t dispatch_lock;
-
-
 ```
+&emsp;前面部分几个成员变量完全照搬 `dispatch_object_s` 结构体的成员变量，
 
 
 
