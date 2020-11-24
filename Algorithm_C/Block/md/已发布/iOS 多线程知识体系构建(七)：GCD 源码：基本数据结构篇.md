@@ -12,13 +12,14 @@
 ```
 &emsp;这是 `DISPATCH_DECL` 在 C（Plain C）环境下的宏定义，其中还有 C++/Objective-c/Swift 环境下的，但这里我们仅看 C 环境下的。前面几篇文章在 .h 中我们只看到的结构体的名字而完全没有看到它们的具体定义，那么就去 libdispatch 源码中找它们的具体定义吧！
 ## dispatch_object_s 
-&emsp;`dispatch_object_s` 是 GCD 的基础结构体。其中涉及连续的多个宏定义（看宏定义真的好烦），下面一起来看一下。
+&emsp;`dispatch_object_s` 是 GCD 的基础结构体。其中涉及连续的多个宏定义（看连续的宏定义真的好烦呀），下面一起来看一下。
 ```c++
 struct dispatch_object_s {
     _DISPATCH_OBJECT_HEADER(object);
 };
 ```
 ### _DISPATCH_OBJECT_HEADER
+&emsp;`dispatch_object_s` 结构体内部唯一一个 `_DISPATCH_OBJECT_HEADER` 宏定义。
 ```c++
 #define _DISPATCH_OBJECT_HEADER(x) \
 struct _os_object_s _as_os_obj[0]; \ ⬅️ 这里是一个长度为 0 的数组，不占用任何内存，暂时可以忽略
@@ -31,11 +32,12 @@ void *do_ctxt; \
 void *do_finalizer
 ```
 ### OS_OBJECT_STRUCT_HEADER
+&emsp;`_DISPATCH_OBJECT_HEADER` 内部的一个 `OS_OBJECT_STRUCT_HEADER` 宏定义。
 ```c++
 #if TARGET_OS_MAC && !TARGET_OS_SIMULATOR && defined(__i386__)
 #define OS_OBJECT_HAVE_OBJC1 1
 #else
-#define OS_OBJECT_HAVE_OBJC1 0 // ⬅️ 当前 x86_64 平台下
+#define OS_OBJECT_HAVE_OBJC1 0 // ⬅️ 当前 x86_64/arm64 平台下
 #endif
 
 #if OS_OBJECT_HAVE_OBJC1
@@ -47,7 +49,7 @@ void *do_finalizer
     const struct x##_vtable_s *do_vtable
 #else
 
-// ⬇️ 当前平台下取这里（iOS 和 x86_64 下）
+// ⬇️ 当前平台下取这里（arm64 和 x86_64 下）
 #define OS_OBJECT_STRUCT_HEADER(x) \
     _OS_OBJECT_HEADER(\
     const struct x##_vtable_s *do_vtable, \
@@ -56,49 +58,72 @@ void *do_finalizer
 #endif
 ```
 ### _OS_OBJECT_HEADER
+&emsp;紧接着 `OS_OBJECT_STRUCT_HEADER` 内部的 `_OS_OBJECT_HEADER` 宏定义，可看到是 `OS_OBJECT` 的头部的三个成员变量。
 ```c++
 #define _OS_OBJECT_HEADER(isa, ref_cnt, xref_cnt) \
 isa; /* must be pointer-sized */ \ // isa 必须是指针大小
 int volatile ref_cnt; \ // 引用计数
 int volatile xref_cnt // 外部引用计数，两者都为 0 时，对象才能释放
 ```
-&emsp;把上面的宏定义内容全部展开后，`dispatch_object_s` 结构体定义如下:
+
+&emsp;把上面的 `dispatch_object_s` 的宏定义内容全部展开替换后，如下:
 ```c++
 struct dispatch_object_s {
     struct _os_object_s _as_os_obj[0]; // 长度为 0 的数组，这里可忽略
     
-    // do_vtable 包含了 dispatch_object_s 的操作函数
-    const struct dispatch_object_vtable_s *do_vtable; /* must be pointer-sized */
-    
+    const struct dispatch_object_vtable_s *do_vtable; /* must be pointer-sized */ // do_vtable 包含了对象类型和 dispatch_object_s 的操作函数
     int volatile do_ref_cnt; // 引用计数
-    int volatile do_xref_cnt; // 外部引用计数
+    int volatile do_xref_cnt; // 外部引用计数，两者都为 0 时才会释放对象内存
     
-    // do_next 表示链表的 next
-    struct dispatch_object_s *volatile do_next;
-    
-    // 目标队列，表示当前任务要在这个队列运行
-    struct dispatch_queue_s *do_targetq;
-    
-    // 上下文，即运行任务（其实是一个函数）的参数
-    void *do_ctxt;
-    
-    // 最终销毁时调用的函数
-    void *do_finalizer
+    struct dispatch_object_s *volatile do_next; // do_next 表示链表的 next，（下一个 dispatch_object_s）
+    struct dispatch_queue_s *do_targetq; // 目标队列，表示当前任务要在这个队列运行
+    void *do_ctxt; // 上下文，即运行任务（其实是一个函数）的参数
+    void *do_finalizer; // 最终销毁时调用的函数
 };
 ```
+
+&emsp;下面我们接着看一下 `dispatch_object_s` 内部的一些结构体类型的变量的具体定义是什么，首先看第一个 `_os_object_s` 结构体。
+### _os_object_s
+&emsp;上面的宏定义已经全部展开，看到比较诡异的第一行，一个长度是 0 的 `_os_object_s` 结构体数组，下面看一下 `_os_object_s` 结构体定义。
+```c++
+typedef struct _os_object_s {
+    _OS_OBJECT_HEADER(
+    const _os_object_vtable_s *os_obj_isa,
+    os_obj_ref_cnt,
+    os_obj_xref_cnt);
+} _os_object_s;
+
+// 把 _OS_OBJECT_HEADER 展开则是:
+typedef struct _os_object_s {
+    const _os_object_vtable_s *os_obj_isa; 
+    int volatile os_obj_ref_cnt; 
+    int volatile os_obj_xref_cnt;
+} _os_object_s;
+```
+&emsp;直白一点的话可以把前缀理解为 `os_obj`。
+### _os_object_vtable_s
+&emsp;`_os_object_s` 结构体的第一个成员变量 `const _os_object_vtable_s *os_obj_isa`。
+```c++
+typedef struct _os_object_vtable_s {
+    _OS_OBJECT_CLASS_HEADER();
+} _os_object_vtable_s;
+```
+###  
+
+
 ### dispatch_object_t
 ```c++
 typedef union {
     struct _os_object_s *_os_obj;
-    struct dispatch_object_s *_do;
-    struct dispatch_queue_s *_dq;
-    struct dispatch_queue_attr_s *_dqa;
-    struct dispatch_group_s *_dg;
-    struct dispatch_source_s *_ds;
+    struct dispatch_object_s *_do; // GCD 的基类
+    struct dispatch_queue_s *_dq; // 任务队列（我们创建的队列都是这个类型，不管是串行队列还是并行队列）
+    struct dispatch_queue_attr_s *_dqa; // 任务队列的属性，包含了任务队列里面的一些操作函数，可以表明这个任务队列是串行队列还是并发队列
+    struct dispatch_group_s *_dg; // GCD 的 group
+    struct dispatch_source_s *_ds; // GCD 的 source，可以监测内核事件，文字读写事件和 socket 通信事件
     struct dispatch_channel_s *_dch;
     struct dispatch_mach_s *_dm;
     struct dispatch_mach_msg_s *_dmsg;
-    struct dispatch_semaphore_s *_dsema;
+    struct dispatch_semaphore_s *_dsema; // 信号量，如果了解过 pthread 都知道，信号量可以用来调度线程
     struct dispatch_data_s *_ddata;
     struct dispatch_io_s *_dchannel;
 } dispatch_object_t DISPATCH_TRANSPARENT_UNION;
@@ -119,16 +144,9 @@ typedef union {
 + [dispatch_once 详解](https://www.jianshu.com/p/4fd27f1db63d)
 + [透明联合类型](http://nanjingabcdefg.is-programmer.com/posts/23951.html)
 + [变态的libDispatch结构分析-dispatch_object_s](https://blog.csdn.net/passerbysrs/article/details/18228333?utm_source=blogxgwz2)
-
-
 + [深入浅出 GCD 之基础篇](https://xiaozhuanlan.com/topic/9168375240)
 + [从源码分析Swift多线程—DispatchGroup](http://leevcan.com/2020/05/30/从源码分析Swift多线程—DispatchGroup/)
-
-
-&emsp;<dispatch/block.h> 文件到这里就全部看完了。下面接着看另一个文件 <dispatch/io.h>，
-## <dispatch/io.h>
-&emsp;Dispatch I/O 对文件描述符（file descriptors）提供流和随机访问异步读取和写入操作。可以从文件描述符（file descriptor）中将一个或多个 dispatch I/O channels 创建为 `DISPATCH_IO_STREAM` 类型或 `DISPATCH_IO_RANDOM` 类型。创建通道后，应用程序可以安排异步读取和写入操作。
-
-&emsp;应用程序可以在 dispatch I/O channel 上设置策略，以指示长时间运行的操作所需的 I/O 处理程序频率。
-
-&emsp;Dispatch I/O 还为 I/O 缓冲区提供了内存管理模型，可避免在通道之间进行管道传输时不必要的数据复制。Dispatch I/O 监视应用程序的整体内存压力和 I/O 访问模式，以优化资源利用率。
++ [GCD源码分析（一）](https://www.jianshu.com/p/bd629d25dc2e)
++ [GCD-源码分析](https://www.jianshu.com/p/866b6e903a2d)
++ [GCD底层源码分析](https://www.jianshu.com/p/4ef55563cd14)
++ [GCD源码吐血分析(1)——GCD Queue](https://blog.csdn.net/u013378438/article/details/81031938)

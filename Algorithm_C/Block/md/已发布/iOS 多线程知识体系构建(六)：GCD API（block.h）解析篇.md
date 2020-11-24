@@ -226,3 +226,20 @@ dispatch_block_testcancel(dispatch_block_t block);
 + [__builtin_expect 说明](https://www.jianshu.com/p/2684613a300f)
 + [内存屏障(__asm__ __volatile__("": : :"memory"))](https://blog.csdn.net/whycold/article/details/24549571)
 
+
+
+
+&emsp;<dispatch/block.h> 文件到这里就全部看完了。下面接着看另一个文件 <dispatch/io.h>，
+## <dispatch/io.h>
+&emsp;Dispatch I/O 对文件描述符（file descriptors）提供流和随机访问异步读取和写入操作。可以从文件描述符（file descriptor）中将一个或多个 dispatch I/O channels 创建为 `DISPATCH_IO_STREAM` 类型或 `DISPATCH_IO_RANDOM` 类型。创建通道后，应用程序可以安排异步读取和写入操作。
+
+&emsp;应用程序可以在 dispatch I/O channel 上设置策略，以指示长时间运行的操作所需的 I/O 处理程序频率。
+
+&emsp;Dispatch I/O 还为 I/O 缓冲区提供了内存管理模型，可避免在通道之间进行管道传输时不必要的数据复制。Dispatch I/O 监视应用程序的整体内存压力和 I/O 访问模式，以优化资源利用率。
+
+
+1. 在 Block_descriptor_3 结构体中有一个 signature 成员变量表示 block 的签名信息，里面主要包含 block 的参数和返回值等信息。
+2. _Block_copy 函数里面有清晰的描述，malloc 函数在堆区申请空间，然后调用 memmove 函数进行字节复制把栈区的 block 复制到堆区。
+3. 经过 __block 修饰的变量已经变为了结构体，此时再修改变量修改的是结构体中的同名成员变量。
+4. 在 ARC 下用 strong/copy 修饰 block 属性时，该属性的 setter 函数内部看到调用的都是 _objc_setProperty_nonatomic_copy 函数即 block 都会发生复制操作，用 weak 的话则是 _objc_storeWeak 函数。所以 ARC 下用 strong 和 copy 修饰 block 是一样的，但是不能用 weak。
+5. 在 block 释放时会调用一个 _Block_object_dispose 函数根据 block 捕获的不同的变量做不同的释放操作。
