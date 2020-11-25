@@ -499,7 +499,6 @@ struct dispatch_queue_attr_s {
 };
 ```
 &emsp;看到了熟悉的三个成员变量（`dispatch_object_s` 的前三个）。看到这里可能会迷惑，不是说好的 `dispatch_queue_attr_s` 是描述队列属性的数据结构吗，怎么内部就只有 “继承” 自 `dispatch_object_s` 的三个成员变量。实际描述队列的属性的结构体是 `dispatch_queue_attr_info_s/t`，
-
 #### dispatch_queue_attr_info_t
 &emsp;看到 `dispatch_queue_attr_info_s` 内部使用了位域来表示不同的值，来节省内存占用。
 ```c++
