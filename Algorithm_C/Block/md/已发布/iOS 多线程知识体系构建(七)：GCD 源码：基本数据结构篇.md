@@ -516,7 +516,6 @@ typedef struct dispatch_queue_attr_info_s {
 } dispatch_queue_attr_info_t;
 ```
 &emsp;其实这里队列属性相关的内容包含更复杂的结构，在代码部分，看到用 `#pragma mark dispatch_queue_attr_t` 定义了一个区域的代码都与队列属性有关，下面我们把该区域的代码都看一遍。
-
 #### DISPATCH_CLASS_DECL
 &emsp;
 ```c++
@@ -530,8 +529,13 @@ DISPATCH_CLASS_DECL(queue_attr, OBJECT);
 ```
 &emsp;上面宏展开:
 ```c++
-
+// 1⃣️：
+_OS_OBJECT_DECL_PROTOCOL(dispatch_queue_attr, dispatch_object) \
+_OS_OBJECT_CLASS_IMPLEMENTS_PROTOCOL(dispatch_queue_attr, dispatch_queue_attr) \
+DISPATCH_CLASS_DECL_BARE(queue_attr, OBJECT)
 ```
+
+
 
 
 
