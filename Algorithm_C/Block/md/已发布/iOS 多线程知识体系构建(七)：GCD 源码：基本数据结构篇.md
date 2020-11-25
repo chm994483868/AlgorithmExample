@@ -121,7 +121,8 @@ typedef struct _os_object_s {
 > #endif
 > 
 > #else
-> 
+> // 这里用两个函数指针，（_os_object_t 应该是 _os_object_s 的指针）
+> // 这里的函数指针大概是处理对象的引用和对象本身的操作吗？
 > #define _OS_OBJECT_CLASS_HEADER() \
 >         void (*_os_obj_xref_dispose)(_os_object_t); \
 >         void (*_os_obj_dispose)(_os_object_t)
@@ -129,6 +130,100 @@ typedef struct _os_object_s {
 > #endif
 > ```
 > &emsp;把 const _os_object_vtable_s *os_obj_isa 展开，在 arm64/x86_64 下，os_obj_isa 是一个指向长度是 5 元素是 void * 的指针。
+
+&emsp;在 `dispatch_object_s` 结构体第一个成员变量是 `const struct dispatch_object_vtable_s *do_vtable`，这里的 `dispatch_object_vtable_s` 结构体也涉及到另外一个宏定义 `DISPATCH_CLASS_DECL_BARE` 下面来看一下。
+
+### DISPATCH_CLASS_DECL_BARE
+&emsp;
+```c++
+#define DISPATCH_CLASS_DECL_BARE(name, cluster) \
+        OS_OBJECT_CLASS_DECL(dispatch_##name, \
+        DISPATCH_##cluster##_VTABLE_HEADER(dispatch_##name))
+```
+```c++
+// 1⃣️
+DISPATCH_CLASS_DECL_BARE(object, OBJECT); 
+```
+&emsp;把上面宏定义展开如下:
+```c++
+// 2⃣️
+OS_OBJECT_CLASS_DECL(dispatch_object, \
+DISPATCH_OBJECT_VTABLE_HEADER(dispatch_object))
+```
+### DISPATCH_OBJECT_VTABLE_HEADER
+&emsp;`DISPATCH_OBJECT_VTABLE_HEADER` 会根据 `USE_OBJC` 环境做不同的定义，当前是 `USE_OBJC` 为真的环境。
+```c++
+#if USE_OBJC
+
+#define DISPATCH_OBJECT_VTABLE_HEADER(x) \
+    unsigned long const do_type; \
+    void (*const do_dispose)(struct x##_s *, bool *allow_free); \
+    size_t (*const do_debug)(struct x##_s *, char *, size_t); \
+    void (*const do_invoke)(struct x##_s *, dispatch_invoke_context_t, \
+            dispatch_invoke_flags_t)
+#else
+
+#define DISPATCH_OBJECT_VTABLE_HEADER(x) \
+    unsigned long const do_type; \
+    const char *const do_kind; \
+    void (*const do_dispose)(struct x##_s *, bool *allow_free); \
+    size_t (*const do_debug)(struct x##_s *, char *, size_t); \
+    void (*const do_invoke)(struct x##_s *, dispatch_invoke_context_t, \
+            dispatch_invoke_flags_t)
+#endif
+```
+### OS_OBJECT_CLASS_DECL
+&emsp;定义一个新的适当的 “类”。
+```c++
+// define a new proper class
+#define OS_OBJECT_CLASS_DECL(name, ...) \
+        struct name##_s; \
+        struct name##_extra_vtable_s { \
+            __VA_ARGS__; \
+        }; \
+        struct name##_vtable_s { \
+            _OS_OBJECT_CLASS_HEADER(); \
+            struct name##_extra_vtable_s _os_obj_vtable; \
+        }; \
+        OS_OBJECT_EXTRA_VTABLE_DECL(name, name) \
+        
+        // OS_OBJECT_CLASS_SYMBOL 宏仅一行
+        // #if OS_OBJECT_HAVE_OBJC_SUPPORT
+        // #define OS_OBJECT_CLASS_SYMBOL(name) OS_##name##_class
+        // #endif
+
+        // #if USE_OBJC
+        // #else
+        // #define OS_OBJECT_CLASS_SYMBOL(name) _##name##_vtable
+        // #endif
+        
+        extern const struct name##_vtable_s OS_OBJECT_CLASS_SYMBOL(name) \
+                __asm__(OS_OBJC_CLASS_RAW_SYMBOL_NAME(OS_OBJECT_CLASS(name)))
+```
+&emsp;那么继续把上面 2⃣️ 处的宏定义继续展开如下：
+```c++
+// 3⃣️
+struct dispatch_object_s; \
+struct dispatch_object_extra_vtable_s {
+    unsigned long const do_type;
+    
+    // 下面是三个函数指针
+    void (*const do_dispose)(struct dispatch_object_s *, bool *allow_free);
+    size_t (*const do_debug)(struct dispatch_object_s *, char *, size_t);
+    void (*const do_invoke)(struct dispatch_object_s *, dispatch_invoke_context_t, dispatch_invoke_flags_t)
+};
+
+struct dispatch_object_vtable_s {
+    void *_os_obj_objc_class_t[5];
+    struct dispatch_object_extra_vtable_s _os_obj_vtable;
+};
+
+// 下面三行宏定义内容可忽略
+OS_OBJECT_EXTRA_VTABLE_DECL(dispatch_object, dispatch_object) \
+extern const struct dispatch_object_vtable_s OS_OBJECT_CLASS_SYMBOL(dispatch_object) \
+        __asm__(OS_OBJC_CLASS_RAW_SYMBOL_NAME(OS_OBJECT_CLASS(dispatch_object)))
+```
+&emsp;看到这里，我们大概就能明白 `"const struct dispatch_object_vtable_s *do_vtable; /* must be pointer-sized */ // do_vtable 包含了对象类型和 dispatch_object_s 的操作函数"`  整行的含义了。
 
 &emsp;下面我们看一下指向 `dispatch_object_s` 结构体的指针类型 `dispatch_object_t`，在此之前我们要扩展一个知识点：**透明联合类型**。
 ### DISPATCH_TRANSPARENT_UNION
@@ -147,8 +242,8 @@ typedef struct _os_object_s {
 typedef union {
     struct _os_object_s *_os_obj;
     struct dispatch_object_s *_do; // GCD 的基类，上面我们已经对它进行详细分析
-    struct dispatch_queue_s *_dq; // 任务队列（我们创建的队列都是这个类型，不管是串行队列还是并行队列）
-    struct dispatch_queue_attr_s *_dqa; // 任务队列的属性，包含了任务队列里面的一些操作函数，可以表明这个任务队列是串行队列还是并发队列
+    struct dispatch_queue_s *_dq; // 队列（我们创建的队列都是这个类型，不管是串行队列还是并行队列）
+    struct dispatch_queue_attr_s *_dqa; // 队列的属性，包含了队列里面的一些操作函数，可以表明这个队列是串行队列还是并发队列
     struct dispatch_group_s *_dg; // GCD 的 group
     struct dispatch_source_s *_ds; // GCD 的 source，可以监测内核事件，文字读写事件和 socket 通信事件
     struct dispatch_channel_s *_dch;
@@ -157,6 +252,19 @@ typedef union {
     struct dispatch_semaphore_s *_dsema; // 信号量，如果了解过 pthread 都知道，信号量可以用来调度线程
     struct dispatch_data_s *_ddata;
     struct dispatch_io_s *_dchannel;
+    
+    struct dispatch_continuation_s *_dc; // 任务，（dispatch_aync 的 block 会封装成这个数据结构）
+    struct dispatch_sync_context_s *_dsc;
+    struct dispatch_operation_s *_doperation;
+    struct dispatch_disk_s *_ddisk;
+    struct dispatch_workloop_s *_dwl;
+    struct dispatch_lane_s *_dl;
+    struct dispatch_queue_static_s *_dsq;
+    struct dispatch_queue_global_s *_dgq;
+    struct dispatch_queue_pthread_root_s *_dpq;
+    dispatch_queue_class_t _dqu;
+    dispatch_lane_class_t _dlu;
+    uintptr_t _do_value;
 } dispatch_object_t DISPATCH_TRANSPARENT_UNION;
 ```
 ### dispatch_queue_s
@@ -317,21 +425,23 @@ struct dispatch_queue_s {
     void *do_ctxt;
     void *do_finalizer
     
-    // ⬆️
-    // DISPATCH_OBJECT_HEADER(queue); 这里是分界，以上内容继承自 dispatch_object_s 
+    // ⬆️ 
+    // DISPATCH_OBJECT_HEADER(queue); 这里是分界，可以把以上内容理解为继承自 dispatch_object_s。 
     
     void *__dq_opaque1;
     union { 
         uint64_t volatile dq_state;
         struct {
+            // typedef uint32_t dispatch_lock;
+            // dispatch_lock 是 uint32_t 类型
             dispatch_lock dq_state_lock;
             uint32_t dq_state_bits;
         };
     };
     
     /* LP64 global queue cacheline boundary */ 
-    unsigned long dq_serialnum;
-    const char *dq_label;
+    unsigned long dq_serialnum; // 序列号，如主队列是 1
+    const char *dq_label; // 队列标签或者队列名
     union { 
         uint32_t volatile dq_atomic_flags;
         struct {
@@ -339,20 +449,91 @@ struct dispatch_queue_s {
             const uint16_t __dq_opaque2;
         };
     };
-    dispatch_priority_t dq_priority;
-    union {
+    // typedef uint32_t dispatch_priority_t;
+    // 在 priority.h 文件中，看到 dispatch_priority_t 是 uint32_t 类型  
+    dispatch_priority_t dq_priority; // 队列优先级
+    union { // 联合体
         struct dispatch_queue_specific_head_s *dq_specific_head;
         struct dispatch_source_refs_s *ds_refs;
         struct dispatch_timer_source_refs_s *ds_timer_refs;
         struct dispatch_mach_recv_refs_s *dm_recv_refs;
         struct dispatch_channel_callbacks_s const *dch_callbacks;
     };
-    int volatile dq_sref_cnt;
+    int volatile dq_sref_cnt; // 
     
     /* 32bit hole on LP64 */
 } DISPATCH_ATOMIC64_ALIGN;
 ```
-&emsp;细心观察会发现前面几个成员变量几乎和 `dispatch_object_s` 结构体的成员变量相同，它们都是来自 `_DISPATCH_OBJECT_HEADER` 的宏展开，一个是 `_DISPATCH_OBJECT_HEADER(object)` 一个是 `_DISPATCH_OBJECT_HEADER(queue)`，可能看它的命名大概也看出了一些端倪“调度对象头部”，其实这里大概是在模拟继承，如 `dispatch_queue_s` 继承自 `dispatch_object_s`，那么头部的一些成员变量自然也要继承自 `dispatch_object_s` 了。
+&emsp;细心观察会发现前面几个成员变量几乎和 `dispatch_object_s` 结构体的成员变量相同，它们都是来自 `_DISPATCH_OBJECT_HEADER` 宏展开，一个是 `_DISPATCH_OBJECT_HEADER(object)` 一个是 `_DISPATCH_OBJECT_HEADER(queue)`，可能看它的命名大概也看出了一些端倪“调度对象头部”，其实这里大概是在模拟继承，如 `dispatch_queue_s` 继承自 `dispatch_object_s`，那么头部的一些成员变量自然也要继承自 `dispatch_object_s` 了。
+
+&emsp;下面我们顺着 `dispatch_object_t` 联合体内部不同成员变量的顺序，来看下它们的具体定义。
+### dispatch_queue_attr_s
+&emsp;`dispatch_queue_attr_s` 结构体用来表示队列的属性，包含了队列里面的一些操作函数，可以表明这个队列是串行队列还是并发队列等信息。
+
+&emsp;`dispatch_queue_attr_s` 同样也是定义在 queue_internal.h 文件中。
+```c++
+struct dispatch_queue_attr_s {
+    OS_OBJECT_STRUCT_HEADER(dispatch_queue_attr);
+};
+```
+&emsp;把内部的 `OS_OBJECT_STRUCT_HEADER` 展开的话是:
+```c++
+struct dispatch_queue_attr_s {
+    _OS_OBJECT_HEADER(\
+    const struct dispatch_queue_attr_vtable_s *do_vtable, \
+    do_ref_cnt, \
+    do_xref_cnt);
+    
+    const struct dispatch_queue_attr_vtable_s *do_vtable;
+    int volatile do_ref_cnt;
+    int volatile do_xref_cnt;
+    
+};
+```
+&emsp;再把 `_OS_OBJECT_HEADER` 展开的话是:
+```c++
+struct dispatch_queue_attr_s {
+    const struct dispatch_queue_attr_vtable_s *do_vtable;
+    int volatile do_ref_cnt;
+    int volatile do_xref_cnt;
+};
+```
+&emsp;看到了熟悉的三个成员变量（`dispatch_object_s` 的前三个）。看到这里可能会迷惑，不是说好的 `dispatch_queue_attr_s` 是描述队列属性的数据结构吗，怎么内部就只有 “继承” 自 `dispatch_object_s` 的三个成员变量。实际描述队列的属性的结构体是 `dispatch_queue_attr_info_s/t`，
+
+#### dispatch_queue_attr_info_t
+&emsp;看到 `dispatch_queue_attr_info_s` 内部使用了位域来表示不同的值，来节省内存占用。
+```c++
+typedef struct dispatch_queue_attr_info_s {
+
+    // typedef uint32_t dispatch_qos_t;
+    
+    dispatch_qos_t dqai_qos : 8; //（表示线程优先级）
+    int      dqai_relpri : 8; //（表示优先级的偏移）
+    uint16_t dqai_overcommit:2; // 
+    uint16_t dqai_autorelease_frequency:2; // （自动释放频率）
+    uint16_t dqai_concurrent:1; // 表示队列是并发队列还是串行队列
+    uint16_t dqai_inactive:1; // 表示当前队列是否是活动状态
+} dispatch_queue_attr_info_t;
+```
+&emsp;其实这里队列属性相关的内容包含更复杂的结构，在代码部分，看到用 `#pragma mark dispatch_queue_attr_t` 定义了一个区域的代码都与队列属性有关，下面我们把该区域的代码都看一遍。
+
+#### DISPATCH_CLASS_DECL
+&emsp;
+```c++
+DISPATCH_CLASS_DECL(queue_attr, OBJECT);
+```
+```c++
+#define DISPATCH_CLASS_DECL(name, cluster) \
+        _OS_OBJECT_DECL_PROTOCOL(dispatch_##name, dispatch_object) \
+        _OS_OBJECT_CLASS_IMPLEMENTS_PROTOCOL(dispatch_##name, dispatch_##name) \
+        DISPATCH_CLASS_DECL_BARE(name, cluster)
+```
+&emsp;上面宏展开:
+```c++
+
+```
+
+
 
 
 

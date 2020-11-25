@@ -288,7 +288,6 @@
 		D202B291255264FD00D9BFBC /* KthNodeFromEnd_1.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = KthNodeFromEnd_1.hpp; sourceTree = "<group>"; };
 		D202B29325526CBE00D9BFBC /* EntryNodeInListLoop_1.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = EntryNodeInListLoop_1.cpp; sourceTree = "<group>"; };
 		D202B29425526CBE00D9BFBC /* EntryNodeInListLoop_1.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = EntryNodeInListLoop_1.hpp; sourceTree = "<group>"; };
-		D202B2962552798F00D9BFBC /* GCD.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = GCD.md; sourceTree = "<group>"; };
 		D202B29725527F7500D9BFBC /* ReverseList_1.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = ReverseList_1.cpp; sourceTree = "<group>"; };
 		D202B29825527F7500D9BFBC /* ReverseList_1.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = ReverseList_1.hpp; sourceTree = "<group>"; };
 		D202B29A255280F800D9BFBC /* MergeSortedLists_1.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = MergeSortedLists_1.cpp; sourceTree = "<group>"; };
@@ -1383,7 +1382,6 @@
 				D2E0674D2506118F008BF0E9 /* iOS Category 底层实现原理(二)：函数分析与加载流程.md */,
 				D2E067692508E82E008BF0E9 /* iOS Category 底层实现原理(三)：附加+load函数超详细解析.md */,
 				D2C74D06253ED8CC0051B89F /* iOS 开发中使用的各种锁的总结.md */,
-				D202B2962552798F00D9BFBC /* GCD.md */,
 				D202B342255BD48B00D9BFBC /* iOS 多线程知识体系构建(一)：基本概念篇.md */,
 				D202B343255D367500D9BFBC /* iOS 多线程知识体系构建(二)：Pthreads、NSThread篇.md */,
 				D202B347256135DD00D9BFBC /* iOS 多线程知识体系构建(三)：GCD API（queue.h）解析篇.md */,

@@ -614,7 +614,6 @@ dispatch_queue_attr_make_initially_inactive(
 #### DISPATCH_QUEUE_CONCURRENT
 &emsp;可用于创建调度队列的属性，该调度队列可同时调用块并支持通过调度屏障API提交的屏障块。(常规 block 和 barrier 的 block 任务块)
 ```c++
-
 #define DISPATCH_GLOBAL_OBJECT(type, object) ((OS_OBJECT_BRIDGE type)&(object))
 
 #define DISPATCH_QUEUE_CONCURRENT \
