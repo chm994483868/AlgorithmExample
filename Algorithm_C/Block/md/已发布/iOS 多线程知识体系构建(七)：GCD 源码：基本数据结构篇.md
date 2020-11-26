@@ -17,7 +17,7 @@
 
 &emsp;那么“继承关系”呢，这里是首先定义了基类的结构体，然后需要继承时，则是把基类结构体的成员变量直接放在子类结构体头部平铺展开，为了“易读和不显臃肿”，apple 定义了大量的宏，需要继承谁时直接在子类结构的头部放一个基类结构体的宏，在阅读时我们则需要把这些宏全部展开，前面 .h 中的内容仅是一些 `**_t` 的宏定义的展开就看的焦头烂额了，这下 `**_s` 的宏展开才是真正的告诉我们什么叫焦头烂额...
 ## _os_object_s
-&emsp;`_os_object_s` 结构体内部的内容不多，它是作为 GCD 的基类存在的，它正是 `dispatch_object_s` 结构体的“父类”，下面看下它都包含哪些内容吧！ 
+&emsp;`_os_object_s` 结构体内部的内容不多，它是作为 GCD 的基类存在的，它正是 `dispatch_object_s` 结构体的“父类”，下面看下它都包含哪些内容。
 ```c++
 typedef struct _os_object_s {
     _OS_OBJECT_HEADER(
@@ -28,9 +28,9 @@ typedef struct _os_object_s {
 
 // 把 _OS_OBJECT_HEADER 展开则是:
 typedef struct _os_object_s {
-    const _os_object_vtable_s *os_obj_isa; 
-    int volatile os_obj_ref_cnt;
-    int volatile os_obj_xref_cnt;
+    const _os_object_vtable_s *os_obj_isa; // 这个 _vtable_ 联想到了 C++ 中的虚函数表...
+    int volatile os_obj_ref_cnt; // 引用计数
+    int volatile os_obj_xref_cnt; // 外部引用计数
 } _os_object_s;
 ```
 &emsp;仅拥有三个成员变量的 `_os_object_s` 结构体。下面看一下它的第一个成员变量涉及的 `_os_object_vtable_s` 结构体的具体定义。
@@ -56,38 +56,83 @@ typedef struct _os_object_vtable_s {
 // 这里是两个函数指针，（_os_object_t 应该是 _os_object_s 的指针）
 // 这里的函数指针大概是处理结构体引用和结构体本身的操作吗？
 
-#define _OS_OBJECT_CLASS_HEADER() \ // 3⃣️ 在 GCD 内部使用的是这里的 _OS_OBJECT_CLASS_HEADER 宏定义
+#define _OS_OBJECT_CLASS_HEADER() \ // 3⃣️ 在 GCD 内部使用的应该是这里的 _OS_OBJECT_CLASS_HEADER 宏定义
         void (*_os_obj_xref_dispose)(_os_object_t); \
         void (*_os_obj_dispose)(_os_object_t)
 #endif
 ```
-&emsp;
+&emsp;把上面的 `_os_object_vtable_s` 结构体完全展开的话是:
+```c++
+typedef struct _os_object_vtable_s {
+    void (*_os_obj_xref_dispose)(_os_object_t);
+    void (*_os_obj_dispose)(_os_object_t);
+} _os_object_vtable_s;
+```
 
 &emsp;把 `const _os_object_vtable_s *os_obj_isa` 展开，在 arm64/x86_64 下，os_obj_isa 是一个指向长度是 5 元素是 void * 的指针。
-## dispatch_object_s 
-&emsp;`dispatch_object_s` 是 GCD 的基础结构体。其中涉及连续的多个宏定义（看连续的宏定义真的好烦呀），下面一起来看一下。
+## dispatch_object_s
+&emsp;`dispatch_object_s` 是 GCD 的基础结构体，它是继承自 `_os_object_s` 结构体的，且其中涉及到连续的多个宏定义（看连续的宏定义真的好烦呀），下面一起来看一下。
 
-&emsp;这里有一个细节要说一下，在 `dispatch_object_s` 内部仅有一行语句：一个宏定义 `_DISPATCH_OBJECT_HEADER`，这宏定义的命名为啥有些奇怪，你这好好的宏定义为啥命名还要加一个 `_HEADER` 后缀呢，这个 `_HEADER` 是有其用意的，它正是给继承自 `dispatch_object_s` 的子类准备的，当把它放在子类的头部时，即表明了子类所继承的父类是谁，把该宏完全展开时发现它们其实是一组父类的成员变量。
+&emsp;这里有一个细节要说一下，在 `dispatch_object_s` 内部仅有一行语句：一个宏定义 `_DISPATCH_OBJECT_HEADER`，这宏定义的命名为啥有些奇怪，你这好好的宏定义为啥命名还要加一个 `_HEADER` 后缀呢，这个 `_HEADER` 是有其用意的，它正是给继承自 `dispatch_object_s` 的子类准备的，当把它放在子类的头部时，即表明了子类所继承的父类是谁，然后把该宏完全展开时发现它们其实是一组父类的成员变量，平铺到子类中，而这正构成了 GCD 中的 “继承关系”。
+
+&emsp;看到这里我们似乎有一些明白了，上面的 `_os_object_s` 结构体定义内部仅有一个 `_OS_OBJECT_HEADER` 宏定义，然后 `dispatch_object_s` 结构体内部也是仅有一个 `_DISPATCH_OBJECT_HEADER` 宏定义，宏定义的名字都是用了结构体名做前缀，然后加一个 `_HEADER` 后缀，而宏定义的内容则都是为了把当前的结构体包含的成员变量都包裹在一起。
+
+&emsp;上面之所以说是把成员变量的内容包裹在一起，因为还有结构体能执行的函数调用的内容，例如：`_OS_OBJECT_CLASS_HEADER` 宏，它与 `_OS_OBJECT_HEADER` 相比名字里面加了 `CLASS` 且 `_HEADER` 后缀是保留的，`_OS_OBJECT_CLASS_HEADER` 宏定义的内容是把 `_os_object_s` 结构体指针做参数的一组函数指针。
+
+&ensp;上面 `_os_object_vtable_s` 结构体定义内仅有的 `_OS_OBJECT_CLASS_HEADER` 宏定义包裹的是 `_os_object_s` 结构体指针做参数的一组函数指针，然后 `_os_object_s` 结构体的第一个成员变量 `os_obj_isa` 是一个指向 `_os_object_vtable_s` 的指针。
+
+&emsp;这样看下来，结构体的成员变量有了，然后结构体做参数所能执行的一些函数调用也有了，这不就是完整的“类”定义吗。
+
+&emsp;如果在全局搜 `DISPATCH_OBJECT_HEADER` 会发现有多个结构体的定义第一行都是 `DISPATCH_OBJECT_HEADER`，正表明了它们都是继承自 `dispatch_object_s`，如下面的队列组结构体、信号量结构体、io 结构体等。看到这里我们就真的明白为啥结构体定义的内部总是仅有一个 `_HEADER` 做后缀的宏定义了，都是为了接下来的“继承”做准备的。
+```c++
+// 队列组
+struct dispatch_group_s {
+    DISPATCH_OBJECT_HEADER(group);
+    ...
+};
+
+// 信号量
+struct dispatch_semaphore_s {
+    DISPATCH_OBJECT_HEADER(semaphore);
+    ...
+};
+
+struct dispatch_disk_s {
+    DISPATCH_OBJECT_HEADER(disk);
+    ...
+};
+
+struct dispatch_operation_s {
+    DISPATCH_OBJECT_HEADER(operation);
+    ...
+};
+
+struct dispatch_io_s {
+    DISPATCH_OBJECT_HEADER(io);
+    ...
+};
+```
+&emsp;下面我们接着一步一步把 `dispatch_object_s` 的内容展开看看。
 ```c++
 struct dispatch_object_s {
     _DISPATCH_OBJECT_HEADER(object);
 };
 ```
 ### _DISPATCH_OBJECT_HEADER
-&emsp;`dispatch_object_s` 结构体内部唯一一个 `_DISPATCH_OBJECT_HEADER` 宏定义。
+&emsp;宏名中的 `_DISPATCH_OBJECT` 表明现在是 GCD 中的对象了。
 ```c++
 #define _DISPATCH_OBJECT_HEADER(x) \
 struct _os_object_s _as_os_obj[0]; \ ⬅️ 这里是一个长度为 0 的数组，不占用任何内存，同时它也预示了 dispatch_object_s 的 “父类” 是 _os_object_s 
 
-OS_OBJECT_STRUCT_HEADER(dispatch_##x); \ ⬅️ OS_OBJECT_STRUCT_HEADER 宏展开就是把“父类”的成员变量平铺展开放在“子类”头部
+OS_OBJECT_STRUCT_HEADER(dispatch_##x); \ ⬅️ OS_OBJECT_STRUCT_HEADER 宏展开就是把“父类”-_os_object_s 的成员变量平铺展开放在“子类”-dispatch_object_s 的头部
 
-struct dispatch_##x##_s *volatile do_next; \ ⬅️ 下面的这一部分则表示“子类”自己的成员变量
+struct dispatch_##x##_s *volatile do_next; \ ⬅️ 下面的这一部分则是“子类”自己的成员变量
 struct dispatch_queue_s *do_targetq; \
 void *do_ctxt; \
 void *do_finalizer
 ```
 ### OS_OBJECT_STRUCT_HEADER
-&emsp;`_DISPATCH_OBJECT_HEADER` 内部的一个 `OS_OBJECT_STRUCT_HEADER` 宏定义。
+&emsp;上面 `_os_object_s` 结构体的内容平铺展开放在 `dispatch_object_s` 结构体中。
 ```c++
 #if TARGET_OS_MAC && !TARGET_OS_SIMULATOR && defined(__i386__)
 #define OS_OBJECT_HAVE_OBJC1 1
@@ -113,14 +158,13 @@ void *do_finalizer
 #endif
 ```
 ### _OS_OBJECT_HEADER
-&emsp;紧接着 `OS_OBJECT_STRUCT_HEADER` 内部的 `_OS_OBJECT_HEADER` 宏定义，可看到是结构体的三个成员变量。
 ```c++
 #define _OS_OBJECT_HEADER(isa, ref_cnt, xref_cnt) \
 isa; /* must be pointer-sized */ \ // isa 必须是指针大小
 int volatile ref_cnt; \ // 引用计数
 int volatile xref_cnt // 外部引用计数，两者都为 0 时，对象才能释放
 ```
-&emsp;把上面的 `dispatch_object_s` 结构体内部的宏定义全部展开后如下:
+&emsp;到这里后 `dispatch_object_s` 涉及到的宏定义就全部看完了，现在把上面的 `dispatch_object_s` 结构体内部的宏定义全部展开后如下:
 ```c++
 struct dispatch_object_s {
     struct _os_object_s _as_os_obj[0]; // 长度为 0 的数组
@@ -131,7 +175,7 @@ struct dispatch_object_s {
     // int volatile os_obj_xref_cnt;
     
     const struct dispatch_object_vtable_s *do_vtable; /* must be pointer-sized */ // do_vtable 包含了对象类型和 dispatch_object_s 的操作函数
-    int volatile do_ref_cnt; // 引用计数
+    int volatile do_ref_cnt; // 引用计数（do 应该是 Dispatch Object 的首字母，上面 _os_object_s 内使用的是 os_obj_ref_cnt）
     int volatile do_xref_cnt; // 外部引用计数，两者都为 0 时才会释放对象内存
     
     struct dispatch_object_s *volatile do_next; // do_next 表示链表的 next，（下一个 dispatch_object_s）
@@ -140,10 +184,13 @@ struct dispatch_object_s {
     void *do_finalizer; // 最终销毁时调用的函数
 };
 ```
-&emsp;看到 `dispatch_object_s` 内部比较诡异的第一行一个长度是 0 的 `_os_object_s` 结构体数组。同时它也暗示了 `dispatch_object_s` 的父类是谁。同时它还有一层含义，我们可能见过一些在结构体末尾放一个长度为 0 的数组，它们是为了表明内存空间接下来的类型是什么，那么这里的结构体头部的长度是 0 的结构体是什么呢？
+&emsp;emmm... 还有一个点，上面虽然一直说子类平铺展开父类的成员变量，其实是成员变量的类型得到保留，而名字是发了变化的。
 
-&emsp;在 `dispatch_object_s` 结构体第一个成员变量是 `const struct dispatch_object_vtable_s *do_vtable`，这里的 `dispatch_object_vtable_s` 结构体也涉及到另外一个宏定义 `DISPATCH_CLASS_DECL_BARE` 下面来看一下。
+&emsp;看到 `dispatch_object_s` 内部比较诡异的第一行一个长度是 0 的 `_os_object_s` 结构体数组。同时它也暗示了 `dispatch_object_s` 的父类是谁，同时它还有一层含义，我们可能见过一些在结构体末尾放一个长度为 0 的数组，它们是为了表明内存空间接下来的类型是什么，那么这里的结构体头部的长度是 0 的数组是什么意思呢，它是用来表明当前内存空间的结构体类型吗？
 
+&emsp;在 `dispatch_object_s` 结构体第一个成员变量是 `const struct dispatch_object_vtable_s *do_vtable`，这里的 `dispatch_object_vtable_s` 结构体和 `_os_object_s` 结构体中的 `_os_object_vtable_s` 结构体内容有何不同呢，下面一起来看一下。
+
+&emsp;这里 `dispatch_object_vtable_s` 不是直接定义的，它涉及到另外一个宏定义 `OS_OBJECT_CLASS_DECL`，`dispatch_object_vtable_s` 结构体定义是放在 `OS_OBJECT_CLASS_DECL` 宏定义里面的（真的快看吐了...），宏定义名也表明了 `dispatch_object_s` 是继承自 `_os_object_s` 的。同时宏名里面也有 `_CLASS` 这也对应了上面 `_OS_OBJECT_CLASS_HEADER` 宏，有 `_CLASS` 的宏都是用来表明继承时的函数继承的，如这里的 `OS_OBJECT_CLASS_DECL` 宏主要是用来让 `dispatch_object_s` 结构体继承 `_os_object_s` 结构体的操作函数用的，下面来看一下吧。
 ### DISPATCH_CLASS_DECL_BARE
 &emsp;
 ```c++
@@ -162,7 +209,7 @@ OS_OBJECT_CLASS_DECL(dispatch_object, \
 DISPATCH_OBJECT_VTABLE_HEADER(dispatch_object))
 ```
 ### DISPATCH_OBJECT_VTABLE_HEADER
-&emsp;`DISPATCH_OBJECT_VTABLE_HEADER` 会根据 `USE_OBJC` 环境做不同的定义，当前是 `USE_OBJC` 为真的环境。
+&emsp;`DISPATCH_OBJECT_VTABLE_HEADER` 会根据 `USE_OBJC` 环境做不同的定义，两者唯一的区别是在非 `USE_OBJC` 环境下多了一个 `const char *const do_kind`。
 ```c++
 #if USE_OBJC
 
@@ -176,16 +223,29 @@ DISPATCH_OBJECT_VTABLE_HEADER(dispatch_object))
 
 #define DISPATCH_OBJECT_VTABLE_HEADER(x) \
     unsigned long const do_type; \
-    const char *const do_kind; \
+    const char *const do_kind; \ // 多了一个 do_kind 成员变量
     void (*const do_dispose)(struct x##_s *, bool *allow_free); \
     size_t (*const do_debug)(struct x##_s *, char *, size_t); \
     void (*const do_invoke)(struct x##_s *, dispatch_invoke_context_t, \
             dispatch_invoke_flags_t)
 #endif
 ```
-### OS_OBJECT_CLASS_DECL
-&emsp;定义一个新的适当的 “类”。
+&emsp;把上面 `OS_OBJECT_CLASS_DECL` 中的 `DISPATCH_OBJECT_VTABLE_HEADER` 宏定义展开如下。
 ```c++
+// 3⃣️ 
+unsigned long const do_type;
+const char *const do_kind;
+void (*const do_dispose)(struct dispatch_object_s *, bool *allow_free);
+size_t (*const do_debug)(struct dispatch_object_s *, char *, size_t);
+void (*const do_invoke)(struct dispatch_object_s *, dispatch_invoke_context_t, dispatch_invoke_flags_t);
+```
+### OS_OBJECT_CLASS_DECL
+&emsp;`OS_OBJECT_CLASS_DECL` 宏定义的内容是完整定义了一个 “继承” 自 `_os_object_s` 的 “类”。
+```c++
+
+OS_OBJECT_CLASS_DECL(dispatch_object, \
+DISPATCH_OBJECT_VTABLE_HEADER(dispatch_object))
+
 // define a new proper class
 #define OS_OBJECT_CLASS_DECL(name, ...) \
         struct name##_s; \
@@ -211,30 +271,48 @@ DISPATCH_OBJECT_VTABLE_HEADER(dispatch_object))
         extern const struct name##_vtable_s OS_OBJECT_CLASS_SYMBOL(name) \
                 __asm__(OS_OBJC_CLASS_RAW_SYMBOL_NAME(OS_OBJECT_CLASS(name)))
 ```
-&emsp;那么继续把上面 2⃣️ 处的宏定义继续展开如下：
+&emsp;那么把上面 2⃣️ 处的宏定义展开如下：
 ```c++
-// 3⃣️
-struct dispatch_object_s; \
-struct dispatch_object_extra_vtable_s {
+// 4⃣️
+struct dispatch_object_s;
+struct dispatch_object_extra_vtable_s { // 这里表明子类的 vtable 内部的扩展，例如子类新增的内容（本来想说是新的操作函数呢，但是里面还有成员变量...）
     unsigned long const do_type;
-    
-    // 下面是三个函数指针
+    const char *const do_kind;
     void (*const do_dispose)(struct dispatch_object_s *, bool *allow_free);
     size_t (*const do_debug)(struct dispatch_object_s *, char *, size_t);
-    void (*const do_invoke)(struct dispatch_object_s *, dispatch_invoke_context_t, dispatch_invoke_flags_t)
+    void (*const do_invoke)(struct dispatch_object_s *, dispatch_invoke_context_t, dispatch_invoke_flags_t);
 };
 
-struct dispatch_object_vtable_s {
-    void *_os_obj_objc_class_t[5];
+struct dispatch_object_vtable_s { // 这里就是我们抽丝剥茧一层一层要找的 dispatch_object_vtable_s 了。
+    // _OS_OBJECT_CLASS_HEADER(); 此处两行是把父类 _os_object_s 的函数带过来 
+    void (*_os_obj_xref_dispose)(_os_object_t);
+    void (*_os_obj_dispose)(_os_object_t);
+    
+    // 下面是子类新增的内容
     struct dispatch_object_extra_vtable_s _os_obj_vtable;
 };
 
-// 下面三行宏定义内容可忽略
+// OS_OBJECT_EXTRA_VTABLE_DECL 是留给子类继承父类的方法用的
 OS_OBJECT_EXTRA_VTABLE_DECL(dispatch_object, dispatch_object) \
 extern const struct dispatch_object_vtable_s OS_OBJECT_CLASS_SYMBOL(dispatch_object) \
         __asm__(OS_OBJC_CLASS_RAW_SYMBOL_NAME(OS_OBJECT_CLASS(dispatch_object)))
 ```
-&emsp;看到这里，我们大概就能明白 `"const struct dispatch_object_vtable_s *do_vtable; /* must be pointer-sized */ // do_vtable 包含了对象类型和 dispatch_object_s 的操作函数"`  整行的含义了。
+```c++
+#define OS_OBJECT_EXTRA_VTABLE_SYMBOL(name) _OS_##name##_vtable
+
+#define OS_OBJECT_EXTRA_VTABLE_DECL(name, ctype) \
+        extern const struct ctype##_vtable_s \
+                OS_OBJECT_EXTRA_VTABLE_SYMBOL(name);
+➡️
+extern const struct dispatch_object_vtable_s _OS_dispatch_object_vtable;
+                
+#define OS_OBJECT_CLASS_SYMBOL(name) _##name##_vtable
+➡️
+extern const struct dispatch_object_vtable_s _dispatch_object_vtable __asm__(".objc_class_name_" OS_STRINGIFY(OS_dispatch_object))
+```
+&emsp;看到这里，我们就能明白前面 `dispatch_object_s` 结构体定义内部的这句："`const struct dispatch_object_vtable_s *do_vtable; /* must be pointer-sized */` // do_vtable 包含了对象类型和 dispatch_object_s 的操作函数"  的含义了。
+
+&emsp;emmm...看到这里我们就把 `dispatch_object_s` 结构定义相关的内容全部看完了，真的是宏定义一层套一层，宏定义里面再套结构体的定义。（关于它定义里面的几个函数具体作用和实现待后续再展开讲解。）
 
 &emsp;下面我们看一下指向 `dispatch_object_s` 结构体的指针类型 `dispatch_object_t`，在此之前我们要扩展一个知识点：**透明联合类型**。
 ### DISPATCH_TRANSPARENT_UNION
