@@ -12,8 +12,62 @@
 ```
 
 &emsp;这是 `DISPATCH_DECL` 在 C（Plain C）环境下的宏定义，其中还有 C++/Objective-c/Swift 环境下的，但这里我们仅看 C 环境下的。在前面几篇文章的 .h 中我们只看到了各个结构体的名字而完全没有看到它们的具体定义是什么，那么现在就去 libdispatch 源码中找它们的具体定义吧！
+
+&emsp;开始之前我们首先需要一些概念的上的认识。GCD 是由 C 语言实现的，C 语言作为面向过程的编程语言，它是没有类的概念的，那么我们想以面向对象的编程思想来实现 GCD 内部的各种“类”以及它们的继承关系该如何来做呢，看了前面的内容我们大概猜到了是运用结构体来模拟类（毕竟我们高级语言中的类和对象其本质也都是用结构体来实现的）。
+
+&emsp;那么“继承关系”呢，这里是首先定义了基类的结构体，然后需要继承时，则是把基类结构体的成员变量直接放在子类结构体头部平铺展开，为了“易读和不显臃肿”，apple 定义了大量的宏，需要继承谁时直接在子类结构的头部放一个基类结构体的宏，在阅读时我们则需要把这些宏全部展开，前面 .h 中的内容仅是一些 `**_t` 的宏定义的展开就看的焦头烂额了，这下 `**_s` 的宏展开才是真正的告诉我们什么叫焦头烂额...
+## _os_object_s
+&emsp;`_os_object_s` 结构体内部的内容不多，它是作为 GCD 的基类存在的，它正是 `dispatch_object_s` 结构体的“父类”，下面看下它都包含哪些内容吧！ 
+```c++
+typedef struct _os_object_s {
+    _OS_OBJECT_HEADER(
+    const _os_object_vtable_s *os_obj_isa,
+    os_obj_ref_cnt,
+    os_obj_xref_cnt);
+} _os_object_s;
+
+// 把 _OS_OBJECT_HEADER 展开则是:
+typedef struct _os_object_s {
+    const _os_object_vtable_s *os_obj_isa; 
+    int volatile os_obj_ref_cnt;
+    int volatile os_obj_xref_cnt;
+} _os_object_s;
+```
+&emsp;仅拥有三个成员变量的 `_os_object_s` 结构体。下面看一下它的第一个成员变量涉及的 `_os_object_vtable_s` 结构体的具体定义。
+
+&emsp;`_os_object_s` 结构体的第一个成员变量 `const _os_object_vtable_s *os_obj_isa`。
+```c++
+typedef struct _os_object_vtable_s {
+    _OS_OBJECT_CLASS_HEADER();
+} _os_object_vtable_s;
+```
+&emsp;下面是 `_os_object_vtable_s` 结构体中的 `_OS_OBJECT_CLASS_HEADER()` 宏定义。
+```c++
+#if OS_OBJECT_HAVE_OBJC_SUPPORT
+
+#if TARGET_OS_MAC && !TARGET_OS_SIMULATOR && defined(__i386__)
+#define _OS_OBJECT_CLASS_HEADER() const void *_os_obj_objc_isa // 1⃣️
+#else
+#define _OS_OBJECT_CLASS_HEADER() void *_os_obj_objc_class_t[5] // 2⃣️
+#endif
+
+#else
+
+// 这里是两个函数指针，（_os_object_t 应该是 _os_object_s 的指针）
+// 这里的函数指针大概是处理结构体引用和结构体本身的操作吗？
+
+#define _OS_OBJECT_CLASS_HEADER() \ // 3⃣️ 在 GCD 内部使用的是这里的 _OS_OBJECT_CLASS_HEADER 宏定义
+        void (*_os_obj_xref_dispose)(_os_object_t); \
+        void (*_os_obj_dispose)(_os_object_t)
+#endif
+```
+&emsp;
+
+&emsp;把 `const _os_object_vtable_s *os_obj_isa` 展开，在 arm64/x86_64 下，os_obj_isa 是一个指向长度是 5 元素是 void * 的指针。
 ## dispatch_object_s 
 &emsp;`dispatch_object_s` 是 GCD 的基础结构体。其中涉及连续的多个宏定义（看连续的宏定义真的好烦呀），下面一起来看一下。
+
+&emsp;这里有一个细节要说一下，在 `dispatch_object_s` 内部仅有一行语句：一个宏定义 `_DISPATCH_OBJECT_HEADER`，这宏定义的命名为啥有些奇怪，你这好好的宏定义为啥命名还要加一个 `_HEADER` 后缀呢，这个 `_HEADER` 是有其用意的，它正是给继承自 `dispatch_object_s` 的子类准备的，当把它放在子类的头部时，即表明了子类所继承的父类是谁，把该宏完全展开时发现它们其实是一组父类的成员变量。
 ```c++
 struct dispatch_object_s {
     _DISPATCH_OBJECT_HEADER(object);
@@ -23,11 +77,11 @@ struct dispatch_object_s {
 &emsp;`dispatch_object_s` 结构体内部唯一一个 `_DISPATCH_OBJECT_HEADER` 宏定义。
 ```c++
 #define _DISPATCH_OBJECT_HEADER(x) \
-struct _os_object_s _as_os_obj[0]; \ ⬅️ 这里是一个长度为 0 的数组，不占用任何内存，暂时可以忽略
+struct _os_object_s _as_os_obj[0]; \ ⬅️ 这里是一个长度为 0 的数组，不占用任何内存，同时它也预示了 dispatch_object_s 的 “父类” 是 _os_object_s 
 
-OS_OBJECT_STRUCT_HEADER(dispatch_##x); \ ⬅️ 这里需要 OS_OBJECT_STRUCT_HEADER 宏展开
+OS_OBJECT_STRUCT_HEADER(dispatch_##x); \ ⬅️ OS_OBJECT_STRUCT_HEADER 宏展开就是把“父类”的成员变量平铺展开放在“子类”头部
 
-struct dispatch_##x##_s *volatile do_next; \
+struct dispatch_##x##_s *volatile do_next; \ ⬅️ 下面的这一部分则表示“子类”自己的成员变量
 struct dispatch_queue_s *do_targetq; \
 void *do_ctxt; \
 void *do_finalizer
@@ -59,20 +113,19 @@ void *do_finalizer
 #endif
 ```
 ### _OS_OBJECT_HEADER
-&emsp;紧接着 `OS_OBJECT_STRUCT_HEADER` 内部的 `_OS_OBJECT_HEADER` 宏定义，可看到是 `OS_OBJECT` 的头部的三个成员变量。
+&emsp;紧接着 `OS_OBJECT_STRUCT_HEADER` 内部的 `_OS_OBJECT_HEADER` 宏定义，可看到是结构体的三个成员变量。
 ```c++
 #define _OS_OBJECT_HEADER(isa, ref_cnt, xref_cnt) \
 isa; /* must be pointer-sized */ \ // isa 必须是指针大小
 int volatile ref_cnt; \ // 引用计数
 int volatile xref_cnt // 外部引用计数，两者都为 0 时，对象才能释放
 ```
-
-&emsp;把上面的 `dispatch_object_s` 的宏定义内容全部展开后，如下:
+&emsp;把上面的 `dispatch_object_s` 结构体内部的宏定义全部展开后如下:
 ```c++
 struct dispatch_object_s {
-    struct _os_object_s _as_os_obj[0]; // 长度为 0 的数组，这里可忽略
+    struct _os_object_s _as_os_obj[0]; // 长度为 0 的数组
     
-    // _os_object_s 是仅包含下面三个成员变量的结构体
+    // _os_object_s 是仅包含下面三个成员变量的结构体，同时它也是 GCD 中所有“类”的基类，大概可以理解为 OC 中的 NSObject
     // const _os_object_vtable_s *os_obj_isa; 
     // int volatile os_obj_ref_cnt; 
     // int volatile os_obj_xref_cnt;
@@ -87,50 +140,7 @@ struct dispatch_object_s {
     void *do_finalizer; // 最终销毁时调用的函数
 };
 ```
-&emsp;看到 `dispatch_object_s` 内部比较诡异的第一行一个长度是 0 的 `_os_object_s` 结构体数组，下面看一下 `_os_object_s` 结构体的定义。
-### _os_object_s
-```c++
-typedef struct _os_object_s {
-    _OS_OBJECT_HEADER(
-    const _os_object_vtable_s *os_obj_isa,
-    os_obj_ref_cnt,
-    os_obj_xref_cnt);
-} _os_object_s;
-
-// 把 _OS_OBJECT_HEADER 展开则是:
-typedef struct _os_object_s {
-    const _os_object_vtable_s *os_obj_isa; 
-    int volatile os_obj_ref_cnt; 
-    int volatile os_obj_xref_cnt;
-} _os_object_s;
-```
-&emsp;直白一点的话可以把前缀理解为 `os_obj`，即它是 `os_object` 的结构体。下面看一下它的第一个成员变量 `_os_object_vtable_s` 结构体的具体定义。
-> &emsp;看下 _os_object_s 结构体的第一个成员变量 const _os_object_vtable_s *os_obj_isa。
-> ```c++
-> typedef struct _os_object_vtable_s {
->    _OS_OBJECT_CLASS_HEADER();
-> } _os_object_vtable_s;
-> ```
-> &emsp;下面是 _os_object_vtable_s 结构体中的 _OS_OBJECT_CLASS_HEADER() 宏定义。
-> ```c++
-> #if OS_OBJECT_HAVE_OBJC_SUPPORT
-> 
-> #if TARGET_OS_MAC && !TARGET_OS_SIMULATOR && defined(__i386__)
-> #define _OS_OBJECT_CLASS_HEADER() const void *_os_obj_objc_isa
-> #else
-> #define _OS_OBJECT_CLASS_HEADER() void *_os_obj_objc_class_t[5] // ⬅️ arm64/x86_64 应该是这个
-> #endif
-> 
-> #else
-> // 这里用两个函数指针，（_os_object_t 应该是 _os_object_s 的指针）
-> // 这里的函数指针大概是处理对象的引用和对象本身的操作吗？
-> #define _OS_OBJECT_CLASS_HEADER() \
->         void (*_os_obj_xref_dispose)(_os_object_t); \
->         void (*_os_obj_dispose)(_os_object_t)
->         
-> #endif
-> ```
-> &emsp;把 const _os_object_vtable_s *os_obj_isa 展开，在 arm64/x86_64 下，os_obj_isa 是一个指向长度是 5 元素是 void * 的指针。
+&emsp;看到 `dispatch_object_s` 内部比较诡异的第一行一个长度是 0 的 `_os_object_s` 结构体数组。同时它也暗示了 `dispatch_object_s` 的父类是谁。同时它还有一层含义，我们可能见过一些在结构体末尾放一个长度为 0 的数组，它们是为了表明内存空间接下来的类型是什么，那么这里的结构体头部的长度是 0 的结构体是什么呢？
 
 &emsp;在 `dispatch_object_s` 结构体第一个成员变量是 `const struct dispatch_object_vtable_s *do_vtable`，这里的 `dispatch_object_vtable_s` 结构体也涉及到另外一个宏定义 `DISPATCH_CLASS_DECL_BARE` 下面来看一下。
 
