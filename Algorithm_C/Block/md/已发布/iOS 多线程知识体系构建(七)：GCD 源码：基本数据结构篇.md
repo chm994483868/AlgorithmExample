@@ -2,15 +2,16 @@
 
 > &emsp;由本篇正式进入 GCD 源码。
 
-> &emsp;首先下载源码，看到当前最新版本是：[libdispatch-1173.40.5](https://opensource.apple.com/tarballs/libdispatch/)。看到项目中 Dispatch Public Headers 文件夹正是我们前几天看的一众 .h 文件，然后下面的 Dispatch Source 文件夹内正是各个 .h 所对应的实现文件（.c 文件，GCD 完全由 C 语言实现），倍感亲切，那么就此开始吧！⛽️⛽️
+> &emsp;首先下载源码，看到当前最新版本是：[libdispatch-1173.40.5](https://opensource.apple.com/tarballs/libdispatch/)。下载完成打开项目看到其中 Dispatch Public Headers 文件夹正是我们前几天看的一众 .h 文件，然后下面的 Dispatch Source 文件夹内包含了各个 .h 所对应的实现文件（.c 文件，GCD 完全由 C 语言实现），倍感亲切，那么就此开始吧！⛽️⛽️
 
-&emsp;那么我们还由基础的数据结构定义开始，例如 `dispatch_object_t/s`、`dispatch_queue_t/s`、`dispatch_group_t/s`等等，是我们之前见的很多次的指针类型和结构体类型，这里首先要对它们做出区分，其中 `**_t` 一般都是用 `typedef` 所定义的指向 `**_s` 结构体的指针，例如: `typedef struct dispatch_group_s *dispatch_group_t`，其中 `dispatch_group_t` 是指向 `dispatch_group_s` 结构体的指针。（其中结尾处的 `t` 和 `s` 分别来自 `typedef` 和 `struct` 的首字母）
+&emsp;那么我们还由基础的数据结构定义开始，例如 `dispatch_object_t/s`、`dispatch_queue_t/s`、`dispatch_group_t/s`等等，是我们之前见的很多次的指针类型和结构体类型，这里首先要对它们做出区分，其中 `**_t` 一般都是用 typedef 所定义的指向 `**_s` 结构体的指针，例如: `typedef struct dispatch_group_s *dispatch_group_t`，其中 `dispatch_group_t` 是指向 `dispatch_group_s` 结构体的指针。（其中结尾处的 `t` 和 `s` 分别来自 `typedef` 和 `struct` 的首字母）
 
 &emsp;当然如果对前面的文章还有印象的话一定记得，其实它们的声明都来自 `DISPATCH_DECL` 宏:
 ```c++
 #define DISPATCH_DECL(name) typedef struct name##_s *name##_t
 ```
-&emsp;这是 `DISPATCH_DECL` 在 C（Plain C）环境下的宏定义，其中还有 C++/Objective-c/Swift 环境下的，但这里我们仅看 C 环境下的。前面几篇文章在 .h 中我们只看到的结构体的名字而完全没有看到它们的具体定义，那么就去 libdispatch 源码中找它们的具体定义吧！
+
+&emsp;这是 `DISPATCH_DECL` 在 C（Plain C）环境下的宏定义，其中还有 C++/Objective-c/Swift 环境下的，但这里我们仅看 C 环境下的。在前面几篇文章的 .h 中我们只看到了各个结构体的名字而完全没有看到它们的具体定义是什么，那么现在就去 libdispatch 源码中找它们的具体定义吧！
 ## dispatch_object_s 
 &emsp;`dispatch_object_s` 是 GCD 的基础结构体。其中涉及连续的多个宏定义（看连续的宏定义真的好烦呀），下面一起来看一下。
 ```c++
@@ -357,25 +358,24 @@ DISPATCH_UNION_ASSERT(uint64_t volatile dq_state,
                       struct {
                           dispatch_lock dq_state_lock;
                           uint32_t dq_state_bits;
-                      };
-                     )
+                      };)
                      
 union { 
-        uint64_t volatile dq_state;
-        struct {
-            dispatch_lock dq_state_lock;
-            uint32_t dq_state_bits;
-        };
-      }
+    uint64_t volatile dq_state;
+    struct {
+        dispatch_lock dq_state_lock;
+        uint32_t dq_state_bits;
+    };
+};
 
 // 4. DISPATCH_UNION_ASSERT 仅是一个断言，且 typedef uint32_t dispatch_lock; 即双方都是 64 位，8 个字节，那么宏定义全部展开就只剩下:
 union { 
-        uint64_t volatile dq_state;
-        struct {
-            dispatch_lock dq_state_lock;
-            uint32_t dq_state_bits;
-        };
-      }
+    uint64_t volatile dq_state;
+    struct {
+        dispatch_lock dq_state_lock;
+        uint32_t dq_state_bits;
+    };
+};
 ```
 ### DISPATCH_STRUCT_LE_2
 ```c++
@@ -508,10 +508,10 @@ typedef struct dispatch_queue_attr_info_s {
     
     dispatch_qos_t dqai_qos : 8; //（表示线程优先级）
     int      dqai_relpri : 8; //（表示优先级的偏移）
-    uint16_t dqai_overcommit:2; // 
+    uint16_t dqai_overcommit:2; // 是否可以 overcommit
     uint16_t dqai_autorelease_frequency:2; // （自动释放频率）
     uint16_t dqai_concurrent:1; // 表示队列是并发队列还是串行队列
-    uint16_t dqai_inactive:1; // 表示当前队列是否是活动状态
+    uint16_t dqai_inactive:1; // 表示当前队列是否是活动状态（是否激活）
 } dispatch_queue_attr_info_t;
 ```
 &emsp;其实这里队列属性相关的内容包含更复杂的结构，在代码部分，看到用 `#pragma mark dispatch_queue_attr_t` 定义了一个区域的代码都与队列属性有关，下面我们把该区域的代码都看一遍。
@@ -533,6 +533,16 @@ _OS_OBJECT_DECL_PROTOCOL(dispatch_queue_attr, dispatch_object) \
 _OS_OBJECT_CLASS_IMPLEMENTS_PROTOCOL(dispatch_queue_attr, dispatch_queue_attr) \
 DISPATCH_CLASS_DECL_BARE(queue_attr, OBJECT)
 ```
+### dispatch_continuation_t
+&emsp;在 queue_internal.h 文件中看到 `#pragma mark dispatch_continuation_t` 行，往下的 200 多行的整个区域的代码都是和 `dispatch_continuation_t` 相关的代码。
+
+&emsp;首先根据上面的规则我们已知 `dispatch_continuation_t` 是指向 `dispatch_continuation_s` 结构体的指针类型。
+
+&emsp;当我们向队列提交任务时，无论 block 还是 function 形式，最终都会被封装为 `dispatch_continuation_s`，所以可以把它理解为描述任务内容的结构体。
+
+
+
+
 
 
 
