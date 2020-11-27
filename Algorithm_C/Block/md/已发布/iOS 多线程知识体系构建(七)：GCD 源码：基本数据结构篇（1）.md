@@ -1,4 +1,4 @@
-# iOS 多线程知识体系构建(七)：GCD 源码：基本数据结构篇
+# iOS 多线程知识体系构建(七)：GCD 源码：基本数据结构篇（1）
 
 > &emsp;由本篇正式进入 GCD 源码。
 
@@ -192,7 +192,6 @@ struct dispatch_object_s {
 
 &emsp;这里 `dispatch_object_vtable_s` 不是直接定义的，它涉及到另外一个宏定义 `OS_OBJECT_CLASS_DECL`，`dispatch_object_vtable_s` 结构体定义是放在 `OS_OBJECT_CLASS_DECL` 宏定义里面的（真的快看吐了...），宏定义名也表明了 `dispatch_object_s` 是继承自 `_os_object_s` 的。同时宏名里面也有 `_CLASS` 这也对应了上面 `_OS_OBJECT_CLASS_HEADER` 宏，有 `_CLASS` 的宏都是用来表明继承时的函数继承的，如这里的 `OS_OBJECT_CLASS_DECL` 宏主要是用来让 `dispatch_object_s` 结构体继承 `_os_object_s` 结构体的操作函数用的，下面来看一下吧。
 ### DISPATCH_CLASS_DECL_BARE
-&emsp;
 ```c++
 #define DISPATCH_CLASS_DECL_BARE(name, cluster) \
         OS_OBJECT_CLASS_DECL(dispatch_##name, \
@@ -276,11 +275,11 @@ DISPATCH_OBJECT_VTABLE_HEADER(dispatch_object))
 // 4⃣️
 struct dispatch_object_s;
 struct dispatch_object_extra_vtable_s { // 这里表明子类的 vtable 内部的扩展，例如子类新增的内容（本来想说是新的操作函数呢，但是里面还有成员变量...）
-    unsigned long const do_type;
-    const char *const do_kind;
-    void (*const do_dispose)(struct dispatch_object_s *, bool *allow_free);
-    size_t (*const do_debug)(struct dispatch_object_s *, char *, size_t);
-    void (*const do_invoke)(struct dispatch_object_s *, dispatch_invoke_context_t, dispatch_invoke_flags_t);
+    unsigned long const do_type; // 类型
+    const char *const do_kind; // 起到说明的作用
+    void (*const do_dispose)(struct dispatch_object_s *, bool *allow_free); // dispose 方法
+    size_t (*const do_debug)(struct dispatch_object_s *, char *, size_t); // debug 方法
+    void (*const do_invoke)(struct dispatch_object_s *, dispatch_invoke_context_t, dispatch_invoke_flags_t); // 唤醒队列的方法
 };
 
 struct dispatch_object_vtable_s { // 这里就是我们抽丝剥茧一层一层要找的 dispatch_object_vtable_s 了。
@@ -312,10 +311,18 @@ extern const struct dispatch_object_vtable_s _dispatch_object_vtable __asm__(".o
 ```
 &emsp;看到这里，我们就能明白前面 `dispatch_object_s` 结构体定义内部的这句："`const struct dispatch_object_vtable_s *do_vtable; /* must be pointer-sized */` // do_vtable 包含了对象类型和 dispatch_object_s 的操作函数"  的含义了。
 
-&emsp;emmm...看到这里我们就把 `dispatch_object_s` 结构定义相关的内容全部看完了，真的是宏定义一层套一层，宏定义里面再套结构体的定义。（关于它定义里面的几个函数具体作用和实现待后续再展开讲解。）
+&emsp;然后看到 object_internal.h 文件中的几个宏定义:
+```c++
+#define dx_dispose(x, y) dx_vtable(x)->do_dispose(x, y)
+#define dx_debug(x, y, z) dx_vtable(x)->do_debug((x), (y), (z))
+#define dx_invoke(x, y, z) dx_vtable(x)->do_invoke(x, y, z)
+```
+&emsp;是的，没错，`dispatch_object_extra_vtable_s` 结构体中的函数指针使用时用也是包裹了一层宏定义。
+
+&emsp;emmm...看到这里我们就把 `dispatch_object_s` 结构定义相关的内容全部看完了，真的是宏定义一层套一层，然后还在宏定义里面再套完整的结构体定义。（还有结构体定义里面的函数指针的具体作用和实现待后续再展开讲解，本篇只关注数据结构。）
 
 &emsp;下面我们看一下指向 `dispatch_object_s` 结构体的指针类型 `dispatch_object_t`，在此之前我们要扩展一个知识点：**透明联合类型**。
-### DISPATCH_TRANSPARENT_UNION
+## DISPATCH_TRANSPARENT_UNION
 &emsp;`DISPATCH_TRANSPARENT_UNION` 是用于添加 `transparent_union` 属性的宏定义。
 ```c++
 #ifndef __cplusplus
@@ -325,16 +332,16 @@ extern const struct dispatch_object_vtable_s _dispatch_object_vtable __asm__(".o
 #endif
 ```
 &emsp;透明联合类型削弱了 C 语言的类型检测机制，或者，换言之，它起到了类似强制类型转换的效果。考虑到在底层，类型实质上是不存在的，因此所谓的透明联合类型，也就是在一定程度上打破了类型对我们的束缚，使数据以一种更底层的角度呈现在我们面前。不过这样也弱化了 C 语言对类型的检测，由此也可能带来一些很严重的错误。详细可参考：[透明联合类型](http://nanjingabcdefg.is-programmer.com/posts/23951.html)。
-### dispatch_object_t
+## dispatch_object_t
 &emsp;`dispatch_object_t` 结尾处的 `DISPATCH_TRANSPARENT_UNION` 表示它是一个透明联合体，即 `dispatch_object_t` 可以表示为指向联合体内部的任何一种类型的指针。
 ```c++
 typedef union {
-    struct _os_object_s *_os_obj;
-    struct dispatch_object_s *_do; // GCD 的基类，上面我们已经对它进行详细分析
+    struct _os_object_s *_os_obj; // GCD 的基基类
+    struct dispatch_object_s *_do; // GCD 的基类，上面我们已经对它进行了详细分析
     struct dispatch_queue_s *_dq; // 队列（我们创建的队列都是这个类型，不管是串行队列还是并行队列）
-    struct dispatch_queue_attr_s *_dqa; // 队列的属性，包含了队列里面的一些操作函数，可以表明这个队列是串行队列还是并发队列
+    struct dispatch_queue_attr_s *_dqa; // 队列的属性，包含了队列里面的一些操作函数，可以表明这个队列是串行队列还是并发队列等等信息（下面会一一展开）
     struct dispatch_group_s *_dg; // GCD 的 group
-    struct dispatch_source_s *_ds; // GCD 的 source，可以监测内核事件，文字读写事件和 socket 通信事件
+    struct dispatch_source_s *_ds; // GCD 的 source，可以监测内核事件，文件读写事件和 socket 通信事件
     struct dispatch_channel_s *_dch;
     struct dispatch_mach_s *_dm;
     struct dispatch_mach_msg_s *_dmsg;
@@ -342,7 +349,7 @@ typedef union {
     struct dispatch_data_s *_ddata;
     struct dispatch_io_s *_dchannel;
     
-    struct dispatch_continuation_s *_dc; // 任务，（dispatch_aync 的 block 会封装成这个数据结构）
+    struct dispatch_continuation_s *_dc; // 任务，（任务的 block 和 函数都会封装成这个数据结构）
     struct dispatch_sync_context_s *_dsc;
     struct dispatch_operation_s *_doperation;
     struct dispatch_disk_s *_ddisk;
@@ -356,10 +363,10 @@ typedef union {
     uintptr_t _do_value;
 } dispatch_object_t DISPATCH_TRANSPARENT_UNION;
 ```
-### dispatch_queue_s
-&emsp;下面我们来看一下可能是 GCD 中最重要的一个数据结构了，队列的数据结构 `dispatch_queue_s`，前面我们看了无数次指向 `dispatch_queue_s` 结构体的指针 `dispatch_queue_t`，下面就看下队列内部的都包含哪些具体的内容吧。
+## dispatch_queue_s
+&emsp;下面我们来看一下可能是 GCD 中最重要的一个数据结构了，队列的数据结构 `dispatch_queue_s`，前面我们见到过无数次指向 `dispatch_queue_s` 结构体的指针 `dispatch_queue_t`，下面就看下队列内部都包含哪些具体的内容吧。
 
-&emsp;上面我们看 `dispatch_object_s` 时它的定义位于 `object_internal.h` 文件中，这次 `dispatch_queue_s` 定义在 `queue_internal.h` 文件中，大概发现了规律，看到还有 `data_internal.h`、`mach_internal.h`、`semaphore_internal.h`、`source_internal.h` 等等文件。
+&emsp;上面我们看 `dispatch_object_s` 时它的定义位于 `object_internal.h` 文件中，这次 `dispatch_queue_s` 定义在 `queue_internal.h` 文件中，大概发现了规律，看到还有 `data_internal.h`、`mach_internal.h`、`semaphore_internal.h`、`source_internal.h` 等等文件，它们大概都一一对应了我们前面几篇 .h 中看到的 `**_t` 指针指向的 `**_s` 结构体。
 
 &emsp;`DISPATCH_ATOMIC64_ALIGN` 标记添加 8 字节对齐的属性。
 ```c++
@@ -372,24 +379,25 @@ struct dispatch_queue_s {
     /* 32bit hole on LP64 */
 } DISPATCH_ATOMIC64_ALIGN;
 ```
+&emsp;看到 `dispatch_queue_s` 内部仅使用了一行宏定义: `DISPATCH_QUEUE_CLASS_HEADER`，与上面的 `dispatch_object_s` 结构体内部仅有的一行的宏定义：`_DISPATCH_OBJECT_HEADER(object)` 相比，`DISPATCH_QUEUE_CLASS_HEADER` 的宏名里面多了 `CLASS`。
 ### DISPATCH_QUEUE_CLASS_HEADER
-&emsp;这宏定义看的真是吐血，一层套一层...
+&emsp;这宏定义看的真是吐🩸，一层套一层...
 ```c++
 #define DISPATCH_QUEUE_CLASS_HEADER(x, __pointer_sized_field__) \
 
-_DISPATCH_QUEUE_CLASS_HEADER(x, __pointer_sized_field__); \ // 等待展开的宏 1
+_DISPATCH_QUEUE_CLASS_HEADER(x, __pointer_sized_field__); \ // 等待展开的宏 1⃣️ （宏名是加了下划线的 DISPATCH_QUEUE_CLASS_HEADER，主要是适配不同的运行环境）
 /* LP64 global queue cacheline boundary */ \
 
-unsigned long dq_serialnum; \ 
-const char *dq_label; \
+unsigned long dq_serialnum; \ // 队列序号，如我们常见的主队列序列号是 1
+const char *dq_label; \ // 队列标签，可以直接理解为队列名字，如我们创建自定义队列时的自定义字符串作为队列名字
 
-DISPATCH_UNION_LE(uint32_t volatile dq_atomic_flags, \ // 等待展开的宏 2
+DISPATCH_UNION_LE(uint32_t volatile dq_atomic_flags, \ // 等待展开的宏 2⃣️
     const uint16_t dq_width, \
     const uint16_t __dq_opaque2 \
 ); \
 
-dispatch_priority_t dq_priority; \
-union { \
+dispatch_priority_t dq_priority; \ // 队列优先级
+union { \ // 类似上面的 dispatch_object_t 联合体，定义了一众指向不同的 GCD 相关结构体的指针
     struct dispatch_queue_specific_head_s *dq_specific_head; \
     struct dispatch_source_refs_s *ds_refs; \
     struct dispatch_timer_source_refs_s *ds_timer_refs; \
@@ -399,12 +407,11 @@ union { \
 int volatile dq_sref_cnt
 ```
 ### _DISPATCH_QUEUE_CLASS_HEADER
-&emsp;前面我们已经看到在 arm64/x86_64 下，`OS_OBJECT_HAVE_OBJC1` 值为 0。所以 `_DISPATCH_QUEUE_CLASS_HEADER` 宏定义如下：
+&emsp;前面我们已经看到在 arm64/x86_64 下，`OS_OBJECT_HAVE_OBJC1` 值都为 0，所以 `_DISPATCH_QUEUE_CLASS_HEADER` 宏定义如下：
 ```c++
 #define _DISPATCH_QUEUE_CLASS_HEADER(x, __pointer_sized_field__) \
-DISPATCH_OBJECT_HEADER(x); \ // 这个宏定义同 "_DISPATCH_OBJECT_HEADER(object);"，这里是 "_DISPATCH_OBJECT_HEADER(queue);"，等下直接展开。
+DISPATCH_OBJECT_HEADER(x); \ // 来了， _DISPATCH_OBJECT_HEADER 宏来了，基类的内容来了，这里是 "_DISPATCH_OBJECT_HEADER(queue);"，等下直接展开。
 __pointer_sized_field__; \
-
 DISPATCH_UNION_LE(uint64_t volatile dq_state, \
         dispatch_lock dq_state_lock, \
         uint32_t dq_state_bits \
@@ -414,58 +421,27 @@ DISPATCH_UNION_LE(uint64_t volatile dq_state, \
 ```c++
 #define DISPATCH_OBJECT_HEADER(x) \
     struct dispatch_object_s _as_do[0]; \ // 长度为 0 的数组，暂时可忽略
-    _DISPATCH_OBJECT_HEADER(x) // 这里对应上面 dispatch_object_s 结构体内部唯一的一行宏定义: "_DISPATCH_OBJECT_HEADER(object);" 这里则是："_DISPATCH_OBJECT_HEADER(queue);"
+    _DISPATCH_OBJECT_HEADER(x) // 这里对应上面 dispatch_object_s 结构体内部唯一的一行宏定义: "_DISPATCH_OBJECT_HEADER(object);" 这里则是："_DISPATCH_OBJECT_HEADER(queue);" 仅入参发生变化
 ```
-&emsp;看到这里有些领悟，`dispatch_queue_s` 结构体的前面几个成员变量的布局用到的宏定义和我们上面学习 `dispatch_object_s` 结构体时用到的是一样。即等下 `dispatch_queue_s` 结构体展开其前面几个成员变量和 `dispatch_object_s` 如出一辙的，这里类似是在模拟继承机制，例如可以这样理解 `dispatch_queue_s` 前面的几个成员变量继承自 `dispatch_object_s`。
+&emsp;看到这里，`dispatch_queue_s` 结构体的前面几个成员变量的布局用到的宏定义展开和上面 `dispatch_object_s` 结构体内部用到的是一样的，即等下 `dispatch_queue_s` 结构体展开其前面几个成员变量时是和 `dispatch_object_s` 如出一辙的，这样就模拟了继承机制，如可以理解为 `dispatch_queue_s` 前面的几个成员变量继承自 `dispatch_object_s`。
 ### DISPATCH_UNION_LE
-&emsp;`DISPATCH_UNION_LE` 宏定义包含的内容有两层的，首先是进行一个断言，然后是生成一个联合体，断言和下面的联合体内部转换几乎是相同的，都是使用相同的宏定义内容。
+&emsp;`DISPATCH_UNION_LE` 宏定义包含的内容有两层，首先是进行一个断言，然后是生成一个联合体，断言和下面的联合体内部转换几乎是相同的，都是使用相同的宏定义内容，而断言的内容也仅是判断联合体中两部分的内存空间占用是否相等。可能描述的不太清楚，不知道怎么描述，看下面的展开的具体内容，一定能一眼看通的！
+
+&emsp;下面先看一些 `DISPATCH_UNION_LE` 内部涉及到的宏定义。
+#### DISPATCH_COUNT_ARGS
+&emsp;`DISPATCH_COUNT_ARGS` 统计宏定义中的参数个数，例如：`DISPATCH_COUNT_ARGS` 中有两个参数时宏转换得到 `_2`，有三个参数时宏转换得到 `_3`。
 ```c++
-#define DISPATCH_UNION_LE(alias, ...) \
-        DISPATCH_UNION_ASSERT(alias, DISPATCH_CONCAT(DISPATCH_STRUCT_LE, \
-                DISPATCH_COUNT_ARGS(__VA_ARGS__))(__VA_ARGS__)) \
-        union { alias; DISPATCH_CONCAT(DISPATCH_STRUCT_LE, \
-                DISPATCH_COUNT_ARGS(__VA_ARGS__))(__VA_ARGS__); }
-
-// DISPATCH_UNION_LE 内部嵌套的宏定义过多，这里我们以一个例子分析一下：
-// DISPATCH_UNION_LE(uint64_t volatile dq_state, dispatch_lock dq_state_lock, uint32_t dq_state_bits)
-
-// 1. DISPATCH_UNION_LE 里面的 DISPATCH_COUNT_ARGS(__VA_ARGS__) 是统计参数个数，
-//    然后返回一个 _参数个数，假设参数个数是 2，可直接把 DISPATCH_COUNT_ARGS(__VA_ARGS__) 转换为 _2 如下：（暂时保留 __VA_ARGS__ 和 alias）
-
-DISPATCH_UNION_ASSERT(alias, DISPATCH_CONCAT(DISPATCH_STRUCT_LE, _2)(__VA_ARGS__)) \
-union { alias; DISPATCH_CONCAT(DISPATCH_STRUCT_LE, _2)(__VA_ARGS__); }
-
-// 2. 然后是 DISPATCH_CONCAT(DISPATCH_STRUCT_LE, _2)，它是较简单的只是进行参数拼接，可继续转换如下：（暂时保留 __VA_ARGS__ 和 alias）
-
-DISPATCH_UNION_ASSERT(alias, DISPATCH_STRUCT_LE_2(__VA_ARGS__)) \
-union { alias; DISPATCH_STRUCT_LE_2(__VA_ARGS__); }
-        
-// 3. 然后是 DISPATCH_STRUCT_LE_2(__VA_ARGS__)，这里开始替换 __VA_ARGS__，可继续转换如下：
-
-DISPATCH_UNION_ASSERT(uint64_t volatile dq_state,         
-                      struct {
-                          dispatch_lock dq_state_lock;
-                          uint32_t dq_state_bits;
-                      };)
-                     
-union { 
-    uint64_t volatile dq_state;
-    struct {
-        dispatch_lock dq_state_lock;
-        uint32_t dq_state_bits;
-    };
-};
-
-// 4. DISPATCH_UNION_ASSERT 仅是一个断言，且 typedef uint32_t dispatch_lock; 即双方都是 64 位，8 个字节，那么宏定义全部展开就只剩下:
-union { 
-    uint64_t volatile dq_state;
-    struct {
-        dispatch_lock dq_state_lock;
-        uint32_t dq_state_bits;
-    };
-};
+#define DISPATCH_COUNT_ARGS(...) DISPATCH_COUNT_ARGS1(, ## __VA_ARGS__, _8, _7, _6, _5, _4, _3, _2, _1, _0)
+#define DISPATCH_COUNT_ARGS1(z, a, b, c, d, e, f, g, h, cnt, ...) cnt
 ```
-### DISPATCH_STRUCT_LE_2
+#### DISPATCH_CONCAT
+&emsp;`DISPATCH_CONCAT` 宏较简单，只是把宏中的两个参数拼接在一起。
+```c++
+#define DISPATCH_CONCAT(x,y) DISPATCH_CONCAT1(x,y)
+#define DISPATCH_CONCAT1(x,y) x ## y
+```
+#### DISPATCH_STRUCT_LE_2
+&emsp;`DISPATCH_STRUCT_LE_2` 宏也较简单，只是把宏中的参数构建为一个结构体。
 ```c++
 #if BYTE_ORDER == LITTLE_ENDIAN
 #define DISPATCH_STRUCT_LE_2(a, b)        struct { a; b; }
@@ -477,8 +453,8 @@ union {
 #define DISPATCH_STRUCT_LE_4(a, b, c, d)  struct { d; c; b; a; }
 #endif
 ```
-### DISPATCH_UNION_ASSERT
-&emsp;`DISPATCH_UNION_ASSERT` 是一个断言联合体，断言的内容是判断仅有一个成员变量 `alias` 的结构体内存字节长度是否等于 `st` 的内存字节长度。
+#### DISPATCH_UNION_ASSERT
+&emsp;`DISPATCH_UNION_ASSERT` 是一个断言联合体，断言的内容是判断仅有一个成员变量 `alias` 的结构体的内存空间长度是否等于 `st` 的内存空间长度。
 ```c++
 #if __has_feature(c_startic_assert)
 #define DISPATCH_UNION_ASSERT(alias, st) _Static_assert(sizeof(struct { alias; }) == sizeof(st), "bogus union");
@@ -486,19 +462,54 @@ union {
 #define DISPATCH_UNION_ASSERT(alias, st)
 #endif
 ```
-### DISPATCH_CONCAT
-&emsp;`DISPATCH_CONCAT` 宏较简单，只是把宏中的两个参数拼接在一起。
+&emsp;下面我们把 `DISPATCH_UNION_LE` 一点一点展开：
 ```c++
-#define DISPATCH_CONCAT(x,y) DISPATCH_CONCAT1(x,y)
-#define DISPATCH_CONCAT1(x,y) x ## y
+#define DISPATCH_UNION_LE(alias, ...) \
+        DISPATCH_UNION_ASSERT(alias, DISPATCH_CONCAT(DISPATCH_STRUCT_LE, \
+                DISPATCH_COUNT_ARGS(__VA_ARGS__))(__VA_ARGS__)) \
+        union { alias; DISPATCH_CONCAT(DISPATCH_STRUCT_LE, \
+                DISPATCH_COUNT_ARGS(__VA_ARGS__))(__VA_ARGS__); }
+
+// DISPATCH_UNION_LE 内部嵌套的宏定义过多，这里我们以一个例子分析一下，假如我们使用如下的参数来使用 DISPATCH_UNION_LE 宏：
+// DISPATCH_UNION_LE(uint64_t volatile dq_state, dispatch_lock dq_state_lock, uint32_t dq_state_bits)
+
+// 1. DISPATCH_UNION_LE 里面的 DISPATCH_COUNT_ARGS(__VA_ARGS__) 是统计参数个数，
+//    然后返回一个 _参数个数，假设参数个数是 2，可直接把 DISPATCH_COUNT_ARGS(__VA_ARGS__) 转换为 _2 如下：（下面的宏展开暂时保留 __VA_ARGS__ 和 alias 不变，为了看清全局，我们先一点一点局部宏展开）
+
+DISPATCH_UNION_ASSERT(alias, DISPATCH_CONCAT(DISPATCH_STRUCT_LE, _2)(__VA_ARGS__)) \
+union { alias; DISPATCH_CONCAT(DISPATCH_STRUCT_LE, _2)(__VA_ARGS__); }
+
+// 2. 然后是 DISPATCH_CONCAT(DISPATCH_STRUCT_LE, _2)，它是较简单的只是进行宏参数拼接，可继续转换如下：（下面的宏展开暂时保留 __VA_ARGS__ 和 alias 不变，为了看清全局，我们先一点一点局部宏展开）
+
+DISPATCH_UNION_ASSERT(alias, DISPATCH_STRUCT_LE_2(__VA_ARGS__)) \
+union { alias; DISPATCH_STRUCT_LE_2(__VA_ARGS__); }
+
+// 3. 然后是 DISPATCH_STRUCT_LE_2(__VA_ARGS__)，这里开始替换 __VA_ARGS__，可继续转换如下：（可看到两行宏定义里面内容转换都是同步的一样的）
+
+DISPATCH_UNION_ASSERT(uint64_t volatile dq_state,         
+                      struct {
+                          dispatch_lock dq_state_lock;
+                          uint32_t dq_state_bits;
+                      };) // 这一行展开是断言判断
+
+union { // 这一行展开是一个联合体定义，而恰恰断言判断的正是联合体内部的两部分内存空间长度是否相等
+    uint64_t volatile dq_state;
+    struct {
+        dispatch_lock dq_state_lock;
+        uint32_t dq_state_bits;
+    };
+};
+
+// 4. DISPATCH_UNION_ASSERT 仅是一个断言，且 dispatch_lock 是 typedef uint32_t dispatch_lock; 即断言判断的双方都是 64 位，8 个字节，那么宏定义全部展开就只剩下联合体了
+union { 
+    uint64_t volatile dq_state;
+    struct {
+        dispatch_lock dq_state_lock;
+        uint32_t dq_state_bits;
+    };
+};
 ```
-### DISPATCH_COUNT_ARGS
-&emsp;`DISPATCH_COUNT_ARGS` 统计宏定义中的参数个数，例如：`DISPATCH_COUNT_ARGS` 中有两个参数时返回 `_2`，有三个参数时返回 `_3`。
-```c++
-#define DISPATCH_COUNT_ARGS(...) DISPATCH_COUNT_ARGS1(, ## __VA_ARGS__, _8, _7, _6, _5, _4, _3, _2, _1, _0)
-#define DISPATCH_COUNT_ARGS1(z, a, b, c, d, e, f, g, h, cnt, ...) cnt
-```
-&emsp;以上是 `dispatch_queue_s` 结构中涉及的宏定义，下面全部展开看下 `dispatch_queue_s` 包含的内容：
+&emsp;以上看完了 `dispatch_queue_s` 结构中涉及的全部宏定义，下面全部展开 `dispatch_queue_s` 中的宏定义，看一下 `dispatch_queue_s` 结构体的完整定义：
 ```c++
 struct dispatch_queue_s {
     struct dispatch_object_s _as_do[0]; // 长度为 0 的数组，可忽略，同时也在暗示着结构体内存空间中的数据类型
@@ -511,14 +522,14 @@ struct dispatch_queue_s {
     struct dispatch_queue_s *volatile do_next;
     struct dispatch_queue_s *do_targetq;
     void *do_ctxt;
-    void *do_finalizer
+    void *do_finalizer;
     
     // ⬆️ 
     // DISPATCH_OBJECT_HEADER(queue); 这里是分界，可以把以上内容理解为继承自 dispatch_object_s。 
     
     void *__dq_opaque1;
     union { 
-        uint64_t volatile dq_state;
+        uint64_t volatile dq_state; // 队列状态？
         struct {
             // typedef uint32_t dispatch_lock;
             // dispatch_lock 是 uint32_t 类型
@@ -528,17 +539,20 @@ struct dispatch_queue_s {
     };
     
     /* LP64 global queue cacheline boundary */ 
-    unsigned long dq_serialnum; // 序列号，如主队列是 1
-    const char *dq_label; // 队列标签或者队列名
+    
+    unsigned long dq_serialnum; // 队列序列号，如主队列序号是 1
+    const char *dq_label; // 队列标签或者队列名字
     union { 
         uint32_t volatile dq_atomic_flags;
         struct {
-            const uint16_t dq_width;
+            const uint16_t dq_width; // 队列的宽度（串行队列为 1，并发队列大于 1）
             const uint16_t __dq_opaque2;
         };
     };
+    
     // typedef uint32_t dispatch_priority_t;
     // 在 priority.h 文件中，看到 dispatch_priority_t 是 uint32_t 类型  
+    
     dispatch_priority_t dq_priority; // 队列优先级
     union { // 联合体
         struct dispatch_queue_specific_head_s *dq_specific_head;
@@ -554,98 +568,11 @@ struct dispatch_queue_s {
 ```
 &emsp;细心观察会发现前面几个成员变量几乎和 `dispatch_object_s` 结构体的成员变量相同，它们都是来自 `_DISPATCH_OBJECT_HEADER` 宏展开，一个是 `_DISPATCH_OBJECT_HEADER(object)` 一个是 `_DISPATCH_OBJECT_HEADER(queue)`，可能看它的命名大概也看出了一些端倪“调度对象头部”，其实这里大概是在模拟继承，如 `dispatch_queue_s` 继承自 `dispatch_object_s`，那么头部的一些成员变量自然也要继承自 `dispatch_object_s` 了。
 
-&emsp;下面我们顺着 `dispatch_object_t` 联合体内部不同成员变量的顺序，来看下它们的具体定义。
-### dispatch_queue_attr_s
-&emsp;`dispatch_queue_attr_s` 结构体用来表示队列的属性，包含了队列里面的一些操作函数，可以表明这个队列是串行队列还是并发队列等信息。
+&emsp;下面我们顺着 `dispatch_object_t` 联合体内部不同成员变量的顺序以及相关不同结构体的重要性，来看下它们各自的具体定义内容。
 
-&emsp;`dispatch_queue_attr_s` 同样也是定义在 queue_internal.h 文件中。
-```c++
-struct dispatch_queue_attr_s {
-    OS_OBJECT_STRUCT_HEADER(dispatch_queue_attr);
-};
-```
-&emsp;把内部的 `OS_OBJECT_STRUCT_HEADER` 展开的话是:
-```c++
-struct dispatch_queue_attr_s {
-    _OS_OBJECT_HEADER(\
-    const struct dispatch_queue_attr_vtable_s *do_vtable, \
-    do_ref_cnt, \
-    do_xref_cnt);
-    
-    const struct dispatch_queue_attr_vtable_s *do_vtable;
-    int volatile do_ref_cnt;
-    int volatile do_xref_cnt;
-    
-};
-```
-&emsp;再把 `_OS_OBJECT_HEADER` 展开的话是:
-```c++
-struct dispatch_queue_attr_s {
-    const struct dispatch_queue_attr_vtable_s *do_vtable;
-    int volatile do_ref_cnt;
-    int volatile do_xref_cnt;
-};
-```
-&emsp;看到了熟悉的三个成员变量（`dispatch_object_s` 的前三个）。看到这里可能会迷惑，不是说好的 `dispatch_queue_attr_s` 是描述队列属性的数据结构吗，怎么内部就只有 “继承” 自 `dispatch_object_s` 的三个成员变量。实际描述队列的属性的结构体是 `dispatch_queue_attr_info_s/t`，
-#### dispatch_queue_attr_info_t
-&emsp;看到 `dispatch_queue_attr_info_s` 内部使用了位域来表示不同的值，来节省内存占用。
-```c++
-typedef struct dispatch_queue_attr_info_s {
+&emsp;emmmm...
 
-    // typedef uint32_t dispatch_qos_t;
-    
-    dispatch_qos_t dqai_qos : 8; //（表示线程优先级）
-    int      dqai_relpri : 8; //（表示优先级的偏移）
-    uint16_t dqai_overcommit:2; // 是否可以 overcommit
-    uint16_t dqai_autorelease_frequency:2; // （自动释放频率）
-    uint16_t dqai_concurrent:1; // 表示队列是并发队列还是串行队列
-    uint16_t dqai_inactive:1; // 表示当前队列是否是活动状态（是否激活）
-} dispatch_queue_attr_info_t;
-```
-&emsp;其实这里队列属性相关的内容包含更复杂的结构，在代码部分，看到用 `#pragma mark dispatch_queue_attr_t` 定义了一个区域的代码都与队列属性有关，下面我们把该区域的代码都看一遍。
-#### DISPATCH_CLASS_DECL
-&emsp;
-```c++
-DISPATCH_CLASS_DECL(queue_attr, OBJECT);
-```
-```c++
-#define DISPATCH_CLASS_DECL(name, cluster) \
-        _OS_OBJECT_DECL_PROTOCOL(dispatch_##name, dispatch_object) \
-        _OS_OBJECT_CLASS_IMPLEMENTS_PROTOCOL(dispatch_##name, dispatch_##name) \
-        DISPATCH_CLASS_DECL_BARE(name, cluster)
-```
-&emsp;上面宏展开:
-```c++
-// 1⃣️：
-_OS_OBJECT_DECL_PROTOCOL(dispatch_queue_attr, dispatch_object) \
-_OS_OBJECT_CLASS_IMPLEMENTS_PROTOCOL(dispatch_queue_attr, dispatch_queue_attr) \
-DISPATCH_CLASS_DECL_BARE(queue_attr, OBJECT)
-```
-### dispatch_continuation_t
-&emsp;在 queue_internal.h 文件中看到 `#pragma mark dispatch_continuation_t` 行，往下的 200 多行的整个区域的代码都是和 `dispatch_continuation_t` 相关的代码。
-
-&emsp;首先根据上面的规则我们已知 `dispatch_continuation_t` 是指向 `dispatch_continuation_s` 结构体的指针类型。
-
-&emsp;当我们向队列提交任务时，无论 block 还是 function 形式，最终都会被封装为 `dispatch_continuation_s`，所以可以把它理解为描述任务内容的结构体。
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+&emsp;看到这里看宏看的真的心累，那么本篇就暂时先到这里，我们都休息一下，下篇再战 GCD！⛽️⛽️
 
 ## 参考链接
 **参考链接:🔗**
