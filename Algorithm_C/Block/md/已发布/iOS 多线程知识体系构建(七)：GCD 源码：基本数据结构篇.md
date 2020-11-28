@@ -1,4 +1,4 @@
-# iOS 多线程知识体系构建(七)：GCD 源码：基本数据结构篇（1）
+# iOS 多线程知识体系构建(七)：GCD 源码：基本数据结构篇
 
 > &emsp;由本篇正式进入 GCD 源码。
 
@@ -569,10 +569,314 @@ struct dispatch_queue_s {
 &emsp;细心观察会发现前面几个成员变量几乎和 `dispatch_object_s` 结构体的成员变量相同，它们都是来自 `_DISPATCH_OBJECT_HEADER` 宏展开，一个是 `_DISPATCH_OBJECT_HEADER(object)` 一个是 `_DISPATCH_OBJECT_HEADER(queue)`，可能看它的命名大概也看出了一些端倪“调度对象头部”，其实这里大概是在模拟继承，如 `dispatch_queue_s` 继承自 `dispatch_object_s`，那么头部的一些成员变量自然也要继承自 `dispatch_object_s` 了。
 
 &emsp;下面我们顺着 `dispatch_object_t` 联合体内部不同成员变量的顺序以及相关不同结构体的重要性，来看下它们各自的具体定义内容。
+## dispatch_queue_attr_s
+&emsp;`dispatch_queue_attr_s` 结构体用来表示队列的属性，包含了队列里面的一些操作函数，可以表明这个队列是串行队列还是并发队列等信息。
 
-&emsp;emmmm...
+&emsp;`dispatch_queue_attr_s` 同样也是定义在 queue_internal.h 文件中。
+```c++
+struct dispatch_queue_attr_s {
+    OS_OBJECT_STRUCT_HEADER(dispatch_queue_attr);
+};
+```
+&emsp;把内部的 `OS_OBJECT_STRUCT_HEADER` 展开的话是:
+```c++
+struct dispatch_queue_attr_s {
+    _OS_OBJECT_HEADER(\
+    const struct dispatch_queue_attr_vtable_s *do_vtable, \
+    do_ref_cnt, \
+    do_xref_cnt);
+};
+```
+&emsp;再把 `_OS_OBJECT_HEADER` 展开的话是:
+```c++
+struct dispatch_queue_attr_s {
+    const struct dispatch_queue_attr_vtable_s *do_vtable;
+    int volatile do_ref_cnt;
+    int volatile do_xref_cnt;
+};
+```
+&emsp;看到了熟悉的三个成员变量（类似 `_os_object_s` 结构体的前三个成员变量）。看到这里可能会迷惑，不是说好的 `dispatch_queue_attr_s` 是描述队列属性的数据结构吗，怎么内部就只有 “继承” 自 `_os_object_s` 的三个成员变量。实际描述队列的属性的结构体其实是 `dispatch_queue_attr_info_t`（是 `dispatch_queue_attr_info_s` 结构体的别名）。
+### dispatch_queue_attr_info_t
+&emsp;看到 `dispatch_queue_attr_info_s` 内部使用了位域来表示不同的值，来节省内存占用。
+```c++
+typedef struct dispatch_queue_attr_info_s {
 
-&emsp;看到这里看宏看的真的心累，那么本篇就暂时先到这里，我们都休息一下，下篇再战 GCD！⛽️⛽️
+    // typedef uint32_t dispatch_qos_t; dispatch_qos_t 是 uint32_t 类型，所以 dispatch_queue_attr_info_s 结构体应该是 32 位的
+    
+    dispatch_qos_t dqai_qos : 8; //（表示线程优先级）
+    int      dqai_relpri : 8; //（表示优先级的偏移）
+    uint16_t dqai_overcommit:2; // 是否可以 overcommit（过的量是 CPU 的物理核心数）
+    uint16_t dqai_autorelease_frequency:2; // （自动释放频率）
+    uint16_t dqai_concurrent:1; // 表示队列是并发队列还是串行队列
+    uint16_t dqai_inactive:1; // 表示当前队列是否是活动状态（是否激活）
+} dispatch_queue_attr_info_t;
+```
+&emsp;其实这里队列属性相关的内容包含更复杂的内容，在 queue_internal.h 文件内部，看到用 `#pragma mark dispatch_queue_attr_t` 定义了一个区域的代码，它们都与队列属性有关，下面我们把该区域的代码都看一遍。
+```c++
+DISPATCH_CLASS_DECL(queue_attr, OBJECT);
+```
+### DISPATCH_CLASS_DECL
+&emsp;`DISPATCH_CLASS_DECL(queue_attr, OBJECT)` 内部是定义 `dispatch_queue_attr_vtable_s` 的内容，定义 `dispatch_queue_attr_s` 的一些操作函数。
+```c++
+#define DISPATCH_CLASS_DECL(name, cluster) \
+        _OS_OBJECT_DECL_PROTOCOL(dispatch_##name, dispatch_object) \
+        _OS_OBJECT_CLASS_IMPLEMENTS_PROTOCOL(dispatch_##name, dispatch_##name) \
+        DISPATCH_CLASS_DECL_BARE(name, cluster)
+```
+&emsp;上面宏展开:
+```c++
+// 1⃣️：
+_OS_OBJECT_DECL_PROTOCOL(dispatch_queue_attr, dispatch_object) \
+_OS_OBJECT_CLASS_IMPLEMENTS_PROTOCOL(dispatch_queue_attr, dispatch_queue_attr) \
+DISPATCH_CLASS_DECL_BARE(queue_attr, OBJECT)
+```
+&emsp;在 C 环境下 `#define _OS_OBJECT_DECL_PROTOCOL(name, super)` 什么事情都不做。同样在 C 环境下 `#define _OS_OBJECT_CLASS_IMPLEMENTS_PROTOCOL(name, super)` 也是什么事情都不做。
+
+```c++
+#define DISPATCH_CLASS_DECL_BARE(name, cluster) \
+        OS_OBJECT_CLASS_DECL(dispatch_##name, \
+        DISPATCH_##cluster##_VTABLE_HEADER(dispatch_##name))
+```
+
+```c++
+// 1⃣️
+DISPATCH_CLASS_DECL_BARE(queue_attr, OBJECT)
+```
+&emsp;把上面宏定义展开如下:
+```c++
+// 2⃣️
+OS_OBJECT_CLASS_DECL(dispatch_queue_attr, \
+DISPATCH_OBJECT_VTABLE_HEADER(dispatch_queue_attr))
+```
+&emsp;把 `DISPATCH_OBJECT_VTABLE_HEADER(dispatch_queue_attr)` 宏定义展开如下:
+```c++
+// 3⃣️
+unsigned long const do_type;
+const char *const do_kind;
+void (*const do_dispose)(struct dispatch_queue_attr_s *, bool *allow_free);
+size_t (*const do_debug)(struct dispatch_queue_attr_s *, char *, size_t);
+void (*const do_invoke)(struct dispatch_queue_attr_s *, dispatch_invoke_context_t, dispatch_invoke_flags_t)
+```
+&emsp;把 2⃣️ 处都宏定义展开如下:
+```c++
+
+OS_OBJECT_CLASS_DECL(dispatch_queue_attr, \
+DISPATCH_OBJECT_VTABLE_HEADER(dispatch_queue_attr))
+
+struct dispatch_queue_attr_s;
+struct dispatch_queue_attr_extra_vtable_s {
+    unsigned long const do_type;
+    const char *const do_kind;
+    void (*const do_dispose)(struct dispatch_queue_attr_s *, bool *allow_free);
+    size_t (*const do_debug)(struct dispatch_queue_attr_s *, char *, size_t);
+    void (*const do_invoke)(struct dispatch_queue_attr_s *, dispatch_invoke_context_t, dispatch_invoke_flags_t)
+};
+
+struct dispatch_queue_attr_vtable_s {
+    void (*_os_obj_xref_dispose)(_os_object_t);
+    void (*_os_obj_dispose)(_os_object_t);
+            
+    struct dispatch_queue_attr_extra_vtable_s _os_obj_vtable;
+};
+        
+extern const struct dispatch_queue_attr_vtable_s _OS_dispatch_queue_attr_vtable;
+extern const struct dispatch_queue_attr_vtable_s _dispatch_queue_attr_vtable __asm__(".objc_class_name_" OS_STRINGIFY(OS_dispatch_queue_attr))
+```
+### _dispatch_queue_attr_overcommit_t
+&emsp;指定队列 overcommit 状态的枚举。 
+```c++
+typedef enum {
+    _dispatch_queue_attr_overcommit_unspecified = 0, // 未指定
+    _dispatch_queue_attr_overcommit_enabled, // 允许 overcommit
+    _dispatch_queue_attr_overcommit_disabled, // 不允许 overcommit
+} _dispatch_queue_attr_overcommit_t;
+```
+### DISPATCH_QUEUE_ATTR_COUNT
+&emsp;是指队列属性的数量吗？值是不同属性的值的乘积。
+```c++
+#define DISPATCH_QUEUE_ATTR_OVERCOMMIT_COUNT 3
+
+#define DISPATCH_QUEUE_ATTR_AUTORELEASE_FREQUENCY_COUNT 3
+
+#define DISPATCH_QUEUE_ATTR_QOS_COUNT (DISPATCH_QOS_MAX + 1) // 6
+
+#define DISPATCH_QUEUE_ATTR_PRIO_COUNT (1 - QOS_MIN_RELATIVE_PRIORITY) // 16
+
+#define DISPATCH_QUEUE_ATTR_CONCURRENCY_COUNT 2
+
+#define DISPATCH_QUEUE_ATTR_INACTIVE_COUNT 2
+
+#define DISPATCH_QUEUE_ATTR_COUNT  ( \
+        DISPATCH_QUEUE_ATTR_OVERCOMMIT_COUNT * \
+        DISPATCH_QUEUE_ATTR_AUTORELEASE_FREQUENCY_COUNT * \
+        DISPATCH_QUEUE_ATTR_QOS_COUNT * \
+        DISPATCH_QUEUE_ATTR_PRIO_COUNT * \
+        DISPATCH_QUEUE_ATTR_CONCURRENCY_COUNT * \
+        DISPATCH_QUEUE_ATTR_INACTIVE_COUNT )
+```
+&emsp;计算可得 `DISPATCH_QUEUE_ATTR_COUNT = 3456(3 * 3 * 6 * 16 * 2 * 2)`。
+### _dispatch_queue_attrs
+&emsp;然后是一个全局变量 `_dispatch_queue_attrs`，一个长度是  3456 的 `dispatch_queue_attr_s` 数组。
+```c++
+extern const struct dispatch_queue_attr_s
+_dispatch_queue_attrs[DISPATCH_QUEUE_ATTR_COUNT];
+```
+&emsp;在 init.c 文件中看到了 `_dispatch_queue_attrs` 数组的初始化。
+```c++
+// DISPATCH_QUEUE_CONCURRENT resp. _dispatch_queue_attr_concurrent is aliased to array member [0] and their properties must match!
+const struct dispatch_queue_attr_s _dispatch_queue_attrs[] = {
+    [0 ... DISPATCH_QUEUE_ATTR_COUNT - 1] = {
+        DISPATCH_GLOBAL_OBJECT_HEADER(queue_attr),
+    },
+};
+```
+### DISPATCH_GLOBAL_OBJECT_HEADER
+&emsp;`DISPATCH_GLOBAL_OBJECT_HEADER` 宏展开的话即为初始化 `dispatch_object_s` 结构体或其子类的头部。
+```c++
+#if OS_OBJECT_HAVE_OBJC1
+#define DISPATCH_GLOBAL_OBJECT_HEADER(name) \
+    .do_vtable = DISPATCH_VTABLE(name), \
+    ._objc_isa = DISPATCH_OBJC_CLASS(name), \
+    .do_ref_cnt = DISPATCH_OBJECT_GLOBAL_REFCNT, \
+    .do_xref_cnt = DISPATCH_OBJECT_GLOBAL_REFCNT
+#else
+#define DISPATCH_GLOBAL_OBJECT_HEADER(name) \
+    .do_vtable = DISPATCH_VTABLE(name), \
+    .do_ref_cnt = DISPATCH_OBJECT_GLOBAL_REFCNT, \ // INT_MAX int 的最大值
+    .do_xref_cnt = DISPATCH_OBJECT_GLOBAL_REFCNT // INT_MAX
+#endif
+```
+### _dispatch_queue_attr_to_info
+&emsp;`_dispatch_queue_attr_to_info` 函数实现从一个 `dispatch_queue_attr_t` 入参得到一个 `dispatch_queue_attr_info_t` 的返回值。
+```c++
+dispatch_queue_attr_info_t
+_dispatch_queue_attr_to_info(dispatch_queue_attr_t dqa)
+{
+    // 创建一个 dispatch_queue_attr_info_t 结构体的局部变量 dqai
+    dispatch_queue_attr_info_t dqai = { };
+
+    // 如果 dqa 不存在则直接返回一个空的 dispatch_queue_attr_info_t 结构体实例
+    if (!dqa) return dqai;
+
+#if DISPATCH_VARIANT_STATIC
+    // DISPATCH_EXPORT
+    // struct dispatch_queue_attr_s _dispatch_queue_attr_concurrent;
+    
+    // _dispatch_queue_attr_concurrent 是一个全局变量，表示并发队列属性
+    if (dqa == &_dispatch_queue_attr_concurrent) {
+        // 如果相等，则把 dqai 的 dqai_concurrent 成员变量置为 true，表示是一个并发队列属性
+        dqai.dqai_concurrent = true;
+        
+        // 直接 return
+        return dqai;
+    }
+#endif
+
+    // 这里是一个内存范围的判断，如果 dqa 的内存空间在 _dispatch_queue_attrs 数组之外，则直接 crash
+    if (dqa < _dispatch_queue_attrs ||
+            dqa >= &_dispatch_queue_attrs[DISPATCH_QUEUE_ATTR_COUNT]) {
+        DISPATCH_CLIENT_CRASH(dqa->do_vtable, "Invalid queue attribute");
+    }
+
+    // idx 表示 dqa 在 _dispatch_queue_attrs 数组中的索引
+    size_t idx = (size_t)(dqa - _dispatch_queue_attrs);
+
+    // 下面是依次取模设置为 dqai 的各个成员变量的值，然后更新 idx 为商，
+    // 在 dispatch_queue_attr_info_s 结构体中它的每个成员变量是以位域的形式保存的，
+    // 所以这里以每个成员变量的占位长度来取模，即取得该成员变量的值。
+    
+    // 类似我们以前常见的分别求一个数字的个位十位百位等等位的数字，只不过它们是每个数字都占 1 位，而这里则是不同的成员值占不同的位数
+    
+    dqai.dqai_inactive = (idx % DISPATCH_QUEUE_ATTR_INACTIVE_COUNT);
+    idx /= DISPATCH_QUEUE_ATTR_INACTIVE_COUNT;
+
+    dqai.dqai_concurrent = !(idx % DISPATCH_QUEUE_ATTR_CONCURRENCY_COUNT);
+    idx /= DISPATCH_QUEUE_ATTR_CONCURRENCY_COUNT;
+
+    dqai.dqai_relpri = -(int)(idx % DISPATCH_QUEUE_ATTR_PRIO_COUNT);
+    idx /= DISPATCH_QUEUE_ATTR_PRIO_COUNT;
+
+    dqai.dqai_qos = idx % DISPATCH_QUEUE_ATTR_QOS_COUNT;
+    idx /= DISPATCH_QUEUE_ATTR_QOS_COUNT;
+
+    dqai.dqai_autorelease_frequency =
+            idx % DISPATCH_QUEUE_ATTR_AUTORELEASE_FREQUENCY_COUNT;
+    idx /= DISPATCH_QUEUE_ATTR_AUTORELEASE_FREQUENCY_COUNT;
+
+    dqai.dqai_overcommit = idx % DISPATCH_QUEUE_ATTR_OVERCOMMIT_COUNT;
+    idx /= DISPATCH_QUEUE_ATTR_OVERCOMMIT_COUNT;
+
+    return dqai;
+}
+```
+&emsp;`dispatch_queue_attr_s` 的内容先看到这里，我们主要记得 `dispatch_queue_attr_info_t` 中队列的各个属性值即可。
+
+&emsp;（预感到 GCD 的坑可太深了......）
+
+&emsp;下面我们看另一个挺重要的数据结构--队列中的任务所使用的数据结构。
+## dispatch_continuation_t
+&emsp;当我们向队列提交任务时，无论 block 还是 function 形式，最终都会被封装为 `dispatch_continuation_s`，所以可以把它理解为描述任务内容的结构体。
+
+&emsp;根据上面命名规则我们已知 `dispatch_continuation_t` 是指向 `dispatch_continuation_s` 结构体的指针类型。
+
+&emsp;在 queue_internal.h 文件中看到 `#pragma mark dispatch_continuation_t` 行，往下的 200 多行的整个区域的代码都是和 `dispatch_continuation_t` 相关的代码。
+```c++
+typedef struct dispatch_continuation_s {
+    DISPATCH_CONTINUATION_HEADER(continuation);
+} *dispatch_continuation_t;
+```
+&emsp;同以前一样，结构体中定义也是仅有一行宏定义。
+### DISPATCH_CONTINUATION_HEADER
+&emsp;仅看 `__LP64__` 下的情况。
+```c++
+
+// If dc_flags is less than 0x1000, then the object is a continuation.
+// Otherwise, the object has a private layout and memory management rules.
+// The layout until after 'do_next' must align with normal objects.
+
+#define DISPATCH_CONTINUATION_HEADER(x) \
+    union { \
+        const void *do_vtable; \
+        uintptr_t dc_flags; \
+    }; \
+    union { \
+        pthread_priority_t dc_priority; \
+        int dc_cache_cnt; \
+        uintptr_t dc_pad; \
+    }; \
+    struct dispatch_##x##_s *volatile do_next; \
+    struct voucher_s *dc_voucher; \
+    dispatch_function_t dc_func; \
+    void *dc_ctxt; \
+    void *dc_data; \
+    void *dc_other
+```
+&emsp;`dispatch_continuation_s` 内部的宏定义展开如下：
+```c++
+typedef struct dispatch_continuation_s {
+    union {
+        const void *do_vtable;
+        uintptr_t dc_flags;
+    };
+    
+    union {
+        pthread_priority_t dc_priority;
+        int dc_cache_cnt;
+        uintptr_t dc_pad;
+    };
+    
+    struct dispatch_continuation_s *volatile do_next; // 下一个任务
+    struct voucher_s *dc_voucher;
+    
+    // typedef void (*dispatch_function_t)(void *_Nullable);
+    
+    dispatch_function_t dc_func; // 要执行的函数指针
+    void *dc_ctxt; // 方法的上下文
+    void *dc_data; // 相关数据
+    void *dc_other; // 其它信息 
+} *dispatch_continuation_t;
+```
+&emsp;emmm...几个数据结构看下来，大概对 GCD 的数据类型定义有了一定的认识，那么数据结构暂时先看到这里，下篇我们进入队列的创建！⛽️⛽️
 
 ## 参考链接
 **参考链接:🔗**
