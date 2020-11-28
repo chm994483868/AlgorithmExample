@@ -43,7 +43,7 @@ dispatch_queue_create(const char *label, dispatch_queue_attr_t attr) {
 #define DISPATCH_TARGET_QUEUE_DEFAULT NULL
 ```
 ### dispatch_lane_t
-&emsp;
+&emsp;`dispatch_lane_t` 是指向 `dispatch_lane_s` 结构体的指针。
 ```c++
 typedef struct dispatch_lane_s {
     DISPATCH_LANE_CLASS_HEADER(lane);
@@ -116,6 +116,19 @@ typedef struct dispatch_lane_s {
 } DISPATCH_ATOMIC64_ALIGN *dispatch_lane_t;
 ```
 &emsp;可看到 `dispatch_lane_s` 是继承自 `dispatch_queue_s` 的“子类”，且 `_dispatch_lane_create_with_target` 函数返回的正是 `dispatch_lane_s` 而不是 `dispatch_queue_s` 类型。
+### DISPATCH_QUEUE_WIDTH_MAX
+```c++
+#define DISPATCH_QUEUE_WIDTH_FULL            0x1000ull //（4096）为创建全局队列时候所使用的
+#define DISPATCH_QUEUE_WIDTH_POOL (DISPATCH_QUEUE_WIDTH_FULL - 1) // 0xfffull（4095）
+#define DISPATCH_QUEUE_WIDTH_MAX  (DISPATCH_QUEUE_WIDTH_FULL - 2) // 0xffeull // 队列宽度的最大值 （4094）
+```
+### _dispatch_priority_make
+&emsp;优先级及相对量。
+```c++
+#define _dispatch_priority_make(qos, relpri) \
+    (qos ? ((((qos) << DISPATCH_PRIORITY_QOS_SHIFT) & DISPATCH_PRIORITY_QOS_MASK) | \
+    ((dispatch_priority_t)(relpri - 1) & DISPATCH_PRIORITY_RELPRI_MASK)) : 0)
+```
 
 &emsp;`_dispatch_lane_create_with_target` 函数实现：
 ```c++
@@ -126,12 +139,12 @@ _dispatch_lane_create_with_target(const char *label, dispatch_queue_attr_t dqa,
 {
     // _dispatch_queue_attr_to_info 函数上篇我们讲解过，
     // 1. 如果 dqa 是 DISPATCH_QUEUE_SERIAL（值是 NULL）作为入参传入的话，
-    //    会直接返回一个空的 dispatch_queue_attr_info_t 结构体实例，（dispatch_queue_attr_info_t dqai = { };），
-    
+    //    会直接返回一个空的 dispatch_queue_attr_info_t 结构体实例，（dispatch_queue_attr_info_t dqai = { };）。
     // 2. 如果 dqa 是 DISPATCH_QUEUE_CONCURRENT（值是全局变量 _dispatch_queue_attr_concurrent）作为入参传入的话，
-    //    会返回一个 dqai_concurrent 值是 true 的 dispatch_queue_attr_info_t 结构体实例，（dqai_concurrent 为 true 表示是并发队列）
+    //    会返回一个 dqai_concurrent 值是 true 的 dispatch_queue_attr_info_t 结构体实例，（dqai_concurrent 为 true 表示是并发队列）。
     // 3. 第三种情况则是传入自定义的 dispatch_queue_attr_t 时，
     //    则会进行取模和取商运算为 dispatch_queue_attr_info_t 结构体实例的每个成员变量赋值后返回该 dispatch_queue_attr_info_t 结构体实例。
+    
     dispatch_queue_attr_info_t dqai = _dispatch_queue_attr_to_info(dqa);
 
     //
@@ -271,28 +284,123 @@ _dispatch_lane_create_with_target(const char *label, dispatch_queue_attr_t dqa,
         }
     }
 
-// void *_dispatch_object_alloc(const void *vtable, size_t size) 函数未找到其定义，只在 object_internal.h 中看到其声明
-
+    // void *_dispatch_object_alloc(const void *vtable, size_t size) 函数未找到其定义，只在 object_internal.h 中看到其声明。
+    // dispatch_lane_s 是 dispatch_queue_s 的子类。
+    
+    // dq 是一个指向 dispatch_lane_s 结构体的指针
     dispatch_lane_t dq = _dispatch_object_alloc(vtable,
             sizeof(struct dispatch_lane_s));
+            
+    // 当 dqai.dqai_concurrent 为真时入参为 DISPATCH_QUEUE_WIDTH_MAX（4094）否则是 1
+    // 当 dqai.dqai_inactive 为真时表示非活动状态，否则为活动状态
+    // #define DISPATCH_QUEUE_ROLE_INNER            0x0000000000000000ull
+    // #define DISPATCH_QUEUE_INACTIVE              0x0180000000000000ull
+    
+    // 初始化 dq
     _dispatch_queue_init(dq, dqf, dqai.dqai_concurrent ?
             DISPATCH_QUEUE_WIDTH_MAX : 1, DISPATCH_QUEUE_ROLE_INNER |
             (dqai.dqai_inactive ? DISPATCH_QUEUE_INACTIVE : 0));
 
+    // 队列签名
     dq->dq_label = label;
+    // 优先级
     dq->dq_priority = _dispatch_priority_make((dispatch_qos_t)dqai.dqai_qos,
             dqai.dqai_relpri);
+    // overcommit
     if (overcommit == _dispatch_queue_attr_overcommit_enabled) {
         dq->dq_priority |= DISPATCH_PRIORITY_FLAG_OVERCOMMIT;
     }
+    
+    // 如果是非活动状态
     if (!dqai.dqai_inactive) {
+        // 新队列的优先级继承自目标队列优先级
         _dispatch_queue_priority_inherit_from_target(dq, tq);
         _dispatch_lane_inherit_wlh_from_target(dq, tq);
     }
+    
+    // 目标队列的内部引用计数加 1（原子操作）
     _dispatch_retain(tq);
+    
+    // 设置新队列的目标队列
     dq->do_targetq = tq;
+    
+    // DEBUG 时的打印函数
     _dispatch_object_debug(dq, "%s", __func__);
     return _dispatch_trace_queue_create(dq)._dq;
+}
+```
+&emsp;`_dispatch_lane_create_with_target` 函数的执行流程如注释所示，下面我们摘录其中的较关键点再进行分析。
+
+## _dispatch_queue_init
+&emsp;`dispatch_lane_s` 结构体实例创建完成后，调用了 `_dispatch_queue_init` 函数进行初始化操作。
+```c++
+...
+// dq 是一个指向 dispatch_lane_s 结构体的指针
+dispatch_lane_t dq = _dispatch_object_alloc(vtable,
+        sizeof(struct dispatch_lane_s));
+        
+// 当 dqai.dqai_concurrent 为真时入参为 DISPATCH_QUEUE_WIDTH_MAX（4094）否则是 1，即串行队列时是 1，并发队列时是 4094
+// 当 dqai.dqai_inactive 为真时表示非活动状态，否则为活动状态
+// #define DISPATCH_QUEUE_ROLE_INNER            0x0000000000000000ull
+// #define DISPATCH_QUEUE_INACTIVE              0x0180000000000000ull
+
+// 初始化 dq
+_dispatch_queue_init(dq, dqf, dqai.dqai_concurrent ?
+        DISPATCH_QUEUE_WIDTH_MAX : 1, DISPATCH_QUEUE_ROLE_INNER |
+        (dqai.dqai_inactive ? DISPATCH_QUEUE_INACTIVE : 0));
+...
+```
+### dispatch_queue_class_t
+&emsp;`dispatch_queue_class_t` 是一个透明联合类型，且每个成员变量都是指向 `dispatch_queue_s` 结构体的子类的指针。
+```c++
+// Dispatch queue cluster class: type for any dispatch_queue_t
+// 调度队列群集类：包含任何 dispatch_queue_t
+typedef union {
+    struct dispatch_queue_s *_dq;
+    struct dispatch_workloop_s *_dwl;
+    struct dispatch_lane_s *_dl;
+    struct dispatch_queue_static_s *_dsq;
+    struct dispatch_queue_global_s *_dgq;
+    struct dispatch_queue_pthread_root_s *_dpq;
+    struct dispatch_source_s *_ds;
+    struct dispatch_channel_s *_dch;
+    struct dispatch_mach_s *_dm;
+    dispatch_lane_class_t _dlu;
+#ifdef __OBJC__
+    id<OS_dispatch_queue> _objc_dq;
+#endif
+} dispatch_queue_class_t DISPATCH_TRANSPARENT_UNION;
+```
+
+&emsp;`_dispatch_queue_init` 函数实现:
+```c++
+// Note to later developers: ensure that any initialization changes are made for statically allocated queues (i.e. _dispatch_main_q).
+
+static inline dispatch_queue_class_t
+_dispatch_queue_init(dispatch_queue_class_t dqu, dispatch_queue_flags_t dqf,
+        uint16_t width, uint64_t initial_state_bits)
+{
+    uint64_t dq_state = DISPATCH_QUEUE_STATE_INIT_VALUE(width);
+    dispatch_queue_t dq = dqu._dq;
+
+    dispatch_assert((initial_state_bits & ~(DISPATCH_QUEUE_ROLE_MASK |
+            DISPATCH_QUEUE_INACTIVE)) == 0);
+
+    if (initial_state_bits & DISPATCH_QUEUE_INACTIVE) {
+        dq->do_ref_cnt += 2; // rdar://8181908 see _dispatch_lane_resume
+        if (dx_metatype(dq) == _DISPATCH_SOURCE_TYPE) {
+            dq->do_ref_cnt++; // released when DSF_DELETED is set
+        }
+    }
+
+    dq_state |= initial_state_bits;
+    dq->do_next = DISPATCH_OBJECT_LISTLESS;
+    dqf |= DQF_WIDTH(width);
+    os_atomic_store2o(dq, dq_atomic_flags, dqf, relaxed);
+    dq->dq_state = dq_state;
+    dq->dq_serialnum =
+            os_atomic_inc_orig(&_dispatch_queue_serial_numbers, relaxed);
+    return dqu;
 }
 ```
 
