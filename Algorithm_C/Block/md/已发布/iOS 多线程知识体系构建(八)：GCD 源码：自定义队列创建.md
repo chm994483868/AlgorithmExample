@@ -1,4 +1,4 @@
-# iOS 多线程知识体系构建(八)：GCD 源码：队列创建
+# iOS 多线程知识体系构建(八)：GCD 源码：自定义队列创建
 
 > &emsp;上篇主要看了源码中基础的数据结构以及和队列相关的一些内容，那么本篇就从创建自定义队列作为主线，过程中遇到新的数据结构时展开作为支线来学习，那么开始吧！⛽️⛽️
 
@@ -331,6 +331,125 @@ _dispatch_lane_create_with_target(const char *label, dispatch_queue_attr_t dqa,
 ```
 &emsp;`_dispatch_lane_create_with_target` 函数的执行流程如注释所示，下面我们摘录其中的较关键点再进行分析。
 
+## _dispatch_get_root_queue
+&emsp;当 `tq` 不存在时，会调用 `_dispatch_get_root_queue` 返回一个 `dispatch_queue_global_t` 赋值给 `tq`。在 `dispatch_queue_create` 函数调用中 `tq` 传了一个默认值：`DISPATCH_TARGET_QUEUE_DEFAULT`（它的实际值是 `NULL`），所以当我们创建串行队列或者并发队列的时候都会调用 `_dispatch_get_root_queue` 函数来获取一个目标队列。
+```c++
+// 当 tq 为 NULL，即入参目标队列为 DISPATCH_TARGET_QUEUE_DEFAULT（值是 NULL） 时，
+// 根据 qos 和 overcommit 从 _dispatch_root_queues 全局的根队列数组中获取一个根队列作为新队列的目标队列
+if (!tq) {
+    tq = _dispatch_get_root_queue(
+            qos == DISPATCH_QOS_UNSPECIFIED ? DISPATCH_QOS_DEFAULT : qos,
+            overcommit == _dispatch_queue_attr_overcommit_enabled)->_as_dq;
+            
+    if (unlikely(!tq)) {
+        // 如果未取得目标队列则 crash
+        DISPATCH_CLIENT_CRASH(qos, "Invalid queue attribute");
+    }
+}
+```
+&emsp;`_dispatch_get_root_queue` 函数有两个参数分别是 `qos` 和 `overcommit`，下面我们分析一下，当 `dqa` 为 `DISPATCH_QUEUE_SERIAL` 或 `DISPATCH_QUEUE_CONCURRENT` 时 `_dispatch_get_root_queue` 函数所使用的两个参数值各是什么。
+
++ `qos`：分析 `_dispatch_queue_attr_to_info` 时我们已知当 `dqa` 为 `DISPATCH_QUEUE_SERIAL` 或者 `DISPATCH_QUEUE_CONCURRENT` 时，都不会对返回的 `dispatch_queue_attr_info_t` 结构体实例的 `dqai_qos` 成员变量赋值所以 `dqai_qos` 的值是 0，即为 `DISPATCH_QOS_UNSPECIFIED`（`#define DISPATCH_QOS_UNSPECIFIED ((dispatch_qos_t)0)`），那么 `qos == DISPATCH_QOS_UNSPECIFIED ? DISPATCH_QOS_DEFAULT : qos` 的值即为 `DISPATCH_QOS_DEFAULT`（`#define DISPATCH_QOS_DEFAULT ((dispatch_qos_t)4)`），即不管是创建串行队列还是并发队列，当调用 `_dispatch_get_root_queue` 函数时 `qos` 用的都是 4。
++ `overcommit`：分析 `_dispatch_queue_attr_to_info` 时已知，串行队列时 `dqai.dqai_concurrent` 值为 `false`，并发队列时是 `true`，即当 `dqa` 是 `DISPATCH_QUEUE_SERIAL` 时，`overcommit` 的值是 `_dispatch_queue_attr_overcommit_enabled`，当 `dqa` 是 `DISPATCH_QUEUE_CONCURRENT` 时，`overcommit` 的值是 `_dispatch_queue_attr_overcommit_disabled`。
+
+&emsp;`dqa` 是 `DISPATCH_QUEUE_SERIAL` 时:
+```c++
+tq = _dispatch_get_root_queue(4, true)->_as_dq;
+```
+&emsp;`dqa` 是 `DISPATCH_QUEUE_CONCURRENT` 时：
+```c++
+tq = _dispatch_get_root_queue(4, false)->_as_dq;
+```
+&emsp;`_dispatch_get_root_queue` 函数的实现很简单，仅是根据下标从 `_dispatch_root_queues` 根队列数组中取指定的队列而已。
+```c++
+DISPATCH_ALWAYS_INLINE DISPATCH_CONST
+static inline dispatch_queue_global_t
+_dispatch_get_root_queue(dispatch_qos_t qos, bool overcommit)
+{
+    // DISPATCH_QOS_MAX = 6
+    // DISPATCH_QOS_MIN = 1
+    
+    if (unlikely(qos < DISPATCH_QOS_MIN || qos > DISPATCH_QOS_MAX)) {
+        DISPATCH_CLIENT_CRASH(qos, "Corrupted priority");
+    }
+    
+    return &_dispatch_root_queues[2 * (qos - 1) + overcommit];
+}
+```
++ `DISPATCH_QUEUE_SERIAL` 时目标队列是: `&_dispatch_root_queues[7]`（com.apple.root.default-qos.overcommit）。
++ `DISPATCH_QUEUE_CONCURRENT` 时目标队列是: `&_dispatch_root_queues[6]`（com.apple.root.default-qos）
+
+## _dispatch_root_queues
+```c++
+// 6618342 Contact the team that owns the Instrument DTrace probe before
+//         renaming this symbol
+struct dispatch_queue_global_s _dispatch_root_queues[] = {
+#define _DISPATCH_ROOT_QUEUE_IDX(n, flags) \
+        ((flags & DISPATCH_PRIORITY_FLAG_OVERCOMMIT) ? \
+        DISPATCH_ROOT_QUEUE_IDX_##n##_QOS_OVERCOMMIT : \
+        DISPATCH_ROOT_QUEUE_IDX_##n##_QOS)
+#define _DISPATCH_ROOT_QUEUE_ENTRY(n, flags, ...) \
+    [_DISPATCH_ROOT_QUEUE_IDX(n, flags)] = { \
+        DISPATCH_GLOBAL_OBJECT_HEADER(queue_global), \
+        .dq_state = DISPATCH_ROOT_QUEUE_STATE_INIT_VALUE, \
+        .do_ctxt = _dispatch_root_queue_ctxt(_DISPATCH_ROOT_QUEUE_IDX(n, flags)), \
+        .dq_atomic_flags = DQF_WIDTH(DISPATCH_QUEUE_WIDTH_POOL), \
+        .dq_priority = flags | ((flags & DISPATCH_PRIORITY_FLAG_FALLBACK) ? \
+                _dispatch_priority_make_fallback(DISPATCH_QOS_##n) : \
+                _dispatch_priority_make(DISPATCH_QOS_##n, 0)), \
+        __VA_ARGS__ \
+    }
+    _DISPATCH_ROOT_QUEUE_ENTRY(MAINTENANCE, 0,
+        .dq_label = "com.apple.root.maintenance-qos",
+        .dq_serialnum = 4,
+    ),
+    _DISPATCH_ROOT_QUEUE_ENTRY(MAINTENANCE, DISPATCH_PRIORITY_FLAG_OVERCOMMIT,
+        .dq_label = "com.apple.root.maintenance-qos.overcommit",
+        .dq_serialnum = 5,
+    ),
+    _DISPATCH_ROOT_QUEUE_ENTRY(BACKGROUND, 0,
+        .dq_label = "com.apple.root.background-qos",
+        .dq_serialnum = 6,
+    ),
+    _DISPATCH_ROOT_QUEUE_ENTRY(BACKGROUND, DISPATCH_PRIORITY_FLAG_OVERCOMMIT,
+        .dq_label = "com.apple.root.background-qos.overcommit",
+        .dq_serialnum = 7,
+    ),
+    _DISPATCH_ROOT_QUEUE_ENTRY(UTILITY, 0,
+        .dq_label = "com.apple.root.utility-qos",
+        .dq_serialnum = 8,
+    ),
+    _DISPATCH_ROOT_QUEUE_ENTRY(UTILITY, DISPATCH_PRIORITY_FLAG_OVERCOMMIT,
+        .dq_label = "com.apple.root.utility-qos.overcommit",
+        .dq_serialnum = 9,
+    ),
+    _DISPATCH_ROOT_QUEUE_ENTRY(DEFAULT, DISPATCH_PRIORITY_FLAG_FALLBACK,
+        .dq_label = "com.apple.root.default-qos",
+        .dq_serialnum = 10,
+    ),
+    _DISPATCH_ROOT_QUEUE_ENTRY(DEFAULT,
+            DISPATCH_PRIORITY_FLAG_FALLBACK | DISPATCH_PRIORITY_FLAG_OVERCOMMIT,
+        .dq_label = "com.apple.root.default-qos.overcommit",
+        .dq_serialnum = 11,
+    ),
+    _DISPATCH_ROOT_QUEUE_ENTRY(USER_INITIATED, 0,
+        .dq_label = "com.apple.root.user-initiated-qos",
+        .dq_serialnum = 12,
+    ),
+    _DISPATCH_ROOT_QUEUE_ENTRY(USER_INITIATED, DISPATCH_PRIORITY_FLAG_OVERCOMMIT,
+        .dq_label = "com.apple.root.user-initiated-qos.overcommit",
+        .dq_serialnum = 13,
+    ),
+    _DISPATCH_ROOT_QUEUE_ENTRY(USER_INTERACTIVE, 0,
+        .dq_label = "com.apple.root.user-interactive-qos",
+        .dq_serialnum = 14,
+    ),
+    _DISPATCH_ROOT_QUEUE_ENTRY(USER_INTERACTIVE, DISPATCH_PRIORITY_FLAG_OVERCOMMIT,
+        .dq_label = "com.apple.root.user-interactive-qos.overcommit",
+        .dq_serialnum = 15,
+    ),
+};
+```
 ## _dispatch_queue_init
 &emsp;`dispatch_lane_s` 结构体实例创建完成后，调用了 `_dispatch_queue_init` 函数进行初始化操作。
 ```c++
@@ -403,6 +522,7 @@ _dispatch_queue_init(dispatch_queue_class_t dqu, dispatch_queue_flags_t dqf,
     return dqu;
 }
 ```
+&emsp;以上即为创建自定义队列的全部内容，整体下来还是比较清晰的。
 
 
 ## 参考链接
