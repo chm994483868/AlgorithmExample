@@ -1,9 +1,9 @@
-# iOS 多线程知识体系构建(八)：GCD 源码：自定义队列创建
+# iOS 多线程知识体系构建(八)：GCD 源码：队列创建（自定义、根队列、主队列）
 
 > &emsp;上篇主要看了源码中基础的数据结构以及和队列相关的一些内容，那么本篇就从创建自定义队列作为主线，过程中遇到新的数据结构时展开作为支线来学习，那么开始吧！⛽️⛽️
 
 &emsp;在 GCD 中使用最多的三种队列：主队列（`dispatch_get_main_queue()`）、全局并发队列（`dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0)`）、自定义队列（`dispatch_queue_create`），那么我们就先由创建自定义队列开始学习。
-## dispatch_queue_create
+## dispatch_queue_create（创建自定义队列）
 &emsp;下面就沿着源码一路看队列的创建过程。
 ```c++
 // 创建一个并发队列
@@ -547,7 +547,7 @@ _DISPATCH_ROOT_QUEUE_ENTRY(USER_INTERACTIVE, 0,
                                                       // 值为：0x0060000000000000ull
     
     .do_ctxt = _dispatch_root_queue_ctxt(DISPATCH_ROOT_QUEUE_IDX_USER_INTERACTIVE_QOS), // 10
-    .dq_atomic_flags = ((dispatch_queue_flags_t)(uint16_t)(0xfffull)),
+    .dq_atomic_flags = ((dispatch_queue_flags_t)(uint16_t)(0xfffull)), // 根队列的并发数，（自定义的并发队列的并发数是 Oxffeull，比根队列少 1，串行队列则是 1）
     
     // (6 ? ((((6) << 8) & 0x00000f00) | ((dispatch_priority_t)(0 - 1) & 0x000000ff)) : 0)
     .dq_priority = flags | (_dispatch_priority_make(DISPATCH_QOS_USER_INTERACTIVE, 0)),
@@ -556,6 +556,7 @@ _DISPATCH_ROOT_QUEUE_ENTRY(USER_INTERACTIVE, 0,
     .dq_serialnum = 14,
 }
 ```
+&emsp;看到是根据入参构建一个结构体实例。
 ## _dispatch_queue_init
 &emsp;`dispatch_lane_s` 结构体实例创建完成后，调用了 `_dispatch_queue_init` 函数进行初始化操作。
 ```c++
@@ -565,6 +566,7 @@ dispatch_lane_t dq = _dispatch_object_alloc(vtable,
         sizeof(struct dispatch_lane_s));
         
 // 当 dqai.dqai_concurrent 为真时入参为 DISPATCH_QUEUE_WIDTH_MAX（4094）否则是 1，即串行队列时是 1，并发队列时是 4094
+
 // 当 dqai.dqai_inactive 为真时表示非活动状态，否则为活动状态
 // #define DISPATCH_QUEUE_ROLE_INNER            0x0000000000000000ull
 // #define DISPATCH_QUEUE_INACTIVE              0x0180000000000000ull
@@ -596,45 +598,245 @@ typedef union {
 #endif
 } dispatch_queue_class_t DISPATCH_TRANSPARENT_UNION;
 ```
-
 &emsp;`_dispatch_queue_init` 函数实现:
 ```c++
 // Note to later developers: ensure that any initialization changes are made for statically allocated queues (i.e. _dispatch_main_q).
-
 static inline dispatch_queue_class_t
 _dispatch_queue_init(dispatch_queue_class_t dqu, dispatch_queue_flags_t dqf,
         uint16_t width, uint64_t initial_state_bits)
 {
-    uint64_t dq_state = DISPATCH_QUEUE_STATE_INIT_VALUE(width);
+    uint64_t dq_state = DISPATCH_QUEUE_STATE_INIT_VALUE(width); // 并发时 dq_state 值：2 << 41 串行时 dq_state 值：Oxfffull << 41
     dispatch_queue_t dq = dqu._dq;
 
     dispatch_assert((initial_state_bits & ~(DISPATCH_QUEUE_ROLE_MASK |
             DISPATCH_QUEUE_INACTIVE)) == 0);
 
+    // 当时非活动状态时，initial_state_bits 入参的值是 0x0180000000000000ull（DISPATCH_QUEUE_INACTIVE） 否则是 0
     if (initial_state_bits & DISPATCH_QUEUE_INACTIVE) {
+        // 如果是非活动状态
+        // 引用计数 +2
         dq->do_ref_cnt += 2; // rdar://8181908 see _dispatch_lane_resume
+        
+        // _DISPATCH_SOURCE_TYPE = 0x00000013, // meta-type for sources
+        // #define dx_metatype(x) (dx_vtable(x)->do_type & _DISPATCH_META_TYPE_MASK)
+        // #define dx_vtable(x) (&(x)->do_vtable->_os_obj_vtable)
+        // _DISPATCH_META_TYPE_MASK = 0x000000ff, // mask for object meta-types
+        
         if (dx_metatype(dq) == _DISPATCH_SOURCE_TYPE) {
+            // dq 是 _DISPATCH_SOURCE_TYPE 类型的话，引用计数自增
             dq->do_ref_cnt++; // released when DSF_DELETED is set
         }
     }
 
     dq_state |= initial_state_bits;
-    dq->do_next = DISPATCH_OBJECT_LISTLESS;
+    dq->do_next = DISPATCH_OBJECT_LISTLESS; // ((void *)0xffffffff89abcdef) 一个字面量硬编码
+    
+    // #define DQF_WIDTH(n) ((dispatch_queue_flags_t)(uint16_t)(n))
+    
+    // 并发队列是 DISPATCH_QUEUE_WIDTH_MAX (Oxffeull)
+    // 串行队列是 1
     dqf |= DQF_WIDTH(width);
+    
+    // #define os_atomic_store2o(p, f, v, m) \
+    //         os_atomic_store(&(p)->f, (v), m)
+    // 原子的给 dq_atomic_flags 赋值，（更新队列的并发数，自定义的并发队列的并发数是 Oxffeull，比根队列少 1，串行队列则是 1）
+    //（上面 _DISPATCH_ROOT_QUEUE_ENTRY 宏展开，看到根队列的并发数是 0xfffull，比自定义的并发队列多 1）
+    // 并发队列是 DISPATCH_QUEUE_WIDTH_MAX (Oxffeull)
+    // 串行队列是 1
+    // dq_atomic_flags 表示了队列的并发数
+    
     os_atomic_store2o(dq, dq_atomic_flags, dqf, relaxed);
+    
     dq->dq_state = dq_state;
+    
+    // #define os_atomic_inc_orig(p, m) \
+    //         os_atomic_add_orig((p), 1, m)
+    // 原子加 1
     dq->dq_serialnum =
             os_atomic_inc_orig(&_dispatch_queue_serial_numbers, relaxed);
+            
     return dqu;
 }
 ```
-&emsp;以上即为创建自定义队列的全部内容，整体下来还是比较清晰的。
+### DISPATCH_QUEUE_STATE_INIT_VALUE
+&emsp;一些简单的位操作。
+```c++
+// #define DISPATCH_QUEUE_WIDTH_FULL 0x1000ull
+// #define DISPATCH_QUEUE_WIDTH_SHIFT 41
+// 
+// 并发队列时 width: #define DISPATCH_QUEUE_WIDTH_MAX  (DISPATCH_QUEUE_WIDTH_FULL - 2) 
+// 2 << 41
 
+// 串行队列时 width: 1
+// Oxfffull << 41
+#define DISPATCH_QUEUE_STATE_INIT_VALUE(width) \
+        ((DISPATCH_QUEUE_WIDTH_FULL - (width)) << DISPATCH_QUEUE_WIDTH_SHIFT)
+```
+### DISPATCH_OBJECT_LISTLESS
+&emsp;硬编码。
+```c++
+#if DISPATCH_SIZEOF_PTR == 8
 
+// the bottom nibble must not be zero, the rest of the bits should be random
+// we sign extend the 64-bit version so that a better instruction encoding is generated on Intel
 
+#define DISPATCH_OBJECT_LISTLESS ((void *)0xffffffff89abcdef)
+#else
+#define DISPATCH_OBJECT_LISTLESS ((void *)0x89abcdef)
+#endif
+```
+&emsp;至此创建自定义串行队列和并发队列的内容就看完了。那么我们上面的根队列什么时候创建的呢？在 `libdispatch_init` 函数的最后面有一个 `_dispatch_introspection_init()` 函数调用，然后在 `_dispatch_introspection_init` 内部我们看到了在一个 for 循环内部 `_dispatch_trace_queue_create(&_dispatch_root_queues[i])` 的调用创建根队列，还有  `_dispatch_trace_queue_create(&_dispatch_main_q)` 创建主队列等操作。
+## _dispatch_introspection_init
+```c++
+void _dispatch_introspection_init(void) {
+    _dispatch_introspection.debug_queue_inversions =
+            _dispatch_getenv_bool("LIBDISPATCH_DEBUG_QUEUE_INVERSIONS", false);
 
+    // Hack to determine queue TSD offset from start of pthread structure
+    uintptr_t thread = _dispatch_thread_self();
+    thread_identifier_info_data_t tiid;
+    mach_msg_type_number_t cnt = THREAD_IDENTIFIER_INFO_COUNT;
+    kern_return_t kr = thread_info(pthread_mach_thread_np((void*)thread),
+            THREAD_IDENTIFIER_INFO, (thread_info_t)&tiid, &cnt);
+    if (!dispatch_assume_zero(kr)) {
+        _dispatch_introspection.thread_queue_offset =
+                (void*)(uintptr_t)tiid.dispatch_qaddr - (void*)thread;
+    }
+    _dispatch_thread_key_create(&dispatch_introspection_key,
+            _dispatch_introspection_thread_remove);
+    _dispatch_introspection_thread_add(); // add main thread
 
+    // for 循环执行 _dispatch_trace_queue_create 函数，把 _dispatch_root_queues 数组中的队列进行一一创建
+    for (size_t i = 0; i < DISPATCH_ROOT_QUEUE_COUNT; i++) {
+        _dispatch_trace_queue_create(&_dispatch_root_queues[i]);
+    }
+    
+#if DISPATCH_USE_MGR_THREAD && DISPATCH_USE_PTHREAD_ROOT_QUEUES
+    _dispatch_trace_queue_create(_dispatch_mgr_q.do_targetq);
+#endif
+    
+    // 创建主队列（主队列 _dispatch_main_q 是一个全局静态变量）
+    _dispatch_trace_queue_create(&_dispatch_main_q);
+    
+    _dispatch_trace_queue_create(&_dispatch_mgr_q);
+}
+```
+## _dispatch_main_q 主队列
+&emsp;主队列是一个全局变量。
+```c++
+API_AVAILABLE(macos(10.6), ios(4.0))
+DISPATCH_EXPORT
+#if defined(__DISPATCH_BUILDING_DISPATCH__) && !defined(__OBJC__)
+struct dispatch_queue_static_s _dispatch_main_q;
+#else
+struct dispatch_queue_s _dispatch_main_q;
+#endif
+```
+&emsp;主队列的初始化。
+```c++
+// 6618342 Contact the team that owns the Instrument DTrace probe before
+//         renaming this symbol
+struct dispatch_queue_static_s _dispatch_main_q = {
+    DISPATCH_GLOBAL_OBJECT_HEADER(queue_main), // 继承自父类
+    
+#if !DISPATCH_USE_RESOLVERS
+    // 是否有目标队列
+    // #define _dispatch_get_default_queue(overcommit) \
+    //         _dispatch_root_queues[DISPATCH_ROOT_QUEUE_IDX_DEFAULT_QOS + \
+    //                 !!(overcommit)]._as_dq
+    
+    .do_targetq = _dispatch_get_default_queue(true),
+#endif
+    // #define DISPATCH_QUEUE_STATE_INIT_VALUE(width) \
+    //         ((DISPATCH_QUEUE_WIDTH_FULL - (width)) << DISPATCH_QUEUE_WIDTH_SHIFT)
+    // #define DISPATCH_QUEUE_WIDTH_FULL  0x1000ull
+    // // #define DISPATCH_QUEUE_WIDTH_SHIFT 41
+    // #define DISPATCH_QUEUE_ROLE_BASE_ANON  0x0000001000000000ull
+    
+    .dq_state = DISPATCH_QUEUE_STATE_INIT_VALUE(1) |
+            DISPATCH_QUEUE_ROLE_BASE_ANON, // (0xfffull << 41) | 0x0000001000000000ull
+    .dq_label = "com.apple.main-thread", // 队列标签（队列名）
+    .dq_atomic_flags = DQF_THREAD_BOUND | DQF_WIDTH(1), // 并发数是 1，即为串行队列
+    .dq_serialnum = 1, // 队列序号是 1
+};
+```
+### dispatch_get_main_queue
+&emsp;我们日常用的获取主线程的方法 `dispatch_get_main_queue`，实现即为获取 `_dispatch_main_q` 变量。
+```c++
+// 强制类型转换
+#define DISPATCH_GLOBAL_OBJECT(type, object) ((OS_OBJECT_BRIDGE type)&(object))
 
+DISPATCH_INLINE DISPATCH_ALWAYS_INLINE DISPATCH_CONST DISPATCH_NOTHROW
+dispatch_queue_main_t
+dispatch_get_main_queue(void)
+{
+    return DISPATCH_GLOBAL_OBJECT(dispatch_queue_main_t, _dispatch_main_q);
+}
+```
+## _dispatch_trace_queue_create（创建根队列/主队列）
+&emsp;
+```c++
+DISPATCH_ALWAYS_INLINE
+static inline dispatch_queue_class_t
+_dispatch_trace_queue_create(dispatch_queue_class_t dqu) {
+    _dispatch_only_if_ktrace_enabled({
+        uint64_t dq_label[4] = {0}; // So that we get the right null termination
+        dispatch_queue_t dq = dqu._dq;
+        strncpy((char *)dq_label, (char *)dq->dq_label ?: "", sizeof(dq_label));
+
+        _dispatch_ktrace2(DISPATCH_QOS_TRACE_queue_creation_start,
+                dq->dq_serialnum,
+                _dispatch_priority_to_pp_prefer_fallback(dq->dq_priority));
+
+        _dispatch_ktrace4(DISPATCH_QOS_TRACE_queue_creation_end,
+                        dq_label[0], dq_label[1], dq_label[2], dq_label[3]);
+    });
+
+    return _dispatch_introspection_queue_create(dqu);
+}
+```
+### _dispatch_introspection_queue_create
+&emsp;主要对 `dq` 做一些赋值操作。
+```c++
+dispatch_queue_class_t
+_dispatch_introspection_queue_create(dispatch_queue_t dq) {
+    dispatch_queue_introspection_context_t dqic;
+    size_t sz = sizeof(struct dispatch_queue_introspection_context_s);
+
+    if (!_dispatch_introspection.debug_queue_inversions) {
+        sz = offsetof(struct dispatch_queue_introspection_context_s,
+                __dqic_no_queue_inversion);
+    }
+    //  申请空间
+    dqic = _dispatch_calloc(1, sz);
+    
+    dqic->dqic_queue._dq = dq;
+    if (_dispatch_introspection.debug_queue_inversions) {
+        LIST_INIT(&dqic->dqic_order_top_head);
+        LIST_INIT(&dqic->dqic_order_bottom_head);
+    }
+    
+    // do_finalizer 函数赋值
+    dq->do_finalizer = dqic;
+
+    // 加锁
+    _dispatch_unfair_lock_lock(&_dispatch_introspection.queues_lock);
+    
+    LIST_INSERT_HEAD(&_dispatch_introspection.queues, dqic, dqic_list);
+    
+    // 解锁
+    _dispatch_unfair_lock_unlock(&_dispatch_introspection.queues_lock);
+
+    // hook
+    DISPATCH_INTROSPECTION_INTERPOSABLE_HOOK_CALLOUT(queue_create, dq);
+    if (DISPATCH_INTROSPECTION_HOOK_ENABLED(queue_create)) {
+        _dispatch_introspection_queue_create_hook(dq);
+    }
+    
+    return upcast(dq)._dqu;
+}
+```
+&emsp;到这里，我们粗略的把自定义队列、根队列、主队列的创建过程就看完了，GCD 整体宏转换、函数嵌套实在太多了导致我们看代码时分支丛生，需要大量时间和精力才能理清思路！⛽️⛽️
 
 ## 参考链接
 **参考链接:🔗**
