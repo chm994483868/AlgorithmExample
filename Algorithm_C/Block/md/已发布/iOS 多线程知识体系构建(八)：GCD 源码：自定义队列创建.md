@@ -380,25 +380,10 @@ _dispatch_get_root_queue(dispatch_qos_t qos, bool overcommit)
 + `DISPATCH_QUEUE_CONCURRENT` 时目标队列是: `&_dispatch_root_queues[6]`（com.apple.root.default-qos）
 
 ## _dispatch_root_queues
+&emsp;在构建 `_dispatch_root_queues` 数组时定义了两个宏：`_DISPATCH_ROOT_QUEUE_IDX` 和 `_DISPATCH_ROOT_QUEUE_ENTRY` 用来初始化数组中的每一个元素。
 ```c++
-// 6618342 Contact the team that owns the Instrument DTrace probe before
-//         renaming this symbol
+// 6618342 Contact the team that owns the Instrument DTrace probe before renaming this symbol
 struct dispatch_queue_global_s _dispatch_root_queues[] = {
-#define _DISPATCH_ROOT_QUEUE_IDX(n, flags) \
-        ((flags & DISPATCH_PRIORITY_FLAG_OVERCOMMIT) ? \
-        DISPATCH_ROOT_QUEUE_IDX_##n##_QOS_OVERCOMMIT : \
-        DISPATCH_ROOT_QUEUE_IDX_##n##_QOS)
-#define _DISPATCH_ROOT_QUEUE_ENTRY(n, flags, ...) \
-    [_DISPATCH_ROOT_QUEUE_IDX(n, flags)] = { \
-        DISPATCH_GLOBAL_OBJECT_HEADER(queue_global), \
-        .dq_state = DISPATCH_ROOT_QUEUE_STATE_INIT_VALUE, \
-        .do_ctxt = _dispatch_root_queue_ctxt(_DISPATCH_ROOT_QUEUE_IDX(n, flags)), \
-        .dq_atomic_flags = DQF_WIDTH(DISPATCH_QUEUE_WIDTH_POOL), \
-        .dq_priority = flags | ((flags & DISPATCH_PRIORITY_FLAG_FALLBACK) ? \
-                _dispatch_priority_make_fallback(DISPATCH_QOS_##n) : \
-                _dispatch_priority_make(DISPATCH_QOS_##n, 0)), \
-        __VA_ARGS__ \
-    }
     _DISPATCH_ROOT_QUEUE_ENTRY(MAINTENANCE, 0,
         .dq_label = "com.apple.root.maintenance-qos",
         .dq_serialnum = 4,
@@ -449,6 +434,127 @@ struct dispatch_queue_global_s _dispatch_root_queues[] = {
         .dq_serialnum = 15,
     ),
 };
+```
+### _DISPATCH_ROOT_QUEUE_IDX
+&emsp;根据 `flags` 判断，`n` 是否 `overcommit`。
+```c++
+#define _DISPATCH_ROOT_QUEUE_IDX(n, flags) \
+        ((flags & DISPATCH_PRIORITY_FLAG_OVERCOMMIT) ? \
+        DISPATCH_ROOT_QUEUE_IDX_##n##_QOS_OVERCOMMIT : \
+        DISPATCH_ROOT_QUEUE_IDX_##n##_QOS)
+```
+### DISPATCH_GLOBAL_OBJECT_HEADER
+```c++
+#if OS_OBJECT_HAVE_OBJC1
+#define DISPATCH_GLOBAL_OBJECT_HEADER(name) \
+    .do_vtable = DISPATCH_VTABLE(name), \
+    ._objc_isa = DISPATCH_OBJC_CLASS(name), \
+    .do_ref_cnt = DISPATCH_OBJECT_GLOBAL_REFCNT, \
+    .do_xref_cnt = DISPATCH_OBJECT_GLOBAL_REFCNT
+#else
+#define DISPATCH_GLOBAL_OBJECT_HEADER(name) \ ⬅️ 我们使用这部分的宏定义
+    .do_vtable = DISPATCH_VTABLE(name), \
+    .do_ref_cnt = DISPATCH_OBJECT_GLOBAL_REFCNT, \
+    .do_xref_cnt = DISPATCH_OBJECT_GLOBAL_REFCNT
+#endif
+```
+### DISPATCH_ROOT_QUEUE_STATE_INIT_VALUE
+```c++
+/* Magic dq_state values for global queues: they have QUEUE_FULL and IN_BARRIER set to force the slow path in dispatch_barrier_sync() and dispatch_sync() */
+#define DISPATCH_ROOT_QUEUE_STATE_INIT_VALUE \
+        (DISPATCH_QUEUE_WIDTH_FULL_BIT | DISPATCH_QUEUE_IN_BARRIER)
+```
+### _dispatch_root_queue_ctxt
+```c++
+#if DISPATCH_USE_INTERNAL_WORKQUEUE
+static struct dispatch_pthread_root_queue_context_s
+        _dispatch_pthread_root_queue_contexts[DISPATCH_ROOT_QUEUE_COUNT];
+#define _dispatch_root_queue_ctxt(n) &_dispatch_pthread_root_queue_contexts[n]
+#else
+#define _dispatch_root_queue_ctxt(n) NULL
+#endif // DISPATCH_USE_INTERNAL_WORKQUEUE
+```
+### DQF_WIDTH
+```c++
+#define DQF_WIDTH(n) ((dispatch_queue_flags_t)(uint16_t)(n))
+```
+### _dispatch_priority_make_fallback
+```c++
+#define _dispatch_priority_make_fallback(qos) \
+    (qos ? ((((qos) << DISPATCH_PRIORITY_FALLBACK_QOS_SHIFT) & \
+     DISPATCH_PRIORITY_FALLBACK_QOS_MASK) | DISPATCH_PRIORITY_FLAG_FALLBACK) : 0)
+```
+### _dispatch_priority_make
+```c++
+#define _dispatch_priority_make(qos, relpri) \
+    (qos ? ((((qos) << DISPATCH_PRIORITY_QOS_SHIFT) & DISPATCH_PRIORITY_QOS_MASK) | \
+     ((dispatch_priority_t)(relpri - 1) & DISPATCH_PRIORITY_RELPRI_MASK)) : 0)
+
+// 调用示例：
+#define DISPATCH_QOS_USER_INTERACTIVE   ((dispatch_qos_t)6)
+#define DISPATCH_PRIORITY_QOS_SHIFT          8
+#define DISPATCH_PRIORITY_QOS_MASK           ((dispatch_priority_t)0x00000f00)
+#define DISPATCH_PRIORITY_RELPRI_MASK        ((dispatch_priority_t)0x000000ff)
+
+_dispatch_priority_make(DISPATCH_QOS_USER_INTERACTIVE, 0) 可展开如下:
+(6 ? ((((6) << 8) & 0x00000f00) | ((dispatch_priority_t)(0 - 1) & 0x000000ff)) : 0)
+```
+### _DISPATCH_ROOT_QUEUE_ENTRY
+&emsp;下面我们一步一步把 `_DISPATCH_ROOT_QUEUE_ENTRY` 展开：
+```c++
+#define _DISPATCH_ROOT_QUEUE_ENTRY(n, flags, ...) \
+    [_DISPATCH_ROOT_QUEUE_IDX(n, flags)] = { \
+        DISPATCH_GLOBAL_OBJECT_HEADER(queue_global), \
+        .dq_state = DISPATCH_ROOT_QUEUE_STATE_INIT_VALUE, \
+        .do_ctxt = _dispatch_root_queue_ctxt(_DISPATCH_ROOT_QUEUE_IDX(n, flags)), \
+        .dq_atomic_flags = DQF_WIDTH(DISPATCH_QUEUE_WIDTH_POOL), \
+        .dq_priority = flags | ((flags & DISPATCH_PRIORITY_FLAG_FALLBACK) ? \
+                _dispatch_priority_make_fallback(DISPATCH_QOS_##n) : \
+                _dispatch_priority_make(DISPATCH_QOS_##n, 0)), \
+        __VA_ARGS__ \
+    }
+```
+&emsp;把 `DISPATCH_GLOBAL_OBJECT_HEADER` 展开：
+```c++
+#define _DISPATCH_ROOT_QUEUE_ENTRY(n, flags, ...) \
+    [_DISPATCH_ROOT_QUEUE_IDX(n, flags)] = { \
+        .do_vtable = (&_dispatch_queue_global_vtable), \
+        .do_ref_cnt = DISPATCH_OBJECT_GLOBAL_REFCNT, \ // INT_MAX
+        .do_xref_cnt = DISPATCH_OBJECT_GLOBAL_REFCNT, \ // INT_MAX
+        .dq_state = DISPATCH_ROOT_QUEUE_STATE_INIT_VALUE, \ // (DISPATCH_QUEUE_WIDTH_FULL_BIT | DISPATCH_QUEUE_IN_BARRIER) （0x0020000000000000ull ｜ 0x0040000000000000ull）
+        .do_ctxt = _dispatch_root_queue_ctxt(_DISPATCH_ROOT_QUEUE_IDX(n, flags)), \
+        .dq_atomic_flags = ((dispatch_queue_flags_t)(uint16_t)(0xfffull)), \
+        .dq_priority = flags | ((flags & DISPATCH_PRIORITY_FLAG_FALLBACK) ? \
+                _dispatch_priority_make_fallback(DISPATCH_QOS_##n) : \
+                _dispatch_priority_make(DISPATCH_QOS_##n, 0)), \
+        __VA_ARGS__ \
+    }
+```
+&emsp;下面以如下例子展开 `_DISPATCH_ROOT_QUEUE_ENTRY`：
+```c++
+_DISPATCH_ROOT_QUEUE_ENTRY(USER_INTERACTIVE, 0,
+    .dq_label = "com.apple.root.user-interactive-qos",
+    .dq_serialnum = 14,
+)
+```
+```c++
+[DISPATCH_ROOT_QUEUE_IDX_USER_INTERACTIVE_QOS] = {
+    .do_vtable = (&_dispatch_queue_global_vtable), 
+    .do_ref_cnt = DISPATCH_OBJECT_GLOBAL_REFCNT, // INT_MAX
+    .do_xref_cnt = DISPATCH_OBJECT_GLOBAL_REFCNT, // INT_MAX
+    .dq_state = DISPATCH_ROOT_QUEUE_STATE_INIT_VALUE, // (DISPATCH_QUEUE_WIDTH_FULL_BIT | DISPATCH_QUEUE_IN_BARRIER)
+                                                      //（0x0020000000000000ull ｜ 0x0040000000000000ull）
+                                                      // 值为：0x0060000000000000ull
+    
+    .do_ctxt = _dispatch_root_queue_ctxt(DISPATCH_ROOT_QUEUE_IDX_USER_INTERACTIVE_QOS), // 10
+    .dq_atomic_flags = ((dispatch_queue_flags_t)(uint16_t)(0xfffull)),
+    
+    // (6 ? ((((6) << 8) & 0x00000f00) | ((dispatch_priority_t)(0 - 1) & 0x000000ff)) : 0)
+    .dq_priority = flags | (_dispatch_priority_make(DISPATCH_QOS_USER_INTERACTIVE, 0)),
+    
+    .dq_label = "com.apple.root.user-interactive-qos",
+    .dq_serialnum = 14,
+}
 ```
 ## _dispatch_queue_init
 &emsp;`dispatch_lane_s` 结构体实例创建完成后，调用了 `_dispatch_queue_init` 函数进行初始化操作。
@@ -524,7 +630,7 @@ _dispatch_queue_init(dispatch_queue_class_t dqu, dispatch_queue_flags_t dqf,
 ```
 &emsp;以上即为创建自定义队列的全部内容，整体下来还是比较清晰的。
 
-&emsp;
+
 
 
 
