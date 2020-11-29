@@ -553,7 +553,7 @@
 		D2F0AF73256904A500DCE258 /* iOS 多线程知识体系构建(六)：GCD API（block.h）解析篇.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 多线程知识体系构建(六)：GCD API（block.h）解析篇.md"; sourceTree = "<group>"; };
 		D2F0AF74256B298E00DCE258 /* iOS 多线程知识体系构建(七)：GCD 源码：基本数据结构篇.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 多线程知识体系构建(七)：GCD 源码：基本数据结构篇.md"; sourceTree = "<group>"; };
 		D2F0AF842570904800DCE258 /* iOS 多线程知识体系构建(八)：GCD 源码：队列创建（自定义、根队列、主队列）.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 多线程知识体系构建(八)：GCD 源码：队列创建（自定义、根队列、主队列）.md"; sourceTree = "<group>"; };
-		D2F0AF8525738EAE00DCE258 /* iOS 多线程知识体系构建(九)：GCD 源码：.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 多线程知识体系构建(九)：GCD 源码：.md"; sourceTree = "<group>"; };
+		D2F0AF8525738EAE00DCE258 /* iOS 多线程知识体系构建(九)：GCD 源码：dispatch_async、dispatch_sync 函数.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 多线程知识体系构建(九)：GCD 源码：dispatch_async、dispatch_sync 函数.md"; sourceTree = "<group>"; };
 		D2F305B324DF90890020A5C2 /* NSObject+ArcDebugRetainCount.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "NSObject+ArcDebugRetainCount.h"; sourceTree = "<group>"; };
 		D2F305B424DF90890020A5C2 /* NSObject+ArcDebugRetainCount.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = "NSObject+ArcDebugRetainCount.m"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -1392,7 +1392,7 @@
 				D2F0AF73256904A500DCE258 /* iOS 多线程知识体系构建(六)：GCD API（block.h）解析篇.md */,
 				D2F0AF74256B298E00DCE258 /* iOS 多线程知识体系构建(七)：GCD 源码：基本数据结构篇.md */,
 				D2F0AF842570904800DCE258 /* iOS 多线程知识体系构建(八)：GCD 源码：队列创建（自定义、根队列、主队列）.md */,
-				D2F0AF8525738EAE00DCE258 /* iOS 多线程知识体系构建(九)：GCD 源码：.md */,
+				D2F0AF8525738EAE00DCE258 /* iOS 多线程知识体系构建(九)：GCD 源码：dispatch_async、dispatch_sync 函数.md */,
 			);
 			path = "已发布";
 			sourceTree = "<group>";
