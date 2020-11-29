@@ -721,6 +721,20 @@ void _dispatch_introspection_init(void) {
     _dispatch_trace_queue_create(&_dispatch_mgr_q);
 }
 ```
+### DISPATCH_ROOT_QUEUE_COUNT
+```c++
+#define DISPATCH_ROOT_QUEUE_COUNT (DISPATCH_QOS_NBUCKETS * 2)
+#define DISPATCH_QOS_NBUCKETS           (DISPATCH_QOS_MAX - DISPATCH_QOS_MIN + 1)
+
+#define DISPATCH_QOS_MAX                DISPATCH_QOS_USER_INTERACTIVE
+#define DISPATCH_QOS_USER_INTERACTIVE   ((dispatch_qos_t)6)
+
+#define DISPATCH_QOS_MIN                DISPATCH_QOS_MAINTENANCE
+#define DISPATCH_QOS_MAINTENANCE        ((dispatch_qos_t)1)
+
+(6 - 1 + 1) * 2 = 12 
+```
+&emsp;即根队列的数量对应不同的优先级（QOS）数量的 2 倍。（乘 2 是指同一优先级时对应 `overcommit` 有否） 
 ## _dispatch_main_q 主队列
 &emsp;主队列是一个全局变量。
 ```c++
