@@ -2,7 +2,7 @@
 
 > &emsp;上一篇我们学习了队列的创建，本篇我们开始学习 GCD  中的相关函数，首先从我们用的最多的 dispatch_async 和 dispatch_sync 开始。
 
-&emsp;GCD 函数阅读过程中会涉及多个由大量宏定义组成的结构体的定义，需要一步一步进行宏展开才能更好的里面代码。
+&emsp;GCD 函数阅读过程中会涉及多个由大量宏定义组成的结构体的定义，需要一步一步进行宏展开才能更好的理解代码。
 
 ## dispatch_async
 &emsp;当我们向队列提交任务时，无论 block 还是 function 形式，最终都会被封装为 `dispatch_continuation_s`，所以可以把它理解为描述任务内容的结构体，`dispatch_async` 函数内部会首先创建 `dispatch_continuation_s` 结构体。
