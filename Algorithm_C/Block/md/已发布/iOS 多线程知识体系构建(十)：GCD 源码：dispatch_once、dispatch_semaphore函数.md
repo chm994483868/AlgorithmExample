@@ -326,6 +326,12 @@ _dispatch_once_wait(dispatch_once_gate_t dgo)
 ```
 &emsp;看到这里 `dispatch_once` 的内容已经看完了，`_dispatch_once_wait` 函数内部是用了一个 do while 循环来阻塞等待 `&dgo->dgo_once` 的值被置为 `DLOCK_ONCE_DONE`，看到一些文章中说是用 `_dispatch_thread_semaphore_wait` 来阻塞线程，这里已经发生更新。
 
+## dispatch_semaphore
+&emsp;接下来我们看信号量相关的内容。
+
+### dispatch_semaphore_s
+&emsp;`dispatch_semaphore_t` 是指向 `dispatch_semaphore_s` 结构体的指针。首先看一下基础的数据结构。
+
 
 ## 参考链接
 **参考链接:🔗**
