@@ -10,11 +10,11 @@
 
 // 将有两个有序数列 a[first...mid] 和 a[mid...last] 合并
 void MergeSort::mergeSort(int nums[], int first, int last, int temp[]) {
-    //
+    // 
 }
 
 void MergeSort::mergeArray(int nums[], int first, int mid, int last, int temp[]) {
-    // 
+    //
 }
 
 // 测试代码
