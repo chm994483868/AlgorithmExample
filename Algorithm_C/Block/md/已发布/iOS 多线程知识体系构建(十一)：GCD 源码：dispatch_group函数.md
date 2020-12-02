@@ -1,25 +1,6 @@
 # iOS 多线程知识体系构建(十一)：GCD 源码：dispatch_group函数
 
-```c++
-/*
-* Dispatch Group State:
-
-* Generation (32 - 63):
-*   32 bit counter that is incremented each time the group value reaaches 0 after a dispatch_group_leave. This 32bit word is used to block waiters (threads in dispatch_group_wait) in _dispatch_wait_on_address() until the generation changes.
-
-* Value (2 - 31):
-*   30 bit value counter of the number of times the group was entered. dispatch_group_enter counts downward on 32bits, and dispatch_group_leave upward on 64bits, which causes the generation to bump each time the value reaches 0 again due to carry propagation.
-
-*
-* Has Notifs (1):
-*   This bit is set when the list of notifications on the group becomes non empty. It is also used as a lock as the thread that successfuly clears this bit is the thread responsible for firing the notifications.
-
-* Has Waiters (0):
-*   This bit is set when there are waiters (threads in dispatch_group_wait) that need to be woken up the next time the value reaches 0. Waiters take a snapshot of the generation before waiting and will wait for the generation to change before they return.
-*/
-```
-
-> &emsp;话不多说，本篇看 dispatch_group 的内容。
+> &emsp;本篇看 dispatch_group 的内容。
 
 ## dispatch_group
 &emsp;用法的话可以看前面的文章，本篇只看数据结构和相关的 API 的源码实现。
@@ -80,7 +61,7 @@ struct dispatch_group_s {
     union { 
         uint64_t volatile dg_state; 
         struct { 
-            uint32_t dg_bits; 
+            uint32_t dg_bits; // 保存进组的任务数量 
             uint32_t dg_gen; 
         };
     } __attribute__((aligned(8)));
@@ -121,7 +102,9 @@ const struct dispatch_group_vtable_s OS_dispatch_group_class = {
 }
 ```
 ### dispatch_group_create
-&emsp;`dispatch_group_create` 函数内部直接调用了 `_dispatch_group_create_with_count` 并且入参为 0，表明组初始化状态没有任务。`_dispatch_group_create_and_enter` 函数则调用 `_dispatch_group_create_with_count` 入参为 1。
+&emsp;`dispatch_group_create` 用于创建可与 block 关联的新组（`dispatch_group_s`），调度组（dispatch group）可用于等待它引用的 block 的执行完成（所有的 blocks 异步执行完成）。（使用 `dispatch_release` 释放 group 对象内存）
+
+&emsp;`dispatch_group_create` 函数内部直接调用了 `_dispatch_group_create_with_count` 并且入参为 0，表明目前没有进组操作。`_dispatch_group_create_and_enter` 函数则调用 `_dispatch_group_create_with_count` 入参为 1，表明进行了一次进组操作。
 ```c++
 dispatch_group_t
 dispatch_group_create(void)
@@ -136,7 +119,7 @@ _dispatch_group_create_and_enter(void)
 }
 ```
 #### _dispatch_group_create_with_count
-&emsp;
+&emsp;创建 `dispatch_group_s` 时指定 `dg_bits` 的值。 
 ```c++
 DISPATCH_ALWAYS_INLINE
 static inline dispatch_group_t
@@ -166,6 +149,8 @@ _dispatch_group_create_with_count(uint32_t n)
     // #define DISPATCH_GROUP_VALUE_INTERVAL   0x0000000000000004ULL
     
     if (n) {
+        // 以原子方式把 (uint32_t)-n * DISPATCH_GROUP_VALUE_INTERVAL 的值保存到 dg_bits 中
+        // 以原子方式把 1 保存到 do_ref_cnt 中
         os_atomic_store2o(dg, dg_bits,
                 (uint32_t)-n * DISPATCH_GROUP_VALUE_INTERVAL, relaxed);
         os_atomic_store2o(dg, do_ref_cnt, 1, relaxed); // <rdar://22318411>
@@ -182,10 +167,142 @@ _dispatch_group_create_with_count(uint32_t n)
 #define os_atomic_store(p, v, m) \
         atomic_store_explicit(_os_atomic_c11_atomic(p), v, memory_order_##m)
 ```
+### dispatch_group_enter
+&emsp;`dispatch_group_enter` 表示 dispatch_group 已手动输入块。
 
+&emsp;调用此函数表示一个 block 已通过 `dispatch_group_async` 以外的方式加入了该 dispatch_group，对该函数的调用必须与 `dispatch_group_leave` 平衡。
+```c++
+void
+dispatch_group_enter(dispatch_group_t dg)
+{
+    // The value is decremented on a 32bits wide atomic so that the carry
+    // for the 0 -> -1 transition is not propagated to the upper 32bits.
+    // 该值在 32 位宽的原子上递减，以使 0->-1 过渡的进位不会传播到高 32 位。
+    
+    // dg_bits 原子方式减少 DISPATCH_GROUP_VALUE_INTERVAL
+    uint32_t old_bits = os_atomic_sub_orig2o(dg, dg_bits,
+            DISPATCH_GROUP_VALUE_INTERVAL, acquire);
+    
+    // #define DISPATCH_GROUP_VALUE_MASK   0x00000000fffffffcULL
+    // 拿 dg_bits 的旧值和 DISPATCH_GROUP_VALUE_MASK 进行与操作
+    uint32_t old_value = old_bits & DISPATCH_GROUP_VALUE_MASK;
+    
+    if (unlikely(old_value == 0)) {
+        // 表示此时有新 block 进组了，dg 的内部引用计数 +1 
+        _dispatch_retain(dg); // <rdar://problem/22318411>
+    }
+    
+    // #define DISPATCH_GROUP_VALUE_INTERVAL   0x0000000000000004ULL
+    // #define DISPATCH_GROUP_VALUE_MAX   DISPATCH_GROUP_VALUE_INTERVAL
+    
+    // 如果旧值等于 DISPATCH_GROUP_VALUE_MAX 表示 dispatch_group_enter 函数过度调用，会 crash
+    if (unlikely(old_value == DISPATCH_GROUP_VALUE_MAX)) {
+        DISPATCH_CLIENT_CRASH(old_bits,
+                "Too many nested calls to dispatch_group_enter()");
+    }
+}
+```
+#### _dispatch_retain
+```c++
+DISPATCH_ALWAYS_INLINE_NDEBUG
+static inline void
+_dispatch_retain(dispatch_object_t dou)
+{
+    (void)_os_object_retain_internal_n_inline(dou._os_obj, 1);
+}
+```
+##### _os_object_retain_internal_n_inline
+```c++
+DISPATCH_ALWAYS_INLINE
+static inline _os_object_t
+_os_object_retain_internal_n_inline(_os_object_t obj, int n)
+{
+    int ref_cnt = _os_object_refcnt_add_orig(obj, n);
+    
+    if (unlikely(ref_cnt < 0)) {
+        _OS_OBJECT_CLIENT_CRASH("Resurrection of an object");
+    }
+    
+    return obj;
+}
+```
+##### _os_object_refcnt_add_orig
+```c++
+#define _os_object_refcnt_add_orig(o, n) \
+        _os_atomic_refcnt_add_orig2o(o, os_obj_ref_cnt, n)
+        
+#define _os_atomic_refcnt_add_orig2o(o, m, n) \
+        _os_atomic_refcnt_perform2o(o, m, add_orig, n, relaxed)
 
+#define _os_atomic_refcnt_perform2o(o, f, op, n, m)   ({ \
+        __typeof__(o) _o = (o); \
+        int _ref_cnt = _o->f; \
+        if (likely(_ref_cnt != _OS_OBJECT_GLOBAL_REFCNT)) { \
+            _ref_cnt = os_atomic_##op##2o(_o, f, n, m); \
+        } \
+        _ref_cnt; \
+    })
+```
+### dispatch_group_leave
+&emsp;`dispatch_group_leave` 手动指示 dispatch_group 中的 block 已完成。
 
+&emsp;调用此函数表示 block 已完成，并且已通过 `dispatch_group_async` 以外的方式离开了 dispatch_group。
+```c++
+void
+dispatch_group_leave(dispatch_group_t dg)
+{
+    // The value is incremented on a 64bits wide atomic so that the carry
+    // for the -1 -> 0 transition increments the generation atomically.
+    // 该值在 64 位宽的原子上递增，以便 -1 -> 0 的携带以原子方式递增生成。
+    
+    uint64_t new_state, old_state = os_atomic_add_orig2o(dg, dg_state,
+            DISPATCH_GROUP_VALUE_INTERVAL, release);
+            
+    uint32_t old_value = (uint32_t)(old_state & DISPATCH_GROUP_VALUE_MASK);
 
+    // #define DISPATCH_GROUP_VALUE_MASK   0x00000000fffffffcULL
+    // #define DISPATCH_GROUP_VALUE_1   DISPATCH_GROUP_VALUE_MASK
+    
+    if (unlikely(old_value == DISPATCH_GROUP_VALUE_1)) {
+        old_state += DISPATCH_GROUP_VALUE_INTERVAL;
+        
+        do {
+            new_state = old_state;
+            if ((old_state & DISPATCH_GROUP_VALUE_MASK) == 0) {
+                new_state &= ~DISPATCH_GROUP_HAS_WAITERS;
+                new_state &= ~DISPATCH_GROUP_HAS_NOTIFS;
+            } else {
+                // If the group was entered again since the atomic_add above,
+                // we can't clear the waiters bit anymore as we don't know for
+                // which generation the waiters are for
+                new_state &= ~DISPATCH_GROUP_HAS_NOTIFS;
+            }
+            if (old_state == new_state) break;
+        } while (unlikely(!os_atomic_cmpxchgv2o(dg, dg_state,
+                old_state, new_state, &old_state, relaxed)));
+                
+        // 
+        return _dispatch_group_wake(dg, old_state, true);
+    }
+
+    if (unlikely(old_value == 0)) {
+        DISPATCH_CLIENT_CRASH((uintptr_t)old_value,
+                "Unbalanced call to dispatch_group_leave()");
+    }
+}
+```
+#### os_atomic_add_orig2o
+```c++
+#define os_atomic_add_orig2o(p, f, v, m) \
+        os_atomic_add_orig(&(p)->f, (v), m)
+
+#define os_atomic_add_orig(p, v, m) \
+        _os_atomic_c11_op_orig((p), (v), m, add, +)
+        
+#define _os_atomic_c11_op_orig(p, v, m, o, op) \
+        atomic_fetch_##o##_explicit(_os_atomic_c11_atomic(p), v, \
+        memory_order_##m)
+```
 
 
 
