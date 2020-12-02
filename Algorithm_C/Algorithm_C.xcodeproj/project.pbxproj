@@ -555,6 +555,7 @@
 		D2F0AF842570904800DCE258 /* iOS 多线程知识体系构建(八)：GCD 源码：队列创建（自定义、根队列、主队列）.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 多线程知识体系构建(八)：GCD 源码：队列创建（自定义、根队列、主队列）.md"; sourceTree = "<group>"; };
 		D2F0AF8525738EAE00DCE258 /* iOS 多线程知识体系构建(九)：GCD 源码：dispatch_async、dispatch_sync 函数.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 多线程知识体系构建(九)：GCD 源码：dispatch_async、dispatch_sync 函数.md"; sourceTree = "<group>"; };
 		D2F0AF862574F31100DCE258 /* iOS 多线程知识体系构建(十)：GCD 源码：dispatch_once、dispatch_semaphore函数.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 多线程知识体系构建(十)：GCD 源码：dispatch_once、dispatch_semaphore函数.md"; sourceTree = "<group>"; };
+		D2F0AF8725778ECD00DCE258 /* iOS 多线程知识体系构建(十一)：GCD 源码：dispatch_group函数.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 多线程知识体系构建(十一)：GCD 源码：dispatch_group函数.md"; sourceTree = "<group>"; };
 		D2F305B324DF90890020A5C2 /* NSObject+ArcDebugRetainCount.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "NSObject+ArcDebugRetainCount.h"; sourceTree = "<group>"; };
 		D2F305B424DF90890020A5C2 /* NSObject+ArcDebugRetainCount.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = "NSObject+ArcDebugRetainCount.m"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -1395,6 +1396,7 @@
 				D2F0AF842570904800DCE258 /* iOS 多线程知识体系构建(八)：GCD 源码：队列创建（自定义、根队列、主队列）.md */,
 				D2F0AF8525738EAE00DCE258 /* iOS 多线程知识体系构建(九)：GCD 源码：dispatch_async、dispatch_sync 函数.md */,
 				D2F0AF862574F31100DCE258 /* iOS 多线程知识体系构建(十)：GCD 源码：dispatch_once、dispatch_semaphore函数.md */,
+				D2F0AF8725778ECD00DCE258 /* iOS 多线程知识体系构建(十一)：GCD 源码：dispatch_group函数.md */,
 			);
 			path = "已发布";
 			sourceTree = "<group>";

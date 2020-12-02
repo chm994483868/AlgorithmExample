@@ -1,6 +1,6 @@
 # iOS 多线程知识体系构建(十)：GCD 源码：dispatch_once、dispatch_semaphore函数
 
-> &emsp;上一篇我们学习了 dispatch_async 和 dispatch_sync 函数，本篇我们开始学习 GCD  中 dispatch_group 相关的函数。
+> &emsp;上一篇我们学习了 dispatch_async 和 dispatch_sync 函数，本篇我们开始学习 GCD  中 dispatch_once、 dispatch_semaphore 相关的函数。
 
 &emsp;GCD 函数阅读过程中会涉及多个由大量宏定义组成的结构体的定义，需要一步一步进行宏展开才能更好的理解代码。
 
@@ -325,13 +325,532 @@ _dispatch_once_wait(dispatch_once_gate_t dgo)
 })
 ```
 &emsp;看到这里 `dispatch_once` 的内容已经看完了，`_dispatch_once_wait` 函数内部是用了一个 do while 循环来阻塞等待 `&dgo->dgo_once` 的值被置为 `DLOCK_ONCE_DONE`，看到一些文章中说是用 `_dispatch_thread_semaphore_wait` 来阻塞线程，这里已经发生更新。
-
 ## dispatch_semaphore
-&emsp;接下来我们看信号量相关的内容。
-
+&emsp;dispatch_semaphore 是 GCD 中最常见的操作，通常用于保证资源的多线程安全性和控制任务的并发数量。其本质实际上是基于 mach 内核的信号量接口来实现的。
 ### dispatch_semaphore_s
 &emsp;`dispatch_semaphore_t` 是指向 `dispatch_semaphore_s` 结构体的指针。首先看一下基础的数据结构。
+```c++
+struct dispatch_queue_s;
 
+DISPATCH_CLASS_DECL(semaphore, OBJECT);
+struct dispatch_semaphore_s {
+    DISPATCH_OBJECT_HEADER(semaphore);
+    long volatile dsema_value;
+    long dsema_orig;
+    _dispatch_sema4_t dsema_sema;
+};
+```
+&emsp;宏定义展开如下:
+```c++
+struct dispatch_semaphore_s;
+
+// OS_OBJECT_CLASS_DECL(dispatch_semaphore, DISPATCH_OBJECT_VTABLE_HEADER(dispatch_semaphore))
+
+struct dispatch_semaphore_extra_vtable_s {
+    unsigned long const do_type;
+    void (*const do_dispose)(struct dispatch_semaphore_s *, bool *allow_free);
+    size_t (*const do_debug)(struct dispatch_semaphore_s *, char *, size_t);
+    void (*const do_invoke)(struct dispatch_semaphore_s *, dispatch_invoke_context_t, dispatch_invoke_flags_t);
+};
+
+struct dispatch_semaphore_vtable_s {
+    // _OS_OBJECT_CLASS_HEADER();
+    void (*_os_obj_xref_dispose)(_os_object_t);
+    void (*_os_obj_dispose)(_os_object_t);
+    
+    struct dispatch_semaphore_extra_vtable_s _os_obj_vtable;
+};
+
+// OS_OBJECT_CLASS_SYMBOL(dispatch_semaphore)
+
+extern const struct dispatch_semaphore_vtable_s _OS_dispatch_semaphore_vtable;
+extern const struct dispatch_semaphore_vtable_s OS_dispatch_semaphore_class __asm__("__" OS_STRINGIFY(dispatch_semaphore) "_vtable");
+
+struct dispatch_semaphore_s {
+    struct dispatch_object_s _as_do[0];
+    struct _os_object_s _as_os_obj[0];
+    
+    const struct dispatch_semaphore_vtable_s *do_vtable; /* must be pointer-sized */
+    
+    int volatile do_ref_cnt;
+    int volatile do_xref_cnt;
+    
+    struct dispatch_semaphore_s *volatile do_next;
+    struct dispatch_queue_s *do_targetq;
+    void *do_ctxt;
+    void *do_finalizer;
+    
+    // 可看到上半部分和其它 GCD 对象都是相同的，毕竟大家都是继承自 dispatch_object_s，重点是下面两个新的成员变量
+    // dsema_value 和 dsema_orig 是信号量执行任务的关键，执行一次 dispatch_semaphore_wait 操作，dsema_value 的值就做一次减操作
+    
+    long volatile dsema_value;
+    long dsema_orig;
+    _dispatch_sema4_t dsema_sema;
+};
+```
+&emsp;`DISPATCH_VTABLE_INSTANCE` 宏定义包裹的内容是 `dispatch_semaphore_vtable_s` 结构体中的内容的初始化，即信号量的一些操作函数。（在 init.c 文件中 Dispatch object cluster 部分包含很多 GCD 对象的操作函数的的初始化）
+```c++
+// dispatch_semaphore_extra_vtable_s 结构体中对应的成员变量的赋值
+DISPATCH_VTABLE_INSTANCE(semaphore,
+    .do_type        = DISPATCH_SEMAPHORE_TYPE,
+    .do_dispose     = _dispatch_semaphore_dispose,
+    .do_debug       = _dispatch_semaphore_debug,
+    .do_invoke      = _dispatch_object_no_invoke,
+);
+⬇️（宏展开）
+DISPATCH_VTABLE_SUBCLASS_INSTANCE(semaphore, semaphore, __VA_ARGS__)
+⬇️（宏展开）
+OS_OBJECT_VTABLE_SUBCLASS_INSTANCE(dispatch_semaphore, dispatch_semaphore, _dispatch_xref_dispose, _dispatch_dispose, __VA_ARGS__)
+⬇️（宏展开）
+const struct dispatch_semaphore_vtable_s OS_OBJECT_CLASS_SYMBOL(dispatch_semaphore) = { \
+    ._os_obj_xref_dispose = _dispatch_xref_dispose, \
+    ._os_obj_dispose = _dispatch_dispose, \
+    ._os_obj_vtable = { __VA_ARGS__ }, \
+}
+⬇️（宏展开）
+const struct dispatch_semaphore_vtable_s OS_dispatch_semaphore_class = {
+    ._os_obj_xref_dispose = _dispatch_xref_dispose,
+    ._os_obj_dispose = _dispatch_dispose,
+    ._os_obj_vtable = { 
+        .do_type        = DISPATCH_SEMAPHORE_TYPE, // 类型
+        .do_dispose     = _dispatch_semaphore_dispose, // dispose 函数赋值
+        .do_debug       = _dispatch_semaphore_debug, // debug 赋值
+        .do_invoke      = _dispatch_object_no_invoke, // invoke 函数赋值
+    }, 
+}
+```
+&emsp;`dispatch_semaphore_s` 结构体中：`dsema_orig` 是信号量的初始值，`dsema_value` 是信号量的当前值，信号量的相关 API 正是通过操作 `dsema_value` 来实现其功能的，`_dispatch_sema4_t` 是信号量的结构。
+#### _dispatch_sema4_t/_DSEMA4_POLICY_FIFO
+&emsp;在不同的平台和环境下 `_dispatch_sema4_t` 使用了不同的类型。（具体类型在 libdispatch 源码中未找到）
+
+&emsp;`_DSEMA4_POLICY_FIFO` 在下面的 `_dispatch_sema4_init` 函数调用中会用到。
+```c++
+#if USE_MACH_SEM
+  typedef semaphore_t _dispatch_sema4_t;
+  #define _DSEMA4_POLICY_FIFO  SYNC_POLICY_FIFO
+#elif USE_POSIX_SEM
+  typedef sem_t _dispatch_sema4_t;
+  #define _DSEMA4_POLICY_FIFO 0
+#elif USE_WIN32_SEM
+  typedef HANDLE _dispatch_sema4_t;
+  #define _DSEMA4_POLICY_FIFO 0
+#else
+#error "port has to implement _dispatch_sema4_t"
+#endif
+```
+&emsp;下面看一下 `dispatch_semaphore_s` 相关 API 的源码实现。
+### dispatch_semaphore_create
+&emsp;`dispatch_semaphore_create` 用初始值（`long value`）创建新的计数信号量。
+
+&emsp;当两个线程需要协调特定事件的完成时，将值传递为零非常有用。传递大于零的值对于管理有限的资源池非常有用，该资源池的大小等于该值（例如我们有多个文件要从服务器下载下来，然后用 dispatch_semaphore 限制只能并发五条线程（`dispatch_semaphore_create(5)`）进行下载）。
+
+&emsp;参数 `value`：信号量的起始值，传递小于零的值将导致返回 `NULL`。返回值 `result`：新创建的信号量，失败时为 `NULL`。
+```c++
+dispatch_semaphore_t
+dispatch_semaphore_create(long value)
+{
+    // 指向 dispatch_semaphore_s 结构体的指针
+    dispatch_semaphore_t dsema;
+
+    // If the internal value is negative, then the absolute of the value is equal
+    // to the number of waiting threads. 
+    // Therefore it is bogus to initialize the semaphore with a negative value.
+    
+    if (value < 0) {
+        // #define DISPATCH_BAD_INPUT   ((void *_Nonnull)0)
+        // 如果 value 值小于 0，则直接返回 0
+        return DISPATCH_BAD_INPUT;
+    }
+
+    // DISPATCH_VTABLE(semaphore) ➡️ &OS_dispatch_semaphore_class
+    // _dispatch_object_alloc 是为 dispatch_semaphore_s 申请空间，然后用 &OS_dispatch_semaphore_class 初始化，
+    // &OS_dispatch_semaphore_class 设置了 dispatch_semaphore_t 的相关回调函数，如销毁函数 _dispatch_semaphore_dispose 等
+    dsema = _dispatch_object_alloc(DISPATCH_VTABLE(semaphore),
+            sizeof(struct dispatch_semaphore_s));
+    
+    // #if DISPATCH_SIZEOF_PTR == 8
+    // // the bottom nibble must not be zero, the rest of the bits should be random we sign extend the 64-bit version so that a better instruction encoding is generated on Intel
+    // #define DISPATCH_OBJECT_LISTLESS ((void *)0xffffffff89abcdef)
+    // #else
+    // #define DISPATCH_OBJECT_LISTLESS ((void *)0x89abcdef)
+    // #endif
+    
+    // 表示链表的下一个节点
+    dsema->do_next = DISPATCH_OBJECT_LISTLESS;
+    
+    // 目标队列（从全局的队列数组 _dispatch_root_queues 中取默认队列）
+    dsema->do_targetq = _dispatch_get_default_queue(false);
+    
+    dsema->dsema_value = value; // 当前值（当前是初始值）
+    
+    // _DSEMA4_POLICY_FIFO 表示先进先出策略吗 ？
+    _dispatch_sema4_init(&dsema->dsema_sema, _DSEMA4_POLICY_FIFO);
+    
+    dsema->dsema_orig = value; // 初始值
+    return dsema;
+}
+```
+#### _dispatch_get_default_queue
+&emsp;从全局的根队列中取默认 QOS 的队列，当 `overcommit` 为 `true` 时取 `com.apple.root.default-qos.overcommit` 队列，为 `false` 时取 `com.apple.root.default-qos` 队列。
+```c++
+#define _dispatch_get_default_queue(overcommit) \
+        _dispatch_root_queues[DISPATCH_ROOT_QUEUE_IDX_DEFAULT_QOS + \
+                !!(overcommit)]._as_dq
+```
+#### _dispatch_object_alloc
+&emsp;为 GCD 对象申请空间并初始化。
+```c++
+void *
+_dispatch_object_alloc(const void *vtable, size_t size)
+{
+#if OS_OBJECT_HAVE_OBJC1
+    const struct dispatch_object_vtable_s *_vtable = vtable;
+    dispatch_object_t dou;
+    dou._os_obj = _os_object_alloc_realized(_vtable->_os_obj_objc_isa, size);
+    dou._do->do_vtable = vtable;
+    return dou._do;
+#else
+    return _os_object_alloc_realized(vtable, size);
+#endif
+}
+```
+&emsp;内部调用了 `_os_object_alloc_realized` 函数，下面看一下它的定义。
+##### _os_object_alloc_realized
+&emsp;核心在 `calloc` 函数申请空间，并赋值。
+```c++
+inline _os_object_t
+_os_object_alloc_realized(const void *cls, size_t size)
+{
+    _os_object_t obj;
+    dispatch_assert(size >= sizeof(struct _os_object_s));
+    
+    // while 循环只是为了申请空间成功，核心还是在 calloc 函数中
+    while (unlikely(!(obj = calloc(1u, size)))) {
+        _dispatch_temporary_resource_shortage();
+    }
+    
+    obj->os_obj_isa = cls;
+    return obj;
+}
+```
+### dispatch_semaphore_wait
+&emsp;`dispatch_semaphore_wait` 等待（减少）信号量。
+```c++
+long
+dispatch_semaphore_wait(dispatch_semaphore_t dsema, dispatch_time_t timeout)
+{
+    // 原子操作 dsema 的成员变量 dsema_value 的值减 1
+    long value = os_atomic_dec2o(dsema, dsema_value, acquire);
+    
+    // 如果减 1 后仍然大于等于 0，则直接 return 
+    if (likely(value >= 0)) {
+        return 0;
+    }
+    
+    // 如果小于 0，则调用 _dispatch_semaphore_wait_slow 函数进行阻塞等待
+    return _dispatch_semaphore_wait_slow(dsema, timeout);
+}
+```
+&emsp;减少计数信号量，如果结果值小于零，此函数将等待信号出现，然后返回。（可以使总信号量减 1，信号总量小于 0 时就会一直等待（阻塞所在线程），否则就可以正常执行。）`dsema`：信号量，在此参数中传递 `NULL` 的结果是未定义的。`timeout`：何时超时（dispatch_time），为方便起见，有 `DISPATCH_TIME_NOW` 和 `DISPATCH_TIME_FOREVER` 常量。函数返回值 `result`，成功返回零，如果发生超时则返回非零（`_DSEMA4_TIMEOUT`）。
+#### os_atomic_dec2o
+&emsp;`os_atomic_dec2o` 是对原子操作 -1 的封装。
+```c++
+#define os_atomic_dec2o(p, f, m) \
+        os_atomic_sub2o(p, f, 1, m)
+        
+#define os_atomic_sub2o(p, f, v, m) \
+        os_atomic_sub(&(p)->f, (v), m)
+        
+#define os_atomic_sub(p, v, m) \
+        _os_atomic_c11_op((p), (v), m, sub, -)
+        
+#define _os_atomic_c11_op(p, v, m, o, op) \
+        ({ _os_atomic_basetypeof(p) _v = (v), _r = \
+        atomic_fetch_##o##_explicit(_os_atomic_c11_atomic(p), _v, \
+        memory_order_##m); (__typeof__(_r))(_r op _v); })
+```
+#### _dispatch_semaphore_wait_slow
+```c++
+DISPATCH_NOINLINE
+static long
+_dispatch_semaphore_wait_slow(dispatch_semaphore_t dsema,
+        dispatch_time_t timeout)
+{
+    long orig;
+    
+    // 为 &dsema->dsema_sema 赋值
+    _dispatch_sema4_create(&dsema->dsema_sema, _DSEMA4_POLICY_FIFO);
+    
+    switch (timeout) {
+    
+    // 如果 timeout 是一个特定时间的话调用 _dispatch_sema4_timedwait 进行 timeout 时间的等待
+    default:
+        if (!_dispatch_sema4_timedwait(&dsema->dsema_sema, timeout)) {
+            break;
+        }
+        // Fall through and try to undo what the fast path did to dsema->dsema_value
+    // 如果 timeout 参数是 DISPATCH_TIME_NOW
+    case DISPATCH_TIME_NOW:
+        orig = dsema->dsema_value;
+        while (orig < 0) {
+        
+            // dsema_value 加 1 抵消掉 dispatch_semaphore_wait 函数中的减 1 操作
+            if (os_atomic_cmpxchgvw2o(dsema, dsema_value, orig, orig + 1,
+                    &orig, relaxed)) {
+                // 返回超时
+                return _DSEMA4_TIMEOUT();
+            }
+        }
+        // Another thread called semaphore_signal().
+        // Fall through and drain the wakeup.
+    
+    // 如果 timeout 参数是 DISPATCH_TIME_FOREVER 的话调用 _dispatch_sema4_wait 一直等待，直到得到 signal 信号
+    case DISPATCH_TIME_FOREVER:
+        _dispatch_sema4_wait(&dsema->dsema_sema);
+        break;
+    }
+    
+    return 0;
+}
+```
+##### _dispatch_sema4_create
+&emsp;`&dsema->dsema_sema` 如果为 NULL 的话则进行赋值。
+```c++
+DISPATCH_ALWAYS_INLINE
+static inline void
+_dispatch_sema4_create(_dispatch_sema4_t *sema, int policy)
+{
+    // #define _dispatch_sema4_is_created(sema)   (*(sema) != MACH_PORT_NULL)
+    
+    // 如果 sema 为 NULL，则调用 _dispatch_sema4_create_slow 为 sema 赋值
+    if (!_dispatch_sema4_is_created(sema)) {
+    
+        // 从缓存读取或者新建
+        _dispatch_sema4_create_slow(sema, policy);
+    }
+}
+```
+&emsp;如果 `DISPATCH_USE_OS_SEMAPHORE_CACHE` 为真并且 `policy` 为 `_DSEMA4_POLICY_FIFO`，则调用 `os_get_cached_semaphore` 从缓存中取得一个 `_dispatch_sema4_t` 赋值给 `s4`，否则调用 `semaphore_create` 新建一个 `_dispatch_sema4_t` 赋值给 `s4`。
+```c++
+void
+_dispatch_sema4_create_slow(_dispatch_sema4_t *s4, int policy)
+{
+    semaphore_t tmp = MACH_PORT_NULL;
+
+    _dispatch_fork_becomes_unsafe();
+
+    // lazily allocate the semaphore port
+
+    // Someday:
+    // 1) Switch to a doubly-linked FIFO in user-space.
+    // 2) User-space timers for the timeout.
+
+#if DISPATCH_USE_OS_SEMAPHORE_CACHE
+    if (policy == _DSEMA4_POLICY_FIFO) {
+        tmp = (_dispatch_sema4_t)os_get_cached_semaphore();
+        
+        // 如果 s4 等于 MACH_PORT_NULL 则把 tmp 赋值给它
+        if (!os_atomic_cmpxchg(s4, MACH_PORT_NULL, tmp, relaxed)) {
+        
+            // 如果 s4 不为 MACH_PORT_NULL 则把它加入缓存
+            os_put_cached_semaphore((os_semaphore_t)tmp);
+        }
+        return;
+    }
+#endif
+    
+    // 新建 kern_return_t
+    kern_return_t kr = semaphore_create(mach_task_self(), &tmp, policy, 0);
+    DISPATCH_SEMAPHORE_VERIFY_KR(kr);
+
+    // 原子赋值
+    if (!os_atomic_cmpxchg(s4, MACH_PORT_NULL, tmp, relaxed)) {
+        kr = semaphore_destroy(mach_task_self(), tmp);
+        DISPATCH_SEMAPHORE_VERIFY_KR(kr);
+    }
+}
+```
+##### _dispatch_sema4_wait
+&emsp;当 `timeout` 是 `DISPATCH_TIME_FOREVER` 时，do while 循环一直等下去，直到 `sema` 的值被修改为不等于 `KERN_ABORTED`。
+```c++
+void
+_dispatch_sema4_wait(_dispatch_sema4_t *sema)
+{
+    kern_return_t kr;
+    do {
+        kr = semaphore_wait(*sema);
+    } while (kr == KERN_ABORTED);
+    
+    DISPATCH_SEMAPHORE_VERIFY_KR(kr);
+}
+```
+##### _dispatch_sema4_timedwait
+&emsp;当 `timeout` 是一个指定的时间的话，则循环等待直到超时，或者发出了 `signal` 信号，`sema` 值被修改。
+```c++
+bool
+_dispatch_sema4_timedwait(_dispatch_sema4_t *sema, dispatch_time_t timeout)
+{
+    mach_timespec_t _timeout;
+    kern_return_t kr;
+
+    do {
+        // 取时间的差值
+        uint64_t nsec = _dispatch_timeout(timeout);
+        
+        _timeout.tv_sec = (__typeof__(_timeout.tv_sec))(nsec / NSEC_PER_SEC);
+        _timeout.tv_nsec = (__typeof__(_timeout.tv_nsec))(nsec % NSEC_PER_SEC);
+        
+        kr = semaphore_timedwait(*sema, _timeout);
+    } while (unlikely(kr == KERN_ABORTED));
+
+    if (kr == KERN_OPERATION_TIMED_OUT) {
+        return true;
+    }
+    
+    DISPATCH_SEMAPHORE_VERIFY_KR(kr);
+    
+    return false;
+}
+```
+&emsp;其中调用了 mach 内核的信号量接口 `semaphore_wait` 和 `semaphore_timedwait` 进行 wait 操作。所以，GCD 的信号量实际上是基于 mach 内核的信号量接口来实现。`semaphore_timedwait` 函数即可以指定超时时间。
+### dispatch_semaphore_signal
+&emsp;`dispatch_semaphore_signal` 发信号（增加）信号量。如果先前的值小于零，则此函数在返回之前唤醒等待的线程。如果线程被唤醒，此函数将返回非零值。否则，返回零。
+```c++
+long
+dispatch_semaphore_signal(dispatch_semaphore_t dsema)
+{
+    // 原子操作 dsema 的成员变量 dsema_value 的值加 1
+    long value = os_atomic_inc2o(dsema, dsema_value, release);
+    
+    if (likely(value > 0)) {
+        // 如果 value 大于 0 表示目前没有线程需要唤醒，直接 return 0
+        return 0;
+    }
+    
+    // 如果过度释放，导致 value 的值一直增加到 LONG_MIN（溢出），则 crash 
+    if (unlikely(value == LONG_MIN)) {
+        DISPATCH_CLIENT_CRASH(value,
+                "Unbalanced call to dispatch_semaphore_signal()");
+    }
+    
+    // value 小于等于 0 时，表示目前有线程需要唤醒
+    return _dispatch_semaphore_signal_slow(dsema);
+}
+```
+&emsp;测试 `value == LONG_MIN` 并没有发生 crash。
+```c++
+dispatch_semaphore_t semaphore = dispatch_semaphore_create(LONG_MAX);
+dispatch_semaphore_signal(semaphore);
+
+// 控制台打印
+(lldb) po semaphore
+<OS_dispatch_semaphore: semaphore[0x600000ed79d0] = { xref = 1, ref = 1, port = 0x0, value = 9223372036854775807, orig = 9223372036854775807 }>
+
+(lldb) po semaphore
+<OS_dispatch_semaphore: semaphore[0x600000ed79d0] = { xref = 1, ref = 1, port = 0x0, value = -9223372036854775808, orig = 9223372036854775807 }> ⬅️ value 的值是 LONG_MIN，并没有 crash
+```
+#### os_atomic_inc2o
+&emsp;`os_atomic_inc2o` 是对原子操作 +1 的封装。
+```c++
+#define os_atomic_inc2o(p, f, m) \
+        os_atomic_add2o(p, f, 1, m)
+
+#define os_atomic_add2o(p, f, v, m) \
+        os_atomic_add(&(p)->f, (v), m)
+        
+#define os_atomic_add(p, v, m) \
+        _os_atomic_c11_op((p), (v), m, add, +)  
+        
+#define _os_atomic_c11_op(p, v, m, o, op) \
+        ({ _os_atomic_basetypeof(p) _v = (v), _r = \
+        atomic_fetch_##o##_explicit(_os_atomic_c11_atomic(p), _v, \
+        memory_order_##m); (__typeof__(_r))(_r op _v); })
+```
+#### _dispatch_semaphore_signal_slow
+&emsp;内部调用 `_dispatch_sema4_signal(&dsema->dsema_sema, 1)` 唤醒一条线程。
+```c++
+DISPATCH_NOINLINE
+long
+_dispatch_semaphore_signal_slow(dispatch_semaphore_t dsema)
+{
+    _dispatch_sema4_create(&dsema->dsema_sema, _DSEMA4_POLICY_FIFO);
+    
+    // count 传 1，唤醒一条线程
+    _dispatch_sema4_signal(&dsema->dsema_sema, 1);
+    return 1;
+}
+```
+##### _dispatch_sema4_signal
+&emsp;`semaphore_signal` 能够唤醒一个在 `semaphore_wait` 中等待的线程。如果有多个等待线程，则根据线程优先级来唤醒。
+```c++
+void
+_dispatch_sema4_signal(_dispatch_sema4_t *sema, long count)
+{
+    do {
+        // semaphore_signal 唤醒线程
+        kern_return_t kr = semaphore_signal(*sema);
+        DISPATCH_SEMAPHORE_VERIFY_KR(kr);
+    } while (--count);
+}
+```
+&emsp;下面看一下 semaphore.c 文件中与信号量有关的最后一个函数。
+### _dispatch_semaphore_dispose
+&emsp;信号量的销毁函数。
+```c++
+void
+_dispatch_semaphore_dispose(dispatch_object_t dou,
+        DISPATCH_UNUSED bool *allow_free)
+{
+    dispatch_semaphore_t dsema = dou._dsema;
+
+    // 容错判断，如果当前 dsema_value 小于 dsema_orig，表示信号量还正在使用，不能进行销毁，如下代码会导致此 crash 
+    // dispatch_semaphore_t sema = dispatch_semaphore_create(1); // 创建 value = 1，orig = 1
+    // dispatch_semaphore_wait(sema, DISPATCH_TIME_FOREVER); // value = 0，orig = 1
+    // sema = dispatch_semaphore_create(1); // 赋值导致原始 dispatch_semaphore_s 释放，但是此时 orig 是 1，value 是 0 则直接 crash
+    
+    if (dsema->dsema_value < dsema->dsema_orig) {
+        DISPATCH_CLIENT_CRASH(dsema->dsema_orig - dsema->dsema_value,
+                "Semaphore object deallocated while in use");
+    }
+
+    _dispatch_sema4_dispose(&dsema->dsema_sema, _DSEMA4_POLICY_FIFO);
+}
+```
+#### _dispatch_sema4_dispose
+```c++
+DISPATCH_ALWAYS_INLINE
+static inline void
+_dispatch_sema4_dispose(_dispatch_sema4_t *sema, int policy)
+{
+    // 如果 sema 存在则调用 _dispatch_sema4_dispose_slow 函数
+    if (_dispatch_sema4_is_created(sema)) {
+        _dispatch_sema4_dispose_slow(sema, policy);
+    }
+}
+```
+##### _dispatch_sema4_dispose_slow
+&emsp;如果 `DISPATCH_USE_OS_SEMAPHORE_CACHE` 为真并且 `policy` 为 `_DSEMA4_POLICY_FIFO`，则调用 `os_put_cached_semaphore` 把 `sema` 放入缓存中，否则，调用 mach 内核的 `semaphore_destroy` 函数进行信号量的销毁。
+```c++
+void
+_dispatch_sema4_dispose_slow(_dispatch_sema4_t *sema, int policy)
+{
+    semaphore_t sema_port = *sema;
+    *sema = MACH_PORT_DEAD;
+    
+#if DISPATCH_USE_OS_SEMAPHORE_CACHE
+    if (policy == _DSEMA4_POLICY_FIFO) {
+    
+        // 放入缓存
+        return os_put_cached_semaphore((os_semaphore_t)sema_port);
+    }
+#endif
+
+    // 调用 semaphore_destroy 销毁
+    kern_return_t kr = semaphore_destroy(mach_task_self(), sema_port);
+    DISPATCH_SEMAPHORE_VERIFY_KR(kr);
+}
+```
+&emsp;到这里信号量相关的常用 API 的源码就看完了，主要根据 `dsema_value` 来进行阻塞和唤醒线程。
 
 ## 参考链接
 **参考链接:🔗**
@@ -352,4 +871,5 @@ _dispatch_once_wait(dispatch_once_gate_t dgo)
 + [GCD源码吐血分析(1)——GCD Queue](https://blog.csdn.net/u013378438/article/details/81031938)
 + [c/c++:计算可变参数宏 __VA_ARGS__ 的参数个数](https://blog.csdn.net/10km/article/details/80760533)
 + [OC底层探索(二十一)GCD异步、GCD同步、单例、信号量、调度组、栅栏函数等底层分析](https://blog.csdn.net/weixin_40918107/article/details/109520980)
++ [iOS源码解析: GCD的信号量semaphore](https://juejin.cn/post/6844904122370490375)
 
