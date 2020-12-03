@@ -332,31 +332,26 @@ dispatch_group_leave(dispatch_group_t dg)
 {
     // The value is incremented on a 64bits wide atomic so that the carry
     // for the -1 -> 0 transition increments the generation atomically.
-    // dg_state 是无符号 64 位 int，但是此处是加 -1 到 0 的转换不受影响
     
-    // 看到这里是以原子方式增加 dg_state 的值，这里 dg_bits 的内存空间是 dg_state 的低 32 bit，
-    // 所以 dg_state + DISPATCH_GROUP_VALUE_INTERVAL 即 dg_bits + DISPATCH_GROUP_VALUE_INTERVAL。
+    // 以原子方式增加 dg_state 的值，这里 dg_bits 的内存空间是 dg_state 的低 32 bit，
+    // 所以 dg_state + DISPATCH_GROUP_VALUE_INTERVAL 即是 dg_bits + DISPATCH_GROUP_VALUE_INTERVAL。
 
-    //（这里注意是把 dg_state 的旧值同时赋值给了 new_state 和 old_state）
-    uint64_t new_state, old_state = os_atomic_add_orig2o(dg, dg_state,
-            DISPATCH_GROUP_VALUE_INTERVAL, release);
+    //（这里注意是把 dg_state 的旧值同时赋值给了 new_state 和 old_state 两个变量）
+    uint64_t new_state, old_state = os_atomic_add_orig2o(dg, dg_state, DISPATCH_GROUP_VALUE_INTERVAL, release);
     
     // #define DISPATCH_GROUP_VALUE_MASK   0x00000000fffffffcULL ➡️ 0b0000...11111100ULL
     // #define DISPATCH_GROUP_VALUE_1   DISPATCH_GROUP_VALUE_MASK
     // dg_state 的旧值和 DISPATCH_GROUP_VALUE_MASK 进行与操作，如果此时仅关联了一个 block 的话那么 dg_state 的旧值就是（十六进制：0xFFFFFFFC），
-    // （那么上面的 os_atomic_add_orig2o 执行后，dg_state 的值是 0x0000000100000000ULL，因为它是 uint64_t 类型，不同于 dg_bits 的 uint32_t 类型）
-    
-    // 如果 dg_state 旧值 old_state 等于 0xFFFFFFFC 则与操作结果还是 0xFFFFFFFC
+    //（那么上面的 os_atomic_add_orig2o 执行后，dg_state 的值是 0x0000000100000000ULL，
+    //  因为它是 uint64_t 类型它会从最大的 uint32_t 继续进位，而不同于 dg_bits 的 uint32_t 类型溢出后为 0）
+    // 如果 dg_state 旧值 old_state 等于 0xFFFFFFFC 则和 DISPATCH_GROUP_VALUE_MASK 与操作结果还是 0xFFFFFFFC
     uint32_t old_value = (uint32_t)(old_state & DISPATCH_GROUP_VALUE_MASK);
-
-    // 如果 old_value 等于 DISPATCH_GROUP_VALUE_1，然后再经过上面的 + DISPATCH_GROUP_VALUE_INTERVAL 后，刚好等于 0 了，
-    // 即 enter 和 leave 平衡了，即调度组关联的 block 执行完了。
     
     if (unlikely(old_value == DISPATCH_GROUP_VALUE_1)) {
         // old_value 的值是 0xFFFFFFFC
         
         // old_state 是 0x00000000fffffffcULL，DISPATCH_GROUP_VALUE_INTERVAL 的值是 0x0000000000000004ULL
-        // 所以这里 old_state 是 uint64_t 类型，不会发生溢出，old_state = 0x0000000100000000ULL
+        // 所以这里 old_state 是 uint64_t 类型，加 DISPATCH_GROUP_VALUE_INTERVAL 后不会发生溢出会产生正常的进位，old_state = 0x0000000100000000ULL
         old_state += DISPATCH_GROUP_VALUE_INTERVAL;
         
         // #define DISPATCH_GROUP_HAS_WAITERS   0x0000000000000001ULL
@@ -428,24 +423,28 @@ dispatch_group_leave(dispatch_group_t dg)
         &_r, v, memory_order_##m, memory_order_relaxed); *(g) = _r; _b; })
 ```
 ### dispatch_group_async
-&emsp;`dispatch_group_async` 
+&emsp;`dispatch_group_async` 将一个 block 提交到指定的调度队列并进行异步调用，并将该 block 与给定的 dispatch_group 关联（其内部自动插入了 enter 和 leave 操作）。
 ```c++
 #ifdef __BLOCKS__
 void
 dispatch_group_async(dispatch_group_t dg, dispatch_queue_t dq,
         dispatch_block_t db)
 {
+    // 从缓存中取一个 dispatch_continuation_t 或者新建一个 dispatch_continuation_t 返回
     dispatch_continuation_t dc = _dispatch_continuation_alloc();
     uintptr_t dc_flags = DC_FLAG_CONSUME | DC_FLAG_GROUP_ASYNC;
     dispatch_qos_t qos;
-
+    
+    // 配置 dsn，（db 转换为函数）
     qos = _dispatch_continuation_init(dc, dq, db, 0, dc_flags);
+    
+    // 调用 _dispatch_continuation_group_async 函数异步执行提交到 dq 的 db
     _dispatch_continuation_group_async(dg, dq, dc, qos);
 }
 #endif
 ```
 #### _dispatch_continuation_group_async
-&emsp;
+&emsp;`_dispatch_continuation_group_async` 
 ```c++
 DISPATCH_ALWAYS_INLINE
 static inline void
