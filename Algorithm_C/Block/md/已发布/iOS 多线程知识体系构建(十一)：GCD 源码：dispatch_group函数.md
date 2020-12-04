@@ -260,20 +260,21 @@ dispatch_group_enter(dispatch_group_t dg)
         // 此时 dispatch_group 不能进行释放，想到前面的信号量，
         // 如果 dsema_value 小于 dsema_orig 表示信号量正在使用，此时释放信号量对象的话也会导致 crash，
         // 整体思想和我们的 NSObject 的引用计数是相同的，不同之处是内存泄漏不一定会 crash，而这里则是立即 crash，
-        // 当然作为一名合格的开发绝对不能容许任何内存泄漏和崩溃！！！）
+        // 当然作为一名合格的开发绝对不能容许任何内存泄漏和崩溃 ！！！）
         
         _dispatch_retain(dg); // <rdar://problem/22318411>
     }
     
-    // #define DISPATCH_GROUP_VALUE_INTERVAL   0x0000000000000004ULL
+    // #define DISPATCH_GROUP_VALUE_INTERVAL   0x0000000000000004ULL 二进制表示 ➡️ 0b0000...00000100ULL
     // #define DISPATCH_GROUP_VALUE_MAX   DISPATCH_GROUP_VALUE_INTERVAL
     
-    // 如果旧值等于 DISPATCH_GROUP_VALUE_MAX 表示 dispatch_group_enter 函数过度调用，则 crash
-    // 0 + DISPATCH_GROUP_VALUE_INTERVAL
+    // 如果 old_bits & DISPATCH_GROUP_VALUE_MASK 的结果等于 DISPATCH_GROUP_VALUE_MAX，即 old_bits 的值是 DISPATCH_GROUP_VALUE_INTERVAL。
+    // 这里可以理解为上面 4294967292 每次减 4，一直往下减，直到溢出...
+    // 表示 dispatch_group_enter 函数过度调用，则 crash。
+    // 0 + DISPATCH_GROUP_VALUE_INTERVAL 
     
     if (unlikely(old_value == DISPATCH_GROUP_VALUE_MAX)) {
-        DISPATCH_CLIENT_CRASH(old_bits,
-                "Too many nested calls to dispatch_group_enter()");
+        DISPATCH_CLIENT_CRASH(old_bits, "Too many nested calls to dispatch_group_enter()");
     }
 }
 ```
@@ -303,7 +304,7 @@ _os_object_retain_internal_n_inline(_os_object_t obj, int n)
     return obj;
 }
 ```
-&emsp;`_os_object_refcnt_add_orig` 是一个宏定义，以原子方式增加引用计数。
+&emsp;`_os_object_refcnt_add_orig` 是一个宏定义，以原子方式增加引用计数。（`os_obj_ref_cnt` 的值）
 ```c++
 #define _os_object_refcnt_add_orig(o, n) \
         _os_atomic_refcnt_add_orig2o(o, os_obj_ref_cnt, n)
@@ -375,13 +376,18 @@ dispatch_group_leave(dispatch_group_t dg)
             }
             
             // 如果目前是仅关联了一个 block 而且是正常的 enter 和 leave 配对执行，则会执行这里的 break，
-            // 结束 do while 循环，执行下面的 _dispatch_group_wake 函数，唤醒执行 dispatch_group_notify 添加到指定队列中的回调函数。
+            // 结束 do while 循环，执行下面的 _dispatch_group_wake 函数，唤醒，异步执行 dispatch_group_notify 添加到指定队列中的回调函数。
             if (old_state == new_state) break;
             
-        // 比较 dg_state 和 old_state 的值，如果相等则把 dg_state 的值存入 new_state 中，如果不相等则把 dg_state 的值存入 old_state 中
+        // 比较 dg_state 和 old_state 的值，如果相等则把 dg_state 的值存入 new_state 中，并返回 true，如果不相等则把 dg_state 的值存入 old_state 中，并返回 false。
+        // unlikely(!os_atomic_cmpxchgv2o(dg, dg_state, old_state, new_state, &old_state, relaxed)) 表达式值为 false 时才会结束循环，否则继续循环，
+        // 即 os_atomic_cmpxchgv2o(dg, dg_state, old_state, new_state, &old_state, relaxed) 返回 true 时才会结束循环，否则继续循环，
+        // 即 dg_state 和 old_state 的值相等时才会结束循环，否则继续循环。
+        
+        // （正常 enter 和 leave 的话，此时 dg_state 和 old_state 的值都是 0x0000000100000000ULL，会结束循环）
         } while (unlikely(!os_atomic_cmpxchgv2o(dg, dg_state, old_state, new_state, &old_state, relaxed)));
                 
-        // 唤醒执行 dispatch_group_notify 添加到指定队列中的回调函数
+        // 唤醒，异步执行 dispatch_group_notify 添加到指定队列中的回调函数
         return _dispatch_group_wake(dg, old_state, true);
     }
 
@@ -423,7 +429,9 @@ dispatch_group_leave(dispatch_group_t dg)
         &_r, v, memory_order_##m, memory_order_relaxed); *(g) = _r; _b; })
 ```
 ### dispatch_group_async
-&emsp;`dispatch_group_async` 将一个 block 提交到指定的调度队列并进行异步调用，并将该 block 与给定的 dispatch_group 关联（其内部自动插入了 enter 和 leave 操作）。
+&emsp;`dispatch_group_async` 将一个 block 提交到指定的调度队列并进行异步调用，并将该 block 与给定的 dispatch_group 关联（其内部自动插入了 `dispatch_group_enter` 和 `dispatch_group_leave` 操作，相当于 `dispatch_async` 和 `dispatch_group_enter`、`dispatch_group_leave` 三个函数的一个封装）。
+
+&emsp;还有一个点这里要注意一下，把入参 block `db` 封装成 `dispatch_continuation_t`  `dc` 的过程中，会把 `dc_flags` 设置为 `DC_FLAG_CONSUME | DC_FLAG_GROUP_ASYNC`，这里的 `DC_FLAG_GROUP_ASYNC` 标志关系到 `dc` 执行的时候调用的具体函数（这里的提交的任务的 block 和 dispatch_group 关联的点就在这里，`dc` 执行时会调用 `_dispatch_continuation_with_group_invoke(dc)`，而我们日常使用的 `dispatch_async` 函数提交的异步任务的 block 执行的时候调用的是 `_dispatch_client_callout(dc->dc_ctxt, dc->dc_func)` 函数，它们正是根据上面的 `DC_FLAG_GROUP_ASYNC` 标识来区分的，具体细节在下面的 `_dispatch_continuation_invoke_inline` 函数中介绍）。
 ```c++
 #ifdef __BLOCKS__
 void
@@ -432,7 +440,11 @@ dispatch_group_async(dispatch_group_t dg, dispatch_queue_t dq,
 {
     // 从缓存中取一个 dispatch_continuation_t 或者新建一个 dispatch_continuation_t 返回
     dispatch_continuation_t dc = _dispatch_continuation_alloc();
+    
+    // 这里的 DC_FLAG_GROUP_ASYNC 的标记很重要，是它标记了 dispatch_continuation 中的函数异步执行时具体调用哪个函数，
+    // 具体细节我们下面细讲
     uintptr_t dc_flags = DC_FLAG_CONSUME | DC_FLAG_GROUP_ASYNC;
+    
     dispatch_qos_t qos;
     
     // 配置 dsn，（db 转换为函数）
@@ -444,23 +456,24 @@ dispatch_group_async(dispatch_group_t dg, dispatch_queue_t dq,
 #endif
 ```
 #### _dispatch_continuation_group_async
-&emsp;`_dispatch_continuation_group_async` 
+&emsp;`_dispatch_continuation_group_async` 函数内部调用的函数很清晰，首先调用 enter 表示 block 与 dispatch_group 建立关联（进组了），然后把 dispatch_group 赋值给 dispatch_continuation 的 `dc_data` 成员变量，这里的用途是当执行完 dispatch_continuation  中的函数后 dispatch_group 是要进行一次出组 leave 操作（详细在下面的 `_dispatch_continuation_with_group_invoke` 函数中），正是和这里的 enter 操作对应的，然后就是我们比较熟悉的 `_dispatch_continuation_async` 函数提交任务到队列中进行异步调用。
 ```c++
 DISPATCH_ALWAYS_INLINE
 static inline void
 _dispatch_continuation_group_async(dispatch_group_t dg, dispatch_queue_t dq,
         dispatch_continuation_t dc, dispatch_qos_t qos)
 {
-    // 进组
+    // 调用 dispatch_group_enter 标记进组
     dispatch_group_enter(dg);
-    
+    // 看到这里把 dg 赋值给了 dc 的 dc_data 成员变量
     dc->dc_data = dg;
     
+    // 在指定队列中异步执行任务
     _dispatch_continuation_async(dq, dc, qos, dc->dc_flags);
 }
 ```
 ##### _dispatch_continuation_async
-&emsp;
+&emsp;`_dispatch_continuation_async` 把封装好的任务的 `dc` 提交到队列中。
 ```c++
 DISPATCH_ALWAYS_INLINE
 static inline void
@@ -474,19 +487,73 @@ _dispatch_continuation_async(dispatch_queue_class_t dqu,
 #else
     (void)dc_flags;
 #endif
+    // 调用队列的 dq_push 函数，任务入队
     return dx_push(dqu._dq, dc, qos);
 }
+
+// dx_push 是一个宏定义
+#define dx_push(x, y, z) dx_vtable(x)->dq_push(x, y, z)
+void (*const dq_push)(dispatch_queue_class_t, dispatch_object_t, dispatch_qos_t)
 ```
-##### 
+##### _dispatch_continuation_invoke_inline
+&emsp;`_dispatch_continuation_invoke_inline` 是 `dispatch_continuation_t` 被调用时执行的函数。当 `dc->dc_flags` 包含 `DC_FLAG_GROUP_ASYNC` 时，执行的是 `_dispatch_continuation_with_group_invoke` 函数。
+```c++
+DISPATCH_ALWAYS_INLINE
+static inline void
+_dispatch_continuation_invoke_inline(dispatch_object_t dou,
+        dispatch_invoke_flags_t flags, dispatch_queue_class_t dqu)
+{
+    dispatch_continuation_t dc = dou._dc, dc1;
+    dispatch_invoke_with_autoreleasepool(flags, {
+        uintptr_t dc_flags = dc->dc_flags;
+        // Add the item back to the cache before calling the function. This
+        // allows the 'hot' continuation to be used for a quick callback.
+        //
+        // The ccache version is per-thread.
+        // Therefore, the object has not been reused yet.
+        // This generates better assembly.
+        _dispatch_continuation_voucher_adopt(dc, dc_flags);
+        if (!(dc_flags & DC_FLAG_NO_INTROSPECTION)) {
+            _dispatch_trace_item_pop(dqu, dou);
+        }
+        if (dc_flags & DC_FLAG_CONSUME) {
+            dc1 = _dispatch_continuation_free_cacheonly(dc);
+        } else {
+            dc1 = NULL;
+        }
+        
+        // 当 dc_flags 包含 DC_FLAG_GROUP_ASYNC 时，执行的是 _dispatch_continuation_with_group_invoke 函数，
+        // else 里面的 _dispatch_client_callout 是我们日常 dispatch_async 函数提交的任务执行时调用的函数。
+        
+        if (unlikely(dc_flags & DC_FLAG_GROUP_ASYNC)) {
+            _dispatch_continuation_with_group_invoke(dc);
+        } else {
+            _dispatch_client_callout(dc->dc_ctxt, dc->dc_func);
+            _dispatch_trace_item_complete(dc);
+        }
+        
+        if (unlikely(dc1)) {
+            _dispatch_continuation_free_to_cache_limit(dc1);
+        }
+    });
+    _dispatch_perfmon_workitem_inc();
+}
+```
+##### _dispatch_continuation_with_group_invoke
+&emsp;`_dispatch_continuation_with_group_invoke` 是 `dispatch_group_async` 提交的异步任务执行时调用的函数。`_dispatch_continuation_with_group_invoke` 函数内的 `dc->dc_data` 正是上面 `_dispatch_continuation_group_async` 函数中赋值的 dispatch_group，然后 `type == DISPATCH_GROUP_TYPE` 为真，`_dispatch_client_callout` 函数执行我们的 `dispatch_group_async` 函数传递的 block，然后是下面的 `dispatch_group_leave((dispatch_group_t)dou)` 出组操作，正对应了上面 `_dispatch_continuation_group_async` 函数中的 `dispatch_group_enter(dg)` 进组操作。
 ```c++
 DISPATCH_ALWAYS_INLINE
 static inline void
 _dispatch_continuation_with_group_invoke(dispatch_continuation_t dc)
 {
+    // dou 我们上面的赋值的 dg
     struct dispatch_object_s *dou = dc->dc_data;
     unsigned long type = dx_type(dou);
+    
     if (type == DISPATCH_GROUP_TYPE) {
+        // 执行任务
         _dispatch_client_callout(dc->dc_ctxt, dc->dc_func);
+        
         _dispatch_trace_item_complete(dc);
         
         // 出组
@@ -496,10 +563,21 @@ _dispatch_continuation_with_group_invoke(dispatch_continuation_t dc)
     }
 }
 ```
+&emsp;至此 `dispatch_group_async` 函数就看完了，和我们自己完全手动调用 enter、leave、dispatch_async 相比轻松了不少，可以让我们更专注于需要和 dispatch_group 关联的任务本身。
 ### dispatch_group_notify
-&emsp;`dispatch_group_notify` 当与 dispatch_group 相关联的所有 block 都已完成时，计划将 `db` 提交到队列 `dq`（即当与 dispatch_group 相关联的所有 block 都已完成时，提交到 `dq` 的 `db` 将执行）。如果没有 block 与 dispatch_group 相关联（即该 dispatch_group 为空），则通知块 `db` 将立即提交。
+&emsp;`dispatch_group_notify` 当与 dispatch_group 相关联的所有 block 都已完成时，计划将 `db` 提交到队列 `dq`（即当与 dispatch_group 相关联的所有 block 都已完成时，提交到 `dq` 的 `db` 将执行）。如果没有 block 与 dispatch_group 相关联（即该 dispatch_group 为空），则通知块 `db` 将立即提交。如下代码中通知块 `db` 将被立即提交并执行。
+```c++
+dispatch_group_t group = dispatch_group_create();
 
-&emsp;通知块 `db` 提交到目标队列 `dq` 时，该 dispatch_group 将为空。该 dispatch_group 可以通过 `dispatch_release` 释放，也可以重新用于其他操作。
+// dispatch_group_notify 提交的 block 立即得到执行
+dispatch_group_notify(group, globalQueue, ^{
+    NSLog(@"🏃‍♀️ %@", [NSThread currentThread]);
+});
+// 控制台打印:
+ 🏃‍♀️ <NSThread: 0x600000fcbe00>{number = 5, name = (null)}
+```
+
+&emsp;通知块 `db` 提交到目标队列 `dq` 时，该 dispatch_group 关联的 block 将为空，或者说只有该 dispatch_group 关联的 block 为空时，通知块 `db` 才会提交到目标队列 `dq`。此时可以通过 `dispatch_release` 释放 dispatch_group，也可以重新用于其他操作。
 
 &emsp;`dispatch_group_notify` 函数不会阻塞当前线程，此函数会立即返回，如果我们想阻塞当前线程，想要等 dispatch_group 中关联的 block 全部执行完成后才执行接下来的操作时，可以使用 `dispatch_group_wait` 函数并指定具体的等待时间（`DISPATCH_TIME_FOREVER`）。
 ```c++
@@ -510,10 +588,10 @@ dispatch_group_notify(dispatch_group_t dg, dispatch_queue_t dq,
 {
     // 从缓存中取一个 dispatch_continuation_t 或者新建一个 dispatch_continuation_t 返回
     dispatch_continuation_t dsn = _dispatch_continuation_alloc();
-    // 配置 dsn，（db 转换为函数）
+    // 配置 dsn，即用 dispatch_continuation_s 封装 db。（db 转换为函数）
     _dispatch_continuation_init(dsn, dq, db, 0, DC_FLAG_CONSUME);
     
-    // 
+    // 嵌套调用 _dispatch_group_notify 函数
     _dispatch_group_notify(dg, dq, dsn);
 }
 #endif
@@ -526,30 +604,47 @@ static inline void
 _dispatch_group_notify(dispatch_group_t dg, dispatch_queue_t dq,
         dispatch_continuation_t dsn)
 {
-    // 临时变量，
     uint64_t old_state, new_state;
     dispatch_continuation_t prev;
 
-    // 任务的 dc_data 成员变量赋值为任务执行时所在的队列 
+    // dispatch_continuation_t 的 dc_data 成员变量被赋值为任务执行时所在的队列 
     dsn->dc_data = dq;
     
-    // dq 队列引用计数 +1 
+    // dq 队列引用计数 +1 （`os_obj_ref_cnt` 的值）
     _dispatch_retain(dq);
 
+    //    prev =  ({
+    //        // 以下都是原子操作:
+    //        _os_atomic_basetypeof(&(dg)->dg_notify_head) _tl = (dsn); // 类型转换
+    //        // 入参 dsn 会作为新的尾节点，这是是把 dsn 的 do_next 置为 NULL，防止错误数据
+    //        os_atomic_store(&(_tl)->do_next, (NULL), relaxed);
+    //        // 入参 dsn 存储到 dispatch_group 的 dg_notify_tail 节点，并返回之前的旧的尾节点
+    //        atomic_exchange_explicit(_os_atomic_c11_atomic(&(dg)->dg_notify_tail), _tl, memory_order_release);
+    //    });
+    
+    // 把 dsn 拼接到 notify 回调函数链表的尾部，并返回之前的尾节点
     prev = os_mpsc_push_update_tail(os_mpsc(dg, dg_notify), dsn, do_next);
     
+    // #define os_mpsc_push_was_empty(prev) ((prev) == NULL)
+    
+    // 如果 prev 为 NULL，表示 dg 是第一次添加 notify 回调函数，则再次增加 dg 的引用计数，（`os_obj_ref_cnt` 的值）
+    // 前面我们还看到 dg 在第一次执行 enter 是也会增加一次引用计数。（`os_obj_ref_cnt` 的值）
     if (os_mpsc_push_was_empty(prev)) _dispatch_retain(dg);
     
+    // 
     os_mpsc_push_update_prev(os_mpsc(dg, dg_notify), prev, dsn, do_next);
     
     if (os_mpsc_push_was_empty(prev)) {
     
         // 一直循环等待直到 old_state == 0
         os_atomic_rmw_loop2o(dg, dg_state, old_state, new_state, release, {
+        
+            // #define DISPATCH_GROUP_HAS_NOTIFS   0x0000000000000002ULL
+            // 
             new_state = old_state | DISPATCH_GROUP_HAS_NOTIFS;
             
             if ((uint32_t)old_state == 0) {
-            
+                // 
                 os_atomic_rmw_loop_give_up({
                     // 调用 _dispatch_group_wake
                     return _dispatch_group_wake(dg, new_state, false);
@@ -559,7 +654,53 @@ _dispatch_group_notify(dispatch_group_t dg, dispatch_queue_t dq,
     }
 }
 ```
+##### os_mpsc_push_update_tail
+&emsp;`os_mpsc_push_update_tail` 是一个宏定义，主要是对 dispatch_group 的 notify 回调函数链表的尾节点（`dg_notify_tail`）进行更新，即把新入参的 `dispatch_continuation_t dsn` 拼接到链表尾部，并返回之前的尾节点。
+
+&emsp;下面是涉及到的宏定义，想要看一行代码的含义，要把下面的涉及的宏定义全部展开，只能感叹...🍎🐂🍺...
+```c++
+#define os_mpsc(q, _ns, ...)   (q, _ns, __VA_ARGS__)
+#define os_mpsc_node_type(Q) _os_atomic_basetypeof(_os_mpsc_head Q)
+
+#define _os_mpsc_head(q, _ns, ...)   &(q)->_ns##_head ##__VA_ARGS__
+#define _os_mpsc_tail(q, _ns, ...)   &(q)->_ns##_tail ##__VA_ARGS__
+#define _os_atomic_c11_atomic(p) \
+        ((__typeof__(*(p)) _Atomic *)(p))
+
+#define os_atomic_store2o(p, f, v, m) \
+        os_atomic_store(&(p)->f, (v), m)
+        
+#define os_atomic_xchg(p, v, m) \
+        atomic_exchange_explicit(_os_atomic_c11_atomic(p), v, memory_order_##m)
+
+#define _os_atomic_basetypeof(p) \
+        __typeof__(atomic_load_explicit(_os_atomic_c11_atomic(p), memory_order_relaxed))
+        
+// Returns true when the queue was empty and the head must be set
+#define os_mpsc_push_update_tail(Q, tail, _o_next)  ({ \
+        os_mpsc_node_type(Q) _tl = (tail); \
+        os_atomic_store2o(_tl, _o_next, NULL, relaxed); \
+        os_atomic_xchg(_os_mpsc_tail Q, _tl, release); \
+    })
+```
+&emsp;`prev = os_mpsc_push_update_tail(os_mpsc(dg, dg_notify), dsn, do_next)` 宏定义展开如下:
+```c++
+prev =  ({
+    // 以下都是原子操作:
+    _os_atomic_basetypeof(&(dg)->dg_notify_head) _tl = (dsn); // 类型转换
+    // 入参 dsn 会作为新的尾节点，这是是把 dsn 的 do_next 置为 NULL，防止错误数据
+    os_atomic_store(&(_tl)->do_next, (NULL), relaxed);
+    // 入参 dsn 存储到 dispatch_group 的 dg_notify_tail 节点，并返回之前的旧的尾节点
+    atomic_exchange_explicit(_os_atomic_c11_atomic(&(dg)->dg_notify_tail), _tl, memory_order_release);
+});
+```
+##### os_mpsc_push_update_prev
 &emsp;
+```c++
+
+```
+
+
 ### _dispatch_group_wake
 &emsp;
 ```c++
