@@ -898,11 +898,11 @@ size_t cache_t::bytesForCapacity(uint32_t cap)
     bool hasFastInstanceSize(size_t extra) const
     {
         if (__builtin_constant_p(extra) && extra == 0) {
-            // 如果 extra 在编译时不是常量，则 _flags & 0b0001 1111 1111 0000 的值返回，
+            // 如果 extra 在编译时是常量并且值为 0，则 _flags & 0b0001 1111 1111 0000 的值返回，
             // 判断 cache_t 是否有快速实例化的大小
             return _flags & FAST_CACHE_ALLOC_MASK16;
         }
-        // _flags & 0b0001 1111 1111 1000 的值
+        // 返回 _flags & 0b0001 1111 1111 1000 的值
         return _flags & FAST_CACHE_ALLOC_MASK;
     }
 
@@ -913,10 +913,10 @@ size_t cache_t::bytesForCapacity(uint32_t cap)
         ASSERT(hasFastInstanceSize(extra));
 
         if (__builtin_constant_p(extra) && extra == 0) {
-            // 如果 extra 在编译时不是常量，则直接返回 _flags & 0b0001 1111 1111 0000 的值
+            // 如果 extra 在编译时是常量并且值为 0，则直接返回 _flags & 0b0001 1111 1111 0000 的值
             return _flags & FAST_CACHE_ALLOC_MASK16;
         } else {
-            // _flags & 0b0001 1111 1111 1000
+            // size = _flags & 0b0001 1111 1111 1000
             size_t size = _flags & FAST_CACHE_ALLOC_MASK;
             
             // remove the FAST_CACHE_ALLOC_DELTA16 that was added by setFastInstanceSize

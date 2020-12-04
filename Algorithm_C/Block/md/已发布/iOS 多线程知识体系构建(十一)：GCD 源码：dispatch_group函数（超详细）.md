@@ -1,4 +1,4 @@
-# iOS 多线程知识体系构建(十一)：GCD 源码：dispatch_group函数
+# iOS 多线程知识体系构建(十一)：GCD 源码：dispatch_group函数（超详细）
 
 > &emsp;用法的话可以看前面的文章，本篇只看 dispatch_group 的数据结构和相关 API 的源码实现。
 
@@ -62,7 +62,7 @@ struct dispatch_group_s {
         uint64_t volatile dg_state;  // leave 时加 DISPATCH_GROUP_VALUE_INTERVAL
         struct { 
             uint32_t dg_bits; // enter 时减 DISPATCH_GROUP_VALUE_INTERVAL
-            uint32_t dg_gen;  // 主要用于 dispatch_group_wait 函数中 
+            uint32_t dg_gen;  // 主要用于 dispatch_group_wait 函数中，当它不为 0 时，说明 dg_state 发生了进位，即可表示 dispatch_group 关联的 block 都执行完毕了
         };
     } __attribute__((aligned(8)));
     
@@ -144,8 +144,8 @@ _dispatch_group_create_and_enter(void)
 #define DISPATCH_GROUP_VALUE_1          DISPATCH_GROUP_VALUE_MASK // 可表示 dispatch_group 关联一个 block 
 #define DISPATCH_GROUP_VALUE_MAX        DISPATCH_GROUP_VALUE_INTERVAL // 可表示 dispatch_group 关联的 block 达到了最大值，正常情况时应小于此值
 
-#define DISPATCH_GROUP_HAS_NOTIFS       0x0000000000000002ULL 
-#define DISPATCH_GROUP_HAS_WAITERS      0x0000000000000001ULL // 对应 dispatch_group_wait 函数的使用， dispatch_group 处于等待状态
+#define DISPATCH_GROUP_HAS_NOTIFS       0x0000000000000002ULL // 表示 dispatch_group 是否有 notify 回调函数的掩码
+#define DISPATCH_GROUP_HAS_WAITERS      0x0000000000000001ULL // 对应 dispatch_group_wait 函数的使用，表示 dispatch_group 是否处于等待状态的掩码
 
 uint32_t max = (uint32_t)-1;
 NSLog(@"⏰⏰：%u", UINT32_MAX);
@@ -248,8 +248,10 @@ dispatch_group_enter(dispatch_group_t dg)
     uint32_t old_bits = os_atomic_sub_orig2o(dg, dg_bits, DISPATCH_GROUP_VALUE_INTERVAL, acquire);
     
     // #define DISPATCH_GROUP_VALUE_MASK   0x00000000fffffffcULL 二进制表示 ➡️ 0b0000...11111100ULL
-    // 拿 dg_bits 的旧值和 DISPATCH_GROUP_VALUE_MASK 进行与操作，主要是用来判断 dg_bits 的旧值是否是 0，
-    // 即用来判断这次 enter 之前 dispatch_group 内部是否没有关联任何 block。
+    // 拿 old_bits 和 DISPATCH_GROUP_VALUE_MASK 进行与操作，取出 dg_bits 的旧值，
+    // old_bits 的二进制表示的后来两位是标记位，需要做这个与操作把它们置为 0。
+    
+    // old_value 可用来判断这次 enter 之前 dispatch_group 内部是否没有关联任何 block。
     uint32_t old_value = old_bits & DISPATCH_GROUP_VALUE_MASK;
     
     if (unlikely(old_value == 0)) {
@@ -342,10 +344,12 @@ dispatch_group_leave(dispatch_group_t dg)
     
     // #define DISPATCH_GROUP_VALUE_MASK   0x00000000fffffffcULL ➡️ 0b0000...11111100ULL
     // #define DISPATCH_GROUP_VALUE_1   DISPATCH_GROUP_VALUE_MASK
-    // dg_state 的旧值和 DISPATCH_GROUP_VALUE_MASK 进行与操作，如果此时仅关联了一个 block 的话那么 dg_state 的旧值就是（十六进制：0xFFFFFFFC），
+    
+    // dg_state 的旧值和 DISPATCH_GROUP_VALUE_MASK 进行与操作进行掩码取值，如果此时仅关联了一个 block 的话那么 dg_state 的旧值就是（十六进制：0xFFFFFFFC），
     //（那么上面的 os_atomic_add_orig2o 执行后，dg_state 的值是 0x0000000100000000ULL，
     //  因为它是 uint64_t 类型它会从最大的 uint32_t 继续进位，而不同于 dg_bits 的 uint32_t 类型溢出后为 0）
     // 如果 dg_state 旧值 old_state 等于 0xFFFFFFFC 则和 DISPATCH_GROUP_VALUE_MASK 与操作结果还是 0xFFFFFFFC
+    
     uint32_t old_value = (uint32_t)(old_state & DISPATCH_GROUP_VALUE_MASK);
     
     if (unlikely(old_value == DISPATCH_GROUP_VALUE_1)) {
@@ -365,13 +369,20 @@ dispatch_group_leave(dispatch_group_t dg)
             if ((old_state & DISPATCH_GROUP_VALUE_MASK) == 0) {
                 // 如果目前是仅关联了一个 block 而且是正常的 enter 和 leave 配对执行，则会执行这里
                 
+                // 清理 new_state 中对应 DISPATCH_GROUP_HAS_WAITERS 的非零位的值，
+                // 即把 new_state 二进制表示的倒数第一位置 0
                 new_state &= ~DISPATCH_GROUP_HAS_WAITERS;
+                
+                // 清理 new_state 中对应 DISPATCH_GROUP_HAS_NOTIFS 的非零位的值，
+                // 即把 new_state 二进制表示的倒数第二位置 0
                 new_state &= ~DISPATCH_GROUP_HAS_NOTIFS;
             } else {
                 // If the group was entered again since the atomic_add above,
                 // we can't clear the waiters bit anymore as we don't know for
                 // which generation the waiters are for
                 
+                // 清理 new_state 中对应 DISPATCH_GROUP_HAS_NOTIFS 的非零位的值，
+                // 即把 new_state 二进制表示的倒数第二位置 0
                 new_state &= ~DISPATCH_GROUP_HAS_NOTIFS;
             }
             
@@ -607,46 +618,70 @@ _dispatch_group_notify(dispatch_group_t dg, dispatch_queue_t dq,
     uint64_t old_state, new_state;
     dispatch_continuation_t prev;
 
-    // dispatch_continuation_t 的 dc_data 成员变量被赋值为任务执行时所在的队列 
+    // dispatch_continuation_t 的 dc_data 成员变量被赋值为 dispatch_continuation_s 执行时所在的队列 
     dsn->dc_data = dq;
     
-    // dq 队列引用计数 +1 （`os_obj_ref_cnt` 的值）
+    // dq 队列引用计数 +1，因为有新的 dsn 要在这个 dq 中执行了（`os_obj_ref_cnt` 的值，）
     _dispatch_retain(dq);
 
     //    prev =  ({
     //        // 以下都是原子操作:
     //        _os_atomic_basetypeof(&(dg)->dg_notify_head) _tl = (dsn); // 类型转换
-    //        // 入参 dsn 会作为新的尾节点，这是是把 dsn 的 do_next 置为 NULL，防止错误数据
+    //        // 把 dsn 的 do_next 置为 NULL，防止错误数据
     //        os_atomic_store(&(_tl)->do_next, (NULL), relaxed);
-    //        // 入参 dsn 存储到 dispatch_group 的 dg_notify_tail 节点，并返回之前的旧的尾节点
+    //        // 入参 dsn 存储到 dg 的成员变量 dg_notify_tail 中，并返回之前的旧的 dg_notify_tail
     //        atomic_exchange_explicit(_os_atomic_c11_atomic(&(dg)->dg_notify_tail), _tl, memory_order_release);
     //    });
     
-    // 把 dsn 拼接到 notify 回调函数链表的尾部，并返回之前的尾节点
+    // 把 dsn 存储到 dg 的 dg_notify_tail 成员变量中，并返回之前的旧 dg_notify_tail，
+    // 这个 dg_notify_tail 是一个指针，用来指向 dg 的 notify 回调函数链表的尾节点。
     prev = os_mpsc_push_update_tail(os_mpsc(dg, dg_notify), dsn, do_next);
     
     // #define os_mpsc_push_was_empty(prev) ((prev) == NULL)
     
-    // 如果 prev 为 NULL，表示 dg 是第一次添加 notify 回调函数，则再次增加 dg 的引用计数，（`os_obj_ref_cnt` 的值）
-    // 前面我们还看到 dg 在第一次执行 enter 是也会增加一次引用计数。（`os_obj_ref_cnt` 的值）
+    // 如果 prev 为 NULL，表示 dg 是第一次添加 notify 回调函数，则再次增加 dg 的引用计数，（os_obj_ref_cnt 的值）
+    // 前面我们还看到 dg 在第一次执行 enter 时也会增加一次引用计数。（os_obj_ref_cnt 的值）
     if (os_mpsc_push_was_empty(prev)) _dispatch_retain(dg);
     
-    // 
+    //    ({
+    //        // prev 是指向 notify 回调函数链表的尾节点的一个指针
+    //        _os_atomic_basetypeof(&(dg)->dg_notify_head) _prev = (prev);
+    //        if (likely(_prev)) {
+    //            // 如果之前的尾节点存在，则把 dsn 存储到之前尾节点的 do_next 中，即进行了链表拼接
+    //            (void)os_atomic_store(&(_prev)->do_next, ((dsn)), relaxed);
+    //        } else {
+    //            // 如果之前尾节点不存在，则表示链表为空，则 dsn 就是第一个节点了，并则存储到 dg 的 dg_notify_head 成员变量中
+    //            (void)os_atomic_store(&(dg)->dg_notify_head, (dsn), relaxed);
+    //        }
+    //    });
+    
+    // 把 dsn 拼接到 dg 的 notify 回调函数链表中，或者是第一次的话，则把 dsn 作为 notify 回调函数链表的头节点
     os_mpsc_push_update_prev(os_mpsc(dg, dg_notify), prev, dsn, do_next);
     
     if (os_mpsc_push_was_empty(prev)) {
+        // 如果 prev 不为 NULL 的话，表示 dg 有 notify 回调函数存在。
     
-        // 一直循环等待直到 old_state == 0
-        os_atomic_rmw_loop2o(dg, dg_state, old_state, new_state, release, {
+        // os_atomic_rmw_loop2o 是一个宏定义，内部包裹了一个 do while 循环，直到 old_state == 0 时跳出循环，
+        // 即对应我们上文中的 dispatch_group_leave 函数中 dg_bits 的值回到 0 表示 dispatch_group 中关联的 block 都执行完了，
+        // 此时需要唤醒执行 notify 链表中的回调函数了。
         
+        // 大概逻辑是这样，这里不再拆开宏定义分析了，具体拆开如下面的 os_atomic_rmw_loop2o 宏分析，
+        // 实在太杀时间了，低头一小时，抬头一小时...😭😭
+        
+        // 只要记得这里是用一个 do while 循环等待，每次循环以原子方式读取状态值（dg_bits），
+        // 直到 0 状态，去执行 _dispatch_group_wake 唤醒函数把 notify 链表中的函数提交到指定的队列异步执行就好了！⛽️⛽️
+        
+        os_atomic_rmw_loop2o(dg, dg_state, old_state, new_state, release, {
             // #define DISPATCH_GROUP_HAS_NOTIFS   0x0000000000000002ULL
-            // 
+            
+            // 这里挺重要的一个点，把 new_state 的二进制表示的倒数第二位置为 1，
+            // 表示 dg 存在 notify 回调函数。
             new_state = old_state | DISPATCH_GROUP_HAS_NOTIFS;
             
             if ((uint32_t)old_state == 0) {
-                // 
+            
+                // 跳出循环执行 _dispatch_group_wake 函数，把 notify 回调函数链表中的任务提交到指定的队列中执行
                 os_atomic_rmw_loop_give_up({
-                    // 调用 _dispatch_group_wake
                     return _dispatch_group_wake(dg, new_state, false);
                 });
             }
@@ -655,7 +690,7 @@ _dispatch_group_notify(dispatch_group_t dg, dispatch_queue_t dq,
 }
 ```
 ##### os_mpsc_push_update_tail
-&emsp;`os_mpsc_push_update_tail` 是一个宏定义，主要是对 dispatch_group 的 notify 回调函数链表的尾节点（`dg_notify_tail`）进行更新，即把新入参的 `dispatch_continuation_t dsn` 拼接到链表尾部，并返回之前的尾节点。
+&emsp;`os_mpsc_push_update_tail` 是一个宏定义，主要是对 dispatch_group 的成员变量 `dg_notify_tail` 进行更新，即把新入参的 `dispatch_continuation_t dsn` 存储到 `dg_notify_tail` 中，并返回之前的 `dg_notify_tail`。
 
 &emsp;下面是涉及到的宏定义，想要看一行代码的含义，要把下面的涉及的宏定义全部展开，只能感叹...🍎🐂🍺...
 ```c++
@@ -695,64 +730,352 @@ prev =  ({
 });
 ```
 ##### os_mpsc_push_update_prev
-&emsp;
+&emsp;`os_mpsc_push_update_prev` 是一个宏定义，当 dispatch_group 的  notify 回调函数链表为空时，把入参的 `dispatch_continuation_t dsn` 存储到 `dg_notify_head` 中，如果是链表不为空，则把入参 `dispatch_continuation_t dsn` 拼接到链表中。
 ```c++
-
+#define os_mpsc_push_update_prev(Q, prev, head, _o_next)  ({ \
+    os_mpsc_node_type(Q) _prev = (prev); \
+    if (likely(_prev)) { \
+        (void)os_atomic_store2o(_prev, _o_next, (head), relaxed); \
+    } else { \
+        (void)os_atomic_store(_os_mpsc_head Q, (head), relaxed); \
+    } \
+})
 ```
+&emsp;`os_mpsc_push_update_prev((dg, dg_notify), prev, dsn, do_next)` 宏定义展开如下：
+```c++
+({
+    // prev 是 notify 回调函数链表的尾节点
+    _os_atomic_basetypeof(&(dg)->dg_notify_head) _prev = (prev);
+    if (likely(_prev)) {
+        // 如果之前的尾节点存在，则把 dsn 存储到之前尾节点的 do_next 中
+        (void)os_atomic_store(&(_prev)->do_next, ((dsn)), relaxed);
+    } else {
+        // 如果之前尾节点不存在，则表示链表为空，则 dsn 就是第一个节点了，并则存储到 dg 的 dg_notify_head 成员变量中
+        (void)os_atomic_store(&(dg)->dg_notify_head, (dsn), relaxed);
+    }
+});
+```
+##### os_atomic_rmw_loop2o
+&emsp;`os_atomic_rmw_loop2o` 宏定义内部其实包裹了一个完整的 do while，然后是 do while 循环内部是一个原子操作进行读值比较赋值直到可以跳出循环。
+```c++
+#define os_atomic_rmw_loop2o(p, f, ov, nv, m, ...) \
+        os_atomic_rmw_loop(&(p)->f, ov, nv, m, __VA_ARGS__)
+        
+#define os_atomic_cmpxchgvw(p, e, v, g, m) \
+        ({ _os_atomic_basetypeof(p) _r = (e); _Bool _b = \
+        atomic_compare_exchange_weak_explicit(_os_atomic_c11_atomic(p), \
+        &_r, v, memory_order_##m, memory_order_relaxed); *(g) = _r;  _b; })
 
+#define os_atomic_rmw_loop(p, ov, nv, m, ...)  ({ \
+    bool _result = false; \
+    __typeof__(p) _p = (p); \
+    ov = os_atomic_load(_p, relaxed); \
+    do { \
+        __VA_ARGS__; \
+        _result = os_atomic_cmpxchgvw(_p, ov, nv, &ov, m); \
+    } while (unlikely(!_result)); \
+    _result; \
+})
+```
+&emsp;上面 `_dispatch_group_notify` 函数中，`os_atomic_rmw_loop2o` 的宏定义使用，大概可以拆成下面一段：
+```c++
+({
+    bool _result = false;
+    __typeof__(dg) _dg = (dg);
+    
+    dg_state = os_atomic_load(_dg, relaxed);
+    
+    do {
+        new_state = old_state | DISPATCH_GROUP_HAS_NOTIFS;
+        if ((uint32_t)old_state == 0) {
+            os_atomic_rmw_loop_give_up({
+                return _dispatch_group_wake(dg, new_state, false);
+            });
+        }
+        
+        _result = ({ _os_atomic_basetypeof(_dg) _r = (dg_state); 
+                     _Bool _b = atomic_compare_exchange_weak_explicit(_os_atomic_c11_atomic(_dg), &_r, old_state, memory_order_release, memory_order_relaxed); 
+                     *(&dg_state) = _r;  
+                     _b; 
+                  });
+    } while (unlikely(!_result));
+    _result;
+})
+```
+### dispatch_group_wait
+&emsp;`dispatch_group_wait` 函数同步等待直到与 dispatch_group 关联的所有 block 都异步执行完成或者直到指定的超时时间过去为止，才会返回。
 
+&emsp;如果没有与 dispatch_group 关联的 block，则此函数将立即返回。
+
+&emsp;从多个线程同时使用同一 dispatch_group 调用此函数的结果是不确定的。
+
+&emsp;成功返回此函数后，dispatch_group 关联的 block 为空，可以使用 `dispatch_release` 释放 dispatch_group，也可以将其重新用于其它 block。
+
+&emsp;`timeout`：指定何时超时（dispatch_time_t）。有 `DISPATCH_TIME_NOW` 和 `DISPATCH_TIME_FOREVER` 常量。
+
+&emsp;`result`：成功返回零（与该组关联的所有块在指定的时间内完成），错误返回非零（即超时）。
+```c++
+long
+dispatch_group_wait(dispatch_group_t dg, dispatch_time_t timeout)
+{
+    uint64_t old_state, new_state;
+    
+    // 使用同上面的 os_atomic_rmw_loop2o 宏定义，内部是一个 do while 循环，
+    // 每次循环都从本地原子取值，判断 dispatch_group 所处的状态，
+    // 是否关联的 block 都异步执行完毕了。 
+    
+    os_atomic_rmw_loop2o(dg, dg_state, old_state, new_state, relaxed, {
+        // #define DISPATCH_GROUP_VALUE_MASK   0x00000000fffffffcULL
+        
+        // 表示关联的 block 为 0 或者关联的 block 都执行完毕了，则直接 return 0，
+        //（函数返回，停止阻塞当前线程。）
+        if ((old_state & DISPATCH_GROUP_VALUE_MASK) == 0) {
+            // 跳出循环并返回 0
+            os_atomic_rmw_loop_give_up_with_fence(acquire, return 0);
+        }
+        
+        // 如果 timeout 等于 0，则立即跳出循环并返回 _DSEMA4_TIMEOUT()，
+        // 指定等待时间为 0，则函数返回，并返回超时提示，
+        //（继续向下执行，停止阻塞当前线程。）
+        if (unlikely(timeout == 0)) {
+            // 跳出循环并返回 _DSEMA4_TIMEOUT() 超时
+            os_atomic_rmw_loop_give_up(return _DSEMA4_TIMEOUT());
+        }
+        
+        // #define DISPATCH_GROUP_HAS_WAITERS   0x0000000000000001ULL
+        new_state = old_state | DISPATCH_GROUP_HAS_WAITERS;
+        
+        // 表示目前需要等待，至少等到关联的 block 都执行完毕或者等到指定时间超时 
+        if (unlikely(old_state & DISPATCH_GROUP_HAS_WAITERS)) {
+            // 跳出循环，执行下面的 _dispatch_group_wait_slow 函数
+            os_atomic_rmw_loop_give_up(break);
+        }
+    });
+
+    return _dispatch_group_wait_slow(dg, _dg_state_gen(new_state), timeout);
+}
+```
+#### _dispatch_group_wait_slow
+&emsp; 
+```c++
+DISPATCH_NOINLINE
+static long
+_dispatch_group_wait_slow(dispatch_group_t dg, uint32_t gen,
+        dispatch_time_t timeout)
+{
+    // for 死循环，等待内部的条件满足时 return，否则一直进行死循环
+    for (;;) {
+        // 比较等待，内部是根据指定的时间进行时间等待，并根据 &dg->dg_gen 值判断是否关联的 block 都异步执行完毕了。
+        // 这里牵涉到 dg_state 的进位，当 dg_bits 溢出时会进位到 dg_gen 中，此时 dg_gen 不再是 0，可表示关联的 block 都执行完毕了。
+        int rc = _dispatch_wait_on_address(&dg->dg_gen, gen, timeout, 0);
+        
+        // 表示 dispatch_group 关联的 block 都异步执行完毕了，return 0
+        if (likely(gen != os_atomic_load2o(dg, dg_gen, acquire))) {
+            return 0;
+        }
+        
+        // 等到超过指定时间了， return _DSEMA4_TIMEOUT() 超时
+        if (rc == ETIMEDOUT) {
+            return _DSEMA4_TIMEOUT();
+        }
+    }
+}
+```
+&emsp;下面我们学习上面 `dispatch_group_leave` 和 `dispatch_group_notify` 函数中都曾使用过的 `_dispatch_group_wake` 函数，正是它完成了唤醒，并把所有的 notify 回调函数提交到指定的队列中异步执行。
 ### _dispatch_group_wake
-&emsp;
+&emsp;`_dispatch_group_wake` 把  notify 回调函数链表中的所有的函数提交到指定的队列中异步执行，`needs_release` 表示是否需要释放所有关联 block 异步执行完成、所有的 notify 回调函数执行完成的 dispatch_group 对象。`dg_state` 则是 dispatch_group 的状态，包含目前的关联的 block 数量等。
 ```c++
 DISPATCH_NOINLINE
 static void
 _dispatch_group_wake(dispatch_group_t dg, uint64_t dg_state, bool needs_release)
 {
-    // 
+    // dispatch_group 对象的引用计数是否需要 -1
     uint16_t refs = needs_release ? 1 : 0; // <rdar://problem/22318411>
     
-    // #define DISPATCH_GROUP_HAS_NOTIFS   0x0000000000000002ULL
+    // #define DISPATCH_GROUP_HAS_NOTIFS   0x0000000000000002ULL // 用来判断 dispatch_group 是否存在 notify 函数的掩码
     
+    // 这里如果 dg_state & 0x0000000000000002ULL 结果不为 0，即表示 dg 存在 notify 回调函数
     if (dg_state & DISPATCH_GROUP_HAS_NOTIFS) {
+    
         dispatch_continuation_t dc, next_dc, tail;
 
         // Snapshot before anything is notified/woken <rdar://problem/8554546>
+        
+        // 取出 dg 的 notify 回调函数链表的头 
         dc = os_mpsc_capture_snapshot(os_mpsc(dg, dg_notify), &tail);
         
         do {
+            // 取出 dc 创建时指定的队列，对应 _dispatch_group_notify 函数中的 dsn->dc_data = dq 赋值操作
             dispatch_queue_t dsn_queue = (dispatch_queue_t)dc->dc_data;
+            
+            // 取得下一个节点
             next_dc = os_mpsc_pop_snapshot_head(dc, tail, do_next);
             
-            // 异步执行函数
-            _dispatch_continuation_async(dsn_queue, dc,
-                    _dispatch_qos_from_pp(dc->dc_priority), dc->dc_flags);
+            // 根据各队列的优先级异步执行 notify 链表中的函数
+            _dispatch_continuation_async(dsn_queue, dc, _dispatch_qos_from_pp(dc->dc_priority), dc->dc_flags);
                     
-            // 释放 dsn_queue
+            // 释放 notify 函数执行时的队列 dsn_queue
             _dispatch_release(dsn_queue);
+            
+        // 当 next_dc 为 NULL 时，跳出循环
         } while ((dc = next_dc));
 
+        // 这里的 refs 计数增加 1 正对应了 _dispatch_group_notify 函数中，
+        // 当第一次给 dispatch_group 添加 notify 函数时的引用计数加 1，_dispatch_retain(dg)
+        // 代码执行到这里时 dg 的 notify 的值
+        //（统计 dispatch_group 的引用计数需要减小的值）
         refs++;
     }
     
-    // 
+    // #define DISPATCH_GROUP_HAS_WAITERS   0x0000000000000001ULL
+    
+    // 根据 &dg->dg_gen 的值判断是否处于阻塞状态
     if (dg_state & DISPATCH_GROUP_HAS_WAITERS) {
         _dispatch_wake_by_address(&dg->dg_gen);
     }
 
-    // 
+    // 根据 refs 判断是否需要释放 dg（执行 os_obj_ref_cnt - refs），当 os_obj_ref_cnt 的值小于 0 时，会销毁 dg。
+    // 如果 needs_release 为真，并且 dg 有 notify 函数时，会执行 os_obj_ref_cnt - 2
+    // 如果 needs_release 为假，但是 dg 有 notify 函数时，会执行 os_obj_ref_cnt - 1
+    // 如果 needs_release 为假，且 dg 无 notify 函数时，不执行操作
     if (refs) _dispatch_release_n(dg, refs);
 }
 ```
+#### os_mpsc_capture_snapshot
+&emsp;`os_mpsc_capture_snapshot` 宏定义，用来取 notify 函数链表的头节点。
+```c++
+#define os_mpsc_get_head(Q)  ({ \
+    __typeof__(_os_mpsc_head Q) __n = _os_mpsc_head Q; \
+    os_mpsc_node_type(Q) _node; \
+    _node = os_atomic_load(__n, dependency); \
+    if (unlikely(_node == NULL)) { \
+        _node = _dispatch_wait_for_enqueuer((void **)__n); \
+    } \
+    _node; \
+})
 
+#define os_atomic_xchg(p, v, m) \
+        atomic_exchange_explicit(_os_atomic_c11_atomic(p), v, memory_order_##m)
 
+#define os_mpsc_capture_snapshot(Q, tail)  ({ \
+    os_mpsc_node_type(Q) _head = os_mpsc_get_head(Q); \
+    os_atomic_store(_os_mpsc_head Q, NULL, relaxed); \
+    /* 22708742: set tail to NULL with release, so that NULL write */ \
+    /* to head above doesn't clobber head from concurrent enqueuer */ \
+    *(tail) = os_atomic_xchg(_os_mpsc_tail Q, NULL, release); \
+    _head; \
+})
+```
+#### _dispatch_release_n
+&emsp;`_dispatch_release_n` 根据入参减少 GCD “对象” 的内部的引用计数。
+```c++
+DISPATCH_ALWAYS_INLINE_NDEBUG
+static inline void
+_dispatch_release_n(dispatch_object_t dou, int n)
+{
+    _os_object_release_internal_n_inline(dou._os_obj, n);
+}
+```
+&emsp;`_os_object_release_internal_n_inline`:
+```c++
+DISPATCH_ALWAYS_INLINE
+static inline void
+_os_object_release_internal_n_inline(_os_object_t obj, int n)
+{
+    // 以原子方式对 obj 的 os_obj_ref_cnt 减少 n
+    int ref_cnt = _os_object_refcnt_sub(obj, n);
+    
+    //  如果大于等于 0 表示该 GCD 对象还正在被使用，直接 return 
+    if (likely(ref_cnt >= 0)) {
+        return;
+    }
+    
+    // 如果小于 -1 的话，表示发生了错误 GCD 对象被过度 release
+    if (unlikely(ref_cnt < -1)) {
+        _OS_OBJECT_CLIENT_CRASH("Over-release of an object");
+    }
+    // 看到只有 DEBUG 模式下才会操作 os_obj_xref_cnt 成员变量
+#if DISPATCH_DEBUG
+    int xref_cnt = obj->os_obj_xref_cnt;
+    if (unlikely(xref_cnt >= 0)) {
+        DISPATCH_INTERNAL_CRASH(xref_cnt,
+                "Release while external references exist");
+    }
+#endif
 
+    // _os_object_refcnt_dispose_barrier() is in _os_object_dispose()
+    return _os_object_dispose(obj);
+}
+```
+&emsp;`_os_object_refcnt_sub` 是一个宏，对 GCD 对象的 `os_obj_ref_cnt` 以原子方式减少 `n`。
+```c++
+#define _os_object_refcnt_sub(o, n) \
+        _os_atomic_refcnt_sub2o(o, os_obj_ref_cnt, n)
+        
+#define _os_atomic_refcnt_sub2o(o, m, n) \
+        _os_atomic_refcnt_perform2o(o, m, sub, n, release)
 
+#define _OS_OBJECT_GLOBAL_REFCNT INT_MAX
 
+#define _os_atomic_refcnt_perform2o(o, f, op, n, m)   ({ \
+    __typeof__(o) _o = (o); \
+    int _ref_cnt = _o->f; \
+    if (likely(_ref_cnt != _OS_OBJECT_GLOBAL_REFCNT)) { \
+        _ref_cnt = os_atomic_##op##2o(_o, f, n, m); \
+    } \
+    _ref_cnt; \
+})
+```
+### _os_object_dispose
+&emsp;`_os_object_dispose` 函数是 GCD 对象的销毁函数。
+```c++
+#define _os_object_refcnt_dispose_barrier(o) \
+        _os_atomic_refcnt_dispose_barrier2o(o, os_obj_ref_cnt)
 
+#define _os_atomic_refcnt_dispose_barrier2o(o, m) \
+        (void)os_atomic_load2o(o, m, acquire)
 
+void
+_os_object_dispose(_os_object_t obj)
+{
+    // 以原子方式读取 os_obj_ref_cnt 的值
+    _os_object_refcnt_dispose_barrier(obj);
+    
+    // 如果 GCD 对象包含指定的销毁函数 _os_obj_dispose，则执行自己的销毁函数
+    if (likely(obj->os_obj_isa->_os_obj_dispose)) {
+        return obj->os_obj_isa->_os_obj_dispose(obj);
+    }
+    
+    return _os_object_dealloc(obj);
+}
 
+void
+_os_object_dealloc(_os_object_t obj)
+{
+    *((void *volatile*)&obj->os_obj_isa) = (void *)0x200;
+    // free 释放 obj 的内存空间
+    return free(obj);
+}
+```
+&emsp;`_os_object_dealloc` 销毁函数也对应了 GCD 对象的创建函数。
+```c++
+inline _os_object_t
+_os_object_alloc_realized(const void *cls, size_t size)
+{
+    _os_object_t obj;
+    dispatch_assert(size >= sizeof(struct _os_object_s));
+    
+    // while 循环保证 calloc 申请内存空间成功
+    while (unlikely(!(obj = calloc(1u, size)))) {
+        _dispatch_temporary_resource_shortage();
+    }
+    
+    obj->os_obj_isa = cls;
+    return obj;
+}
+```
 
-
+&emsp;至此 dispatch_group 的内容就看完了，细节很多，知识点很多，需要耐心取一点一点解读！⛽️⛽️
 
 ## 参考链接
 **参考链接:🔗**
