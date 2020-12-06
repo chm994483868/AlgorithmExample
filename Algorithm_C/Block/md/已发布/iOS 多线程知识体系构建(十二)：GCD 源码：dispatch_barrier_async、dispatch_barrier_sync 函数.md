@@ -2,18 +2,25 @@
 
 > &emsp;
 
-&emsp;
-
 ## dispatch_barrier_async
-&emsp;
+&emsp;`dispatch_barrier_async` 提交 barrier block 以在调度队列上异步执行。（同 `dispatch_async` 不会阻塞当前线程，直接返回执行接下来的语句，但是后添加的 block 则是等到 barrier block 执行完成后才会开始执行。）
+
+&emsp;将一个 block 提交到诸如 `dispatch_async` 之类的调度队列中，但将该 block 标记为 barrier（`DC_FLAG_BARRIER`）屏障（仅与 `DISPATCH_QUEUE_CONCURRENT` 并发队列相关）。
+
+&emsp;`dq` 参数是 block 提交到的目标调度队列。系统将在目标队列上保留引用，直到该 block 执行完成为止。
+
+&emsp;`work` 参数是提交到目标调度队列的 block（该函数内部代表调用者执行 `Block_copy` 和 `Block_release`）。
 ```c++
 #ifdef __BLOCKS__
 void
 dispatch_barrier_async(dispatch_queue_t dq, dispatch_block_t work)
 {
     dispatch_continuation_t dc = _dispatch_continuation_alloc();
-    // 
+    
+    // dc_flags 中添加 DC_FLAG_BARRIER 标记，标记此 work 是一个屏障 block，
+    // 然后函数内部的别的内容都和 dispatch_async
     uintptr_t dc_flags = DC_FLAG_CONSUME | DC_FLAG_BARRIER;
+    
     dispatch_qos_t qos;
 
     qos = _dispatch_continuation_init(dc, dq, work, 0, dc_flags);
@@ -21,6 +28,23 @@ dispatch_barrier_async(dispatch_queue_t dq, dispatch_block_t work)
 }
 #endif
 ```
+&emsp;看到 `dispatch_barrier_async` 函数内部出了 `dc_flags` 赋值和 `dispatch_async` 不同，其它调用完全如出一辙。
+## dispatch_barrier_sync
+```c++
+void
+dispatch_barrier_sync(dispatch_queue_t dq, dispatch_block_t work)
+{
+    // dc_flags 里面添加了 DC_FLAG_BARRIER 标记
+    uintptr_t dc_flags = DC_FLAG_BARRIER | DC_FLAG_BLOCK;
+    
+    if (unlikely(_dispatch_block_has_private_data(work))) {
+        return _dispatch_sync_block_with_privdata(dq, work, dc_flags);
+    }
+    
+    _dispatch_barrier_sync_f(dq, work, _dispatch_Block_invoke(work), dc_flags);
+}
+```
+
 
 ## 参考链接
 **参考链接:🔗**
