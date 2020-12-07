@@ -68,8 +68,12 @@ _dispatch_barrier_sync_f_inline(dispatch_queue_t dq, void *ctxt,
     if (unlikely(dx_metatype(dq) != _DISPATCH_LANE_TYPE)) {
         DISPATCH_CLIENT_CRASH(0, "Queue type doesn't support dispatch_sync");
     }
-
+    
+    // dispatch_lane_s 是 dispatch_queue_s 的子类
+    // struct dispatch_lane_s *_dl 是透明联合体 dispatch_object_t 中的一个成员变量，
+    // 所以这里的作用是把入参 dispatch_queue_t dq （dispatch_queue_s 类型的指针）转化为一个 dispatch_lane_s 类型的指针
     dispatch_lane_t dl = upcast(dq)._dl;
+    
     // The more correct thing to do would be to merge the qos of the thread
     // that just acquired the barrier lock into the queue state.
     //
@@ -84,13 +88,12 @@ _dispatch_barrier_sync_f_inline(dispatch_queue_t dq, void *ctxt,
                 DC_FLAG_BARRIER | dc_flags);
     }
 
-    // 队列递归
+    // 目标队列的递归
     if (unlikely(dl->do_targetq->do_targetq)) {
         return _dispatch_sync_recurse(dl, ctxt, func,
                 DC_FLAG_BARRIER | dc_flags);
     }
     
-    // 
     _dispatch_introspection_sync_begin(dl);
     // 
     _dispatch_lane_barrier_sync_invoke_and_complete(dl, ctxt, func
