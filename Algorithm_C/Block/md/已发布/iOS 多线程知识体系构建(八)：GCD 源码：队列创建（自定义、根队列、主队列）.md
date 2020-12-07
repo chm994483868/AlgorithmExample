@@ -1,6 +1,6 @@
 # iOS 多线程知识体系构建(八)：GCD 源码：队列创建（自定义、根队列、主队列）
 
-> &emsp;上篇主要看了源码中基础的数据结构以及和队列相关的一些内容，那么本篇就从创建自定义队列作为主线，过程中遇到新的数据结构时展开作为支线来学习，那么开始吧！⛽️⛽️
+> &emsp;上篇主要看了源码中基础的数据结构以及和队列相关的一些内容，那么本篇就从创建自定义队列作为主线，过程中遇到新的数据结构时再展开作为支线来学习，那么开始吧！⛽️⛽️
 
 &emsp;在 GCD 中使用最多的三种队列：主队列（`dispatch_get_main_queue()`）、全局并发队列（`dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0)`）、自定义队列（`dispatch_queue_create`），那么我们就先由创建自定义队列开始学习。
 ## dispatch_queue_create（创建自定义队列）
@@ -63,7 +63,7 @@ typedef struct dispatch_lane_s {
 &emsp;把 `dispatch_lane_s` 定义中的宏完全展开的话：
 ```c++
 typedef struct dispatch_lane_s {
-    // 此处两行则是 dispatch_lane_s 继承的父类 dispatch_queue_s 的头部内容
+    // 表示 dispatch_lane_s 继承的父类 dispatch_queue_s、dispatch_object_s、_os_object_s
     struct dispatch_queue_s _as_dq[0];
     struct dispatch_object_s _as_do[0];
     struct _os_object_s _as_os_obj[0];
@@ -330,7 +330,6 @@ _dispatch_lane_create_with_target(const char *label, dispatch_queue_attr_t dqa,
 }
 ```
 &emsp;`_dispatch_lane_create_with_target` 函数的执行流程如注释所示，下面我们摘录其中的较关键点再进行分析。
-
 ## _dispatch_get_root_queue
 &emsp;当 `tq` 不存在时，会调用 `_dispatch_get_root_queue` 返回一个 `dispatch_queue_global_t` 赋值给 `tq`。在 `dispatch_queue_create` 函数调用中 `tq` 传了一个默认值：`DISPATCH_TARGET_QUEUE_DEFAULT`（它的实际值是 `NULL`），所以当我们创建串行队列或者并发队列的时候都会调用 `_dispatch_get_root_queue` 函数来获取一个目标队列。
 ```c++
@@ -754,7 +753,8 @@ struct dispatch_queue_static_s _dispatch_main_q = {
     DISPATCH_GLOBAL_OBJECT_HEADER(queue_main), // 继承自父类
     
 #if !DISPATCH_USE_RESOLVERS
-    // 是否有目标队列
+
+    // 是否有目标队列（从根队列数组中取出 DISPATCH_ROOT_QUEUE_IDX_DEFAULT_QOS + !!(overcommit) 为下标的队列作为目标队列）
     // #define _dispatch_get_default_queue(overcommit) \
     //         _dispatch_root_queues[DISPATCH_ROOT_QUEUE_IDX_DEFAULT_QOS + \
     //                 !!(overcommit)]._as_dq
@@ -788,7 +788,6 @@ dispatch_get_main_queue(void)
 }
 ```
 ## _dispatch_trace_queue_create（创建根队列/主队列）
-&emsp;
 ```c++
 DISPATCH_ALWAYS_INLINE
 static inline dispatch_queue_class_t
