@@ -122,7 +122,7 @@ struct dispatch_object_s {
 #define _DISPATCH_OBJECT_HEADER(x) \
         struct _os_object_s _as_os_obj[0]; \ ⬅️ 这里是一个长度为 0 的数组，不占用任何内存，同时它也预示了 dispatch_object_s 的 “父类” 是 _os_object_s 
 
-        OS_OBJECT_STRUCT_HEADER(dispatch_##x); \ ⬅️ OS_OBJECT_STRUCT_HEADER 宏展开就是把“父类”-_os_object_s 的成员变量平铺展开放在“子类”-dispatch_object_s 的头部
+        OS_OBJECT_STRUCT_HEADER(dispatch_##x); \ ⬅️ OS_OBJECT_STRUCT_HEADER 宏展开就是把“父类”-_os_object_s 的成员变量平铺展开放在“子类” dispatch_object_s 的头部位置
 
         struct dispatch_##x##_s *volatile do_next; \ ⬅️ 下面的这一部分则是“子类”自己的成员变量
         struct dispatch_queue_s *do_targetq; \
@@ -160,7 +160,7 @@ struct dispatch_object_s {
 #define _OS_OBJECT_HEADER(isa, ref_cnt, xref_cnt) \
 isa; /* must be pointer-sized */ \ // isa 必须是指针大小
 int volatile ref_cnt; \ // 引用计数
-int volatile xref_cnt // 外部引用计数，两者都为 0 时，对象才能释放
+int volatile xref_cnt // 外部引用计数
 ```
 &emsp;到这里后 `dispatch_object_s` 涉及到的宏定义就全部看完了，现在把上面的 `dispatch_object_s` 结构体内部的宏定义全部展开后如下:
 ```c++
@@ -174,10 +174,10 @@ struct dispatch_object_s {
     
     const struct dispatch_object_vtable_s *do_vtable; /* must be pointer-sized */ // do_vtable 包含了对象类型和 dispatch_object_s 的操作函数
     int volatile do_ref_cnt; // 引用计数（do 应该是 Dispatch Object 的首字母，上面 _os_object_s 内使用的是 os_obj_ref_cnt）
-    int volatile do_xref_cnt; // 外部引用计数，两者都为 0 时才会释放对象内存
+    int volatile do_xref_cnt; // 外部引用计数
     
     struct dispatch_object_s *volatile do_next; // do_next 表示链表的 next，（下一个 dispatch_object_s）
-    struct dispatch_queue_s *do_targetq; // 目标队列，（表示当前任务要在这个队列运行，待验证）
+    struct dispatch_queue_s *do_targetq; // 目标队列，（表示当前任务要在这个队列运行）
     void *do_ctxt; // 上下文，即运行任务（其实是一个函数）的参数
     void *do_finalizer; // 最终销毁时调用的函数
 };
@@ -277,7 +277,7 @@ struct dispatch_object_extra_vtable_s { // 这里表明子类的 vtable 内部�
     const char *const do_kind; // 起到说明的作用
     void (*const do_dispose)(struct dispatch_object_s *, bool *allow_free); // dispose 方法
     size_t (*const do_debug)(struct dispatch_object_s *, char *, size_t); // debug 方法
-    void (*const do_invoke)(struct dispatch_object_s *, dispatch_invoke_context_t, dispatch_invoke_flags_t); // 唤醒队列的方法
+    void (*const do_invoke)(struct dispatch_object_s *, dispatch_invoke_context_t, dispatch_invoke_flags_t); // 调用队列中的任务的方法
 };
 
 struct dispatch_object_vtable_s { // 这里就是我们抽丝剥茧一层一层要找的 dispatch_object_vtable_s 了。
@@ -527,7 +527,7 @@ struct dispatch_queue_s {
     
     void *__dq_opaque1;
     union { 
-        uint64_t volatile dq_state; // 队列状态？
+        uint64_t volatile dq_state; // 队列状态
         struct {
             // typedef uint32_t dispatch_lock;
             // dispatch_lock 是 uint32_t 类型
