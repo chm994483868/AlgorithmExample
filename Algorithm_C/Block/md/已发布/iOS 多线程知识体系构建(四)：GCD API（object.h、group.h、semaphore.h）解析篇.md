@@ -400,7 +400,6 @@ dispatch_resume(dispatch_object_t object);
 
 &emsp;`object` 要恢复的对象。在此参数中传递 `NULL` 的结果是未定义的。
 ## dispatch_set_qos_class_floor
-&emsp;
 ```c++
 API_AVAILABLE(macos(10.14), ios(12.0), tvos(12.0), watchos(5.0))
 DISPATCH_EXPORT DISPATCH_NOTHROW
@@ -425,7 +424,7 @@ dispatch_wait(void *object, dispatch_time_t timeout);
         )((object),(timeout))
 #endif
 ```
-&emsp;类型通用宏，根据第一个参数的类型，映射到 `dispatch_block_wait`，`dispatch_group_wait` 或 `dispatch_semaphore_wait`。此功能不适用于任何其他对象类型。
+&emsp;类型通用宏，根据第一个参数的类型，映射到 `dispatch_block_wait`，`dispatch_group_wait` 或 `dispatch_semaphore_wait` 此功能不适用于任何其他对象类型。
 
 &emsp;`object` 要等待的对象。在此参数中传递 `NULL` 的结果是未定义的。
 

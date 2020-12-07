@@ -2,10 +2,9 @@
 
 > &emsp;本篇首先来学习 iOS 多线程技术中的 Pthreads 技术。⛽️⛽️
 
-## Pthreads
-
 > &emsp;可移植操作系统接口（英语：Portable Operating System Interface，缩写为POSIX）是 IEEE（电气和电子工程师协会）为要在各种 UNIX 操作系统上运行软件，而定义 API 的一系列互相关联的标准的总称，其正式称呼为 IEEE Std 1003，而国际标准名称为 ISO/IEC 9945。此标准源于一个大约开始于1985 年的项目。POSIX 这个名称是由理查德·斯托曼（RMS）应 IEEE 的要求而提议的一个易于记忆的名称。它基本上是 Portable Operating System Interface（可移植操作系统接口）的缩写，而 X 则表明其对 Unix API 的传承。--来自百度百科。
 
+## Pthreads
 &emsp;Pthreads 一般指 POSIX 线程。 POSIX 线程（POSIX Threads，常被缩写为 Pthreads）是 POSIX 的线程标准，定义了创建和操纵线程的一套 API。
 ### Pthreads 简介
 &emsp;实现 POSIX 线程标准的库常被称作 Pthreads，一般用于 Unix-like POSIX  系统，如 Linux、Solaris、macOS。但是 Microsoft Windows 上的实现也存在，例如直接使用 Windows API 实现的第三方库 pthreads-w32，而利用 Windows 的 SFU/SUA 子系统，则可以使用微软提供的一部分原生 POSIX API。Pthreads 是一套通用的多线程的 API，可以在 Unix / Linux / Windows 等系统跨平台使用，使用 C  语言编写，需要程序员自己管理线程的生命周期，这里我们对它常用的 API 学习一下，等到后面学习 GCD  源码的时候都会用到。
@@ -44,8 +43,7 @@
     // Use __bridge to convert directly (no change in ownership)
     // Use CFBridgingRetain call to make an ARC object available as a +1 'void *'
     
-    // MRC 中不需要使用桥接，能直接使用 objc
-    
+    // MRC 中不需要使用桥接，能直接使用 objc。
     int result = pthread_create(&thread, NULL, run, (__bridge void *)(objc));
     
     if (result == 0) {
@@ -128,7 +126,7 @@ struct _opaque_pthread_t {
 struct __darwin_pthread_handler_rec {
     void (*__routine)(void *);    // Routine to call 线程的入口函数，即需要在新线程中执行的任务
     void *__arg;            // Argument to pass __routine 函数的参数
-    struct __darwin_pthread_handler_rec *__next; 
+    struct __darwin_pthread_handler_rec *__next; // 可以理解为链表下一个节点的指针
 };
 ```
 &emsp;通过上面的代码一层一层递进：`pthread_t` 其实是 `_opaque_pthread_t` 结构体指针。
@@ -264,10 +262,10 @@ int pthread_attr_getscope(const pthread_attr_t * __restrict, int * __restrict); 
 ```
 
 &emsp;由于目前该属性的理解有限，这边就先把 Linux 大佬的原文摘录贴出了。
-> &emsp;说到这个绑定属性，就不得不提起另外一个概念：轻进程（ Light Weight Process，简称 LWP）。轻进程和 Linux 系统的内核线程拥有相同的概念，属于内核的调度实体。一个轻进程可以控制一个或多个线程。默认情况下，对于一个拥有n个线程的程序，启动多少轻进程，由哪些轻进程来控制哪些线程由操作系统来控制，这种状态被称为非绑定的。那么绑定的含义就很好理解了，只要指定了某个线程“绑”在某个轻进程上，就可以称之为绑定的了。被绑定的线程具有较高的相应速度，因为操作系统的调度主体是轻进程，绑定线程可以保证在需要的时候它总有一个轻进程可用。绑定属性就是干这个用的。
+> &emsp;说到这个绑定属性，就不得不提起另外一个概念：轻进程（ Light Weight Process，简称 LWP）。轻进程和 Linux 系统的内核线程拥有相同的概念，属于内核的调度实体。一个轻进程可以控制一个或多个线程。默认情况下，对于一个拥有 n 个线程的程序，启动多少轻进程，由哪些轻进程来控制哪些线程由操作系统来控制，这种状态被称为非绑定的。那么绑定的含义就很好理解了，只要指定了某个线程 “绑” 在某个轻进程上，就可以称之为绑定的了。被绑定的线程具有较高的响应速度，因为操作系统的调度主体是轻进程，绑定线程可以保证在需要的时候它总有一个轻进程可用。绑定属性就是干这个用的。
 设置绑定属性的接口是 pthread_attr_setscope()，它的完整定义是：int pthread_attr_setscope(pthread_attr_t *attr, int scope);
 它有两个参数，第一个就是线程属性对象的指针，第二个就是绑定类型，拥有两个取值：PTHREAD_SCOPE_SYSTEM（绑定的）和 PTHREAD_SCOPE_PROCESS（非绑定的）。
->  &emsp;不知道你是否在这里发现了本文的矛盾之处。就是这个绑定属性跟我们之前说的 NPTL 有矛盾之处。在介绍 NPTL 的时候就说过业界有一种 m:n 的线程方案，就跟这个绑定属性有关。但是笔者还说过 NPTL 因为 Linux 的“蠢”没有采取这种方案，而是采用了“1:1” 的方案。这也就是说，Linux 的线程永远都是绑定。对，Linux 的线程永远都是绑定的，所以 PTHREAD_SCOPE_PROCESS 在 Linux 中不管用，而且会返回 ENOTSUP 错误。
+>  &emsp;不知道你是否在这里发现了本文的矛盾之处。就是这个绑定属性跟我们之前说的 NPTL 有矛盾之处。在介绍 NPTL 的时候就说过业界有一种 m:n 的线程方案，就跟这个绑定属性有关。但是笔者还说过 NPTL 因为 Linux 的 “蠢” 没有采取这种方案，而是采用了“1:1” 的方案。这也就是说，Linux 的线程永远都是绑定。对，Linux 的线程永远都是绑定的，所以 PTHREAD_SCOPE_PROCESS 在 Linux 中不管用，而且会返回 ENOTSUP 错误。
 既然 Linux 并不支持线程的非绑定，为什么还要提供这个接口呢？答案就是兼容！因为 Linux 的 NTPL 是号称 POSIX 标准兼容的，而绑定属性正是 POSIX 标准所要求的，所以提供了这个接口。如果读者们只是在 Linux 下编写多线程程序，可以完全忽略这个属性。如果哪天你遇到了支持这种特性的系统，别忘了我曾经跟你说起过这玩意儿：）[在Linux中使用线程](https://blog.csdn.net/jiajun2001/article/details/12624923)
 
 > &emsp;设置线程 __scope 属性。scope 属性表示线程间竞争 CPU 的范围，也就是说线程优先级的有效范围。POSIX 的标准中定义了两个值： PTHREAD_SCOPE_SYSTEM 和 PTHREAD_SCOPE_PROCESS ，前者表示与系统中所有线程一起竞争 CPU 时间，后者表示仅与同进程中的线程竞争 CPU。默认为 PTHREAD_SCOPE_PROCESS。 目前 Linux Threads 仅实现了 PTHREAD_SCOPE_SYSTEM 一值。[线程属性pthread_attr_t简介](https://blog.csdn.net/hudashi/article/details/7709413)
@@ -307,9 +305,7 @@ int pthread_attr_getschedpolicy(const pthread_attr_t * __restrict, int * __restr
 #define SCHED_OTHER                1 // 其它
 #define SCHED_FIFO                 4 // 先进先出
 #define SCHED_RR                   2 // 轮询
-
 ```
-
 ```c++
 #ifndef __POSIX_LIB__
 struct sched_param { int sched_priority;  char __opaque[__SCHED_PARAM_SIZE__]; };
@@ -323,7 +319,6 @@ __API_AVAILABLE(macos(10.4), ios(2.0))
 int pthread_attr_getschedparam(const pthread_attr_t * __restrict,
         struct sched_param * __restrict); // 读取线程优先级
 ```
-
 ```c++
 __API_AVAILABLE(macos(10.4), ios(2.0))
 int pthread_attr_setinheritsched(pthread_attr_t *, int); // 设置继承权
@@ -424,9 +419,8 @@ __API_AVAILABLE(macos(10.4), ios(2.0))
 void pthread_exit(void * _Nullable) __dead2;
 ```
 &emsp;线程通过调用 `pthread_exit` 函数终止执行，就如同进程在结束时调用 `exit` 函数一样。这个函数的作用是，终止调用它的线程并返回一个指向某个对象的指针。
-
 ### 线程本地存储
-&emsp;在学习自动释放池对函数返回值优化、空自动释放占位等等知识点时，我们遇到过线程本地存储的概念（Thread Local Storage）。
+&emsp;在学习自动释放池对函数返回值优化、空自动释放池占位等等知识点时，我们遇到过线程本地存储的概念（Thread Local Storage）。
 
 &emsp;同一进程内线程之间可以共享内存地址空间，线程之间的数据交换可以非常快捷，这是线程最显著的优点。但是多个线程访问共享数据，需要昂贵的同步开销（加锁），也容易造成与同步相关的 BUG，更麻烦的是有些数据根本就不希望被共享，这又是缺点。
 
@@ -435,7 +429,7 @@ void pthread_exit(void * _Nullable) __dead2;
 &emsp;此外，从现代技术角度看，在很多时候使用多线程的目的并不是为了对共享数据进行并行处理。更多是由于多核心 CPU 技术的引入，为了充分利用 CPU 资源而进行并行运算（不互相干扰）。换句话说，大多数情况下每个线程只会关心自己的数据而不需要与别人同步。
 
 &emsp;为了解决这些问题，可以有很多种方案。比如使用不同名称的全局变量。但是像 errno 这种名称已经固定了的全局变量就没办法了。在前面的内容中提到在线程堆栈中分配局部变量是不在线程间共享的。但是它有一个弊病，就是线程内部的其它函数很难访问到。目前解决这个问题的简便易行的方案是线程本地存储，即 Thread Local Storage，简称 TLS。利用 TLS，errno 所反映的就是本线程内最后一个系统调用的错误代码了，也就是线程安全的了。
-Linux （iOS/macOS）提供了对 TLS 的完整支持，通过下面这些接口来实现：
+Linux（iOS/macOS）提供了对 TLS 的完整支持，通过下面这些接口来实现：
 ```c++
 typedef __darwin_pthread_key_t pthread_key_t;
 typedef unsigned long __darwin_pthread_key_t;
@@ -457,14 +451,14 @@ void* _Nullable pthread_getspecific(pthread_key_t);
 &emsp;`pthread_key_delete` 接口用于回收线程本地存储区。其唯一的参数就要回收的存储区的句柄。
 
 &emsp;`pthread_getspecific` 和 `pthread_setspecific` 这两个接口分别用于获取和设置线程本地存储区的数据。这两个接口在不同的线程下会有不同的结果不同（相同的线程下就会有相同的结果），这也就是线程本地存储的关键所在。
-
 ## NSThread
-&emsp;`NSThread` 是一个继承自 `NSObject` 并用来管理和操作线程的类。学习完 `Pthreads`，再来看 `NSThread` 真是倍感亲切呀，貌似现在看到 `NS` 前缀的类都会倍感亲切，它们几乎都是继承自 `NSObject` 的类，并且在 `ARC` 的加持下最后的释放销毁都由编译器为我们做了，我们尽管创建使用就好了，再加上它们几乎同一的使用逻辑也使我们易学习易上手易使用，这是赞呀！下面我们正式进入 `NSThread` 的学习。
+&emsp;`NSThread` 是一个继承自 `NSObject` 并用来管理和操作线程的类。学习完 `Pthreads`，再来看 `NSThread` 真是倍感亲切呀，貌似现在看到 `NS` 前缀的类都会倍感亲切，它们几乎都是继承自 `NSObject` 的类，并且在 `ARC` 的加持下最后的释放销毁都由编译器为我们做了，我们尽管创建使用就好了，再加上它们几乎同一的使用逻辑也使我们易学习易上手易使用。下面我们正式进入 `NSThread` 的学习。
 
-&emsp;一个 `NSThread` 对象会对应一个线程，与 `Pthreads` 相比，它以更加面向对象的方式来操作和管理线程，尽管还是需要我们自己手动管理线程的生命周期，但是此时仅限于创建，我们这里可以把创建线程的过程理解为创建 `NSThread` 对象，至于最后任务执行结束，线程资源的回收系统都会帮我们处理，所以相比 GCD 来说还不是最易用的，GCD 的使用和源码部分留在下篇，那么我们首先来看下 `NSThread` 的使用吧！⛽️⛽️
+&emsp;一个 `NSThread` 对象会对应一个线程，与 `Pthreads` 相比，它以更加面向对象的方式来操作和管理线程，尽管还是需要我们自己手动管理线程的生命周期，但是此时仅限于创建，我们这里可以把创建线程的过程理解为创建 `NSThread` 对象，至于最后任务执行结束，线程资源的回收，系统都会帮我们处理，所以相比 GCD 来说还不是最易用的，GCD 的使用过程中，我们可以完全不考虑线程的创建和销毁，GCD 的使用和源码部分留在下篇，那么我们首先来看下 `NSThread` 的使用吧！⛽️⛽️
 
 ### NSThread 创建和启动线程
 &emsp;NSThread.h 文件中列出了所有 NSThread 创建和启动线程的方式，并且提供了以 selector 或者 block 的形式在线程中执行函数（或者说是任务），同时在文件底部还提供了一个 `NSObject` 的 `NSThreadPerformAdditions` 分类，它列举了一组实例方法，分别在主线程、后台线程或是指定线程中执行函数（或说是任务），即我们可以使用任何继承自 `NSObject` 的类的对象来使用这些与多线程相关的 API，大大方便了我们在开发中使用多线程来执行任务。下面看一下 NSThread 的使用示例：
+
 + 使用 NSThread 的 `alloc` 和 `init` 方法显式创建 NSThread 对象（创建线程），然后调用 `start` 函数启动线程。
 ```c++
 - (void)viewDidLoad {
@@ -485,6 +479,7 @@ void* _Nullable pthread_getspecific(pthread_key_t);
     
     // 2. 启动线程
     [thread start];
+    //（不会阻塞当前线程，不用等 run 函数执行完成才执行接下来的指令）
     
     // 1. 创建 NSThread 对象（创建线程），线程执行的任务以 block 的形式，代码更加紧凑
     NSThread *thread2 = [[NSThread alloc] initWithBlock:^{
@@ -493,6 +488,7 @@ void* _Nullable pthread_getspecific(pthread_key_t);
     }];
     // 2. 启动线程
     [thread2 start];
+    //（不会阻塞当前线程，不用等 block 执行完成才执行接下来的指令）
     
     NSLog(@"🧑‍💻 %@", [NSThread currentThread]);
 }
@@ -522,11 +518,14 @@ void* _Nullable pthread_getspecific(pthread_key_t);
     
     // 线程执行的任务以 selector 形式
     [NSThread detachNewThreadSelector:@selector(run:) toTarget:self withObject:objc];
+    //（不会阻塞当前线程，不用等 run 函数执行完成才执行接下来的指令）
+    
     // 线程执行的任务以 block 形式，代码更加紧凑
     [NSThread detachNewThreadWithBlock:^{
         sleep(2);
         NSLog(@"🙆‍♂️ %@", [NSThread currentThread]);
     }];
+    //（不会阻塞当前线程，不用等 block 执行完成才执行接下来的指令）
     
     NSLog(@"🧑‍💻 %@", [NSThread currentThread]);
 }
@@ -554,6 +553,8 @@ void* _Nullable pthread_getspecific(pthread_key_t);
     NSLog(@"objc: %p", objc);
     
     [self performSelectorInBackground:@selector(run:) withObject:objc];
+    //（不会阻塞当前线程，不用等 run 函数执行完成才执行接下来的指令）
+    
     NSLog(@"🧑‍💻 %@", [NSThread currentThread]);
 }
 
@@ -576,7 +577,7 @@ void* _Nullable pthread_getspecific(pthread_key_t);
 ```c++
 @property (class, readonly, strong) NSThread *currentThread;
 ```
-&emsp;这里看到 `class` 真的被震惊到了，这个....这个....，这是类属性吗？做了这么多年 iOS 开发，第一次关注到这个属性修饰符里面竟然可以添加一个 `class` ，而且这个 `[NSThread currentThread]` 几乎每天都在使用的判断当前线程的方式，确从没关注过它是一个类属性，哭了。
+&emsp;这里看到 `class` 真的被震惊到了，这个....这个....，这是类属性吗？做了这么多年 iOS 开发，第一次关注到这个属性修饰符里面竟然可以添加一个 `class` ，而且这个 `[NSThread currentThread]` 几乎每天都在使用的判断当前线程的方式，却从没关注过它是一个类属性，一直以为它是一个类函数，哭了。
 
 &emsp;返回值代表当前执行线程的线程对象。(返回值表示当前执行线程的线程对象。)
 #### isMultiThreaded
@@ -732,7 +733,6 @@ NSLog(@"🏃‍♀️ %@", [[NSThread currentThread] threadDictionary]);
 &emsp;你永远不要直接调用此方法。你应该始终通过调用 `start` 方法来启动线程。
 
 &emsp;至此，我们的 NSThread 类的所有代码就看完了，还是挺清晰的哦。
-
 ### NSObject + NSThreadPerformAdditions
 &emsp;下面是 NSObject 的一个分类，同时也是 `NSThread.h` 文件的最后一部分。其中的几个在主线程、指定线程和后台线程执行任务，还挺重要的，一起来看看吧！⛽️⛽️
 #### performSelectorOnMainThread:withObject:waitUntilDone:modes: 

@@ -120,7 +120,7 @@ typedef NSObject<OS_dispatch_queue> * dispatch_queue_t;
  */
 OS_OBJECT_DECL_CLASS(dispatch_object);
 
-// 如下代码验证 dispatch_queue_t 添加到 OC 集合中:
+// 如下代码可验证 dispatch_queue_t 添加到 OC 集合中:
 dispatch_queue_t globalQueue = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0);
 NSMutableArray *array = [NSMutableArray array];
 [array addObject:globalQueue];
@@ -219,7 +219,7 @@ typedef NSObject<OS_dispatch_queue_global> * dispatch_queue_global_t;
 
 &emsp;提交到全局并发队列（global concurrent queues）的工作项相对于提交顺序没有排序保证，并且提交到这些队列的工作项可以并发调用（毕竟本质还是并发队列）。
 
-&emsp;调度全局并发队列（dispatch global concurrent queues）是由 `dispatch_get_global_queue()` 函数返回的已知全局对象，这些对象无法修改。 `dispatch_suspend()`、`dispatch_resume()`、`dispatch_set_context()` 等等函数对此类型的队列调用无效。
+&emsp;调度全局并发队列（dispatch global concurrent queues）是由 `dispatch_get_global_queue` 函数返回的已知全局对象，这些对象无法修改。 `dispatch_suspend`、`dispatch_resume`、`dispatch_set_context` 等等函数对此类型的队列调用无效。
 #### dispatch_queue_serial_t
 ```c++
 DISPATCH_DECL_SUBCLASS(dispatch_queue_serial, dispatch_queue);
@@ -237,9 +237,9 @@ typedef NSObject<OS_dispatch_queue_serial> * dispatch_queue_serial_t;
 
 &emsp;调度串行队列（dispatch serial queues）是轻量级对象，可以向其提交工作项以 FIFO 顺序调用。串行队列一次只能调用一个工作项，但是独立的串行队列可以各自相对于彼此并发地调用其工作项。
 
-&emsp;串行队列可以相互定位（`dispatch_set_target_queue()`）（串行队列可以彼此作为目标）。队列层次结构底部的串行队列提供了一个排除上下文：在任何给定的时间，提交给这种层次结构中的任何队列的最多一个工作项将运行。这样的层次结构提供了一个自然的结构来组织应用程序子系统。
+&emsp;串行队列可以相互定位（`dispatch_set_target_queue`）（串行队列可以彼此作为目标）。队列层次结构底部的串行队列提供了一个排除上下文：在任何给定的时间，提交给这种层次结构中的任何队列的最多一个工作项将运行。这样的层次结构提供了一个自然的结构来组织应用程序子系统。
 
-&emsp;通过将派生自 `DISPATCH_QUEUE_SERIAL` 的调度队列属性传递给 `dispatch_queue_create_with_target()` 来创建串行队列。（串行队列的创建过程后续会通过源码来进行解读）
+&emsp;通过将派生自 `DISPATCH_QUEUE_SERIAL` 的调度队列属性传递给 `dispatch_queue_create_with_target` 来创建串行队列。（串行队列的创建过程后续会通过源码来进行解读）
 #### dispatch_queue_main_t
 ```c++
 DISPATCH_DECL_SUBCLASS(dispatch_queue_main, dispatch_queue_serial);
@@ -255,9 +255,9 @@ typedef NSObject<OS_dispatch_queue_main> * dispatch_queue_main_t;
 
 &emsp;`dispatch_queue_main_t` 是绑定到主线程的默认队列的类型。
 
-&emsp;主队列是一个串行队列（`dispatch_queue_serial_t`），该队列绑定到应用程序的主线程。为了调用提交到主队列的工作项，应用程序必须调用 `dispatch_main()`，`NSApplicationMain()` 或在主线程上使用 `CFRunLoop`。
+&emsp;主队列是一个串行队列（`dispatch_queue_serial_t`），该队列绑定到应用程序的主线程。为了调用提交到主队列的工作项，应用程序必须调用 `dispatch_main`，`NSApplicationMain` 或在主线程上使用 `CFRunLoop`。
 
-&emsp;主队列是一个众所周知的全局对象，它在进程初始化期间代表主线程自动创建，并由 `dispatch_get_main_queue()` 返回，无法修改该对象。`dispatch_suspend()`、`dispatch_resume()`、`dispatch_set_context()` 等等函数对此类型的队列调用无效（主队列只有一个，全局并发队列有多个）。
+&emsp;主队列是一个众所周知的全局对象，它在进程初始化期间代表主线程自动创建，并由 `dispatch_get_main_queue` 返回，无法修改该对象。`dispatch_suspend`、`dispatch_resume`、`dispatch_set_context` 等等函数对此类型的队列调用无效（主队列只有一个，全局并发队列有多个）。
 #### dispatch_queue_concurrent_t
 ```c++
 DISPATCH_DECL_SUBCLASS(dispatch_queue_concurrent, dispatch_queue);
@@ -271,7 +271,7 @@ typedef NSObject<OS_dispatch_queue_concurrent> * dispatch_queue_concurrent_t;
 ```
 &emsp;`OS_dispatch_queue_concurrent` 是继承自 `OS_dispatch_queue` 协议的协议，并且为遵循该协议的 `NSObject` 实例对象类型的指针定义了一个 `dispatch_queue_concurrent_t` 的别名。
 
-&emsp;调度并发队列（dispatch concurrent queues）会同时调用提交给它们的工作项，并接受屏障工作项的概念（and admit a notion of barrier workitems，（barrier 屏障是指调用 `dispatch_barrier_async` 函数，向队列提交工作项。））。
+&emsp;调度并发队列（dispatch concurrent queues）会同时调用提交给它们的工作项，并接受屏障工作项的概念（and admit a notion of barrier workitems，（barrier 屏障是指调用 `dispatch_barrier_async` 函数，向队列提交工作项））。
 
 &emsp;调度并发队列（dispatch concurrent queues）是可以向其提交常规和屏障工作项的轻量级对象。在排除其他任何类型的工作项目（按 FIFO 顺序）时，将调用屏障工作项目。（提交在 barrier 工作项之前的工作项并发执行完以后才会并发执行 barrier 工作项之后的工作项）。
 
@@ -279,7 +279,7 @@ typedef NSObject<OS_dispatch_queue_concurrent> * dispatch_queue_concurrent_t;
 
 &emsp;换句话说，如果在 Dispatch 世界中串行队列等效于互斥锁，则并发队列等效于 reader-writer lock，其中常规项是读取器，而屏障是写入器。
 
-&emsp;通过将派生自 `DISPATCH_QUEUE_CONCURRENT` 的调度队列属性传递给 `dispatch_queue_create_with_target()` 来创建并发队列。
+&emsp;通过将派生自 `DISPATCH_QUEUE_CONCURRENT` 的调度队列属性传递给 `dispatch_queue_create_with_target` 来创建并发队列。
 
 &emsp;注意事项：当调用优先级较低的常规工作项（readers）时，此时调度并发队列不会实现优先级反转避免，并且会阻止调用优先级较高的屏障（writer）。
 #### dispatch_block_t
@@ -365,7 +365,7 @@ dispatch_sync(dispatch_queue_t queue, DISPATCH_NOESCAPE dispatch_block_t block);
 
 &emsp;针对当前队列调用 `dispatch_sync` 将导致死锁（dead-lock）（如在任何串行队列（包括主线程）中调用 `dispatch_sync` 函数提交 block 到当前串行队列，必死锁）。使用 `dispatch_sync` 也会遇到由于使用互斥锁而导致的多方死锁（multi-party dead-lock）问题，最好使用 `dispatch_async`。
 
-&emsp;与 `dispatch_async` 不同，在目标队列上不执行保留。因为对这个函数的调用是同步的，所以dispatch_sync（）会 “借用” 调用者的引用。
+&emsp;与 `dispatch_async` 不同，在目标队列上不执行保留。因为对这个函数的调用是同步的，所以 `dispatch_sync` 会 “借用” 调用者的引用。
 
 &emsp;作为一种优化，`dispatch_sync` 在提交该工作项的线程上调用该工作项，除非所传递的队列是主队列或以其为目标的队列（参见 `dispatch_queue_main_t`，`dispatch_set_target_queue`）。
 
@@ -631,7 +631,7 @@ struct dispatch_queue_attr_s _dispatch_queue_attr_concurrent; // 这里有一个
         dispatch_queue_attr_make_initially_inactive(DISPATCH_QUEUE_CONCURRENT)
 ```
 #### dispatch_autorelease_frequency_t
-&emsp;`dispatch_autorelease_frequency_t` 传递给 `dispatch_queue_attr_make_with_autorelease_frequency()` 函数的值。
+&emsp;`dispatch_autorelease_frequency_t` 传递给 `dispatch_queue_attr_make_with_autorelease_frequency` 函数的值。
 ```c++
 // 枚举宏定义
 #define DISPATCH_ENUM(name, type, ...) \
@@ -661,7 +661,7 @@ dispatch_queue_attr_make_with_autorelease_frequency(
         dispatch_queue_attr_t _Nullable attr,
         dispatch_autorelease_frequency_t frequency);
 ```
-&emsp;当队列使用按工作项自动释放的频率（直接或从其目标队列继承）时，将异步提交到此队列的任何块（通过dispatch_async（），dispatch_barrier_async（），dispatch_group_notify（）等）执行。如果被单个Objective-C @autoreleasepool 范围包围。
+&emsp;当队列使用按工作项自动释放的频率（直接或从其目标队列继承）时，将异步提交到此队列的任何块（通过 `dispatch_async`，`dispatch_barrier_async`，`dispatch_group_notify` 等）执行。如果被单个Objective-C @autoreleasepool 范围包围。
 
 &emsp;当队列使用每个工作项自动释放频率（直接或从其目标队列继承）时，异步提交到此队列的任何块（通过 `dispatch_async`、`dispatch_barrier_async`、`dispatch_group_notify` 等）都将被执行，就像被单独的 Objective-C `@autoreleasepool` 作用域包围一样。
 
@@ -675,7 +675,7 @@ dispatch_queue_attr_make_with_autorelease_frequency(
 
 &emsp;`frequency`：请求的自动释放频率。
 
-&emsp;`return`：返回可以提供给 `dispatch_queue_create` 的属性值，如果请求的自动释放频率无效，则为 `NULL`。这个新值结合了 “ attr” 参数指定的属性和所选的自动释放频率。
+&emsp;`return`：返回可以提供给 `dispatch_queue_create` 的属性值，如果请求的自动释放频率无效，则为 `NULL`。这个新值结合了 `attr` 参数指定的属性和所选的自动释放频率。
 #### DISPATCH_QUEUE_SERIAL_WITH_AUTORELEASE_POOL
 &emsp;`DISPATCH_QUEUE_SERIAL_WITH_AUTORELEASE_POOL` 使用此属性创建的调度队列按 FIFO 顺序串行调用块，并用相当于单个 Objective-C @autoreleasepool 作用域来包围异步提交给它的任何块的执行。
 ```c++
@@ -741,7 +741,7 @@ __QOS_ENUM(qos_class, unsigned int,
 
 &emsp;尽最大努力将可用的系统资源分配给每个 QOS 类。服务质量（Quality of service）降低仅发生在系统资源争用期间，与 QOS 等级成比例。也就是说，QOS 类代表用户发起的工作试图达到峰值吞吐量，而 QOS 类则试图实现峰值能量和热效率，即使在没有争用的情况下。最后，QOS 类的使用不允许线程取代可能应用于整个进程的任何限制。
 
-+ `QOS_CLASS_USER_INTERACTIVE`：指示此线程执行的工作是用户交互。要求此类工作相对于系统上的其他工作具有较高的优先级。指定此QOS类是一个请求，要求即使在竞争中也要使用几乎所有可用的系统 CPU 和 I/O 带宽运行。这不是用于大型任务的高能效 QOS 类。该 QOS 类的使用应限于与用户的关键交互，如处理主事件循环上的事件、视图绘制、动画等。(可以直白的理解为告诉系统更高优先级的处理用户的交互事件)
++ `QOS_CLASS_USER_INTERACTIVE`：指示此线程执行的工作是用户交互。要求此类工作相对于系统上的其他工作具有较高的优先级。指定此 QOS 类是一个请求，要求即使在竞争中也要使用几乎所有可用的系统 CPU 和 I/O 带宽运行。这不是用于大型任务的高能效 QOS 类。该 QOS 类的使用应限于与用户的关键交互，如处理主事件循环上的事件、视图绘制、动画等。(可以直白的理解为告诉系统更高优先级的处理用户的交互事件)
 + `QOS_CLASS_USER_INITIATED`：指示此线程执行的工作是由用户启动的，并且用户可能正在等待结果。要求此类工作在低于关键用户交互性工作的优先级下运行，但要相对于系统上的其他工作更高。这不是用于大型任务的高能效 QOS 类。它的使用应限于持续时间足够短的操作，以使用户在等待结果时不太可能切换任务。典型的用户启动的工作将通过占位符内容或模式用户界面的显示来指示进度。
 + `QOS_CLASS_DEFAULT`：在没有更具体的 QOS 类信息的情况下，系统使用的默认 QOS 类。要求此类工作的优先级低于关键用户交互性（INTERACTIVE）和用户启动（INITIATED）的工作，但相对高于实用程序（UTILITY）和后台（BACKGROUND）任务。`pthread_create` 创建的没有指定 QOS 类属性的线程将默认为 `QOS_CLASS_DEFAULT`。此 QOS 类值不打算用作工作分类，它只应在传播或恢复系统提供的 QOS 类值时设置。
 + `QOS_CLASS_UTILITY`：指示由该线程执行的工作的 QOS 类可能由用户启动或未启动，并且用户不太可能立即等待结果。要求此类工作的优先级低于关键的用户交互性（INTERACTIVE）和用户启动（INITIATED）的工作，但要比低级别的系统维护任务高。使用此 QOS 类**表示工作应以节能高效的方式进行**。实用程序工作的进度可能会显示给用户，也可能不会显示给用户，但是这种工作的效果是用户可见的。
@@ -787,14 +787,14 @@ queue = dispatch_queue_create("com.example.myqueue", attr);
 
 &emsp;`relative_priority`：QOS 类中的相对优先级。该值是给定类别与最大支持的调度程序优先级的负偏移量，传递大于零或小于 `QOS_MIN_RELATIVE_PRIORITY`（-15）的值将导致返回 `NULL`。
 
-&emsp;`return`：返回可以提供给 `dispatch_queue_create` 和 `dispatch_queue_create_with_target` 的属性值；如果请求了无效的 `QOS` 类，则返回 `NULL`。新值结合了 “attr” 参数指定的属性，新的 `QOS` 类（形参：qos_class）和相对优先级（形参：relative_priority）。
+&emsp;`return`：返回可以提供给 `dispatch_queue_create` 和 `dispatch_queue_create_with_target` 的属性值；如果请求了无效的 `QOS` 类，则返回 `NULL`。新值结合了 `attr` 参数指定的属性，新的 `QOS` 类（形参：qos_class）和相对优先级（形参：relative_priority）。
 #### DISPATCH_TARGET_QUEUE_DEFAULT
 &emsp;`DISPATCH_TARGET_QUEUE_DEFAULT` 传递给 `dispatch_queue_create_with_target`、`dispatch_set_target_queue` 和 `dispatch_source_create` 函数的常量，以指示应使用相关对象类型的默认目标队列。
 ```c++
 #define DISPATCH_TARGET_QUEUE_DEFAULT NULL
 ```
 #### dispatch_queue_create_with_target
-&emsp;`dispatch_queue_create_with_target` 用指定的目标队列创建一个新的调度队列。（这个目标队列是什么作用?）
+&emsp;`dispatch_queue_create_with_target` 用指定的目标队列创建一个新的调度队列。
 ```c++
 API_AVAILABLE(macos(10.12), ios(10.0), tvos(10.0), watchos(3.0))
 DISPATCH_EXPORT DISPATCH_MALLOC DISPATCH_RETURNS_RETAINED DISPATCH_WARN_RESULT
@@ -806,7 +806,7 @@ dispatch_queue_create_with_target(const char *_Nullable label,
 ```
 &emsp;使用 `DISPATCH_QUEUE_SERIAL` 或 `NULL` 属性创建的调度队列按 `FIFO` 顺序依次调用块。(串行队列)
 
-&emsp;使用 `DISPATCH_QUEUE_CONCURRENT` 属性创建的调度队列可以并发调用块（类似于全局并发队列（`dispatch_get_global_queue` 函数获取的队列），但可能会有更多开销），并支持通过调度屏障 API （`dispatch_barrier_async` 函数）提交的屏障块（blocks），例如实现有效的读写器方案（多读单写模型）。
+&emsp;使用 `DISPATCH_QUEUE_CONCURRENT` 属性创建的调度队列可以并发调用块（类似于全局并发队列（`dispatch_get_global_queue` 函数获取的队列），但可能会有更多开销），并支持通过调度屏障 API （`dispatch_barrier_async` 函数）提交的屏障块（barrier blocks），例如实现有效的读写器方案（多读单写模型）。
 
 &emsp;当不再需要调度队列时，应使用 `dispatch_release` 释放它。请注意，异步提交到队列的任何待处理块（pending blocks）都将保存对该队列的引用。因此，在所有待处理块（pending blocks）都完成之前，不会释放队列。
 
