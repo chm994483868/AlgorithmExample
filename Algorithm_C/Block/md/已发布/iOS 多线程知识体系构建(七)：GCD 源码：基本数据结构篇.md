@@ -26,7 +26,7 @@ typedef struct _os_object_s {
     os_obj_xref_cnt);
 } _os_object_s;
 
-// 把 _OS_OBJECT_HEADER 展开则是:
+// 把 _OS_OBJECT_HEADER 宏展开则是:
 typedef struct _os_object_s {
     const _os_object_vtable_s *os_obj_isa; // 这个 _vtable_ 联想到了 C++ 中的虚函数表...
     int volatile os_obj_ref_cnt; // 引用计数
@@ -53,9 +53,7 @@ typedef struct _os_object_vtable_s {
 
 #else
 
-// 这里是两个函数指针，（_os_object_t 应该是 _os_object_s 的指针）
-// 这里的函数指针大概是处理结构体引用和结构体本身的操作吗？
-
+// 两个销毁函数的指针（_os_object_t 是指向 _os_object_s 结构体的指针）
 #define _OS_OBJECT_CLASS_HEADER() \ // 3⃣️ 在 GCD 内部使用的应该是这里的 _OS_OBJECT_CLASS_HEADER 宏定义
         void (*_os_obj_xref_dispose)(_os_object_t); \
         void (*_os_obj_dispose)(_os_object_t)
@@ -122,14 +120,14 @@ struct dispatch_object_s {
 &emsp;宏名中的 `_DISPATCH_OBJECT` 表明现在是 GCD 中的对象了。
 ```c++
 #define _DISPATCH_OBJECT_HEADER(x) \
-struct _os_object_s _as_os_obj[0]; \ ⬅️ 这里是一个长度为 0 的数组，不占用任何内存，同时它也预示了 dispatch_object_s 的 “父类” 是 _os_object_s 
+        struct _os_object_s _as_os_obj[0]; \ ⬅️ 这里是一个长度为 0 的数组，不占用任何内存，同时它也预示了 dispatch_object_s 的 “父类” 是 _os_object_s 
 
-OS_OBJECT_STRUCT_HEADER(dispatch_##x); \ ⬅️ OS_OBJECT_STRUCT_HEADER 宏展开就是把“父类”-_os_object_s 的成员变量平铺展开放在“子类”-dispatch_object_s 的头部
+        OS_OBJECT_STRUCT_HEADER(dispatch_##x); \ ⬅️ OS_OBJECT_STRUCT_HEADER 宏展开就是把“父类”-_os_object_s 的成员变量平铺展开放在“子类”-dispatch_object_s 的头部
 
-struct dispatch_##x##_s *volatile do_next; \ ⬅️ 下面的这一部分则是“子类”自己的成员变量
-struct dispatch_queue_s *do_targetq; \
-void *do_ctxt; \
-void *do_finalizer
+        struct dispatch_##x##_s *volatile do_next; \ ⬅️ 下面的这一部分则是“子类”自己的成员变量
+        struct dispatch_queue_s *do_targetq; \
+        void *do_ctxt; \
+        void *do_finalizer
 ```
 ### OS_OBJECT_STRUCT_HEADER
 &emsp;上面 `_os_object_s` 结构体的内容平铺展开放在 `dispatch_object_s` 结构体中。

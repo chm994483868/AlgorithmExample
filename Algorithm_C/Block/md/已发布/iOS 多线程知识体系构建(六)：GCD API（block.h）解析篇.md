@@ -21,6 +21,7 @@
 #endif // __has_feature(objc_fixed_enum) ...
 ```
 &emsp;`dispatch_block_flags_t`:
+
 &emsp;传递给 `dispatch_block_create*` 函数的标志。
 + `DISPATCH_BLOCK_BARRIER`：指示调度块对象（dispatch block object）在提交给 `DISPATCH_QUEUE_CONCURRENT` 队列时应充当屏障块（barrier block）的标志。有关详细信息，参考 `dispatch_barrier_async`。当直接调用调度块对象（dispatch block object）时，此标志无效。
 + `DISPATCH_BLOCK_DETACHED`：指示应该执行与当前执行上下文属性（例如 os_activity_t 和当前 IPC 请求的属性，如果有）无关的调度块对象（dispatch block object）的标志。关于 QoS 类别，其行为与 DISPATCH_BLOCK_NO_QOS 相同。如果直接调用，则块对象将在块主体的持续时间内从调用线程中删除其他属性（在应用分配给块对象的属性（如果有）之前）。如果提交给队列，则将使用队列的属性（或专门分配给该块对象的任何属性）执行该块对象。
