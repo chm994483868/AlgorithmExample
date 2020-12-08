@@ -77,7 +77,7 @@ typedef struct dispatch_lane_s {
     void *do_ctxt;
     void *do_finalizer
     
-    struct dispatch_object_s *volatile dq_items_tail;
+    struct dispatch_object_s *volatile dq_items_tail; // 尾
     
     union { 
         uint64_t volatile dq_state;

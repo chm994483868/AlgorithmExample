@@ -9,7 +9,7 @@
 
 &emsp;首先我们要知道一点，不管是用 `dispatch_async` 向队列中异步提交 block，还是用 `dispatch_async_f` 向队列中异步提交函数，都会把提交的任务包装成 `dispatch_continuation_s`，而在 `dispatch_continuation_s` 结构体中是使用一个函数指针（`dc_func`）来存储要执行的任务的，当提交的是 block 任务时 `dispatch_continuation_s` 内部存储的是 block 结构体定义的函数，而不是 block 本身。
 
-&emsp;`dispatch_async` 函数在逻辑上可以分为两个部分，第一部分对 `work` 函数对封装（`_dispatch_continuation_init`），第二部分是对线程的调用（`_dispatch_continuation_async`）。
+&emsp;`dispatch_async` 函数在逻辑上可以分为两个部分，第一部分对 `work` 函数封装（`_dispatch_continuation_init`），第二部分是对线程的调用（`_dispatch_continuation_async`）。
 ```c++
 void
 dispatch_async(dispatch_queue_t dq, dispatch_block_t work)
@@ -19,7 +19,6 @@ dispatch_async(dispatch_queue_t dq, dispatch_block_t work)
     
     // DC_FLAG_CONSUME 标记 dc 是设置在异步中的源程序（即表明 dispatch_continuation_s 是一个在异步中执行的任务）
     // #define DC_FLAG_CONSUME   0x004ul
-    
     uintptr_t dc_flags = DC_FLAG_CONSUME; // 2⃣️
     
     // dispatch_qos_t 是一个 uint32_t 类型别名
@@ -130,7 +129,7 @@ _dispatch_continuation_init(dispatch_continuation_t dc,
     // #define DC_FLAG_BLOCK   0x010ul
     // #define DC_FLAG_ALLOCATED   0x100ul
     
-    // 即 dc_flags 等于 0x114ul
+    // 即 dc_flags 等于 0x114ul，把上面的三个枚举合并在一起
     dc_flags |= DC_FLAG_BLOCK | DC_FLAG_ALLOCATED;
     
     // 判断 work block 的函数是否等于一个外联的函数指针
@@ -332,7 +331,7 @@ _dispatch_root_queue_push(dispatch_queue_global_t rq, dispatch_object_t dou,
 #else
     (void)qos;
 #endif
-    
+    // 调用内联函数
     _dispatch_root_queue_push_inline(rq, dou, dou, 1);
 }
 ```
@@ -389,7 +388,7 @@ _dispatch_root_queue_poke_slow(dispatch_queue_global_t dq, int n, int floor)
     int remaining = n;
     int r = ENOSYS;
 
-    // 创建与根队列相关的线程池（内部调用了 dispatch_once_f，全局只会只会执行一次）
+    // 注册回调（内部调用了 dispatch_once_f，全局只会只会执行一次）
     _dispatch_root_queues_init();
     // DEGBUG 模式时的打印 __func__ 函数执行
     _dispatch_debug_root_queue(dq, __func__);
