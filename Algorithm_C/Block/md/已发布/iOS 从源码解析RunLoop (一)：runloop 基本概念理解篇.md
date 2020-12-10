@@ -176,12 +176,14 @@ entries =>
 🍀🍀🍀 0x281ffa940 NSRunLoop dealloc... // commonRunLoop run loop 对象被销毁（run loop 退出）
 🍀🍀🍀 <CommonThread: 0x282ea3600>{number = 5, name = (null)} CommonThread dealloc... // commonThread 线程对象被销毁（线程退出）
 ```
-&emsp;运行程序后，我们的 `commonThread` 线程还是退出了，`commonRunLoop` 也退出了。其实是这里涉及到一个知识点，当 run loop 当前运行的 mode 中没有任何需要处理的事件时，run loop 会退出。正如上面控制台中的打印: sources0、sources1、observers、timers 四者都是 `(null)`，所以我们需要创建一个事件让 run loop 来处理，这样 run loop 才不会退出。我们在上面示例代码中 `[commonRunLoop run];` 上面添加如下两行：
+&emsp;运行程序后，我们的 `commonThread` 线程还是退出了，`commonRunLoop` 也退出了。其实是这里涉及到一个知识点，当 run loop 当前运行的 mode 中没有任何需要处理的事件时，run loop 会退出。正如上面控制台中的打印: sources0、sources1、observers、timers 四者都是 `(null)`，所以我们需要创建一个事件让 run loop 来处理，这样 run loop 才不会退出。我们在上面示例代码中的 `[commonRunLoop run];` 行上面添加如下两行：
 ```c++
 [commonRunLoop addPort:[[NSPort alloc] init] forMode:NSDefaultRunLoopMode];
 NSLog(@"♻️ %p %@", commonRunLoop, commonRunLoop);
 ```
-&emsp;运行程序发现我们的 `commonThread` 和 `commonRunLoop` 都没有打印 `dealloc`，即它们都没有退出。
+&emsp;运行程序发现我们的 `commonThread` 和 `commonRunLoop` 都没有打印 `dealloc`，即它们都没有退出，此时 `commonThread` 线程对应的 run loop 就被启动了。同时仔细观察控制台的话看到 `[commonRunLoop run];` 行下面的 `NSLog(@"♻️♻️ %p %@", commonRunLoop, commonRunLoop);` 行没有得到执行，即使我们在此行打一个断点，发现代码也不会执行到这里，这和我们上面 `main` 函数中由于 `UIApplicationMain` 函数不返回并开启了 main run loop，所以最后的 `return 0;` 行得不到执行的结果是一致的，而这里则是由于 `[commonRunLoop run];` 开启了当前线程的 run loop，自此 `commonThread` 线程进入永久循环，`[commonRunLoop run];` 行可以被看作一个界限，它下面的代码都不会再执行了。同 `UIApplicationMain` 函数一样，这里的 `run` 函数也是不会返回的。下面我们通过开发文档对 NSRunLoop 的 run 函数进行学习。
+
+#### run
 
 
 
