@@ -180,10 +180,41 @@ entries =>
 ```c++
 [commonRunLoop addPort:[[NSPort alloc] init] forMode:NSDefaultRunLoopMode];
 NSLog(@"♻️ %p %@", commonRunLoop, commonRunLoop);
-```
-&emsp;运行程序发现我们的 `commonThread` 和 `commonRunLoop` 都没有打印 `dealloc`，即它们都没有退出，此时 `commonThread` 线程对应的 run loop 就被启动了。同时仔细观察控制台的话看到 `[commonRunLoop run];` 行下面的 `NSLog(@"♻️♻️ %p %@", commonRunLoop, commonRunLoop);` 行没有得到执行，即使我们在此行打一个断点，发现代码也不会执行到这里，这和我们上面 `main` 函数中由于 `UIApplicationMain` 函数不返回并开启了 main run loop，所以最后的 `return 0;` 行得不到执行的结果是一致的，而这里则是由于 `[commonRunLoop run];` 开启了当前线程的 run loop，自此 `commonThread` 线程进入永久循环，`[commonRunLoop run];` 行可以被看作一个界限，它下面的代码都不会再执行了。同 `UIApplicationMain` 函数一样，这里的 `run` 函数也是不会返回的。下面我们通过开发文档对 NSRunLoop 的 run 函数进行学习。
 
+// 控制台部分打印:
+...
+sources1 = <CFBasicHash 0x60000251a4c0 [0x7fff8002e7f0]>{type = mutable set, count = 1,
+entries =>
+1 : <CFRunLoopSource 0x600001e700c0 [0x7fff8002e7f0]>{signalled = No, valid = Yes, order = 200, context = <CFMachPort 0x600001c7c370 [0x7fff8002e7f0]>{valid = Yes, por 
+// ⬆️ CFMachPort 0x600001c7c370 即为我们添加的 NSPort
+...
+```
+&emsp;运行程序发现我们的 `NSPort` 实例被添加到 `commonRunLoop` 的 `sources1` 中，并且 `commonThread` 和 `commonRunLoop` 都没有打印 `dealloc`，表示我们的线程和 run loop 都没有退出，此时 `commonThread` 线程对应的 run loop 就被启动了，同时观察控制台的话看到 `[commonRunLoop run];` 行下面的 `NSLog(@"♻️♻️ %p %@", commonRunLoop, commonRunLoop);` 行没有得到执行，即使我们在此行打一个断点，发现代码也不会执行到这里，这和我们上面 `main` 函数中由于 `UIApplicationMain` 函数开启了 main run loop 使 `UIApplicationMain` 函数本身不再返回，所以最后的 `return 0;` 行得不到执行的结果是一致的，这里则是由于 `[commonRunLoop run];` 开启了当前线程的 run loop 使 `run` 函数本身不再返回，自此 `commonThread` 线程不再退出并保持活性。`[commonRunLoop run];` 行可以被看作一个界限，它下面的代码在 `commonRunLoop` 启动期间不会再执行了，只有当 `commonRunLoop` 退出时才会执行。
+
+&emsp;下面我们首先通过开发文档对 NSRunLoop 的 `run` 函数进行学习，然后再对 `commonThread` 线程的活性进行验证，然后再使 `commonRunLoop` 失去活性让线程和 run loop 在我们的控制下退出。
 #### run
+&emsp;`run` 是 `NSRunLoop` 类的一个实例方法，它的主要功能是：Puts the receiver（NSRunLoop 对象） into a permanent loop, during which time it processes data from all attached input sources.
+```c++
+@interface NSRunLoop (NSRunLoopConveniences)
+
+- (void)run;
+// ⬇️ 下面还有两个指定 mode 和 limitDate 的 run 函数
+- (void)runUntilDate:(NSDate *)limitDate;
+- (BOOL)runMode:(NSRunLoopMode)mode beforeDate:(NSDate *)limitDate;
+...
+@end
+```
+&emsp;如果没有 input sources 或 timers（NSTimer）附加到 run loop，此方法将立即退出。否则，它将通过重复调用 `runMode:beforeDate:` 在 `NSDefaultRunLoopMode` 模式下运行 receiver（NSRunLoop 对象）。换句话说，此方法有效地开始了一个无限 loop，该 loop 处理来自 run loop 的 input sources  和 timers 的数据。
+
+&emsp;从 run loop 中手动删除所有已知的 input sources 和 timers 并不能保证 run loop 将退出。macOS 可以根据需要安装和删除附加的 input sources，以处理针对 receiver’s thread 的请求。因此，这些 sources 可以阻止 run loop 退出。
+
+&emsp;如果希望 run loop 终止，则不应使用此方法。相反，请使用其他run方法之一，并在循环中检查自己的其他任意条件。一个简单的例子是：
+```c++
+BOOL shouldKeepRunning = YES; // global
+NSRunLoop *theRL = [NSRunLoop currentRunLoop];
+while (shouldKeepRunning && [theRL runMode:NSDefaultRunLoopMode beforeDate:[NSDate distantFuture]]);
+```
+&emsp;在程序中的其它位置应将 `shouldKeepRunning` 设置为 `NO`。
 
 
 
