@@ -327,19 +327,219 @@ current mode = (none),
 
 &emsp;那么我们根据 run 函数中的注释来把代码修改为 Apple 示例代码的样子。首先添加一个布尔类型的 `shouldKeepRunning` 属性，并初始为 `YES`，然后把 `[commonRunLoop runMode:NSDefaultRunLoopMode beforeDate:[NSDate distantFuture]];` 修改为 `while (self.shouldKeepRunning && [commonRunLoop runMode:NSDefaultRunLoopMode beforeDate:[NSDate distantFuture]]);`，然后进行各项测试，可发现打印结果和 `[commonRunLoop run];` 使用时完全一致。
 
-&emsp;
+&emsp;下面我们优化一下代码，添加 `__weak` 修饰的 `self` 防止循环引用:
+```c++
+NSLog(@"🔞 START: %@", [NSThread currentThread]);
+{
+    __weak typeof(self) _self = self;
+    self.commonThread = [[CommonThread alloc] initWithBlock:^{
+        NSLog(@"🏃‍♀️🏃‍♀️ %@", [NSThread currentThread]);
+        
+        NSRunLoop *commonRunLoop = [NSRunLoop currentRunLoop];
+        
+        // 往 run loop 里面添加 Source\Timer\Observer
+        [commonRunLoop addPort:[[NSPort alloc] init] forMode:NSDefaultRunLoopMode];
+        
+        // NSTimer *time = [NSTimer scheduledTimerWithTimeInterval:1 repeats:YES block:^(NSTimer * _Nonnull timer) {
+        //     NSLog(@"⏰⏰ %@", timer);
+        // }];
+        // [[NSRunLoop currentRunLoop] addTimer:time forMode:NSDefaultRunLoopMode];
+        
+        NSLog(@"♻️ %p %@", commonRunLoop, commonRunLoop);
+        __strong typeof(_self) self = _self;
+        while (self && self.shouldKeepRunning && [commonRunLoop runMode:NSDefaultRunLoopMode beforeDate:[NSDate distantFuture]]);
+        NSLog(@"♻️♻️ %p %@", commonRunLoop, commonRunLoop);
+    }];
+    
+    [self.commonThread start];
+}
 
+NSLog(@"🔞 END: %@", [NSThread currentThread]);
+```
+&emsp;然后是 `stopRunLoop` 函数，当点击停止按钮时修改 `self.shouldKeepRunning` 为 `NO`，保证 `CFRunLoopStop` 函数执行后 `commonRunLoop` 停止，然后不再进入 `while` 循环。
+```c++
+- (void)stopRunLoop:(NSObject *)param {
+    NSLog(@"🎏 stop loop START...");
+    self.shouldKeepRunning = NO;
+    CFRunLoopStop(CFRunLoopGetCurrent());
+    NSLog(@"🎏 stop loop END...");
+}
+```
+&emsp;然后我们再测试一下，运行程序，首先点击屏幕空白区域，`rocket` 函数正常执行，然后点击停止按钮，看到 `self.commonThread` 线程的 run loop 退出并且 run loop 对象销毁，然后由当前 `ViewControler` 返回上一个控制器（跳转逻辑可以自行添加），看到当前控制器和 `self.commonThread` 线程都正常销毁。如下是控制台打印:
+```c++
+ 🔞 START: <NSThread: 0x283cfda80>{number = 1, name = main}
+ 🔞 END: <NSThread: 0x283cfda80>{number = 1, name = main}
+ 🏃‍♀️🏃‍♀️ <CommonThread: 0x283c84180>{number = 6, name = (null)} // ⬅️ self.commonThread 子线程开启
+ ♻️ 0x280dfdce0 <CFRunLoop 0x2815f9500 [0x20e729430]>{wakeup port = 0x1507, stopped = false, ignoreWakeUps = true, 
+current mode = (none), // ⬅️ 正常获取到 self.commonThread 线程的 run loop 并且给它添加一个事件，防止无事件时 run loop 退出
+...
 
+ 📺📺 START...
+ 📺📺 END...
+ 🚀🚀 <CommonThread: 0x283c84180>{number = 6, name = (null)} param: 0x0 // ⬅️ 触摸屏幕向已保持活性的 self.commonThread 线程添加任务能正常执行 
+ 🎏 stop loop START(ACTION)... // ⬅️ 点击停止按钮，停止 self.commonThread 线程的 run loop
+ 🎏 stop loop END(ACTION)...
+ 🎏 stop loop START...
+ 🎏 stop loop END...
+ ♻️♻️ 0x280dfdce0 <CFRunLoop 0x2815f9500 [0x20e729430]>{wakeup port = 0x1507, stopped = false, ignoreWakeUps = true, 
+current mode = (none), // self.commonThread 线程的 run loop 已停止，self.commonThread 线程创建时添加的 block 函数继续往下执行
+...
 
+ 🍀🍀🍀 0x280dfdce0 NSRunLoop -[NSRunLoop(Common) dealloc] // self.commonThread 线程的 run loop 已经退出，run loop 对象正常销毁
+ 🍀🍀🍀 <ViewController: 0x10151b630> ViewController -[ViewController dealloc] // pop 后当前控制器正常销毁
+ 🍀🍀🍀 <CommonThread: 0x283c84180>{number = 6, name = main} CommonThread -[CommonThread dealloc] // self.commonThread 线程对象也正常销毁
+```
+&emsp;以上是在我们在完全手动可控的情况下：开启线程的 run loop、动态的向已开启 run loop 的线程中添加任务、手动停止已开启 run loop 的线程，看到这里我们大概对 run loop 保持线程的活性有一个整体的认识了。根据 Apple 提供的 NSThread 和 NSRunLoop 类以面向对象的思想学习线程和 run loop 确实更好的帮助我们理解一些概念性的东西。
 
+&emsp;下面我们根据一些重要的知识点对上面的全部代码进行整体优化。
 
+&emsp;`performSelector:onThread:withObject:waitUntilDone:` 函数的最后一个参数 `wait` 传 `YES` 时必须保证 thread 线程参数存在并且该线程已开启 run loop，否则会直接 crash，这是因为线程不满足以上条件时无法执行 selector 参数传递的事件，`wait` 传递 `YES` 又非要等 `selector` 执行完成，这固然是完全是不可能的。所以，我们在所有的 `performSelector:onThread:withObject:waitUntilDone:` 函数执行前可以加一行 `if (!self.commonThread) return;`，这里当然在 `self.commonThread` 线程创建完成后，若 `ViewController` 不 `dealloc` 函数执行完成并彻底销毁并释放 `self.commonThread` 的引用之前，`self.commonThread` 是不会为 `nil` 的，这里我们在 `self.commonThread` 的 run loop 执行 `CFRunLoopStop` 后手动把 `self.commonThread` 置为 `nil`，毕竟失去活性的线程和已经为 `nil` 没什么两样。
 
+&emsp;因为我们在创建 `self.commonThread` 时就已经开启了该线程的 run loop，所以可以保证在向 `self.commonThread` 线程添加事件时它已经保持了活性。
 
+&emsp;还有一个极隐秘的点。当我们使用 block 时会在 block 外面使用 `__weak` 修饰符取得一个的 `self` 的弱引用变量，然后在 block 内部又会使用 `__strong` 修饰符取得一个的 self 弱引用变量的强引用，首先这里是在 block 内部，当 block 执行完毕后会进行自动释放强引用的 self，这里的目的只是为了保证在 block  执行期间 self 不会被释放，这就默认延长了 self 的生命周期到 block 执行结束，这在我们的日常开发中没有任何问题，但是，但是，但是，放在 run loop 这里是不行的，当我们直接 push 进入 `ViewController` 然后直接 pop 会上一个页面时，我们要借用 ViewController 的 dealloc 函数来 stop `self.commonThread` 线程的 run loop 的，如果我们还用 `__strong` 修饰符取得 self 强引用的话，那么由于 `self.commonThread` 线程创建时的 block 内部的 run loop 的 `runMode:beforeDate:` 启动函数是没有返回的，它会一直潜在的延长 self 的生命周期，会直接导致 `ViewController` 无法释放，`dealloc` 函数得不到调用（描述的不够清晰，看下面的实例代码应该会一眼看明白的）。
 
+&emsp;这里是 `__weak` 和 `__strong` 配对使用的一些解释，如果对 block 不清晰的话可以参考前面的文章进行学习。
+```c++
+// 下面在并行队列里面要执行的 block 没有 retain self
+__weak typeof(self) _self = self;
+dispatch_async(globalQueue_DEFAULT, ^{
+    // 保证在下面的执行过程中 self 不会被释放，执行结束后 self 会执行一次 release。
+    
+    // 在 ARC 下，这里看似前面的 __wek 和这里的 __strong 相互抵消了，
+    // 这里 __strong 的 self，在出了下面的右边花括号时，会执行一次 release 操作。 
+    // 且只有此 block 执行的时候 _self 有值那么此处的 __strong self 才会有值，
+    // 否则下面的 if 判断就直接 return 了。
+    
+    __strong typeof(_self) self = _self;
+    if (!self) return;
+    
+    // do something
+    // ...
+    
+    dispatch_async(dispatch_get_main_queue(), ^{
+        // 此时如果能进来，表示此时 self 是存在的
+        self.view.backgroundColor = [UIColor redColor];
+    });
+});
+```
+&emsp;下面是对应上面的解释结果的所有代码。
+```c+
+#import "ViewController.h"
+#import "CommonThread.h"
 
+@interface ViewController ()
 
+@property (nonatomic, strong) CommonThread *commonThread;
+@property (nonatomic, assign) BOOL shouldKeepRunning;
 
+@end
 
+@implementation ViewController
+
+- (void)viewDidLoad {
+    [super viewDidLoad];
+    // Do any additional setup after loading the view.
+    self.shouldKeepRunning = YES;
+    
+    NSLog(@"🔞 START: %@", [NSThread currentThread]);
+    
+    // ⬇️ 下面的 block 内部要使用 self 的弱引用，否则会导致 vc 无法销毁
+    __weak typeof(self) _self = self;
+    
+    self.commonThread = [[CommonThread alloc] initWithBlock:^{
+        NSLog(@"🏃‍♀️🏃‍♀️ %@", [NSThread currentThread]);
+        NSRunLoop *commonRunLoop = [NSRunLoop currentRunLoop];
+        
+        // 往 run loop 里面添加 Source/Timer/Observer
+        [commonRunLoop addPort:[[NSPort alloc] init] forMode:NSDefaultRunLoopMode];
+        NSLog(@"♻️ %p %@", commonRunLoop, commonRunLoop);
+        
+        // ⬇️ 上面的最后一段描述即针对这里，这里不能再使用 __strong 强引用外部的 _self，会直接导致 vc 无法销毁
+        // __strong typeof(_self) self = _self;
+        
+        while (_self && _self.shouldKeepRunning) {
+            [commonRunLoop runMode:NSDefaultRunLoopMode beforeDate:[NSDate distantFuture]];
+        }
+        NSLog(@"♻️♻️ %p %@", commonRunLoop, commonRunLoop);
+    }];
+    [self.commonThread start];
+    NSLog(@"🔞 END: %@", [NSThread currentThread]);
+}
+
+- (void)rocket:(NSObject *)param {
+    // sleep(3);
+    NSLog(@"🚀🚀 %@ param: %p", [NSThread currentThread], param);
+}
+
+- (void)touchesBegan:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
+    NSLog(@"📺📺 START...");
+    if (!self.commonThread) return; // 首先判断 self.commonThread 不为 nil，下面的 wait 参数是 YES
+    [self performSelector:@selector(rocket:) onThread:self.commonThread withObject:nil waitUntilDone:YES];
+    NSLog(@"📺📺 END...");
+}
+
+- (IBAction)stopAction:(UIButton *)sender {
+    NSLog(@"🎏 stop loop START(ACTION)...");
+    if (!self.commonThread) return; // 首先判断 self.commonThread 不为 nil，下面的 wait 参数是 YES
+    [self performSelector:@selector(stopRunLoop:) onThread:self.commonThread withObject:nil waitUntilDone:YES];
+    NSLog(@"🎏 stop loop END(ACTION)...");
+}
+
+- (void)stopRunLoop:(NSObject *)param {
+    NSLog(@"🎏 stop loop START...");
+    self.shouldKeepRunning = NO;
+    CFRunLoopStop(CFRunLoopGetCurrent()); // 停止当前线程的 run loop
+    self.commonThread = nil; // run loop 停止后在这里把 self.commonThread 置为 nil
+    NSLog(@"🎏 stop loop END...");
+}
+
+- (void)dealloc {
+    [self stopAction:nil]; // 这里随着 vc 的销毁停止 self.commonThread 的 run loop
+    NSLog(@"🍀🍀🍀 %@ ViewController %s", self, __func__);
+}
+
+@end
+```
+&emsp;看到这里我们应该对 run loop 和线程的关系有个大概的认知了，当然 run loop 的作用绝不仅仅是线程保活，还有许多其他方面的应用，下篇开始我们对 run loop 进入全面学习，本来准备本篇先对 NSRunLoop.h 文件先进行学习的，但是还是决定把 NSRunLoop 和 CFRunLoopRef 对照学习比较清晰，那么就下篇见吧！ 
+
+&emsp;看到这里我们应该对 run loop 和线程的关系有个大概的认知了，当然 run loop 的作用绝不仅仅是线程保活，还有许多其他各方面的应用，那么下面我们以 Apple 提供的 NSRunLoop 类来学习 run loop。
+
+## NSRunLoop
+&emsp;The programmatic interface to objects that manage input sources. 管理输入源的对象的编程接口。
+```c++
+@interface NSRunLoop : NSObject {
+@private
+    id          _rl;
+    id          _dperf;
+    id          _perft;
+    id          _info;
+    id        _ports;
+    void    *_reserved[6];
+}
+```
+&emsp;NSRunLoop 对象处理来自 window system 的鼠标和键盘事件、NSPort 对象和 NSConnection 对象等 sources 的输入。NSRunLoop 对象还处理 NSTimer 事件。
+
+&emsp;你的应用程序既不创建也不显式管理 NSRunLoop 对象。每个 NSThread 对象（包括应用程序的主线程）都有一个根据需要自动为其创建的 NSRunLoop 对象。如果你需要访问当前线程的 run loop，应使用类方法 currentRunLoop 进行访问。请注意，从 NSRunLoop 的角度来看，NSTimer  对象不是 "input"—而是一种特殊类型，这意味着它们在触发时不会导致 run loop 返回。
+
+&emsp;NSRunLoop 类通常不被认为是线程安全的，其方法只能在当前线程的上下文中调用。永远不要尝试调用在其他线程中运行的 NSRunLoop 对象的方法，因为这样做可能会导致意外结果。
+### currentRunLoop
+&emsp;`currentRunLoop` 返回当前线程的 run loop，返回值是当前线程的 NSRunLoop 对象。如果该线程还没有 run loop，则会为其创建并返回一个 run loop。
+```c++
+@property (class, readonly, strong) NSRunLoop *currentRunLoop;
+```
+### currentMode
+&emsp;`currentMode` 是接收者（NSRunLoop 实例对象）的当前 input mode。
+```c++
+@property (nullable, readonly, copy) NSRunLoopMode currentMode;
+```
+&emsp;接收者的当前 input mode，该方法仅在接收者运行时返回当前输入模式，否则，返回 nil。current mode 由运行 run loop 的方法设置，例如 `acceptInputForMode:beforeDate:` 和 `runMode:beforeDate:`。
+### limitDateForMode:
+&emsp;`limitDateForMode:` 在指定模式下通过 run loop 执行一次遍历，并返回计划下一个计时器触发的日期。
+```c++
+- (nullable NSDate *)limitDateForMode:(NSRunLoopMode)mode;
+```
+&emsp;`mode`：以此 run loop mode 进行搜索。你可以指定自定义模式或使用 Run Loop Modes 中列出的模式之一。
 
 
 
