@@ -94,8 +94,8 @@ int main(int argc, char * argv[]) {
     frame #5: 0x00000001de1ce8e0 libdyld.dylib`start + 4 // ⬅️ 加载 dyld 和动态库
 (lldb) 
 ```
-### 如何对子线程进行保活
-&emsp;首先对 “一般来讲，一个线程一次只能执行一个任务，执行完成后线程就会退出。” 进行证明。这里我们使用 NSThread 作为线程对象，首先创建一个继承自 NSThread 的 CommonThread 类，然后重写它的 `dealloc` 函数（之所以不直接在一个 NSThread 的分类中重写 dealloc 函数，是因为 app 内部的 NSThread 对象的创建和销毁会影响我们的观察） 。
+### 如何对子线程进行保活--手动启动线程的 run loop
+&emsp;首先对 “一般来讲，一个线程一次只能执行一个任务，执行完成后线程就会退出。” 这个结论进行证明。这里我们使用 NSThread 作为线程对象，首先创建一个继承自 NSThread 的 CommonThread 类，然后重写它的 `dealloc` 函数（之所以不直接在一个 NSThread 的分类中重写 dealloc 函数，是因为 app 内部的 NSThread 对象的创建和销毁会影响我们的观察） 。
 ```c++
 // CommonThread 定义
 
@@ -110,7 +110,7 @@ NS_ASSUME_NONNULL_END
 #import "CommonThread.h"
 @implementation CommonThread
 - (void)dealloc {
-    NSLog(@"🍀🍀🍀 %@ CommonThread dealloc...", self);
+    NSLog(@"🍀🍀🍀 %@ CommonThread %s", self, __func__);
 }
 @end
 ```
@@ -128,8 +128,8 @@ NSLog(@"🔞 END: %@", [NSThread currentThread]);
 // 控制台打印:
 🔞 START: <NSThread: 0x282801a40>{number = 1, name = main}
 🔞 END: <NSThread: 0x282801a40>{number = 1, name = main}
-🏃‍♀️🏃‍♀️ <CommonThread: 0x282850a80>{number = 5, name = (null)} // 子线程
-🍀🍀🍀 <CommonThread: 0x282850a80>{number = 5, name = (null)} CommonThread dealloc... // commonThread 线程对象被销毁（线程退出）
+🏃‍♀️🏃‍♀️ <CommonThread: 0x2825b6e00>{number = 5, name = (null)} // 子线程
+🍀🍀🍀 <CommonThread: 0x2825b6e00>{number = 5, name = (null)} CommonThread -[CommonThread dealloc] // commonThread 线程对象被销毁（线程退出）
 ```
 &emsp;根据控制台打印我们可以看到在 `commonThread` 线程中的任务执行完毕后，`commonThread` 线程就被释放销毁了（线程退出）。那么下面我们试图使用 run loop 让 `commonThread` 不退出，同时为了便于观察 run loop 的退出（NSRunLoop 对象的销毁），我们添加一个 NSRunLoop 的分类并在分类中重写 `dealloc` 函数（这里之所以直接用 NSRunLoop 类的分类是因为，app 除了 main run loop 外是不会自己主动为线程开启 run loop 的，所以这里我们不用担心 app 内部的 NSRunLoop 对象对我们的影响）。那么我们在上面的代码基础上为线程添加 run loop 的获取和 run。
 ```c++
@@ -173,12 +173,20 @@ entries =>
 }
 }
 
-🍀🍀🍀 0x281ffa940 NSRunLoop dealloc... // commonRunLoop run loop 对象被销毁（run loop 退出）
-🍀🍀🍀 <CommonThread: 0x282ea3600>{number = 5, name = (null)} CommonThread dealloc... // commonThread 线程对象被销毁（线程退出）
+🍀🍀🍀 0x2814eb360 NSRunLoop -[NSRunLoop(Common) dealloc] // commonRunLoop run loop 对象被销毁（run loop 退出）
+🍀🍀🍀 <CommonThread: 0x2836ddc40>{number = 6, name = (null)} CommonThread -[CommonThread dealloc] // commonThread 线程对象被销毁（线程退出）
 ```
 &emsp;运行程序后，我们的 `commonThread` 线程还是退出了，`commonRunLoop` 也退出了。其实是这里涉及到一个知识点，当 run loop 当前运行的 mode 中没有任何需要处理的事件时，run loop 会退出。正如上面控制台中的打印: sources0、sources1、observers、timers 四者都是 `(null)`，所以我们需要创建一个事件让 run loop 来处理，这样 run loop 才不会退出。我们在上面示例代码中的 `[commonRunLoop run];` 行上面添加如下两行：
 ```c++
+// 往 run loop 里面添加 Source\Timer\Observer
 [commonRunLoop addPort:[[NSPort alloc] init] forMode:NSDefaultRunLoopMode];
+
+// 这里要添加如下完整的 NSTimer 对象，只是添加一个 [[NSTimer alloc] init] 会 crash
+// NSTimer *time = [NSTimer scheduledTimerWithTimeInterval:1 repeats:YES block:^(NSTimer * _Nonnull timer) {
+//     NSLog(@"⏰⏰ %@", timer);
+// }];
+// [[NSRunLoop currentRunLoop] addTimer:time forMode:NSDefaultRunLoopMode];
+
 NSLog(@"♻️ %p %@", commonRunLoop, commonRunLoop);
 
 // 控制台部分打印:
@@ -198,6 +206,7 @@ entries =>
 @interface NSRunLoop (NSRunLoopConveniences)
 
 - (void)run;
+
 // ⬇️ 下面还有两个指定 mode 和 limitDate 的 run 函数
 - (void)runUntilDate:(NSDate *)limitDate;
 - (BOOL)runMode:(NSRunLoopMode)mode beforeDate:(NSDate *)limitDate;
@@ -208,13 +217,120 @@ entries =>
 
 &emsp;从 run loop 中手动删除所有已知的 input sources 和 timers 并不能保证 run loop 将退出。macOS 可以根据需要安装和删除附加的 input sources，以处理针对 receiver’s thread 的请求。因此，这些 sources 可以阻止 run loop 退出。
 
-&emsp;如果希望 run loop 终止，则不应使用此方法。相反，请使用其他run方法之一，并在循环中检查自己的其他任意条件。一个简单的例子是：
+&emsp;如果希望 run loop 终止，则不应使用此方法。相反，请使用其他 run 方法之一，并在循环中检查自己的其他任意条件。一个简单的例子是：
 ```c++
 BOOL shouldKeepRunning = YES; // global
 NSRunLoop *theRL = [NSRunLoop currentRunLoop];
 while (shouldKeepRunning && [theRL runMode:NSDefaultRunLoopMode beforeDate:[NSDate distantFuture]]);
 ```
 &emsp;在程序中的其它位置应将 `shouldKeepRunning` 设置为 `NO`。
+
+&emsp;看到 run 函数的注释已经明确告诉我们，run 内部无限重复调用 `runMode:beforeDate:` 函数，在默认模式下运行 run loop，即开启了一个无限 loop，如果我们打算让 run loop 永久运行且对应的线程也永不退出的话我们可以使用 run 函数来启动 run loop 对象，如果想要根据开发场景需要来任意的启动或停止 run loop 的话，则需要使用 run 函数下面两个有 `limitDate` 参数的 run 函数并结合一个 while 循环使用，如上面 Apple 给的示例代码一样，等下面我们会对此情景进行详细的讲解。
+
+&emsp;`run` 函数的伪代码大概如下，`CFRunLoopStop` 函数（它是 run loop 的停止函数，下面会细讲，这里主要帮助我们理解 run 函数的内部逻辑）对调用 `run` 函数启动的 run loop 无效，使用 `CFRunLoopStop` 函数停止的可能只是某一次循环中的 `runMode:beforeDate:`，下次循环进来时 run loop 对象又一次调用了 `runMode:beforeDate:` 函数。 
+```c++
+NSRunLoop *theRL = [NSRunLoop currentRunLoop];
+while(1) {
+    Bool resul = [theRL runMode:NSDefaultRunLoopMode beforeDate:[NSDate distantFuture]];
+}
+```
+##### [NSDate distantFuture]
+&emsp;`[NSDate distantFuture]` 是一个 NSDate 对象，表示遥远的将来的一个日期（以世纪为单位）。当需要 NSDate 对象以实质上忽略 date 参数时，可以传递此值。可以使用 distantFuture 返回的对象作为 date 参数来无限期地等待事件发生。
+```c++
+@property (class, readonly, copy) NSDate *distantFuture;
+```
+&emsp;当前打印 `[NSDate distantFuture]` 是: **4001-01-01 08:00:00，当前实际时间是 2020 12 11**。
+
+&emsp;等下我们再进行手动退出 run loop 的功能点，暂时先验证下在已经启动 run loop 的线程中我们是否可以动态的给该线程添加任务。
+#### 在已启动 run loop 的线程中添加任务
+&emsp;我们需要对上面的测试代码进行修改。首先我们把上面的 `commonThread` 局部变量修改为 `ViewController` 的一个属性。
+```c++
+@property (nonatomic, strong) CommonThread *commonThread;
+```
+&emsp;然后把之前 `commonThread` 局部变量的创建赋值给 `self.commonThread`，然后添加如下一个自定义函数 `rocket:` 和 `ViewController` 的 `touchesBegan:withEvent:` 方法。
+```c++
+- (void)rocket:(NSObject *)param {
+    sleep(1);
+    NSLog(@"🚀🚀 %@ param: %p", [NSThread currentThread], param);
+}
+
+- (void)touchesBegan:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
+    NSLog(@"📺📺 START...");
+    
+    // 末尾的 wait 参数表示 performSelector:onThread:withObject: 函数是否等 @selector(rocket:) 执行完成后才返回，还是直接返回，
+    // 类似 dispatch_async 和 dispatch_sync，表示在 self.commonThread 线程中是异步执行 @selector(rocket:) 还是同步执行 @selector(rocket:)。
+    [self performSelector:@selector(rocket:) onThread:self.commonThread withObject:nil waitUntilDone:YES];
+    
+    NSLog(@"📺📺 END...");
+}
+```
+&emsp;上面代码编辑好后，触摸 `ViewController` 的空白区域，看到 `rocket` 函数正常执行。
+```c++
+📺📺 START...
+🚀🚀 <CommonThread: 0x281f8ce80>{number = 5, name = (null)} param: 0x0
+📺📺 END...
+```
+> &emsp;（这里发现一个点，连续点击屏幕，点击几次 `rocket` 函数就能执行几次，即使在 `performSelector:onThread:withObject:waitUntilDone:` 函数的最后参数传递 `YES` 时，`touchesBegan:withEvent:` 函数本次没有执行完成的时候，我们就点击屏幕，系统依然会记录我们点击过屏幕的次数，然后 `rocket` 函数就会执行对应的次数。把 thread 参数使用主线程 `[NSThread mainThread]`，依然会执行对应的点击次数，不过子线程和主线程还是有些许区别的，感兴趣的话可以自行测试一下。（其实是我真的不知道怎么描述这个区别）） 
+
+&emsp;然后我们再进行一个测试，把 `self.commonThread` 线程任务中的 run loop 代码注释的话，则触摸屏幕是不会执行 `rocket` 函数的，如果把 `performSelector:onThread:withObject:waitUntilDone:` 函数最后一个参数传 `YES` 的话，则会直接 crash，之前 `commonThread` 线程是一个局部变量的时候我们能看到它会退出并且被销毁了，此时虽然我们修改为了 `ViewController` 的一个属性被强引用，但是当不主动启动 `self.commonThread` 线程的 run loop 的话，它依然是没有活性的。
+#### 停止已启动 run loop 线程的 run loop
+&emsp;下面学习如何停止 run loop，首先我们在 `ViewController` 上添加一个停止按钮并添加点击事件，添加如下代码:
+```c++
+// 停止按钮的点击事件
+- (IBAction)stopAction:(UIButton *)sender {
+    NSLog(@"🎏 stop loop START(ACTION)...");
+    [self performSelector:@selector(stopRunLoop:) onThread:self.commonThread withObject:nil waitUntilDone:NO];
+    NSLog(@"🎏 stop loop END(ACTION)...");
+}
+
+// 停止 run loop
+- (void)stopRunLoop:(NSObject *)param {
+    NSLog(@"🎏 stop loop START...");
+    CFRunLoopStop(CFRunLoopGetCurrent());
+    NSLog(@"🎏 stop loop END...");
+}
+```
+&emsp;点击停止按钮后，可看到两个函数都正常的执行了。但是我们点击屏幕的空白区域，发现 `rocket` 函数依然能正常调用。
+```c++
+ 🎏 stop loop START(ACTION)...
+ 🎏 stop loop END(ACTION)...
+ 🎏 stop loop START...
+ 🎏 stop loop END...
+ 📺📺 START...
+ 🚀🚀 <CommonThread: 0x2807c2a80>{number = 5, name = (null)} param: 0x0
+ 📺📺 END...
+```
+&emsp;那么我们把 `[commonRunLoop run];` 修改为 `[commonRunLoop runMode:NSDefaultRunLoopMode beforeDate:[NSDate distantFuture]];`，然后运行程序后，我们直接点击停止按钮，看到控制台有如下打印:
+```c++
+ 🎏 stop loop START(ACTION)...
+ 🎏 stop loop END(ACTION)...
+ 🎏 stop loop START...
+ 🎏 stop loop END...
+ ♻️♻️ 0x2819d6700 <CFRunLoop 0x2801d7000 [0x20e729430]>{wakeup port = 0x9b03, stopped = false, ignoreWakeUps = true, 
+current mode = (none),
+...
+ 🍀🍀🍀 0x2819d6700 NSRunLoop -[NSRunLoop(Common) dealloc]
+```
+&emsp;此逻辑大概是 `commonRunLoop` 执行完 `CFRunLoopStop` 函数后，`[commonRunLoop runMode:NSDefaultRunLoopMode beforeDate:[NSDate distantFuture]];` 函数返回了，然后下面的 `NSLog(@"♻️♻️ %p %@", commonRunLoop, commonRunLoop);` 得到了执行，然后 `self.commonThread` 创建时添加的 block 函数就完整执行完毕了，完整执行完此逻辑后，`commonRunLoop` 便退出并且销毁了。
+
+&emsp;下面我们再看一种情况。再次运行程序，我们不点击停止按钮，直接点击屏幕空白区域，看到控制台有如下打印:
+```c++
+ 📺📺 START...
+ 📺📺 END...
+  🚀🚀 <CommonThread: 0x280fddb00>{number = 5, name = (null)} param: 0x0
+ ♻️♻️ 0x283e86b80 <CFRunLoop 0x282687900 [0x20e729430]>{wakeup port = 0x9b03, stopped = false, ignoreWakeUps = true, 
+current mode = (none),
+...
+ 🍀🍀🍀 0x283e86b80 NSRunLoop -[NSRunLoop(Common) dealloc]
+```
+&emsp;本次我们没有执行 `CFRunLoopStop` 函数，仅在 `self.commonThread` 线程执行了一个事件，执行完 `rocket` 函数以后，`[commonRunLoop runMode:NSDefaultRunLoopMode beforeDate:[NSDate distantFuture]];` 函数返回了，然后下面的 `NSLog(@"♻️♻️ %p %@", commonRunLoop, commonRunLoop);` 得到了执行，然后 `self.commonThread` 创建时添加的 block 函数就完整执行完毕了，完整执行完此逻辑后，`commonRunLoop` 便退出并且销毁了。
+
+&emsp;那么我们根据 run 函数中的注释来把代码修改为 Apple 示例代码的样子。首先添加一个布尔类型的 `shouldKeepRunning` 属性，并初始为 `YES`，然后把 `[commonRunLoop runMode:NSDefaultRunLoopMode beforeDate:[NSDate distantFuture]];` 修改为 `while (self.shouldKeepRunning && [commonRunLoop runMode:NSDefaultRunLoopMode beforeDate:[NSDate distantFuture]]);`，然后进行各项测试，可发现打印结果和 `[commonRunLoop run];` 使用时完全一致。
+
+&emsp;
+
+
+
 
 
 
