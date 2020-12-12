@@ -535,14 +535,65 @@ dispatch_async(globalQueue_DEFAULT, ^{
 ```
 &emsp;接收者的当前 input mode，该方法仅在接收者运行时返回当前输入模式，否则，返回 nil。current mode 由运行 run loop 的方法设置，例如 `acceptInputForMode:beforeDate:` 和 `runMode:beforeDate:`。
 ### limitDateForMode:
-&emsp;`limitDateForMode:` 在指定模式下通过 run loop 执行一次遍历，并返回计划下一个计时器触发的日期。
+&emsp;`limitDateForMode:` 在指定模式下通过 run loop 执行一次遍历，并返回计划下一个 timer 触发的日期。
 ```c++
 - (nullable NSDate *)limitDateForMode:(NSRunLoopMode)mode;
 ```
 &emsp;`mode`：以此 run loop mode 进行搜索。你可以指定自定义模式或使用 Run Loop Modes 中列出的模式之一。
 
+&emsp;返回值是下一个 timer 计划触发的日期；如果没有此模式的  input sources，则为 nil。
 
+&emsp;进入 run loop 时立即超时，因此如果没有需要处理的 input sources，则 run loop 不会阻塞，等待输入。
+### mainRunLoop
+&emsp;`mainRunLoop` 返回主线程的 run loop。返回值是代表主线程的 run loop 的对象。
+```c++
+@property (class, readonly, strong) NSRunLoop *mainRunLoop API_AVAILABLE(macos(10.5), ios(2.0), watchos(2.0), tvos(9.0));
+```
+### getCFRunLoop
+&emsp;`getCFRunLoop` 返回接收者（NSRunLoop 实例对象）的基础 CFRunLoop 对象。
+```c++
+- (CFRunLoopRef)getCFRunLoop CF_RETURNS_NOT_RETAINED;
+```
+&emsp;你可以使用返回的 run loop 通过 Core Foundation 函数调用配置当前 run loop。例如，你可以使用此函数来设置 run loop observer。
 
+&emsp;（这里我们可能需要理解一下，首先 NSRunLoop 是对 Core Foundation 框架中的 __CFRunLoop 的封装，所以文章上面所有提到的 run loop 在代码层面都可以理解为 NSRunLoop 对象或者是 __CFRunLoop 结构体实例。NSRunLoop 的封装使我们可以以更加面向对象的思想来学习和使用 run loop，并且是继承自 NSObject 的可以使用 ARC 来自动处理内存申请和释放，同时每个 NSRunLoop 对象是和一个 __CFRunLoop 结构体实例所对应的，getCFRunLoop 函数使我们可以由一个 NSRunLoop 对象得到其对应的 CFRunLoopRef（__CFRunLoop 结构体指针）然后由 CFRunLoopRef 我们可以对 run loop 执行更多的操作，因为这里虽是封装，但是还是有很多 __CFRunLoop 的函数在 NSRunLoop 并没有实现，例如上面的提到的设置 run loop observer：`void CFRunLoopAddObserver(CFRunLoopRef rl, CFRunLoopObserverRef observer, CFRunLoopMode mode)` 函数）
+### NSRunLoopMode
+&emsp;`NSRunLoopMode` 本质是 `NSString` 类型，表示 NSRunLoop 的运行模式。
+```c++
+typedef NSString * NSRunLoopMode NS_EXTENSIBLE_STRING_ENUM;
+```
+&emsp;有以下几种不同的类型。
++ `NSRunLoopCommonModes`
+```c++
+const NSRunLoopMode NSRunLoopCommonModes;
+```
+&emsp;使用此值作为 mode 添加到 run loop 的对象由所有已声明为 “common” 模式集成员的运行循环模式监视；有关详细信息，参考 `CFRunLoopAddCommonMode` 的描述。（可以把 NSRunLoopCommonModes 理解为一个 run loop 运行模式的集合，包含所有已标记为 common 的 mode）
++ `NSDefaultRunLoopMode`
+```c++
+const NSRunLoopMode NSDefaultRunLoopMode;
+```
+&emsp;处理 NSConnection 对象以外的 input sources 的模式，也是最常用的 run loop 模式。
++ `NSEventTrackingRunLoopMode`
+```c++
+NSRunLoopMode NSEventTrackingRunLoopMode;
+```
+&emsp;当以 tracking events modally（如鼠标拖动循环，scrollView 滚动等）时，应将 run loop 设置为此模式。
++ `NSModalPanelRunLoopMode`
+```c++
+NSRunLoopMode NSModalPanelRunLoopMode;
+```
+&emsp;等待诸如 NSSavePanel 或 NSOpenPanel 之类的模式面板（modal panel）的输入时，应将 run loop 设置为此模式。
++ `UITrackingRunLoopMode`
+```c++
+const NSRunLoopMode UITrackingRunLoopMode;
+```
+&emsp;进行控件中跟踪（tracking in controls）时设置的模式，如屏幕滑动时。你可以使用此模式添加在跟踪过程中触发的 timers。
+### addTimer:forMode:
+&emsp;`addTimer:forMode:` 使用给定的 input mode 注册给定的 timer。
+```c++
+- (void)addTimer:(NSTimer *)timer forMode:(NSRunLoopMode)mode;
+```
+&emsp;``
 
 
 ## 参考链接
