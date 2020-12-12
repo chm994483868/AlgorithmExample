@@ -45,7 +45,7 @@
 | Common modes | NSRunLoopCommonModes (Cocoa) kCFRunLoopCommonModes (Core Foundation) | 这是一组可配置的常用模式。将 input source 与此模式关联也会将其与组中的每个模式相关联。对于 Cocoa 应用程序，默认情况下，此集合包括 default、modal、event tracking 模式。Core Foundation 最初只包括 default mode。你可以使用 CFRunLoopAddCommonMode 函数向集合添加自定义模式。 |
 
 ## Input Sources
-&emsp;
+&emsp;Input sources 将事件异步传递到你的线程。事件的 source 取决于 input source 的类型，通常是两个类别之一。基于端口的输入源（port-based input sources）监视你的应用程序的 Mach 端口。定制输入源监视事件的定制源。就你的 run loop 而言，input source 是基于端口（port-based）的还是定制的（custom）都无关紧要。系统通常实现两种类型的输入源，你可以按原样使用。两种信号源之间的唯一区别是信号的发送方式。基于端口的源由内核自动发出信号，而自定义源（custom sources）必须从另一个线程手动发出信号。
 
 
 
