@@ -5,7 +5,6 @@
 &emsp;Run loop 管理不是完全自动的。你仍然必须设计 thread 的代码以在适当的时候启动 run loop 并响应传入的事件。Cocoa 和 Core Foundation 都提供运行循环对象（NSRunLoop 和 __CFRunLoop），以帮助你配置和管理 thread 的 run loop。你的应用程序不需要显式创建这些对象；每个 thread，包括应用程序的 main thread，都有一个与之关联的 run loop 对象。但是，只有子线程需要显式地运行其 run loop。在应用程序启动过程中，应用程序框架会自动在 main thread 上设置并运行其 run loop。
 
 &emsp;以下各节提供有关 run loop 以及如何为应用程序配置 run loop 的更多信息。
-
 ## Anatomy of a Run Loop（剖析 Run Loop）
 &emsp;run loop 和它的名字听起来很像。它是 thread 进入并用于运行事件处理程序以响应传入事件的循环。你的代码提供了用于实现 run loop 的实际循环部分的控制语句—换句话说，你的代码提供了驱动 run loop 的 while 或 for 循环。在循环内部，你可以使用 run loop 对象来 "run"（运行） 事件处理代码，以接收事件并调用已安装的处理程序（installed handlers）。
 
@@ -27,7 +26,7 @@
 
 &emsp;在代码中，你可以通过名称识别 modes。Cocoa 和 Core Foundation 都定义了默认模式和几种常用模式，以及用于在代码中指定这些 mode 的字符串。你可以通过简单地为 mode 名称指定自定义字符串来定义自定义 mode。尽管你分配给自​​定义 mode 的名称是任意的，但是这些 mode 的内容不是任意的。你必须确保将一个或多个 input sources，timers 或 run-loop observers 添加到你创建的任何 mode 中，以使其有用。
 
-&emsp;您可以使用模式从运行循环的特定遍历中过滤掉有害来源的事件。大多数时候，您将需要在系统定义的“默认”模式下运行运行循环。但是，模式面板可以在“模式”模式下运行。在这种模式下，只有与模式面板相关的源才将事件传递给线程。对于辅助线程，您可以使用自定义模式来防止低优先级源在时间紧迫的操作期间传递事件。
+&emsp;你可以使用模式从运行循环的特定遍历中过滤掉有害来源的事件。大多数时候，您将需要在系统定义的“默认”模式下运行运行循环。但是，模式面板可以在“模式”模式下运行。在这种模式下，只有与模式面板相关的源才将事件传递给线程。对于辅助线程，您可以使用自定义模式来防止低优先级源在时间紧迫的操作期间传递事件。
 
 &emsp;在 run loop 的特定传递过程中，可以使用 mode 从不需要的 sources 中筛选出事件。大多数情况下，你希望以系统定义的 "default" mode 运行 run loop。然而，modal panel 可能以 "modal" mode 运行，在这种 mode 下，只有与 modal panel 相关的 sources 才会向线程传递事件。对于子线程（secondary threads），可以使用自定义 mode 来防止低优先级源（low-priority sources）在时间关键型操作（time-critical operations）期间传递事件。
 
