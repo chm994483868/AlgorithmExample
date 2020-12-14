@@ -4,6 +4,11 @@
 
 &emsp;CFRunLoop.h 文件是 run loop 在 Core Foundation 下的最重要的接口文件，与我们前面学习的 Cocoa 下的 NSRunLoop.h 文件相对应，但是 CFRunLoop.h 文件包含更多的 run loop 的操作，下面我们就一起来学习一下吧！
 
+## CFRunLoop Overview
+&emsp;CFRunLoop 对象监视任务的输入源（sources of input），并在准备好进行处理时调度控制。输入源（input sources）的示例可能包括用户输入设备、网络连接、周期性或延时事件以及异步回调。
+
+&emsp;运行循环可以监视三种类型的对象：源（CFRunLoopSource）、计时器（CFRunLoopTimer）和观察者（CFRunLoopObserver）。要在这些对象需要处理时接收回调，必须首先使用CFRunLoopAddSource、CFRunLoopAddTimer或CFRunLoopAddObserver将这些对象放入运行循环中。以后可以从运行循环中删除对象（或使其无效）以停止接收其回调。 
+
 &emsp;看到 CFRunLoop.h 文件的内容被包裹在 `CF_IMPLICIT_BRIDGING_ENABLED` 和 `CF_IMPLICIT_BRIDGING_DISABLED` 它们是一对表示隐式桥接转换的宏。
 ```c++
 #ifndef CF_IMPLICIT_BRIDGING_ENABLED
@@ -316,7 +321,39 @@ typedef struct {
     CFStringRef    (*copyDescription)(const void *info);
 } CFRunLoopObserverContext;
 ```
+### CFRunLoopTimerRef（struct __CFRunLoopTimer *）
+&emsp;NSTimer 是与 run loop 息息相关的，CFRunLoopTimerRef 与 NSTimer 是可以 toll-free bridged（免费桥转换）的。当 timer 加到 run loop 的时候，run loop 会注册对应的触发时间点，时间到了，run loop 若处于休眠则会被唤醒，执行 timer 对应的回调函数。
+```c++
+typedef struct CF_BRIDGED_MUTABLE_TYPE(NSTimer) __CFRunLoopTimer * CFRunLoopTimerRef;
 
+struct __CFRunLoopTimer {
+    CFRuntimeBase _base; // 所有 CF "instances" 都是从这个结构开始的
+    uint16_t _bits; // 标记 timer 的状态
+    pthread_mutex_t _lock; // 互斥锁
+    CFRunLoopRef _runLoop; // timer 对应的 run loop
+    CFMutableSetRef _rlModes; // timer 对应的 run loop modes
+    CFAbsoluteTime _nextFireDate; // timer 的下次触发时机，每次触发后都会再次设置该值
+    CFTimeInterval _interval; /* immutable */
+    CFTimeInterval _tolerance; /* mutable */ // timer 的允许时间偏差
+    uint64_t _fireTSR; /* TSR units */ // timer 本次需要被触发的时间
+    CFIndex _order; /* immutable */
+    
+    // typedef void (*CFRunLoopTimerCallBack)(CFRunLoopTimerRef timer, void *info);
+    CFRunLoopTimerCallBack _callout; /* immutable */ // timer 回调
+    
+    CFRunLoopTimerContext _context; /* immutable, except invalidation */ // timer 上下文
+};
+```
+#### CFRunLoopTimerContext
+```c++
+typedef struct {
+    CFIndex    version;
+    void *    info;
+    const void *(*retain)(const void *info);
+    void    (*release)(const void *info);
+    CFStringRef    (*copyDescription)(const void *info);
+} CFRunLoopTimerContext;
+```
 
 
 
