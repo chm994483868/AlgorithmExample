@@ -118,7 +118,7 @@ typedef struct __CFRunLoopMode *CFRunLoopModeRef;
 
 struct __CFRunLoopMode {
     CFRuntimeBase _base; // 所有 CF "instances" 都是从这个结构开始的
-    pthread_mutex_t _lock; /* must have the run loop locked before locking this */ 必须在锁定之前将运行循环锁定
+    pthread_mutex_t _lock; /* must have the run loop locked before locking this */ 必须在锁定之前将 run loop 锁定，即加锁前需要 run loop 先加锁
     CFStringRef _name; // mode 都会指定一个字符串名称
     Boolean _stopped; // 标记了 run loop 的运行状态，实际上并非如此简单，还有前面的 _per_run_data。
     char _padding[3]; // 
@@ -144,17 +144,15 @@ struct __CFRunLoopMode {
     
 #if USE_DISPATCH_SOURCE_FOR_TIMERS
     // macOS 下，使用 dispatch_source 表示 timer
-    
-    dispatch_source_t _timerSource;
-    dispatch_queue_t _queue;
-    Boolean _timerFired; // set to true by the source when a timer has fired
+    dispatch_source_t _timerSource; // GCD 定时器
+    dispatch_queue_t _queue; // 队列
+    Boolean _timerFired; // set to true by the source when a timer has fired 计时器触发时由 source 设置为 true
     Boolean _dispatchTimerArmed;
 #endif
 
 #if USE_MK_TIMER_TOO
     // iOS 下，使用 MK 表示 timer 
-    
-    mach_port_t _timerPort;
+    mach_port_t _timerPort; // MK_TIMER 的 port
     Boolean _mkTimerArmed;
 #endif
 
@@ -163,11 +161,73 @@ struct __CFRunLoopMode {
     void (*_msgPump)(void);
 #endif
 
+    // timer 软临界点
     uint64_t _timerSoftDeadline; /* TSR */
+    // timer 硬临界点
     uint64_t _timerHardDeadline; /* TSR */
 };
 ```
+### CFRunLoopSourceRef（struct __CFRunLoopSource *）
+&emsp;CFRunLoopSourceRef 是事件源（输入源）。通过源码可以发现，其分为 source0 和 source1 两个
+```c++
+typedef struct __CFRunLoopSource * CFRunLoopSourceRef;
 
+struct __CFRunLoopSource {
+    CFRuntimeBase _base; // 所有 CF "instances" 都是从这个结构开始的
+    uint32_t _bits;
+    pthread_mutex_t _lock; // 互斥锁
+    CFIndex _order; /* immutable */ source 的优先级，值为小，优先级越高
+    CFMutableBagRef _runLoops; // run loop 集合
+    union {
+        CFRunLoopSourceContext version0; /* immutable, except invalidation */
+        CFRunLoopSourceContext1 version1; /* immutable, except invalidation */
+    } _context;
+};
+```
+&emsp;CFRunLoopSourceContext 
+```c++
+typedef struct {
+    CFIndex    version;
+    void *    info; // source 的信息
+    
+    const void *(*retain)(const void *info); // retain 函数
+    void    (*release)(const void *info); // release 函数
+    
+    CFStringRef    (*copyDescription)(const void *info);
+    
+    Boolean    (*equal)(const void *info1, const void *info2); // 判断 source 相等的函数
+    
+    CFHashCode    (*hash)(const void *info);
+    void    (*schedule)(void *info, CFRunLoopRef rl, CFStringRef mode);
+    void    (*cancel)(void *info, CFRunLoopRef rl, CFStringRef mode);
+    
+    void    (*perform)(void *info); // source 要执行的任务块
+} CFRunLoopSourceContext;
+```
+&emsp;CFRunLoopSourceContext1
+```c++
+typedef struct {
+    CFIndex    version;
+    void *    info; // source 的信息
+    
+    const void *(*retain)(const void *info); // retain 函数
+    void    (*release)(const void *info); // release 函数
+    
+    CFStringRef    (*copyDescription)(const void *info);
+    
+    Boolean    (*equal)(const void *info1, const void *info2); // 判断 source 相等的函数
+    
+    CFHashCode    (*hash)(const void *info);
+#if (TARGET_OS_MAC && !(TARGET_OS_EMBEDDED || TARGET_OS_IPHONE)) || (TARGET_OS_EMBEDDED || TARGET_OS_IPHONE)
+    mach_port_t    (*getPort)(void *info);
+    void *    (*perform)(void *msg, CFIndex size, CFAllocatorRef allocator, void *info);
+#else
+    void *    (*getPort)(void *info);
+    void    (*perform)(void *info);
+#endif
+} CFRunLoopSourceContext1;
+```
+### CFRunLoopObserverRef（）
 
 
 
