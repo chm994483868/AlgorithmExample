@@ -168,7 +168,7 @@ struct __CFRunLoopMode {
 };
 ```
 ### CFRunLoopSourceRef（struct __CFRunLoopSource *）
-&emsp;CFRunLoopSourceRef 是事件源（输入源）。通过源码可以发现，其分为 source0 和 source1 两个
+&emsp;CFRunLoopSourceRef 是事件源（输入源），通过源码可以发现，其分为 source0 和 source1 两个。
 ```c++
 typedef struct __CFRunLoopSource * CFRunLoopSourceRef;
 
@@ -217,6 +217,16 @@ typedef struct {
     
     Boolean    (*equal)(const void *info1, const void *info2); // 判断 source 相等的函数
     
+    // #if __LLP64__
+    //  typedef unsigned long long CFOptionFlags;
+    //  typedef unsigned long long CFHashCode;
+    //  typedef signed long long CFIndex;
+    // #else
+    //  typedef unsigned long CFOptionFlags;
+    //  typedef unsigned long CFHashCode;
+    //  typedef signed long CFIndex;
+    // #endif
+    
     CFHashCode    (*hash)(const void *info);
 #if (TARGET_OS_MAC && !(TARGET_OS_EMBEDDED || TARGET_OS_IPHONE)) || (TARGET_OS_EMBEDDED || TARGET_OS_IPHONE)
     mach_port_t    (*getPort)(void *info);
@@ -227,7 +237,86 @@ typedef struct {
 #endif
 } CFRunLoopSourceContext1;
 ```
-### CFRunLoopObserverRef（）
+#### CFAllocatorRef
+&emsp;在大多数情况下，为创建函数指定分配器时，NULL 参数表示 “使用默认值”；这与使用 kCFAllocatorDefault 或 `CFAllocatorGetDefault()` 的返回值相同。这样可以确保你将使用当时有效的分配器。
+```c++
+typedef const struct __CFAllocator * CFAllocatorRef;
+
+struct __CFAllocator {
+    CFRuntimeBase _base;
+#if DEPLOYMENT_TARGET_MACOSX || DEPLOYMENT_TARGET_EMBEDDED || DEPLOYMENT_TARGET_EMBEDDED_MINI
+    // CFAllocator structure must match struct _malloc_zone_t!
+    // The first two reserved fields in struct _malloc_zone_t are for us with CFRuntimeBase
+    size_t     (*size)(struct _malloc_zone_t *zone, const void *ptr); /* returns the size of a block or 0 if not in this zone; must be fast, especially for negative answers */
+    void     *(*malloc)(struct _malloc_zone_t *zone, size_t size);
+    void     *(*calloc)(struct _malloc_zone_t *zone, size_t num_items, size_t size); /* same as malloc, but block returned is set to zero */
+    void     *(*valloc)(struct _malloc_zone_t *zone, size_t size); /* same as malloc, but block returned is set to zero and is guaranteed to be page aligned */
+    void     (*free)(struct _malloc_zone_t *zone, void *ptr);
+    void     *(*realloc)(struct _malloc_zone_t *zone, void *ptr, size_t size);
+    void     (*destroy)(struct _malloc_zone_t *zone); /* zone is destroyed and all memory reclaimed */
+    const char    *zone_name;
+
+    /* Optional batch callbacks; these may be NULL */
+    unsigned    (*batch_malloc)(struct _malloc_zone_t *zone, size_t size, void **results, unsigned num_requested); /* given a size, returns pointers capable of holding that size; returns the number of pointers allocated (maybe 0 or less than num_requested) */
+    void    (*batch_free)(struct _malloc_zone_t *zone, void **to_be_freed, unsigned num_to_be_freed); /* frees all the pointers in to_be_freed; note that to_be_freed may be overwritten during the process */
+
+    struct malloc_introspection_t    *introspect;
+    unsigned    version;
+    
+    /* aligned memory allocation. The callback may be NULL. */
+    void *(*memalign)(struct _malloc_zone_t *zone, size_t alignment, size_t size);
+    
+    /* free a pointer known to be in zone and known to have the given size. The callback may be NULL. */
+    void (*free_definite_size)(struct _malloc_zone_t *zone, void *ptr, size_t size);
+#endif
+    CFAllocatorRef _allocator;
+    CFAllocatorContext _context;
+};
+```
+### CFRunLoopObserverRef（struct __CFRunLoopObserver *）
+&emsp;CFRunLoopObserverRef 是观察者，每个 Observer 都包含了一个回调(函数指针)，当 RunLoop 的状态发生变化时，观察者就能通过回调接受到这个变化。主要是用来向外界报告 Runloop 当前的状态的更改。
+```c++
+typedef struct __CFRunLoopObserver * CFRunLoopObserverRef;
+
+struct __CFRunLoopObserver {
+    CFRuntimeBase _base; // 所有 CF "instances" 都是从这个结构开始的
+    pthread_mutex_t _lock; // 互斥锁
+    CFRunLoopRef _runLoop; // observer 所观察的 run loop
+    CFIndex _rlCount; // observer 观察了多少个 run loop
+    CFOptionFlags _activities; /* immutable */ // 所监听的事件，通过位异或，可以监听多种事件，_activities 用来说明要观察 runloop 的哪些状态，一旦指定了就不可变。
+    CFIndex _order; /* immutable */ // observer 优先级
+    
+    // typedef void (*CFRunLoopObserverCallBack)(CFRunLoopObserverRef observer, CFRunLoopActivity activity, void *info);
+    CFRunLoopObserverCallBack _callout; /* immutable */ // observer 回调函数，观察到 run loop 状态变化后的回调
+    
+    CFRunLoopObserverContext _context; /* immutable, except invalidation */ // observer 上下文
+};
+```
+#### CFRunLoopActivity
+&emsp;运行循环观察者活动。
+```c++
+/* Run Loop Observer Activities */
+typedef CF_OPTIONS(CFOptionFlags, CFRunLoopActivity) {
+    kCFRunLoopEntry = (1UL << 0), // 进入 RunLoop 循环(这里其实还没进入)
+    kCFRunLoopBeforeTimers = (1UL << 1), // Run Loop 要处理 timer 了
+    kCFRunLoopBeforeSources = (1UL << 2), // Run Loop 要处理 source 了
+    kCFRunLoopBeforeWaiting = (1UL << 5), // Run Loop 要休眠了
+    kCFRunLoopAfterWaiting = (1UL << 6), // Run Loop 醒了
+    kCFRunLoopExit = (1UL << 7), // Run Loop 退出（和 kCFRunLoopEntry 对应，Entry 和 Exit 在每次 Run Loop 循环中仅调用一次，用于表示即将进入循环和退出循环。）
+    kCFRunLoopAllActivities = 0x0FFFFFFFU
+};
+```
+#### CFRunLoopObserverContext
+```c++
+typedef struct {
+    CFIndex    version;
+    void *    info;
+    const void *(*retain)(const void *info);
+    void    (*release)(const void *info);
+    CFStringRef    (*copyDescription)(const void *info);
+} CFRunLoopObserverContext;
+```
+
 
 
 
