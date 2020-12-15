@@ -148,9 +148,179 @@ struct _block_item {
     void (^_block)(void); // 真正要执行的 block 本体
 };
 ```
-&emsp;上面是 CFRunLoopRef 涉及的相关数据结构，特别是其中与 mode 相关的 _modes、_commonModes、_commonModeItems 三个成员变量都是  CFMutableSetRef 可变集合类型，也正对应了前面的一些结论，一个 run loop 对应多个 mode，一个 mode 下可以包含多个 modeItem（更详细的内容在下面的 __CFRunLoopMode 结构中）。既然 run loop 包含多个 mode 那么它定可以在不同的 mode 下运行， 
+&emsp;上面是 CFRunLoopRef 涉及的相关数据结构，特别是其中与 mode 相关的 _modes、_commonModes、_commonModeItems 三个成员变量都是  CFMutableSetRef 可变集合类型，也正对应了前面的一些结论，一个 run loop 对应多个 mode，一个 mode 下可以包含多个 modeItem（更详细的内容在下面的 __CFRunLoopMode 结构中）。既然 run loop 包含多个 mode 那么它定可以在不同的 mode 下运行，run loop 一次只能在一个 mode 下运行，如果想要切换 mode，只能退出 run loop，然后再根据指定的 mode 运行 run loop，这样可以是使不同的 mode 下的 modeItem 相互隔离，不会相互影响。
+
+&emsp;下面看两个超级重要的函数，获取主线程的 run loop 和获取当前线程（子线程）的 run loop。
+### CFRunLoopGetMain/CFRunLoopGetCurrent
+&emsp;`CFRunLoopGetMain/CFRunLoopGetCurrent` 函数可分别用于获取主线程的 run loop 和获取当前线程（子线程）的 run loop。main run loop 使用一个静态变量 \__main 存储，子线程的 run loop 会保存在当前线程的 TSD 中。两者在第一次获取 run loop 时都会调用 `_CFRunLoopGet0` 函数根据线程的 pthread_t 对象从静态全局变量 \__CFRunLoops（static CFMutableDictionaryRef）中获取，如果获取不到的话则新建 run loop 对象，并根据线程的 pthread_t 保存在静态全局变量 \__CFRunLoops（static CFMutableDictionaryRef）中，方便后续读取。
+```c++
+CFRunLoopRef CFRunLoopGetMain(void) {
+    // 用于检查给定的进程是否被分叉
+    CHECK_FOR_FORK();
+    // __main 是一个静态变量，只能初始化一次，用于保存主线程关联的 run loop 对象
+    static CFRunLoopRef __main = NULL; // no retain needed
+    
+    // 只有第一个获取 main run loop 时 __main 值为 NULL，
+    // 然后从静态全局的 CFMutableDictionaryRef __CFRunLoops 中根据主线程查找 main run loop，
+    // 赋值给 __main，以后再获取 main run loop，即直接返回 __main。
+    //（主线程和 main run loop 都是全局唯一的，pthread_main_thread_np() 获取主线程）
+    if (!__main) __main = _CFRunLoopGet0(pthread_main_thread_np()); // no CAS needed
+    
+    // 返回 main run loop
+    return __main;
+}
+
+CFRunLoopRef CFRunLoopGetCurrent(void) {
+    // 用于检查给定的进程是否被分叉
+    CHECK_FOR_FORK();
+    
+    // 从当前线程的 TSD 中获取其 run loop，
+    // 如果未找到的话则去静态全局的 CFMutableDictionaryRef __CFRunLoops 中根据 pthread_t 查找 run loop
+    CFRunLoopRef rl = (CFRunLoopRef)_CFGetTSD(__CFTSDKeyRunLoop);
+    if (rl) return rl;
+    
+    // TSD 中未找到当前线程的 run loop 的话，即是第一次获取当前线程 run loop 的情况，
+    // 系统会为当前线程创建一个 run loop，会把它存入当前线程的 TSD 中同时也会存入静态全局变量 __CFRunLoops 中。
+    
+    // pthread_self() 获取当前线程的 pthread_t。
+    
+    // 去静态全局的 CFMutableDictionaryRef __CFRunLoops 中根据 pthread_t 查找当前线程的 run loop，
+    // 如果找不到的话则会为当前线程进行创建 run loop。
+    return _CFRunLoopGet0(pthread_self());
+}
+```
+#### _CFRunLoopGet0
+&emsp;`_CFRunLoopGet0` 函数，可以通过当前线程的 pthread_t 来获取其 run loop 对象，如果没有则新创建一个 run loop 对象。创建之后，将 run loop 对象保存在静态全局 \__CFRunLoops 中，同时还会保存在当前线程的 TSD 中。
+```c++
+// 静态全局的 CFMutableDictionaryRef，key 是 pthread_t，value 是 CFRunLoopRef。
+static CFMutableDictionaryRef __CFRunLoops = NULL;
+
+// #if DEPLOYMENT_TARGET_MACOSX
+// typedef pthread_mutex_t CFLock_t; 在 macOS 下 CFLock_t 是互斥锁
+
+// 用于访问 __CFRunLoops 时加锁
+static CFLock_t loopsLock = CFLockInit;
+
+// should only be called by Foundation
+// t==0 is a synonym for "main thread" that always works 
+// t 为 0 等同于获取主线程的 run loop
+
+// 外联函数，根据入参 pthread_t t 获取该线程的 run loop
+CF_EXPORT CFRunLoopRef _CFRunLoopGet0(pthread_t t) {
+    // static pthread_t kNilPthreadT = (pthread_t)0;
+    // 如果 t 是 nil，则把 t 赋值为主线程
+    if (pthread_equal(t, kNilPthreadT)) {
+        t = pthread_main_thread_np();
+    }
+    
+    // macOS 下 __CFLock 是互斥锁加锁
+    // #define __CFLock(LP) ({ (void)pthread_mutex_lock(LP); })
+    
+    // 加锁
+    __CFLock(&loopsLock);
+    // 第一次调用时，__CFRunLoops 不存在则进行新建，并且会直接为主线程创建一个 run loop，并保存进 __CFRunLoops 中
+    if (!__CFRunLoops) {
+        // 解锁
+        __CFUnlock(&loopsLock);
+        // 创建 CFMutableDictionaryRef
+        CFMutableDictionaryRef dict = CFDictionaryCreateMutable(kCFAllocatorSystemDefault, 0, NULL, &kCFTypeDictionaryValueCallBacks);
+        // 根据主线程的 pthread_t 创建 run loop
+        CFRunLoopRef mainLoop = __CFRunLoopCreate(pthread_main_thread_np());
+    
+        // #define pthreadPointer(a) a
+        // 把 mainLoop 根据主线程的 pthread_t 作为 key 保存在 dict 中
+        CFDictionarySetValue(dict, pthreadPointer(pthread_main_thread_np()), mainLoop);
+        
+        // InterlockedCompareExchangePointer 函数是进行原子性的比较和交换指针指向的值。
+        // 把 dst 内存地址中存储的值与 oldp 进行比较，如果相等，则用 newp 指向的内存地址与 dst 内存地址中存储的值进行交换。
+        // 返回值是 dst 内存地址中存储的值。
+        // CF_EXPORT bool OSAtomicCompareAndSwapPtrBarrier(void *oldp, void *newp, void *volatile *dst) 
+        // { 
+        //     return oldp == InterlockedCompareExchangePointer(dst, newp, oldp);
+        // }
+        
+        // 原子性的比较交换内存空间中值，如果 &__CFRunLoops 存储的值是 NULL 的话，把 dict 指向的内存地址与 &__CFRunLoops 内存中的值进行交换，并返回 True。
+        // 当 &__CFRunLoops 内存空间中的值不是 NULL 时，不发生交换，返回 false，此时进入会 if，执行释放 dict 操作。
+        if (!OSAtomicCompareAndSwapPtrBarrier(NULL, dict, (void * volatile *)&__CFRunLoops)) {
+            // 释放 dict 
+            CFRelease(dict);
+        }
+        
+        // 释放 mainLoop，这里 __CFRunLoops 已经持有 mainLoop，这里的 release 并不会导致 mainLoop 对象被销毁
+        CFRelease(mainLoop);
+        
+        // 加锁 
+        __CFLock(&loopsLock);
+    }
+    
+    // 根据线程的 pthread_t 从 __CFRunLoops 中获取其对应的 run loop
+    CFRunLoopRef loop = (CFRunLoopRef)CFDictionaryGetValue(__CFRunLoops, pthreadPointer(t));
+    
+    // 解锁
+    __CFUnlock(&loopsLock);
+    
+    // 如果 loop 不存在，则新建 run loop，例如子线程第一次获取 run loop 时都会走到这里，需要为它创建 run loop。
+    if (!loop) {
+        // 根据线程创建 run loop
+        CFRunLoopRef newLoop = __CFRunLoopCreate(t);
+        // 加锁
+        __CFLock(&loopsLock);
+        
+        // 再次判断 __CFRunLoops 中是否有线程 t 的 run loop，因为第一次判断后已经解锁了，可能在多线程的场景下已经创建好了该 run loop
+        loop = (CFRunLoopRef)CFDictionaryGetValue(__CFRunLoops, pthreadPointer(t));
+        if (!loop) {
+            // 把 newLoop 根据线程 t 保存在 __CFRunLoops 中
+            CFDictionarySetValue(__CFRunLoops, pthreadPointer(t), newLoop);
+            // 赋值给 loop
+            loop = newLoop;
+        }
+        
+        // don't release run loops inside the loopsLock, because CFRunLoopDeallocate may end up taking it
+        // 不要在 loopsLock 内部释放运行循环，因为 CFRunLoopDeallocate 最终可能会占用它
+        
+        // 解锁
+        __CFUnlock(&loopsLock);
+        
+        // 放入 __CFRunLoops 时，__CFRunLoops 会持有 newLoop，这里的 release 只是对应 __CFRunLoopCreate(t) 时的引用计数 + 1
+        CFRelease(newLoop);
+    }
+    
+    // 这里判断入参线程 t 是否就是当前线程，如果是的话则可以直接把 loop 保存在当前线程的 TSD 中。
+    if (pthread_equal(t, pthread_self())) {
+        // loop 存入 TSD 中，方便 CFRunLoopGetCurrent 中直接读取
+        _CFSetTSD(__CFTSDKeyRunLoop, (void *)loop, NULL);
+        
+        if (0 == _CFGetTSD(__CFTSDKeyRunLoopCntr)) {
+            // 注册一个回调 __CFFinalizeRunLoop，当线程销毁时，顺便销毁其 run loop 对象。
+            _CFSetTSD(__CFTSDKeyRunLoopCntr, (void *)(PTHREAD_DESTRUCTOR_ITERATIONS-1), (void (*)(void *))__CFFinalizeRunLoop);
+        }
+    }
+    return loop;
+}
+```
+&emsp;
 
 
+#### CHECK_FOR_FORK
+&emsp;Forking is a system call where a process creates a copy of itself. CHECK_FOR_FORK is a boolean value in the code which checks whether the given process was forked.（Forking 是系统调用，其中进程创建其自身的副本。 CHECK_FOR_FORK 是代码中的布尔值，用于检查给定的进程是否被分叉。）[What's the meaning of CHECK_FOR_FORK?](https://stackoverflow.com/questions/47260563/whats-the-meaning-of-check-for-fork)
+```c++
+#if DEPLOYMENT_TARGET_MACOSX || DEPLOYMENT_TARGET_EMBEDDED || DEPLOYMENT_TARGET_EMBEDDED_MINI
+extern uint8_t __CF120293;
+extern uint8_t __CF120290;
+extern void __THE_PROCESS_HAS_FORKED_AND_YOU_CANNOT_USE_THIS_COREFOUNDATION_FUNCTIONALITY___YOU_MUST_EXEC__(void);
+#define CHECK_FOR_FORK() do { __CF120290 = true; if (__CF120293) __THE_PROCESS_HAS_FORKED_AND_YOU_CANNOT_USE_THIS_COREFOUNDATION_FUNCTIONALITY___YOU_MUST_EXEC__(); } while (0)
+#endif
+
+#if !defined(CHECK_FOR_FORK)
+#define CHECK_FOR_FORK() do { } while (0)
+#endif
+
+CF_PRIVATE void __THE_PROCESS_HAS_FORKED_AND_YOU_CANNOT_USE_THIS_COREFOUNDATION_FUNCTIONALITY___YOU_MUST_EXEC__(void) {
+    write(2, EXEC_WARNING_STRING_1, sizeof(EXEC_WARNING_STRING_1) - 1);
+    write(2, EXEC_WARNING_STRING_2, sizeof(EXEC_WARNING_STRING_2) - 1);
+//    HALT;
+}
+```
 ### CFRunLoopModeRef（struct \__CFRunLoopMode *）
 &emsp;每次 run loop 开始 run 的时候，都必须指定一个 mode，称为 run loop mode。mode 指定了在这次的 run 中，run loop 可以处理的任务。对于不属于当前 mode 的任务，则需要切换 run loop 至对应 mode 下，再重新调用 run 方法，才能够被处理。
 ```c++
