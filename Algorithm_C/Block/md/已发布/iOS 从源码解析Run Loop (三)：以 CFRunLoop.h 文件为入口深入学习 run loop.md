@@ -150,7 +150,7 @@ struct _block_item {
 ```
 &emsp;上面是 CFRunLoopRef 涉及的相关数据结构，特别是其中与 mode 相关的 _modes、_commonModes、_commonModeItems 三个成员变量都是  CFMutableSetRef 可变集合类型，也正对应了前面的一些结论，一个 run loop 对应多个 mode，一个 mode 下可以包含多个 modeItem（更详细的内容在下面的 __CFRunLoopMode 结构中）。既然 run loop 包含多个 mode 那么它定可以在不同的 mode 下运行，run loop 一次只能在一个 mode 下运行，如果想要切换 mode，只能退出 run loop，然后再根据指定的 mode 运行 run loop，这样可以是使不同的 mode 下的 modeItem 相互隔离，不会相互影响。
 
-&emsp;下面看两个超级重要的函数，获取主线程的 run loop 和获取当前线程（子线程）的 run loop。
+&emsp;下面看两个超级重要的函数（其实是一个函数），获取主线程的 run loop 和获取当前线程（子线程）的 run loop。
 ### CFRunLoopGetMain/CFRunLoopGetCurrent
 &emsp;`CFRunLoopGetMain/CFRunLoopGetCurrent` 函数可分别用于获取主线程的 run loop 和获取当前线程（子线程）的 run loop。main run loop 使用一个静态变量 \__main 存储，子线程的 run loop 会保存在当前线程的 TSD 中。两者在第一次获取 run loop 时都会调用 `_CFRunLoopGet0` 函数根据线程的 pthread_t 对象从静态全局变量 \__CFRunLoops（static CFMutableDictionaryRef）中获取，如果获取不到的话则新建 run loop 对象，并根据线程的 pthread_t 保存在静态全局变量 \__CFRunLoops（static CFMutableDictionaryRef）中，方便后续读取。
 ```c++
@@ -220,8 +220,10 @@ CF_EXPORT CFRunLoopRef _CFRunLoopGet0(pthread_t t) {
     __CFLock(&loopsLock);
     // 第一次调用时，__CFRunLoops 不存在则进行新建，并且会直接为主线程创建一个 run loop，并保存进 __CFRunLoops 中
     if (!__CFRunLoops) {
-        // 解锁
+    
+        // 解锁，（先加锁，如果 __CFRunLoops 为 nil，则立即进行了解锁，在多线程环境下，可能会存在多个线程同时进入到下面的 dict 创建）
         __CFUnlock(&loopsLock);
+        
         // 创建 CFMutableDictionaryRef
         CFMutableDictionaryRef dict = CFDictionaryCreateMutable(kCFAllocatorSystemDefault, 0, NULL, &kCFTypeDictionaryValueCallBacks);
         // 根据主线程的 pthread_t 创建 run loop
@@ -242,11 +244,20 @@ CF_EXPORT CFRunLoopRef _CFRunLoopGet0(pthread_t t) {
         // 原子性的比较交换内存空间中值，如果 &__CFRunLoops 存储的值是 NULL 的话，把 dict 指向的内存地址与 &__CFRunLoops 内存中的值进行交换，并返回 True。
         // 当 &__CFRunLoops 内存空间中的值不是 NULL 时，不发生交换，返回 false，此时进入会 if，执行释放 dict 操作。
         if (!OSAtomicCompareAndSwapPtrBarrier(NULL, dict, (void * volatile *)&__CFRunLoops)) {
+        
+            // 🔒🔒
+            // 在多线程环境下，假如这里有 1 2 3 三条线程入参 t 都是主线程，那么同一时间它们可能都走到这个 if 这里，只有 1 准确的把 dict 的值保存在 __CFRunLoops 中以后，
+            // 剩下的 2 3 线程由于判断时 &__CFRunLoops 存储的不再是 NULL，则会进入这个 if，执行 dict 的释放操作并且销毁 dict。
+            
             // 释放 dict 
             CFRelease(dict);
         }
         
-        // 释放 mainLoop，这里 __CFRunLoops 已经持有 mainLoop，这里的 release 并不会导致 mainLoop 对象被销毁
+        // 🔒🔒
+        // 多线程环境下，对应到上面的 1 线程时，由于 __CFRunLoops 持有了 mainLoop，所以下面的 mainLoop 的释放操作，只是对应上面的创建操作做一次释放，并不会销毁 mainLoop。
+        // 而在 2 3 线程下，由于 dict 被释放销毁，dict 不再持有 mainLoop 了，所以针对 2 3 线程下 mainLoop 则会被释放并销毁。
+        
+        // 释放 mainLoop，这里 __CFRunLoops 已经持有 mainLoop，这里的 release 并不会导致 mainLoop 对象被销毁。
         CFRelease(mainLoop);
         
         // 加锁 
@@ -266,7 +277,16 @@ CF_EXPORT CFRunLoopRef _CFRunLoopGet0(pthread_t t) {
         // 加锁
         __CFLock(&loopsLock);
         
-        // 再次判断 __CFRunLoops 中是否有线程 t 的 run loop，因为第一次判断后已经解锁了，可能在多线程的场景下已经创建好了该 run loop
+        // 再次判断 __CFRunLoops 中是否有线程 t 的 run loop，因为 "if (!loop)" 判断上面进行了解锁，可能在多线程的场景下前面一条线程已经创建好了该入参 t 的 run loop 并保存在 __CFRunLoops 中。
+        //（开始思考时思维固定在了即使在多线程环境下，由于每条线程的入参 t 都是它们自己当前线程，所以即使多条线程同时进来，由于它们各自创建自己的 run loop，那么这里就根本不需要再二次判断 loop 是否存在，
+        // 其实我们应该这样思考，假如有三条线程同时进来，然后它们的入参 t 是同一个线程的情况，就必须进行再次的 loop 是否为 nil 的判断了。）
+        
+        // 🔒🔒
+        // 例如线程 1 2 3 同时进来，分别创建了三次 newLoop，假设线程 1 首先执行完成后并解锁，那么 __CFRunLoops 中已经存在 t 对应的 run loop 了，
+        // 此时线程 2 再走到这里的时候，取得的 loop 便是有值的了，这时候不再需要存入 __CFRunLoops 中了，只需要继续往下走释放并销毁 newLoop 就好了，线程 3 也是同样。
+        
+        // 这里还有一点时，为什么要先创建 newLoop 后加锁呢，这样在多线程的情况下会存在创建多个 newLoop 的情况。
+        
         loop = (CFRunLoopRef)CFDictionaryGetValue(__CFRunLoops, pthreadPointer(t));
         if (!loop) {
             // 把 newLoop 根据线程 t 保存在 __CFRunLoops 中
@@ -321,6 +341,11 @@ CF_PRIVATE void __THE_PROCESS_HAS_FORKED_AND_YOU_CANNOT_USE_THIS_COREFOUNDATION_
 //    HALT;
 }
 ```
+
+
+
+
+
 ### CFRunLoopModeRef（struct \__CFRunLoopMode *）
 &emsp;每次 run loop 开始 run 的时候，都必须指定一个 mode，称为 run loop mode。mode 指定了在这次的 run 中，run loop 可以处理的任务。对于不属于当前 mode 的任务，则需要切换 run loop 至对应 mode 下，再重新调用 run 方法，才能够被处理。
 ```c++
