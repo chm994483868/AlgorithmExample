@@ -7,7 +7,19 @@
 ## CFRunLoop Overview
 &emsp;CFRunLoop 对象监视任务的输入源（sources of input），并在准备好进行处理时调度控制。输入源（input sources）的示例可能包括用户输入设备、网络连接、周期性或延时事件以及异步回调。
 
-&emsp;运行循环可以监视三种类型的对象：源（CFRunLoopSource）、计时器（CFRunLoopTimer）和观察者（CFRunLoopObserver）。要在这些对象需要处理时接收回调，必须首先使用CFRunLoopAddSource、CFRunLoopAddTimer或CFRunLoopAddObserver将这些对象放入运行循环中。以后可以从运行循环中删除对象（或使其无效）以停止接收其回调。 
+&emsp;运行循环可以监视三种类型的对象：sources（CFRunLoopSource）、timers（CFRunLoopTimer）和 observers（CFRunLoopObserver）。要在这些对象需要处理时接收回调，必须首先使用 `CFRunLoopAddSource`、`CFRunLoopAddTimer` 或 `CFRunLoopAddObserver` 将这些对象放入 run loop 中，以后也可以从 run loop 中删除它们（或使其 invalidate）以停止接收其回调。 
+
+&emsp;添加到运行循环的每个 source、timer 和 observer 必须与一个或多个 run loop modes 相关联。Modes 决定 run loop 在给定迭代期间处理哪些事件。每次 run loop 执行时，它都以特定 mode 执行。在该 mode 下，run loop 只处理与该 mode 关联的 sources、timers 和 observers 关联的事件。你可以将大多数 sources 分配给默认的 run loop mode（由 kCFRunLoopDefaultMode 常量指定），该 mode 用于在应用程序（或线程）空闲时处理事件。然而，系统定义了其它 modes，并且可以在其它 modes 下执行 run loop，以限制处理哪些 sources、timers 和 observers。因为 run loop modes 被简单地指定为字符串，所以你还可以定义自己的自定义 mode 来限制事件的处理。
+
+&emsp;Core Foundation 定义了一种特殊的伪模式（pseudo-mode），称为 common modes，允许你将多个 mode 与给定的 source、timer 或 observer 关联起来。要指定 common modes，请在配置对象时为 mode 使用 kCFRunLoopCommonModes 常量。每个 run loop 都有自己独立的 set of common modes，默认 mode（kcfrunlopDefaultMode）始终是该 set 的成员。要向 set of common modes 添加 mode，请使用 `CFRunLoopAddCommonMode` 函数。
+
+&emsp;每个线程只有一个 run loop。既不能创建（系统帮创建，不需要开发者自己手动创建）也不能销毁线程的 run loop。Core Foundation 会根据需要自动为你创建它。使用 `CFRunLoopGetCurrent` 获取当前线程的 run loop。调用 `CFRunLoopRun` 以默认模式运行当前线程的 run loop，直到 run loop 被 `CFRunLoopStop` 停止。也可以调用 `CFRunLoopRunInMode` 以指定的 mode 运行当前线程的 run loop 一段时间（或直到 run loop 停止）。只有在请求的模式至少有一个要监视的 source 或 timer 时，才能运行 run loop。
+
+&emsp;Run loop 可以递归运行。你可以从任何运行循环 callout 中调用 `CFRunLoopRun` 或 `CFRunLoopRunInMode`，并在当前线程的调用堆栈上创建嵌套的运行循环激活（run loop activations）。在调用中可以运行的 modes 不受限制。你可以创建另一个在任何可用的运行循环模式下运行的运行循环激活，包括调用堆栈中已经运行的任何模式。（You can create another run loop activation running in any available run loop mode, including any modes already running higher in the call stack.）
+
+&emsp;Cocoa 应用程序基于 CFRunLoop 来实现它们自己的高级事件循环（NSRunLoop）。Cocoa 编写应用程序时，可以将 sources、timers 和 observers 添加到它们的 run loop 对象和 modes 中。然后，对象将作为常规应用程序事件循环的一部分进行监视。使用 NSRunLoop 的 `getCFRunLoop` 方法获取相应的 CFRunLoopRef 类型。在 Carbon 应用程序中，使用 `getcfrunloopfrompeventloop` 函数。
+
+&emsp;有关 run loop 的行为的更多信息，请参见 Threading Programming Guide 中的 Run Loops。（即上篇内容）
 
 &emsp;看到 CFRunLoop.h 文件的内容被包裹在 `CF_IMPLICIT_BRIDGING_ENABLED` 和 `CF_IMPLICIT_BRIDGING_DISABLED` 它们是一对表示隐式桥接转换的宏。
 ```c++
