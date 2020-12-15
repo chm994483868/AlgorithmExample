@@ -1,17 +1,14 @@
-# iOS 从源码解析Run Loop (三)：结合源码学习 CFRunLoop.h 文件
+# iOS 从源码解析Run Loop (三)：以 CFRunLoop.h 文件为入口深入学习 run loop
 
-> &emsp;本篇通过 Apple 开源的 CF-1151.16 来学习 CFRunLoop.h 文件。⛽️⛽️
-
-&emsp;CFRunLoop.h 文件是 run loop 在 Core Foundation 下的最重要的接口文件，与我们前面学习的 Cocoa 下的 NSRunLoop.h 文件相对应，但是 CFRunLoop.h 文件包含更多的 run loop 的操作，下面我们就一起来学习一下吧！
-
+> &emsp;CFRunLoop.h 文件是 run loop 在 Core Foundation 下的最重要的头文件，与我们前面学习的 Cocoa Foundation 下的 NSRunLoop.h 文件相对应。NSRunLoop 的内容也正是对 \__CFRunLoop 的面向对象的简单封装，CFRunLoop.h 文件包含更多 run loop 的操作以及 run loop 涉及的部分底层数据结构的声明，\__CFRunLoop 结构则是 run loop 在 Core Foundation 下 C 语言的实现。本篇以 CFRunLoop.h 文件为入口通过 Apple 开源的 CF-1151.16 来深入学习 run loop。⛽️⛽️
 ## CFRunLoop Overview
 &emsp;CFRunLoop 对象监视任务的输入源（sources of input），并在准备好进行处理时调度控制。输入源（input sources）的示例可能包括用户输入设备、网络连接、周期性或延时事件以及异步回调。
 
-&emsp;运行循环可以监视三种类型的对象：sources（CFRunLoopSource）、timers（CFRunLoopTimer）和 observers（CFRunLoopObserver）。要在这些对象需要处理时接收回调，必须首先使用 `CFRunLoopAddSource`、`CFRunLoopAddTimer` 或 `CFRunLoopAddObserver` 将这些对象放入 run loop 中，以后也可以从 run loop 中删除它们（或使其 invalidate）以停止接收其回调。 
+&emsp;run loop 可以监视三种类型的对象：sources（CFRunLoopSource）、timers（CFRunLoopTimer）和 observers（CFRunLoopObserver）。要在这些对象需要处理时接收回调，必须首先使用 `CFRunLoopAddSource`、`CFRunLoopAddTimer` 或 `CFRunLoopAddObserver` 将这些对象放入 run loop 中，以后也可以从 run loop 中删除它们（或使其 invalidate）以停止接收其回调。 
 
-&emsp;添加到运行循环的每个 source、timer 和 observer 必须与一个或多个 run loop modes 相关联。Modes 决定 run loop 在给定迭代期间处理哪些事件。每次 run loop 执行时，它都以特定 mode 执行。在该 mode 下，run loop 只处理与该 mode 关联的 sources、timers 和 observers 关联的事件。你可以将大多数 sources 分配给默认的 run loop mode（由 kCFRunLoopDefaultMode 常量指定），该 mode 用于在应用程序（或线程）空闲时处理事件。然而，系统定义了其它 modes，并且可以在其它 modes 下执行 run loop，以限制处理哪些 sources、timers 和 observers。因为 run loop modes 被简单地指定为字符串，所以你还可以定义自己的自定义 mode 来限制事件的处理。
+&emsp;添加到 run loop 的每个 source、timer 和 observer 必须与一个或多个 run loop modes 相关联。Modes 决定 run loop 在给定迭代期间处理哪些事件。每次 run loop 执行时，它都以特定 mode 执行。在该 mode 下，run loop 只处理与该 mode 关联的 sources、timers 和 observers 关联的事件。你可以将大多数 sources 分配给默认的 run loop mode（由 kCFRunLoopDefaultMode 常量指定），该 mode 用于在应用程序（或线程）空闲时处理事件。然而，系统定义了其它 modes，并且可以在其它 modes 下执行 run loop，以限制处理哪些 sources、timers 和 observers。因为 run loop modes 被简单地指定为字符串，所以你还可以定义自己的自定义 mode 来限制事件的处理。
 
-&emsp;Core Foundation 定义了一种特殊的伪模式（pseudo-mode），称为 common modes，允许你将多个 mode 与给定的 source、timer 或 observer 关联起来。要指定 common modes，请在配置对象时为 mode 使用 kCFRunLoopCommonModes 常量。每个 run loop 都有自己独立的 set of common modes，默认 mode（kcfrunlopDefaultMode）始终是该 set 的成员。要向 set of common modes 添加 mode，请使用 `CFRunLoopAddCommonMode` 函数。
+&emsp;Core Foundation 定义了一种特殊的伪模式（pseudo-mode），称为 common modes，允许你将多个 mode 与给定的 source、timer 或 observer 关联起来。要指定 common modes，请在配置对象时为 mode 使用 kCFRunLoopCommonModes 常量。每个 run loop 都有自己独立的 set of common modes，默认 mode（kCFRunlopDefaultMode）始终是该 set 的成员。要向 set of common modes 添加 mode，请使用 `CFRunLoopAddCommonMode` 函数。
 
 &emsp;每个线程只有一个 run loop。既不能创建（系统帮创建，不需要开发者自己手动创建）也不能销毁线程的 run loop。Core Foundation 会根据需要自动为你创建它。使用 `CFRunLoopGetCurrent` 获取当前线程的 run loop。调用 `CFRunLoopRun` 以默认模式运行当前线程的 run loop，直到 run loop 被 `CFRunLoopStop` 停止。也可以调用 `CFRunLoopRunInMode` 以指定的 mode 运行当前线程的 run loop 一段时间（或直到 run loop 停止）。只有在请求的模式至少有一个要监视的 source 或 timer 时，才能运行 run loop。
 
@@ -21,7 +18,30 @@
 
 &emsp;有关 run loop 的行为的更多信息，请参见 Threading Programming Guide 中的 Run Loops。（即上篇内容）
 
-&emsp;看到 CFRunLoop.h 文件的内容被包裹在 `CF_IMPLICIT_BRIDGING_ENABLED` 和 `CF_IMPLICIT_BRIDGING_DISABLED` 它们是一对表示隐式桥接转换的宏。
+&emsp;以上是 CFRunLoop 文档的综述，估计对大家而言都是老生常谈的内容了。下面我们则深入源码，看看在代码层面是如何构建 run loop 体系的。
+
+&emsp;Core Foundation 中的 CFRunLoop 都是 C API，提供了 run loop 相当丰富的接口，且都是线程安全的，NSRunLoop 是对 CFRunLoopRef 的封装，提供了面向对象的 API，非线程安全的。使用 NSRunLoop 的 `getCFRunLoop` 方法即可获取相应的 `CFRunLoopRef` 类型。
+
+&emsp;下面我们对 Cocoa Foundation 和 Core Foundation 之间区别做一些拓展。
+
+> &emsp;Core Foundation 框架 (CoreFoundation.framework) 是一组 C 语言接口，它们为 iOS 应用程序提供基本数据管理和服务功能。该框架支持进行管理的数据以及可提供的服务：群体数据类型 (数组、集合等)、程序包、字符串管理、日期和时间管理、原始数据块管理、偏好管理、URL及数据流操作、线程和RunLoop、端口和soket通讯。
+> &emsp;Core Foundation 框架和 Cocoa Foundation 框架紧密相关，它们为相同功能提供接口，但Cocoa Foundation 框架提供 Objective-C 接口。如果你将 Cocoa Foundation 对象和 Core Foundation 类型掺杂使用，则可利用两个框架之间的 “toll-free bridging”。所谓的 Toll-free bridging 是说你可以在某个框架的方法或函数同时使用 Core Foundatio 和 Cocoa Foundation 框架中的某些类型。很多数据类型支持这一特性，其中包括群体和字符串数据类型。每个框架的类和类型描述都会对某个对象是否为 toll-free bridged，应和什么对象桥接进行说明。
+>
+> &emsp;下面看一下Objective-C 指针与 Core Foundation 指针之间的转换规则：
+>
+> &emsp;ARC 仅管理 Objective-C 指针（retain、release、autorelease），不管理 Core Foundation 指针，CF 指针需要我们手动的 CFRetain 和 CFRelease 来管理（对应 MRC 时的 retain/release），CF 中没有 autorelease。
+> &emsp;Cocoa Foundation 指针与 Core Foundation指针转换，需要考虑的是**所指向对象所有权的归属**。ARC 提供了 3 个修饰符来管理。
+> &emsp;1. \__bridge，什么也不做，仅仅是转换。此种情况下：
+> &emsp;    1.1：从 Cocoa 转换到 Core，需要手动 CFRetain，否则，Cocoa 指针释放后，传出去的指针则无效。
+> &emsp;    1.2：从 Core 转换到 Cocoa，需要手动 CFRelease，否则，Cocoa 指针释放后，对象引用计数仍为 1，不会被销毁。
+> &emsp;2. \__bridge_retained，转换后自动调用 CFRetain，即帮助自动解决上述 1.1 的情形。
+> &emsp;（\__bridge_retained or CFBridgingRetain，ARC 把对象所有权转出，需 Core Foundation 处理。）
+> &emsp;3. \__bridge_transfer，转换后自动调用 CFRelease，即帮助自动解决上述 1.2 的情形。
+> &emsp;（\__bridge_transfer or CFBridgingRelease，Core Foundation 把对象所有权交给 ARC，由 ARC 自动处理。）
+> &emsp;[Cocoa Foundation和 Core Foundation之间数据转换（桥接 \__bridge）](https://www.cnblogs.com/qingpeng/p/4568239.html)
+
+## Run Loop 数据结构
+&emsp;首先看到 CFRunLoop.h 文件的内容被包裹在 `CF_IMPLICIT_BRIDGING_ENABLED` 和 `CF_IMPLICIT_BRIDGING_DISABLED` 两个宏之间， 它们是一对表示隐式桥接转换的宏。
 ```c++
 #ifndef CF_IMPLICIT_BRIDGING_ENABLED
 #if __has_feature(arc_cf_code_audited)
@@ -40,7 +60,7 @@
 #endif
 #endif
 ```
-&emsp;表示 Cocoa 和 Core Foundation 下对应的免费桥接转换类型。如 id 和 struct __CFRunLoop，id 和 struct __CFRunLoopSource，NSTimer 和 struct __CFRunLoopTimer。 
+&emsp;CF_BRIDGED_MUTABLE_TYPE 宏表示 Cocoa 和 Core Foundation 下对应的免费桥接转换类型。如 id 和 struct \__CFRunLoop，id 和 struct \__CFRunLoopSource，NSTimer 和 struct \__CFRunLoopTimer。 
 ```c++
 #if __has_attribute(objc_bridge)
     #define CF_BRIDGED_MUTABLE_TYPE(T)    __attribute__((objc_bridge_mutable(T)))
@@ -48,24 +68,24 @@
     #define CF_BRIDGED_MUTABLE_TYPE(T)
 #endif
 ```
-## Run Loop 数据结构
-&emsp;Core Founction 中 run loop 相关的数据结构有：CFRunLoopRef、CFRunLoopSourceRef、CFRunLoopObserverRef、CFRunLoopTimerRef 等等。
-### CFRunLoopRef（struct __CFRunLoop *）
-&emsp;在 Core Foundation 中 __CFRunLoop 结构体是 Run Loop 对应的数据结构，对应 Cocoa 中的 NSRunLoop 类。CFRunLoopRef 则是指向 __CFRunLoop 结构体的指针。
+&emsp;然后看到几个重要的 typedef 声明。Core Founction 中 run loop 相关的数据结构有：CFRunLoopRef、CFRunLoopSourceRef、CFRunLoopObserverRef、CFRunLoopTimerRef 等等。
+### CFRunLoopRef（struct \__CFRunLoop *）
+&emsp;在 Core Foundation 下 \__CFRunLoop 结构是 Run Loop 对应的数据结构，对应 Cocoa 中的 NSRunLoop 类。CFRunLoopRef 则是指向 \__CFRunLoop 结构体的指针。
 ```c++
 typedef struct __CFRunLoop * CFRunLoopRef;
 
-struct __CFRunLoop {
+struct __CFRunLoop { 
     CFRuntimeBase _base; // 所有 CF "instances" 都是从这个结构开始的
     pthread_mutex_t _lock; /* locked for accessing mode list */ 锁定以访问模式列表
     
     // typedef mach_port_t __CFPort;
+    // 唤醒 run loop 的端口，这个是 run loop 原理的关键所在，可通过 port 来触发 CFRunLoopWakeUp 函数
     __CFPort _wakeUpPort; // used for CFRunLoopWakeUp 手动唤醒 run loop 的端口。初始化 run loop 时设置，仅用于 CFRunLoopWakeUp，CFRunLoopWakeUp 函数会向 _wakeUpPort 发送一条消息
     
     Boolean _unused; // 标记是否使用过
     
     volatile _per_run_data *_perRunData; // reset for runs of the run loop // run loop 运行会重置的一个数据结构
-    pthread_t _pthread; // run loop 所对应的线程
+    pthread_t _pthread; // run loop 所对应的线程，二者是一一对应的。（之前在学习线程时并没有在线程的结构体中看到有 run loop 相关的字段，其实线程的 run loop 是存在了 TSD 中，当然如果是线程有获取 run loop 的话）
     uint32_t _winthread;
     
     CFMutableSetRef _commonModes; // 存储字符串（而非 runloopMode 对象）的容器，对应着所有标记为 common 的 mode。
@@ -105,8 +125,8 @@ typedef struct __CFRuntimeBase {
 #endif
 } CFRuntimeBase;
 ```
-#### _per_run_data
-&emsp;重置 run loop 时用的数据结构，每次 run loop 运行后都会重置 _perRunData。
+#### \_per_run_data
+&emsp;重置 run loop 时用的数据结构，每次 run loop 运行后都会重置 _perRunData 的值。
 ```c++
 typedef struct _per_run_data {
     uint32_t a;
@@ -115,7 +135,7 @@ typedef struct _per_run_data {
     uint32_t ignoreWakeUps; // run loop 是否已唤醒
 } _per_run_data;
 ```
-#### _block_item
+#### \_block_item
 &emsp;需要被 run loop 执行的 block 链表中的节点数据结构。
 ```c++
 struct _block_item {
@@ -128,8 +148,11 @@ struct _block_item {
     void (^_block)(void); // 真正要执行的 block 本体
 };
 ```
-### CFRunLoopModeRef（struct __CFRunLoopMode *）
-&emsp;每次 run loop开始 run 的时候，都必须指定一个 mode，称为 run loop mode。mode 指定了在这次的 run 中，run loop 可以处理的任务。对于不属于当前 mode 的任务，则需要切换 run loop 至对应 mode 下，再重新调用 run 方法，才能够被处理
+&emsp;上面是 CFRunLoopRef 涉及的相关数据结构，特别是其中与 mode 相关的 _modes、_commonModes、_commonModeItems 三个成员变量都是  CFMutableSetRef 可变集合类型，也正对应了前面的一些结论，一个 run loop 对应多个 mode，一个 mode 下可以包含多个 modeItem（更详细的内容在下面的 __CFRunLoopMode 结构中）。既然 run loop 包含多个 mode 那么它定可以在不同的 mode 下运行， 
+
+
+### CFRunLoopModeRef（struct \__CFRunLoopMode *）
+&emsp;每次 run loop 开始 run 的时候，都必须指定一个 mode，称为 run loop mode。mode 指定了在这次的 run 中，run loop 可以处理的任务。对于不属于当前 mode 的任务，则需要切换 run loop 至对应 mode 下，再重新调用 run 方法，才能够被处理。
 ```c++
 typedef struct __CFRunLoopMode *CFRunLoopModeRef;
 
@@ -184,7 +207,7 @@ struct __CFRunLoopMode {
     uint64_t _timerHardDeadline; /* TSR */
 };
 ```
-### CFRunLoopSourceRef（struct __CFRunLoopSource *）
+### CFRunLoopSourceRef（struct \__CFRunLoopSource *）
 &emsp;CFRunLoopSourceRef 是事件源（输入源），通过源码可以发现，其分为 source0 和 source1 两个。
 ```c++
 typedef struct __CFRunLoopSource * CFRunLoopSourceRef;
@@ -290,7 +313,7 @@ struct __CFAllocator {
     CFAllocatorContext _context;
 };
 ```
-### CFRunLoopObserverRef（struct __CFRunLoopObserver *）
+### CFRunLoopObserverRef（struct \__CFRunLoopObserver *）
 &emsp;CFRunLoopObserverRef 是观察者，每个 Observer 都包含了一个回调(函数指针)，当 RunLoop 的状态发生变化时，观察者就能通过回调接受到这个变化。主要是用来向外界报告 Runloop 当前的状态的更改。
 ```c++
 typedef struct __CFRunLoopObserver * CFRunLoopObserverRef;
@@ -333,7 +356,7 @@ typedef struct {
     CFStringRef    (*copyDescription)(const void *info);
 } CFRunLoopObserverContext;
 ```
-### CFRunLoopTimerRef（struct __CFRunLoopTimer *）
+### CFRunLoopTimerRef（struct \__CFRunLoopTimer *）
 &emsp;NSTimer 是与 run loop 息息相关的，CFRunLoopTimerRef 与 NSTimer 是可以 toll-free bridged（免费桥转换）的。当 timer 加到 run loop 的时候，run loop 会注册对应的触发时间点，时间到了，run loop 若处于休眠则会被唤醒，执行 timer 对应的回调函数。
 ```c++
 typedef struct CF_BRIDGED_MUTABLE_TYPE(NSTimer) __CFRunLoopTimer * CFRunLoopTimerRef;
@@ -372,6 +395,20 @@ typedef struct {
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ## 参考链接
 **参考链接:🔗**
 + [runloop 源码](https://opensource.apple.com/tarballs/CF/)
@@ -385,3 +422,4 @@ typedef struct {
 + [NSRunLoop](https://www.cnblogs.com/wsnb/p/4753685.html)
 + [iOS刨根问底-深入理解RunLoop](https://www.cnblogs.com/kenshincui/p/6823841.html)
 + [RunLoop总结与面试](https://www.jianshu.com/p/3ccde737d3f3)
++ [Runloop-实际开发你想用的应用场景](https://juejin.cn/post/6889769418541252615)
