@@ -641,22 +641,36 @@ static CFRunLoopModeRef __CFRunLoopFindMode(CFRunLoopRef rl, CFStringRef modeNam
     // 把 srlm 的 mode 名称设置为入参 modeName
     srlm._name = modeName;
     
-    // 
+    // 从 rl->_modes 哈希表中找 &srlm 对应的 CFRunLoopModeRef
     rlm = (CFRunLoopModeRef)CFSetGetValue(rl->_modes, &srlm);
     
+    // 如果找到了则加锁，然后返回 rlm。
     if (NULL != rlm) {
-    __CFRunLoopModeLock(rlm);
-    return rlm;
+        __CFRunLoopModeLock(rlm);
+        return rlm;
     }
+    
+    // 如果没有找到，并且 create 值为 false，则表示不进行创建，直接返回 NULL。
     if (!create) {
     return NULL;
     }
+    
+    // 创建一个 CFRunLoopMode 对并返回其地址
     rlm = (CFRunLoopModeRef)_CFRuntimeCreateInstance(kCFAllocatorSystemDefault, __kCFRunLoopModeTypeID, sizeof(struct __CFRunLoopMode) - sizeof(CFRuntimeBase), NULL);
+    
+    // 如果 rlm 创建失败，则返回 NULL
     if (NULL == rlm) {
-    return NULL;
+        return NULL;
     }
+    
+    // 初始化 rlm 的 pthread_mutex_t _lock 为一个互斥递归锁。
+    //（__CFRunLoopLockInit 内部使用的 PTHREAD_MUTEX_RECURSIVE 表示递归锁，允许同一个线程对同一锁加锁多次，且需要对应次数的解锁操作）
     __CFRunLoopLockInit(&rlm->_lock);
+    
+    // 初始化 _name
     rlm->_name = CFStringCreateCopy(kCFAllocatorSystemDefault, modeName);
+    
+    // 下面是一组成员变量的初始赋值
     rlm->_stopped = false;
     rlm->_portToV1SourceMap = NULL;
     rlm->_sources0 = NULL;
@@ -664,46 +678,79 @@ static CFRunLoopModeRef __CFRunLoopFindMode(CFRunLoopRef rl, CFStringRef modeNam
     rlm->_observers = NULL;
     rlm->_timers = NULL;
     rlm->_observerMask = 0;
-    rlm->_portSet = __CFPortSetAllocate();
+    rlm->_portSet = __CFPortSetAllocate(); // CFSet 申请空间
     rlm->_timerSoftDeadline = UINT64_MAX;
     rlm->_timerHardDeadline = UINT64_MAX;
     
+    // ret 一个临时变量
     kern_return_t ret = KERN_SUCCESS;
+    
+    
 #if USE_DISPATCH_SOURCE_FOR_TIMERS
+    // macOS 下，使用 dispatch_source 构造 timer
+    
+    // _timerFired 首先赋值为 false，然后在 timer 的回调函数执行的时候会赋值为 true
     rlm->_timerFired = false;
+    
+    // 队列
     rlm->_queue = _dispatch_runloop_root_queue_create_4CF("Run Loop Mode Queue", 0);
+    
+    // 构建 queuePort，入参是 mode 的 _queue
     mach_port_t queuePort = _dispatch_runloop_root_queue_get_port_4CF(rlm->_queue);
+    
+    // 如果 queuePort 为 NULL，则 crash。（无法创建运行循环模式队列端口。）
     if (queuePort == MACH_PORT_NULL) CRASH("*** Unable to create run loop mode queue port. (%d) ***", -1);
+    
+    // 构建 dispatch_source 类型使用的是 DISPATCH_SOURCE_TYPE_TIMER，表示是一个 timer
     rlm->_timerSource = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, rlm->_queue);
     
+    // 这里为了在下面的 block 内部 _timerFired 的值，用了一个 __block 指针变量，
+    // 当 _timerSource（定时器）回调时会执行这个 block。
     __block Boolean *timerFiredPointer = &(rlm->_timerFired);
     dispatch_source_set_event_handler(rlm->_timerSource, ^{
         *timerFiredPointer = true;
     });
     
     // Set timer to far out there. The unique leeway makes this timer easy to spot in debug output.
+    // 将计时器设置在远处。独特的回旋余地使该计时器易于发现调试输出。（从 DISPATCH_TIME_FOREVER 启动，DISPATCH_TIME_FOREVER 为时间间隔）
     _dispatch_source_set_runloop_timer_4CF(rlm->_timerSource, DISPATCH_TIME_FOREVER, DISPATCH_TIME_FOREVER, 321);
+    // 启动
     dispatch_resume(rlm->_timerSource);
     
+    // 把运行循环模式队列端口 queuePort 添加到 rlm 的 _portSet（端口集合）中。
     ret = __CFPortSetInsert(queuePort, rlm->_portSet);
+    // 如果添加失败则 crash。（无法将计时器端口插入端口集中。）
     if (KERN_SUCCESS != ret) CRASH("*** Unable to insert timer port into port set. (%d) ***", ret);
-    
 #endif
+
 #if USE_MK_TIMER_TOO
+    // mk 构造 timer
+    
+    // 构建 timer 端口
     rlm->_timerPort = mk_timer_create();
+    // 同样把 rlm 的 _timerPort 添加到 rlm 的 _portSet（端口集合）中。
     ret = __CFPortSetInsert(rlm->_timerPort, rlm->_portSet);
+    // 如果添加失败则 crash。（无法将计时器端口插入端口集中。）
     if (KERN_SUCCESS != ret) CRASH("*** Unable to insert timer port into port set. (%d) ***", ret);
 #endif
     
+    // 然后这里把 rl 的 _wakeUpPort 也添加到 rlm 的 _portSet（端口集合）中。
     ret = __CFPortSetInsert(rl->_wakeUpPort, rlm->_portSet);
+    // 如果添加失败则 crash。（无法将计时器端口插入端口集中。）
     if (KERN_SUCCESS != ret) CRASH("*** Unable to insert wake up port into port set. (%d) ***", ret);
     
 #if DEPLOYMENT_TARGET_WINDOWS
     rlm->_msgQMask = 0;
     rlm->_msgPump = NULL;
 #endif
+
+    // 这里把 rlm 添加到 rl 的 _modes 中
     CFSetAddValue(rl->_modes, rlm);
+    
+    // 释放
     CFRelease(rlm);
+    
+    // 加锁，然后返回 rlm
     __CFRunLoopModeLock(rlm);    /* return mode locked */
     return rlm;
 }
