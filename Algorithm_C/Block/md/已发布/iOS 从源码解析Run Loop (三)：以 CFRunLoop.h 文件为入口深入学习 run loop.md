@@ -76,7 +76,7 @@ typedef struct __CFRunLoop * CFRunLoopRef;
 
 struct __CFRunLoop { 
     CFRuntimeBase _base; // 所有 CF "instances" 都是从这个结构开始的
-    pthread_mutex_t _lock; /* locked for accessing mode list */ 锁定以访问模式列表
+    pthread_mutex_t _lock; /* locked for accessing mode list */ 锁定以访问 mode list（CFMutableSetRef _modes）
     
     // typedef mach_port_t __CFPort;
     // 唤醒 run loop 的端口，这个是 run loop 原理的关键所在，可通过 port 来触发 CFRunLoopWakeUp 函数
@@ -84,9 +84,12 @@ struct __CFRunLoop {
     
     Boolean _unused; // 标记是否使用过
     
-    volatile _per_run_data *_perRunData; // reset for runs of the run loop // run loop 运行会重置的一个数据结构
+    //_perRunData 是 run loop 每次运行都会重置的一个数据结构，这里的重置是指再创建一个 _per_run_data 实例赋值给 rl->_perRunData，
+    // 并不是简单的把 _perRunData 的每个成员变量重新赋值。（volatile 防止编译器自行优化，每次读值都去寄存器里面读取）
+    volatile _per_run_data *_perRunData; // reset for runs of the run loop 
+    
     pthread_t _pthread; // run loop 所对应的线程，二者是一一对应的。（之前在学习线程时并没有在线程的结构体中看到有 run loop 相关的字段，其实线程的 run loop 是存在了 TSD 中，当然如果是线程有获取 run loop 的话）
-    uint32_t _winthread;
+    uint32_t _winthread; // Windows 下记录 run loop 对象创建时所处的线程的 ID
     
     CFMutableSetRef _commonModes; // 存储字符串（而非 runloopMode 对象）的容器，对应着所有标记为 common 的 mode。
     CFMutableSetRef _commonModeItems; // 存储 modeItem 对象的容器，对应于所有标记为 common 的 mode 下的 Item（即 source、timer、observer）
@@ -115,24 +118,46 @@ struct __CFRunLoop {
 };
 ```
 #### CFRuntimeBase
-&emsp;所有 CF "instances" 都是从这个结构开始的。不要直接引用这些字段--它们是供 CF 使用的，可以在没有警告的情况下添加或删除或更改格式。不能保证从一个版本到另一个版本使用此结构的二进制兼容性。
+&emsp;所有 CF "instances" 都是从这个结构开始的，如 \__CFBoolean、\__CFString、\__CFDate、\__CFURL 等。不要直接引用这些字段--它们是供 CF 使用的，可以在没有警告的情况下添加或删除或更改格式。不能保证从一个版本到另一个版本使用此结构的二进制兼容性。
 ```c++
 typedef struct __CFRuntimeBase {
-    uintptr_t _cfisa;
-    uint8_t _cfinfo[4];
+    uintptr_t _cfisa; // 类型
+    uint8_t _cfinfo[4]; // 表示 run loop 状态如：Sleeping/Deallocating
 #if __LP64__
-    uint32_t _rc;
+    uint32_t _rc; // 引用计数
 #endif
 } CFRuntimeBase;
+
+struct __CFBoolean {
+    CFRuntimeBase _base;
+};
+
+struct __CFString {
+    CFRuntimeBase base;
+    union {    // In many cases the allocated structs are smaller than these
+        struct __inline1 {
+    ...
+};
+
+struct __CFDate {
+    CFRuntimeBase _base;
+    CFAbsoluteTime _time;       /* immutable */
+};
+
+struct __CFURL {
+    CFRuntimeBase _cfBase;
+    UInt32 _flags;
+    ...
+};
 ```
 #### \_per_run_data
-&emsp;重置 run loop 时用的数据结构，每次 run loop 运行后都会重置 _perRunData 的值。
+&emsp;重置 run loop 时用的数据结构，每次 run loop 运行后都会重置 \_perRunData 的值。
 ```c++
 typedef struct _per_run_data {
     uint32_t a;
     uint32_t b;
-    uint32_t stopped; // run loop 是否停止
-    uint32_t ignoreWakeUps; // run loop 是否已唤醒
+    uint32_t stopped; // run loop 是否停止的标记
+    uint32_t ignoreWakeUps; // run loop 是否忽略唤醒的标记
 } _per_run_data;
 ```
 #### \_block_item
@@ -148,11 +173,11 @@ struct _block_item {
     void (^_block)(void); // 真正要执行的 block 本体
 };
 ```
-&emsp;上面是 CFRunLoopRef 涉及的相关数据结构，特别是其中与 mode 相关的 _modes、_commonModes、_commonModeItems 三个成员变量都是  CFMutableSetRef 可变集合类型，也正对应了前面的一些结论，一个 run loop 对应多个 mode，一个 mode 下可以包含多个 modeItem（更详细的内容在下面的 __CFRunLoopMode 结构中）。既然 run loop 包含多个 mode 那么它定可以在不同的 mode 下运行，run loop 一次只能在一个 mode 下运行，如果想要切换 mode，只能退出 run loop，然后再根据指定的 mode 运行 run loop，这样可以是使不同的 mode 下的 modeItem 相互隔离，不会相互影响。
+&emsp;上面是 CFRunLoopRef 涉及的相关数据结构，特别是其中与 mode 相关的 \_modes、\_commonModes、\_commonModeItems 三个成员变量都是  CFMutableSetRef 可变集合类型，也正对应了前面的一些结论，一个 run loop 对应多个 mode，一个 mode 下可以包含多个 modeItem（更详细的内容在下面的 \__CFRunLoopMode 结构中）。既然 run loop 包含多个 mode 那么它定可以在不同的 mode 下运行，run loop 一次只能在一个 mode 下运行，如果想要切换 mode，只能退出 run loop，然后再根据指定的 mode 运行 run loop，这样可以是使不同的 mode 下的 modeItem 相互隔离，不会相互影响。
 
 &emsp;下面看两个超级重要的函数（其实是一个函数），获取主线程的 run loop 和获取当前线程（子线程）的 run loop。
 ### CFRunLoopGetMain/CFRunLoopGetCurrent
-&emsp;`CFRunLoopGetMain/CFRunLoopGetCurrent` 函数可分别用于获取主线程的 run loop 和获取当前线程（子线程）的 run loop。main run loop 使用一个静态变量 \__main 存储，子线程的 run loop 会保存在当前线程的 TSD 中。两者在第一次获取 run loop 时都会调用 `_CFRunLoopGet0` 函数根据线程的 pthread_t 对象从静态全局变量 \__CFRunLoops（static CFMutableDictionaryRef）中获取，如果获取不到的话则新建 run loop 对象，并根据线程的 pthread_t 保存在静态全局变量 \__CFRunLoops（static CFMutableDictionaryRef）中，方便后续读取。
+&emsp;`CFRunLoopGetMain/CFRunLoopGetCurrent` 函数可分别用于获取主线程的 run loop 和获取当前线程（子线程）的 run loop。main run loop 使用一个静态变量 \__main 存储，子线程的 run loop 会保存在当前线程的 TSD 中。两者在第一次获取 run loop 时都会调用 \_CFRunLoopGet0 函数根据线程的 pthread_t 对象从静态全局变量 \__CFRunLoops（static CFMutableDictionaryRef）中获取，如果获取不到的话则新建 run loop 对象，并根据线程的 pthread_t 保存在静态全局变量 \__CFRunLoops（static CFMutableDictionaryRef）中，方便后续读取。
 ```c++
 CFRunLoopRef CFRunLoopGetMain(void) {
     // 用于检查给定的进程是否被分叉
@@ -190,7 +215,7 @@ CFRunLoopRef CFRunLoopGetCurrent(void) {
 }
 ```
 #### _CFRunLoopGet0
-&emsp;`_CFRunLoopGet0` 函数，可以通过当前线程的 pthread_t 来获取其 run loop 对象，如果没有则新创建一个 run loop 对象。创建之后，将 run loop 对象保存在静态全局 \__CFRunLoops 中，同时还会保存在当前线程的 TSD 中。
+&emsp;\_CFRunLoopGet0 函数，可以通过当前线程的 pthread_t 来获取其 run loop 对象，如果没有则新创建一个 run loop 对象。创建之后，将 run loop 对象保存在静态全局 \__CFRunLoops 中，同时还会保存在当前线程的 TSD 中。
 ```c++
 // 静态全局的 CFMutableDictionaryRef，key 是 pthread_t，value 是 CFRunLoopRef。
 static CFMutableDictionaryRef __CFRunLoops = NULL;
@@ -215,6 +240,8 @@ CF_EXPORT CFRunLoopRef _CFRunLoopGet0(pthread_t t) {
     
     // macOS 下 __CFLock 是互斥锁加锁
     // #define __CFLock(LP) ({ (void)pthread_mutex_lock(LP); })
+    // macOS 下 __CFUnlock 是互斥锁解锁
+    // #define __CFUnlock(LP) ({ (void)pthread_mutex_unlock(LP); })
     
     // 加锁
     __CFLock(&loopsLock);
@@ -285,7 +312,9 @@ CF_EXPORT CFRunLoopRef _CFRunLoopGet0(pthread_t t) {
         // 例如线程 1 2 3 同时进来，分别创建了三次 newLoop，假设线程 1 首先执行完成后并解锁，那么 __CFRunLoops 中已经存在 t 对应的 run loop 了，
         // 此时线程 2 再走到这里的时候，取得的 loop 便是有值的了，这时候不再需要存入 __CFRunLoops 中了，只需要继续往下走释放并销毁 newLoop 就好了，线程 3 也是同样。
         
-        // 这里还有一点时，为什么要先创建 newLoop 后加锁呢，这样在多线程的情况下会存在创建多个 newLoop 的情况。
+        // 这里还有一点时，为什么要先创建 newLoop 后加锁呢，这样在多线程的情况下会存在创建多个 newLoop 的情况，如果把 newLoop 的创建放在下面的 "if (!loop)" 内部的话，
+        // 需要把 "CFRelease(newLoop);" 也提到这个 "if (!loop)" 内部去，这样就会导致在 __CFLock(&loopsLock)/__CFUnlock(&loopsLock) 中间插入一条 "CFRelease(newLoop);"，
+        // 可是即使是这样，newLoop 也只是会执行 release 操作，但是并不会执行销毁操作呀，那么什么时候 CFRunLoopDeallocate 会执行呢 ？
         
         loop = (CFRunLoopRef)CFDictionaryGetValue(__CFRunLoops, pthreadPointer(t));
         if (!loop) {
@@ -295,7 +324,7 @@ CF_EXPORT CFRunLoopRef _CFRunLoopGet0(pthread_t t) {
             loop = newLoop;
         }
         
-        // don't release run loops inside the loopsLock, because CFRunLoopDeallocate may end up taking it
+        // don't release run loops inside the loopsLock, because CFRunLoopDeallocate may end up taking it.
         // 不要在 loopsLock 内部释放运行循环，因为 CFRunLoopDeallocate 最终可能会占用它
         
         // 解锁
@@ -307,9 +336,11 @@ CF_EXPORT CFRunLoopRef _CFRunLoopGet0(pthread_t t) {
     
     // 这里判断入参线程 t 是否就是当前线程，如果是的话则可以直接把 loop 保存在当前线程的 TSD 中。
     if (pthread_equal(t, pthread_self())) {
-        // loop 存入 TSD 中，方便 CFRunLoopGetCurrent 中直接读取
+        // loop 存入 TSD 中，方便 CFRunLoopGetCurrent 函数直接从当前线程的 TSD 读取到线程的 run loop 就可以返回了，不用再调用 _CFRunLoopGet0 函数。
         _CFSetTSD(__CFTSDKeyRunLoop, (void *)loop, NULL);
         
+        // 从 TSD 中根据 __CFTSDKeyRunLoopCntr 取 run loop 的退出函数（__CFFinalizeRunLoop 函数，每个线程退出时都会调用，做一些清理和释放工作，
+        // 最重要的如果线程的 run loop 存在的话会把其从 __CFRunLoops 中移除并进行释放等工作，后面我们详细分析 __CFFinalizeRunLoop 函数）
         if (0 == _CFGetTSD(__CFTSDKeyRunLoopCntr)) {
             // 注册一个回调 __CFFinalizeRunLoop，当线程销毁时，顺便销毁其 run loop 对象。
             _CFSetTSD(__CFTSDKeyRunLoopCntr, (void *)(PTHREAD_DESTRUCTOR_ITERATIONS-1), (void (*)(void *))__CFFinalizeRunLoop);
@@ -318,9 +349,189 @@ CF_EXPORT CFRunLoopRef _CFRunLoopGet0(pthread_t t) {
     return loop;
 }
 ```
-&emsp;
+&emsp;Note:感觉有一点理解是以前没有过的（大概就是日常单线程写多了，现在专注看多线程的内容有了一些新的认识），日常对函数调用的惯性使然，当函数内部需要操作什么数据时我们就把什么数据作为参数传入（全局变量以及和函数调用时同处一个作用域的变量除外），由于线程和它的 run loop 对象一一对应，那么当一个函数内部需要操作当前线程的 run loop 对象时不需要通过参数传入，可以直接通过 `CFRunLoopRef rl = (CFRunLoopRef)CFDictionaryGetValue(__CFRunLoops, pthreadPointer(pthread_self()));` 取得当前线程的 run loop 对象（这里其实还是一个 `__CFRunLoops` 全局变量读值😂），还有一点，同一个函数在不同的线程执行那么在函数内部能直接通过 `pthread_self()` 函数获取当前线程的线程对象。`pthread_self` 一个不需要任何参数的函数只要执行一下就能获取当前线程的线程对象，感觉还挺有意思的！（对操作系统的内容几乎一无所知，觉得后续需要补充一下）
 
+&emsp;下面我们看一下 `__CFRunLoopCreate` 创建 run loop 的函数。
+##### \__CFRunLoopCreate
+&emsp;`__CFRunLoopCreate` 函数入参是一个线程，返回值是一个 run loop，正如其名，完成的功能就是为线程创建 run loop。
+```c++
+static CFRunLoopRef __CFRunLoopCreate(pthread_t t) {
+    CFRunLoopRef loop = NULL;
+    CFRunLoopModeRef rlm;
+    
+    // sizeof(CFRuntimeBase) 在 x86_64 macOS 下是 16，CFRuntimeBase 是所有 CF 类都包含的字段。
+    
+    // 减去 sizeof(CFRuntimeBase) 得到的 size 是为了计算出 extraBytes 的大小，即计算出 CFRuntimeBase 之外的扩展空间的大小，
+    // 因为 CFRuntimeBase 是所有 CF 类都包含的字段，__CFRunLoop 结构体中是包含 CFRuntimeBase _base 成员变量的，
+    // 所以要减去 sizeof(CFRuntimeBase) 得到 __CFRunLoop 结构体中剩余成员变量占用的空间。
+    uint32_t size = sizeof(struct __CFRunLoop) - sizeof(CFRuntimeBase);
+    
+    // CFRunLoopGetTypeID() 内部调用 dispatch_once 在 CF 运行时中注册两个新类 run loop（CFRunLoop）和 run loop mode（CFRunLoopMode），并返回 __kCFRunLoopTypeID。
+    // 然后 _CFRuntimeCreateInstance 函数根据 __kCFRunLoopTypeID 构建一个 run loop 对象并返回赋值给 loop。
+    //（注册新类是把全局的 run loop "类对象" 和 run loop mode "类对象" 放进全局的类表 __CFRuntimeClassTable 中，
+    // 其中 __kCFRunLoopTypeID 实际值是 run loop "类对象" 在 __CFRuntimeClassTable 类表中的索引。）
+    loop = (CFRunLoopRef)_CFRuntimeCreateInstance(kCFAllocatorSystemDefault, CFRunLoopGetTypeID(), size, NULL);
+    
+    // 如果创建失败，则返回 NULL。
+    if (NULL == loop) {
+        return NULL;
+    }
+    
+    // 初始化 loop 的 _perRunData。
+    (void)__CFRunLoopPushPerRunData(loop);
+    
+    // 初始化 loop 的 pthread_mutex_t _lock 为一个互斥递归锁。
+    //（__CFRunLoopLockInit 内部使用的 PTHREAD_MUTEX_RECURSIVE 表示递归锁，允许同一个线程对同一锁加锁多次，且需要对应次数的解锁操作）
+    __CFRunLoopLockInit(&loop->_lock);
+    
+    // 给 loop 的 _wakeUpPort 唤醒端口赋值
+    loop->_wakeUpPort = __CFPortAllocate();
+    if (CFPORT_NULL == loop->_wakeUpPort) HALT;
+    
+    // 设置 loop 的 _perRunData->ignoreWakeUps 为 0x57414B45，
+    // 前面 __CFRunLoopPushPerRunData 初始化时 _perRunData->ignoreWakeUps 的值是 0x00000000。
+    // 0x57414B45 表示忽略，0x00000000 表示不忽略。
+    __CFRunLoopSetIgnoreWakeUps(loop);
+    
+    // _commonModes 是 CFMutableSetRef 类型，CFSetCreateMutable 是为其申请空间。 
+    loop->_commonModes = CFSetCreateMutable(kCFAllocatorSystemDefault, 0, &kCFTypeSetCallBacks);
+    // 把 kCFRunLoopDefaultMode 添加到 loop 的 _commonModes 集合中，
+    // 同时也验证了 _commonModes 中存放的是 mode 对应的字符串（"kCFRunLoopDefaultMode"）并不是 CFRunLoopModeRef，
+    // 同时也验证了 loop 创建时就会直接把默认的 mode 标记为 common。
+    CFSetAddValue(loop->_commonModes, kCFRunLoopDefaultMode);
+    
+    // loop 的其它一些成员变量赋初值为 NULL
+    loop->_commonModeItems = NULL;
+    loop->_currentMode = NULL;
+    // 同上面的 _commonModes，也是为 _modes 申请空间。
+    loop->_modes = CFSetCreateMutable(kCFAllocatorSystemDefault, 0, &kCFTypeSetCallBacks);
+    loop->_blocks_head = NULL;
+    loop->_blocks_tail = NULL;
+    loop->_counterpart = NULL;
+    
+    // 把 pthread_t t 赋值给 loop 的 _pthread 成员变量。
+    loop->_pthread = t;
+    
+#if DEPLOYMENT_TARGET_WINDOWS
+    // Windows 下会获取当前线程的 ID 赋值给 loop 的 _winthread
+    loop->_winthread = GetCurrentThreadId();
+#else
+    loop->_winthread = 0;
+#endif
 
+    // __CFRunLoopFindMode(CFRunLoopRef rl, CFStringRef modeName, Boolean create)
+    // __CFRunLoopFindMode 函数根据 modeName 从 rl 的 _modes 中找到其对应的 CFRunLoopModeRef，如果找到的话则加锁并返回，
+    // 如果未找到，并且 create 为真的话，则新建 __CFRunLoopMode 加锁并返回，如果 create 为假的话，则返回 NULL。
+    // 具体拆开讲解准备留在 CFRunLoopModeRef 章节。
+    
+    // 此处是构建一个 _name 是 kCFRunLoopDefaultMode 的 mode 赋值给 rlm，最后会把 rlm 添加到 loop 的 _modes 中。
+    
+    // 函数返回时会调用 __CFRunLoopModeLock(rlm) 进行加锁，然后对应下面 if 中的 __CFRunLoopModeUnlock(rlm) 解锁。
+    //（内部加锁是：pthread_mutex_lock(&(rlm->_lock))，解锁是：pthread_mutex_unlock(&(rlm->_lock))。）
+    
+    //（关于 rlm 的 _portSet：）
+    //（会把 loop 的 _wakeUpPort 添加到 rlm 的 _portSet 中）
+    // (rlm->_timerPort = mk_timer_create()，然后把 _timerPort 也添加到 rlm 的 _portSet 中)
+    //（还有一个 queuePort 也添加到 rlm 的 _portSet 中）
+    
+    rlm = __CFRunLoopFindMode(loop, kCFRunLoopDefaultMode, true);
+    if (NULL != rlm) __CFRunLoopModeUnlock(rlm);
+    
+    return loop;
+}
+```
+&emsp;`__CFRunLoopCreate` 函数整体看下来涉及的细节和函数调用还挺多的。首先是 `_CFRuntimeCreateInstance` 函数调用中的参数：`CFRunLoopGetTypeID()` 该函数内部使用全局只会进行一次的在 Core Foundation 运行时中为我们注册两个类 run loop（CFRunLoop）和 run loop mode（CFRunLoopMode），并返回 `__kCFRunLoopTypeID` 指定 `_CFRuntimeCreateInstance` 函数构建的是 CFRunLoop 的实例。
+
+&emsp;这里我们仅看一下 `_CFRuntimeCreateInstance` 函数的声明好了。（定义也是开源的但是实在太长了，😣）
+```c++
+// 使用给定的分配器，创建由给定 CFTypeID 指定的类的新 CF 实例，并返回它。如果分配器（kCFAllocatorSystemDefault）返回 NULL，则此函数返回 NULL。
+// CFRuntimeBase 结构在返回实例的开始处初始化。
+// extraBytes 是为实例分配的额外字节数（超出 CFRuntimeBase 所需的字节数）。
+// 如果指定的 CFTypeID 对于 CF 运行时是未知的，则此函数返回 NULL。
+// 除了基址头（CFRuntimeBase）之外，新内存的任何部分都没有初始化（例如，多余的字节不归零）。
+// 使用此函数创建的所有实例只能通过使用 CFRelease() 函数来销毁——不能直接使用 CFAllocatorDeallocate() 销毁实例，即使在类的初始化或创建函数中也是如此。 为 category 参数传递NULL。
+
+// loop = (CFRunLoopRef)_CFRuntimeCreateInstance(kCFAllocatorSystemDefault, CFRunLoopGetTypeID(), size, NULL);
+CF_EXPORT CFTypeRef _CFRuntimeCreateInstance(CFAllocatorRef allocator, CFTypeID typeID, CFIndex extraBytes, unsigned char *category);
+```
+&emsp;kCFAllocatorSystemDefault 是一个静态全局的 struct \__CFAllocator 实例。所有的 CF 实例创建时都共用此分配器，这里不再展开了，源码都比较清晰，这里我们暂时先关注到 run loop 对象的 `CFRuntimeBase _base` 被初始化 `INIT_CFRUNTIME_BASE`。
+```c++
+#if __BIG_ENDIAN__
+#define INIT_CFRUNTIME_BASE(...) {0, {0, 0, 0, 0x80}}
+#else
+#define INIT_CFRUNTIME_BASE(...) {0, {0x80, 0, 0, 0}}
+#endif
+```
+
+&emsp;然后 run loop 的实例 loop 创建好以后是对 loop 的一些成员变量进行初始化。
++ 初始化 loop 的 `_perRunData`。
++ 初始化 loop 的 `pthread_mutex_t _lock`，`_lock` 的初始时属性用的 `PTHREAD_MUTEX_RECURSIVE`，即 `_lock` 为一个互斥递归锁。
++ 给 loop 的 `_wakeUpPort`（唤醒端口）赋初值（`__CFPortAllocate()`）。
++ 设置 loop 的 `_perRunData->ignoreWakeUps` 为 `0x57414B45`，前面 `__CFRunLoopPushPerRunData` 初始化时 `_perRunData->ignoreWakeUps` 的值是 `0x00000000`。
++ 初始化 loop 的 `_commonModes` 并把默认 mode 的字符串（"kCFRunLoopDefaultMode"）添加到 `_commonModes` 中，即把默认 mode 标记为 common。
++ 初始化 loop 的 `_modes`，并把构建好的 `CFRunLoopModeRef rlm` 添加到 `_modes` 中。
++ 把 `pthread_t t` 赋值给 loop 的 `_pthread` 成员变量。（`Windows` 下会获取当前线程的 ID 赋值给 loop 的 `_winthread`）
+##### \__CFRunLoopPushPerRunData
+&emsp;`__CFRunLoopPushPerRunData` 初始化 run loop 的 `_perRunData`，并返回 `_perRunData` 的旧值。每次 run loop 运行会重置 `_perRunData`（重新为 \_perRunData 创建 \_per_run_data 实例）。`_perRunData->stopped` 表示是否停止的标记，停止则设置为 `0x53544F50`，运行则为 `0x0`。`_perRunData->ignoreWakeUps` 表示是否忽略唤醒的标记，忽略则设置为 `0x57414B45`，不忽略则为`0x0`。
+```c++
+// (void)__CFRunLoopPushPerRunData(loop);
+CF_INLINE volatile _per_run_data *__CFRunLoopPushPerRunData(CFRunLoopRef rl) {
+    // previous 记录旧值
+    volatile _per_run_data *previous = rl->_perRunData;
+    // 为入参 run loop 新建 _perRunData
+    rl->_perRunData = (volatile _per_run_data *)CFAllocatorAllocate(kCFAllocatorSystemDefault, sizeof(_per_run_data), 0); // 创建 _per_run_data 实例
+    
+    rl->_perRunData->a = 0x4346524C;
+    rl->_perRunData->b = 0x4346524C; // 'CFRL'
+    rl->_perRunData->stopped = 0x00000000; 
+    rl->_perRunData->ignoreWakeUps = 0x00000000; // 在 __CFRunLoopCreate 函数中，接下来会设置 loop 的 _perRunData->ignoreWakeUps 为 0x57414B45
+    
+    // 返回旧值
+    return previous;
+}
+```
+&emsp;`__CFRunLoopPushPerRunData` 源码下面是一组 `_perRunData` 相关的函数。
+```c++
+// 把 previous（旧值）赋值给 rl 的 _perRunData
+CF_INLINE void __CFRunLoopPopPerRunData(CFRunLoopRef rl, volatile _per_run_data *previous) {
+    // 如果当前 rl 的 _perRunData 有值，则销毁它。
+    if (rl->_perRunData) CFAllocatorDeallocate(kCFAllocatorSystemDefault, (void *)rl->_perRunData);
+    
+    // 把 previous 赋值给 rl->_perRunData。
+    rl->_perRunData = previous;
+}
+
+// 判断 run loop 是否已停止，如果 stopped 的值是 0x00000000，则返回 false，表示没有停止，
+// 若是其它值则表示停止，即 stopped 的值非零表示停止，零表示正在运行。
+CF_INLINE Boolean __CFRunLoopIsStopped(CFRunLoopRef rl) {
+    return (rl->_perRunData->stopped) ? true : false;
+}
+
+// 设置 run loop 已停止，直接把 stopped 赋值为 0x53544F50。
+CF_INLINE void __CFRunLoopSetStopped(CFRunLoopRef rl) {
+    rl->_perRunData->stopped = 0x53544F50;    // 'STOP'
+}
+
+// 未停止
+CF_INLINE void __CFRunLoopUnsetStopped(CFRunLoopRef rl) {
+    rl->_perRunData->stopped = 0x0;
+}
+
+// 判断是否忽略 WakeUp，ignoreWakeUps 非零表示忽略，零表示不忽略。
+CF_INLINE Boolean __CFRunLoopIsIgnoringWakeUps(CFRunLoopRef rl) {
+    return (rl->_perRunData->ignoreWakeUps) ? true : false;    
+}
+
+// 直接把 ignoreWakeUps 赋值为 0x57414B45，非零表示忽略。
+CF_INLINE void __CFRunLoopSetIgnoreWakeUps(CFRunLoopRef rl) {
+    rl->_perRunData->ignoreWakeUps = 0x57414B45; // 'WAKE'
+}
+
+// 0x0
+CF_INLINE void __CFRunLoopUnsetIgnoreWakeUps(CFRunLoopRef rl) {
+    rl->_perRunData->ignoreWakeUps = 0x0;
+}
+```
 #### CHECK_FOR_FORK
 &emsp;Forking is a system call where a process creates a copy of itself. CHECK_FOR_FORK is a boolean value in the code which checks whether the given process was forked.（Forking 是系统调用，其中进程创建其自身的副本。 CHECK_FOR_FORK 是代码中的布尔值，用于检查给定的进程是否被分叉。）[What's the meaning of CHECK_FOR_FORK?](https://stackoverflow.com/questions/47260563/whats-the-meaning-of-check-for-fork)
 ```c++
@@ -341,34 +552,31 @@ CF_PRIVATE void __THE_PROCESS_HAS_FORKED_AND_YOU_CANNOT_USE_THIS_COREFOUNDATION_
 //    HALT;
 }
 ```
-
-
-
-
-
+&emsp;看到这里 run loop 创建的相关的内容就看完了，其中比较重要的 `__CFRunLoopFindMode` 函数，留在下 CFRunLoopModeRef 节再分析。
 ### CFRunLoopModeRef（struct \__CFRunLoopMode *）
-&emsp;每次 run loop 开始 run 的时候，都必须指定一个 mode，称为 run loop mode。mode 指定了在这次的 run 中，run loop 可以处理的任务。对于不属于当前 mode 的任务，则需要切换 run loop 至对应 mode 下，再重新调用 run 方法，才能够被处理。
+&emsp;每次 run loop 开始 run 的时候，都必须指定一个 mode，称为 run loop mode（运行循环模式）。mode 指定了在这次 run 中，run loop 可以处理的任务，对于不属于当前 mode 的任务，则需要切换 run loop 至对应 mode 下，再重新调用 run 方法，才能够被处理，这样也保证了不同 mode 的 source/timer/observer 互不影响，使不同 mode 下的数据做到相互隔离的。下面我们就从代码层面看下 mode 的数据结构及一些相关的函数。
 ```c++
 typedef struct __CFRunLoopMode *CFRunLoopModeRef;
 
 struct __CFRunLoopMode {
     CFRuntimeBase _base; // 所有 CF "instances" 都是从这个结构开始的
-    pthread_mutex_t _lock; /* must have the run loop locked before locking this */ 必须在锁定之前将 run loop 锁定，即加锁前需要 run loop 先加锁
-    CFStringRef _name; // mode 都会指定一个字符串名称
+    pthread_mutex_t _lock; /* must have the run loop locked before locking this */ 必须在锁定之前将 run loop 锁定，即加锁前需要 run loop 对象先加锁
+    CFStringRef _name; // mode 的一个字符串名称
     Boolean _stopped; // 标记了 run loop 的运行状态，实际上并非如此简单，还有前面的 _per_run_data。
-    char _padding[3]; // 
+    char _padding[3]; 
     
     // _sources0、_sources1、_observers、_timers 都是集合类型，里面都是 mode item，即一个 mode 包含多个 mode item
     CFMutableSetRef _sources0; // sources0 事件集合（之所以用集合是为了保证每个元素唯一）
     CFMutableSetRef _sources1; // sources1 事件集合
+    
     CFMutableArrayRef _observers; // run loop observer 观察者数组
     CFMutableArrayRef _timers; // 定时器数组
     
     CFMutableDictionaryRef _portToV1SourceMap; // 存储了 Source1 的 port 与 source 的对应关系，key 是 mach_port_t，value 是 CFRunLoopSourceRef
-    __CFPortSet _portSet; // 保存所有需要监听的 port，比如 _wakeUpPort，_timerPort 都保存在这个集合中
+    __CFPortSet _portSet; // 保存所有需要监听的 port，比如 _wakeUpPort，_timerPort，queuePort 都保存在这个集合中
     CFIndex _observerMask; // 添加 obsever 时设置 _observerMask 为 observer 的 _activities（CFRunLoopActivity 状态）
     
-    // DEPLOYMENT_TARGET_MACOSX 表示是否部署在 maxOS 下
+    // DEPLOYMENT_TARGET_MACOSX 表示部署在 maxOS 下
     // #if DEPLOYMENT_TARGET_MACOSX
     //  #define USE_DISPATCH_SOURCE_FOR_TIMERS 1
     //  #define USE_MK_TIMER_TOO 1
@@ -377,16 +585,17 @@ struct __CFRunLoopMode {
     //  #define USE_MK_TIMER_TOO 1
     // #endif
     
+    // 在 maxOS 下支持两种类型的 timer
 #if USE_DISPATCH_SOURCE_FOR_TIMERS
-    // macOS 下，使用 dispatch_source 表示 timer
+    // 使用 dispatch_source 表示 timer
     dispatch_source_t _timerSource; // GCD 定时器
     dispatch_queue_t _queue; // 队列
-    Boolean _timerFired; // set to true by the source when a timer has fired 计时器触发时由 source 设置为 true
+    Boolean _timerFired; // set to true by the source when a timer has fired 计时器触发时由 source 设置为 true，在 _timerSource 的回调事件中值会置为 true，即标记为 timer 被触发。
     Boolean _dispatchTimerArmed;
 #endif
 
 #if USE_MK_TIMER_TOO
-    // iOS 下，使用 MK 表示 timer 
+    // 使用 MK 表示 timer 
     mach_port_t _timerPort; // MK_TIMER 的 port
     Boolean _mkTimerArmed;
 #endif
@@ -402,6 +611,109 @@ struct __CFRunLoopMode {
     uint64_t _timerHardDeadline; /* TSR */
 };
 ```
+&emsp;看完了 run loop mode 的数据结构定义，那么我们分析下 `__CFRunLoopFindMode` 函数，正是通过它得到一个 run loop mode 对象。通常我们接触到的 run loop mode 只有 kCFRunLoopDefaultMode 和 UITrackingRunLoopMode，前面看到 run loop 创建时会通过 `__CFRunLoopFindMode` 函数取得一个默认 mode，并把它添加到 run loop 对象的 \_modes 中。
+#### \__CFRunLoopFindMode
+&emsp;`__CFRunLoopFindMode` 函数根据 modeName 从 rl 的 _modes 中找到其对应的 CFRunLoopModeRef，如果找到的话则加锁并返回。如果未找到，并且 create 为真的话，则新建 __CFRunLoopMode 加锁并返回，如果 create 为假的话，则返回 NULL。
+```c++
+static CFRunLoopModeRef __CFRunLoopFindMode(CFRunLoopRef rl, CFStringRef modeName, Boolean create) {
+    // 用于检查给定的进程是否被分叉
+    CHECK_FOR_FORK();
+    
+    // struct __CFRunLoopMode 结构体指针
+    CFRunLoopModeRef rlm;
+    
+    // 创建一个 struct __CFRunLoopMode 结构体实例，
+    // 并调用 memset 把 srlm 内存空间全部置为 0。
+    struct __CFRunLoopMode srlm;
+    memset(&srlm, 0, sizeof(srlm));
+    
+    // __kCFRunLoopModeTypeID 现在正是表示 CFRunLoopMode 类，实际值是 run loop mode 类在全局类表 __CFRuntimeClassTable 中的索引。
+    
+    // 前面 __CFRunLoopCreate 函数内部会调用 CFRunLoopGetTypeID() 函数，
+    // 其内部是全局执行一次在 CF 运行时中注册两个新类 run loop（CFRunLoop）和 run loop mode（CFRunLoopMode），
+    // 其中 __kCFRunLoopModeTypeID = _CFRuntimeRegisterClass(&__CFRunLoopModeClass)，那么 __kCFRunLoopModeTypeID 此时便是 run loop mode 类在全局类表中的索引。
+    //（__CFRunLoopModeClass 可以理解为一个静态全局的 "类对象"（实际值是一个），_CFRuntimeRegisterClass 函数正是把它放进一个全局的 __CFRuntimeClassTable 类表中。）
+
+    // 本身 srlm 是一片空白内存，现在相当于把 srlm 设置为一个 run loop mode 类的对象。 
+    //（实际就是设置 CFRuntimeBase 的 _cfinfo 成员变量，srlm 里面目前包含的内容就是 run loop mode 的类信息。）
+    _CFRuntimeSetInstanceTypeIDAndIsa(&srlm, __kCFRunLoopModeTypeID);
+    
+    // 把 srlm 的 mode 名称设置为入参 modeName
+    srlm._name = modeName;
+    
+    // 
+    rlm = (CFRunLoopModeRef)CFSetGetValue(rl->_modes, &srlm);
+    
+    if (NULL != rlm) {
+    __CFRunLoopModeLock(rlm);
+    return rlm;
+    }
+    if (!create) {
+    return NULL;
+    }
+    rlm = (CFRunLoopModeRef)_CFRuntimeCreateInstance(kCFAllocatorSystemDefault, __kCFRunLoopModeTypeID, sizeof(struct __CFRunLoopMode) - sizeof(CFRuntimeBase), NULL);
+    if (NULL == rlm) {
+    return NULL;
+    }
+    __CFRunLoopLockInit(&rlm->_lock);
+    rlm->_name = CFStringCreateCopy(kCFAllocatorSystemDefault, modeName);
+    rlm->_stopped = false;
+    rlm->_portToV1SourceMap = NULL;
+    rlm->_sources0 = NULL;
+    rlm->_sources1 = NULL;
+    rlm->_observers = NULL;
+    rlm->_timers = NULL;
+    rlm->_observerMask = 0;
+    rlm->_portSet = __CFPortSetAllocate();
+    rlm->_timerSoftDeadline = UINT64_MAX;
+    rlm->_timerHardDeadline = UINT64_MAX;
+    
+    kern_return_t ret = KERN_SUCCESS;
+#if USE_DISPATCH_SOURCE_FOR_TIMERS
+    rlm->_timerFired = false;
+    rlm->_queue = _dispatch_runloop_root_queue_create_4CF("Run Loop Mode Queue", 0);
+    mach_port_t queuePort = _dispatch_runloop_root_queue_get_port_4CF(rlm->_queue);
+    if (queuePort == MACH_PORT_NULL) CRASH("*** Unable to create run loop mode queue port. (%d) ***", -1);
+    rlm->_timerSource = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, rlm->_queue);
+    
+    __block Boolean *timerFiredPointer = &(rlm->_timerFired);
+    dispatch_source_set_event_handler(rlm->_timerSource, ^{
+        *timerFiredPointer = true;
+    });
+    
+    // Set timer to far out there. The unique leeway makes this timer easy to spot in debug output.
+    _dispatch_source_set_runloop_timer_4CF(rlm->_timerSource, DISPATCH_TIME_FOREVER, DISPATCH_TIME_FOREVER, 321);
+    dispatch_resume(rlm->_timerSource);
+    
+    ret = __CFPortSetInsert(queuePort, rlm->_portSet);
+    if (KERN_SUCCESS != ret) CRASH("*** Unable to insert timer port into port set. (%d) ***", ret);
+    
+#endif
+#if USE_MK_TIMER_TOO
+    rlm->_timerPort = mk_timer_create();
+    ret = __CFPortSetInsert(rlm->_timerPort, rlm->_portSet);
+    if (KERN_SUCCESS != ret) CRASH("*** Unable to insert timer port into port set. (%d) ***", ret);
+#endif
+    
+    ret = __CFPortSetInsert(rl->_wakeUpPort, rlm->_portSet);
+    if (KERN_SUCCESS != ret) CRASH("*** Unable to insert wake up port into port set. (%d) ***", ret);
+    
+#if DEPLOYMENT_TARGET_WINDOWS
+    rlm->_msgQMask = 0;
+    rlm->_msgPump = NULL;
+#endif
+    CFSetAddValue(rl->_modes, rlm);
+    CFRelease(rlm);
+    __CFRunLoopModeLock(rlm);    /* return mode locked */
+    return rlm;
+}
+```
+
+
+
+
+
+
 ### CFRunLoopSourceRef（struct \__CFRunLoopSource *）
 &emsp;CFRunLoopSourceRef 是事件源（输入源），通过源码可以发现，其分为 source0 和 source1 两个。
 ```c++
