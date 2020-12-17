@@ -1,4 +1,4 @@
-# iOS 从源码解析Run Loop (三)：以 CFRunLoop.h 文件为入口深入学习 run loop
+# iOS 从源码解析Run Loop (三)：获取RunLoop、RunLoopMode以及Source、Timer、Observer创建的完整过程
 
 > &emsp;CFRunLoop.h 文件是 run loop 在 Core Foundation 下的最重要的头文件，与我们前面学习的 Cocoa Foundation 下的 NSRunLoop.h 文件相对应。NSRunLoop 的内容也正是对 \__CFRunLoop 的面向对象的简单封装，CFRunLoop.h 文件包含更多 run loop 的操作以及 run loop 涉及的部分底层数据结构的声明，\__CFRunLoop 结构则是 run loop 在 Core Foundation 下 C 语言的实现。本篇以 CFRunLoop.h 文件为入口通过 Apple 开源的 CF-1151.16 来深入学习 run loop。⛽️⛽️
 ## CFRunLoop Overview
@@ -570,7 +570,7 @@ struct __CFRunLoopMode {
     CFMutableSetRef _sources1; // sources1 事件集合
     
     CFMutableArrayRef _observers; // run loop observer 观察者数组
-    CFMutableArrayRef _timers; // 定时器数组
+    CFMutableArrayRef _timers; // 计时器数组
     
     CFMutableDictionaryRef _portToV1SourceMap; // 存储了 Source1 的 port 与 source 的对应关系，key 是 mach_port_t，value 是 CFRunLoopSourceRef
     __CFPortSet _portSet; // 保存所有需要监听的 port，比如 _wakeUpPort，_timerPort，queuePort 都保存在这个集合中
@@ -585,10 +585,11 @@ struct __CFRunLoopMode {
     //  #define USE_MK_TIMER_TOO 1
     // #endif
     
-    // 在 maxOS 下支持两种类型的 timer
+    // 在 maxOS 下 USE_DISPATCH_SOURCE_FOR_TIMERS 和 USE_MK_TIMER_TOO 都为真。
+    
 #if USE_DISPATCH_SOURCE_FOR_TIMERS
     // 使用 dispatch_source 表示 timer
-    dispatch_source_t _timerSource; // GCD 定时器
+    dispatch_source_t _timerSource; // GCD 计时器
     dispatch_queue_t _queue; // 队列
     Boolean _timerFired; // set to true by the source when a timer has fired 计时器触发时由 source 设置为 true，在 _timerSource 的回调事件中值会置为 true，即标记为 timer 被触发。
     Boolean _dispatchTimerArmed;
@@ -673,18 +674,21 @@ static CFRunLoopModeRef __CFRunLoopFindMode(CFRunLoopRef rl, CFStringRef modeNam
     // 下面是一组成员变量的初始赋值
     rlm->_stopped = false;
     rlm->_portToV1SourceMap = NULL;
+    
+    // _sources0、_sources1、_observers、_timers 初始状态都是空的
     rlm->_sources0 = NULL;
     rlm->_sources1 = NULL;
     rlm->_observers = NULL;
     rlm->_timers = NULL;
+    
     rlm->_observerMask = 0;
-    rlm->_portSet = __CFPortSetAllocate(); // CFSet 申请空间
+    rlm->_portSet = __CFPortSetAllocate(); // CFSet 申请空间初始化
     rlm->_timerSoftDeadline = UINT64_MAX;
     rlm->_timerHardDeadline = UINT64_MAX;
     
-    // ret 一个临时变量
+    // ret 是一个临时变量初始值是 KERN_SUCCESS，用来表示向 rlm->_portSet 中添加 port 时的结果，
+    // 如果添加失败的话，会直接 CRASH， 
     kern_return_t ret = KERN_SUCCESS;
-    
     
 #if USE_DISPATCH_SOURCE_FOR_TIMERS
     // macOS 下，使用 dispatch_source 构造 timer
@@ -704,8 +708,8 @@ static CFRunLoopModeRef __CFRunLoopFindMode(CFRunLoopRef rl, CFStringRef modeNam
     // 构建 dispatch_source 类型使用的是 DISPATCH_SOURCE_TYPE_TIMER，表示是一个 timer
     rlm->_timerSource = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, rlm->_queue);
     
-    // 这里为了在下面的 block 内部 _timerFired 的值，用了一个 __block 指针变量，
-    // 当 _timerSource（定时器）回调时会执行这个 block。
+    // 这里为了在下面的 block 内部修改 _timerFired 的值，用了一个 __block 指针变量。（觉的如果这里只是改值，感觉用指针就够了可以不用 __block 修饰）
+    // 当 _timerSource（计时器）回调时会执行这个 block。
     __block Boolean *timerFiredPointer = &(rlm->_timerFired);
     dispatch_source_set_event_handler(rlm->_timerSource, ^{
         *timerFiredPointer = true;
@@ -735,8 +739,9 @@ static CFRunLoopModeRef __CFRunLoopFindMode(CFRunLoopRef rl, CFStringRef modeNam
 #endif
     
     // 然后这里把 rl 的 _wakeUpPort 也添加到 rlm 的 _portSet（端口集合）中。
+    //（这里要特别注意一下，run loop 的 _wakeUpPort 会被插入到所有 mode 的 _portSet 中。）
     ret = __CFPortSetInsert(rl->_wakeUpPort, rlm->_portSet);
-    // 如果添加失败则 crash。（无法将计时器端口插入端口集中。）
+    // 如果添加失败则 crash。（无法将唤醒端口插入端口集中。）
     if (KERN_SUCCESS != ret) CRASH("*** Unable to insert wake up port into port set. (%d) ***", ret);
     
 #if DEPLOYMENT_TARGET_WINDOWS
@@ -744,10 +749,11 @@ static CFRunLoopModeRef __CFRunLoopFindMode(CFRunLoopRef rl, CFStringRef modeNam
     rlm->_msgPump = NULL;
 #endif
 
-    // 这里把 rlm 添加到 rl 的 _modes 中
+    // 这里把 rlm 添加到 rl 的 _modes 中，
+    //（本质是把 rlm 添加到 _modes 哈希表中）
     CFSetAddValue(rl->_modes, rlm);
     
-    // 释放
+    // 释放，rlm 被 rl->_modes 持有，并不会被销毁
     CFRelease(rlm);
     
     // 加锁，然后返回 rlm
@@ -755,14 +761,16 @@ static CFRunLoopModeRef __CFRunLoopFindMode(CFRunLoopRef rl, CFStringRef modeNam
     return rlm;
 }
 ```
+&emsp;其中 `ret = __CFPortSetInsert(rl->_wakeUpPort, rlm->_portSet)` 会把 run loop 对象的 `_wakeUpPort` 添加到每个 run loop mode 对象的 `_portSet` 端口集合里。即当一个 run loop 有多个 run loop mode 时，那么每个 run loop mode 都会有 run loop 的 `_wakeUpPort`。
 
+&emsp;在 macOS 下 run loop mode 的 `_timerSource` 的计时器的回调事件内部会把 run loop mode 的 `_timerFired` 字段置为 true，表示计时器被触发。
 
-
-
-
+&emsp;run loop mode 创建好了，看到 source/timer/observer 三者对应的 `_sources0`、`_sources1`、`_observers`、`_timers` 四个字段初始状态都是空，需要我们自己添加 run loop mode item，它们在代码层中对应的数据类型分别是: CFRunLoopSourceRef、CFRunLoopObserverRef、CFRunLoopTimerRef，下面我们看一下它们的具体定义。
 
 ### CFRunLoopSourceRef（struct \__CFRunLoopSource *）
-&emsp;CFRunLoopSourceRef 是事件源（输入源），通过源码可以发现，其分为 source0 和 source1 两个。
+&emsp;CFRunLoopSourceRef 是事件源（输入源），通过源码可以发现它内部的 `_context` 联合体中有两个成员变量 `version0` 和 `version1`，它们正分别对应了我们前面提到过多次的 source0 和 source1。
+
+&emsp;
 ```c++
 typedef struct __CFRunLoopSource * CFRunLoopSourceRef;
 
@@ -778,97 +786,60 @@ struct __CFRunLoopSource {
     } _context;
 };
 ```
-&emsp;CFRunLoopSourceContext 
+&emsp;当 \__CFRunLoopSource 表示 source0 的数据结构时 `_context` 中使用 `CFRunLoopSourceContext version0`，下面是 CFRunLoopSourceContext 的定义。 
 ```c++
+// #if __LLP64__
+//  typedef unsigned long long CFOptionFlags;
+//  typedef unsigned long long CFHashCode;
+//  typedef signed long long CFIndex;
+// #else
+//  typedef unsigned long CFOptionFlags;
+//  typedef unsigned long CFHashCode;
+//  typedef signed long CFIndex;
+// #endif
+
 typedef struct {
-    CFIndex    version;
-    void *    info; // source 的信息
-    
+    CFIndex version;
+    void * info; // source 的信息
     const void *(*retain)(const void *info); // retain 函数
-    void    (*release)(const void *info); // release 函数
+    void (*release)(const void *info); // release 函数
+    CFStringRef (*copyDescription)(const void *info); // 
+    Boolean (*equal)(const void *info1, const void *info2); // 判断 source 相等的函数
+    CFHashCode (*hash)(const void *info); // 哈希函数
     
-    CFStringRef    (*copyDescription)(const void *info);
+    // 上面是 CFRunLoopSourceContext 和 CFRunLoopSourceContext1 的基础内容双方完成等同，
+    // 两者的区别主要在下面，同时它们也表示了 source0 和 source1 的不同功能。
     
-    Boolean    (*equal)(const void *info1, const void *info2); // 判断 source 相等的函数
-    
-    CFHashCode    (*hash)(const void *info);
-    void    (*schedule)(void *info, CFRunLoopRef rl, CFStringRef mode);
-    void    (*cancel)(void *info, CFRunLoopRef rl, CFStringRef mode);
-    
-    void    (*perform)(void *info); // source 要执行的任务块
+    void (*schedule)(void *info, CFRunLoopRef rl, CFStringRef mode); // 当 source 加入到 run loop 时触发的回调函数
+    void (*cancel)(void *info, CFRunLoopRef rl, CFStringRef mode); // 当 source 从 run loop 中移除时触发的回调函数
+    void (*perform)(void *info); // source 要执行的任务块，当 source 事件被触发时的回调, 使用 CFRunLoopSourceSignal 函数触发
 } CFRunLoopSourceContext;
 ```
-&emsp;CFRunLoopSourceContext1
+&emsp;当 \__CFRunLoopSource 表示 source1 的数据结构时 `_context` 中使用 `CFRunLoopSourceContext1 version1`，下面是 CFRunLoopSourceContext1 的定义。
 ```c++
 typedef struct {
-    CFIndex    version;
-    void *    info; // source 的信息
-    
+    CFIndex version;
+    void * info; // source 的信息
     const void *(*retain)(const void *info); // retain 函数
-    void    (*release)(const void *info); // release 函数
+    void (*release)(const void *info); // release 函数
+    CFStringRef (*copyDescription)(const void *info); // 
+    Boolean (*equal)(const void *info1, const void *info2); // 判断 source 相等的函数
+    CFHashCode (*hash)(const void *info); // 哈希函数
     
-    CFStringRef    (*copyDescription)(const void *info);
+    // 上面是 CFRunLoopSourceContext 和 CFRunLoopSourceContext1 的基础内容双方完成等同，
+    // 两者的区别主要在下面，同时它们也表示了 source0 和 source1 的不同功能。
     
-    Boolean    (*equal)(const void *info1, const void *info2); // 判断 source 相等的函数
-    
-    // #if __LLP64__
-    //  typedef unsigned long long CFOptionFlags;
-    //  typedef unsigned long long CFHashCode;
-    //  typedef signed long long CFIndex;
-    // #else
-    //  typedef unsigned long CFOptionFlags;
-    //  typedef unsigned long CFHashCode;
-    //  typedef signed long CFIndex;
-    // #endif
-    
-    CFHashCode    (*hash)(const void *info);
 #if (TARGET_OS_MAC && !(TARGET_OS_EMBEDDED || TARGET_OS_IPHONE)) || (TARGET_OS_EMBEDDED || TARGET_OS_IPHONE)
-    mach_port_t    (*getPort)(void *info);
-    void *    (*perform)(void *msg, CFIndex size, CFAllocatorRef allocator, void *info);
+    mach_port_t (*getPort)(void *info); // getPort 函数指针，用于当 source 被添加到 run loop 中的时候，从该函数中获取具体的 mach_port_t 对象.
+    void * (*perform)(void *msg, CFIndex size, CFAllocatorRef allocator, void *info); // perform 函数指针即指向 run loop 被唤醒后将要处理的事情
 #else
-    void *    (*getPort)(void *info);
-    void    (*perform)(void *info);
+    void * (*getPort)(void *info);
+    void (*perform)(void *info);
 #endif
 } CFRunLoopSourceContext1;
 ```
-#### CFAllocatorRef
-&emsp;在大多数情况下，为创建函数指定分配器时，NULL 参数表示 “使用默认值”；这与使用 kCFAllocatorDefault 或 `CFAllocatorGetDefault()` 的返回值相同。这样可以确保你将使用当时有效的分配器。
-```c++
-typedef const struct __CFAllocator * CFAllocatorRef;
-
-struct __CFAllocator {
-    CFRuntimeBase _base;
-#if DEPLOYMENT_TARGET_MACOSX || DEPLOYMENT_TARGET_EMBEDDED || DEPLOYMENT_TARGET_EMBEDDED_MINI
-    // CFAllocator structure must match struct _malloc_zone_t!
-    // The first two reserved fields in struct _malloc_zone_t are for us with CFRuntimeBase
-    size_t     (*size)(struct _malloc_zone_t *zone, const void *ptr); /* returns the size of a block or 0 if not in this zone; must be fast, especially for negative answers */
-    void     *(*malloc)(struct _malloc_zone_t *zone, size_t size);
-    void     *(*calloc)(struct _malloc_zone_t *zone, size_t num_items, size_t size); /* same as malloc, but block returned is set to zero */
-    void     *(*valloc)(struct _malloc_zone_t *zone, size_t size); /* same as malloc, but block returned is set to zero and is guaranteed to be page aligned */
-    void     (*free)(struct _malloc_zone_t *zone, void *ptr);
-    void     *(*realloc)(struct _malloc_zone_t *zone, void *ptr, size_t size);
-    void     (*destroy)(struct _malloc_zone_t *zone); /* zone is destroyed and all memory reclaimed */
-    const char    *zone_name;
-
-    /* Optional batch callbacks; these may be NULL */
-    unsigned    (*batch_malloc)(struct _malloc_zone_t *zone, size_t size, void **results, unsigned num_requested); /* given a size, returns pointers capable of holding that size; returns the number of pointers allocated (maybe 0 or less than num_requested) */
-    void    (*batch_free)(struct _malloc_zone_t *zone, void **to_be_freed, unsigned num_to_be_freed); /* frees all the pointers in to_be_freed; note that to_be_freed may be overwritten during the process */
-
-    struct malloc_introspection_t    *introspect;
-    unsigned    version;
-    
-    /* aligned memory allocation. The callback may be NULL. */
-    void *(*memalign)(struct _malloc_zone_t *zone, size_t alignment, size_t size);
-    
-    /* free a pointer known to be in zone and known to have the given size. The callback may be NULL. */
-    void (*free_definite_size)(struct _malloc_zone_t *zone, void *ptr, size_t size);
-#endif
-    CFAllocatorRef _allocator;
-    CFAllocatorContext _context;
-};
-```
 ### CFRunLoopObserverRef（struct \__CFRunLoopObserver *）
-&emsp;CFRunLoopObserverRef 是观察者，每个 Observer 都包含了一个回调(函数指针)，当 RunLoop 的状态发生变化时，观察者就能通过回调接受到这个变化。主要是用来向外界报告 Runloop 当前的状态的更改。
+&emsp;CFRunLoopObserverRef 是观察者，每个 observer 都包含了一个回调（函数指针），当 run loop 的状态发生变化时，观察者就能通过回调接受到这个变化。主要是用来向外界报告 run loop 当前的状态的更改。
 ```c++
 typedef struct __CFRunLoopObserver * CFRunLoopObserverRef;
 
@@ -886,8 +857,9 @@ struct __CFRunLoopObserver {
     CFRunLoopObserverContext _context; /* immutable, except invalidation */ // observer 上下文
 };
 ```
-#### CFRunLoopActivity
-&emsp;运行循环观察者活动。
+&emsp;observer 也包含一个回调函数，在监听的 run loop 状态出现时触发该回调函数。run loop 对 observer 的使用逻辑，基本与 timer 一致，都需要指定 callback 函数，然后通过 context 可传递参数。
+
+&emsp;`CFRunLoopActivity` 是一组枚举值用于表示 run loop 的活动。
 ```c++
 /* Run Loop Observer Activities */
 typedef CF_OPTIONS(CFOptionFlags, CFRunLoopActivity) {
@@ -900,18 +872,18 @@ typedef CF_OPTIONS(CFOptionFlags, CFRunLoopActivity) {
     kCFRunLoopAllActivities = 0x0FFFFFFFU
 };
 ```
-#### CFRunLoopObserverContext
+&emsp;CFRunLoopObserverContext 的定义。
 ```c++
 typedef struct {
-    CFIndex    version;
-    void *    info;
+    CFIndex version;
+    void * info;
     const void *(*retain)(const void *info);
-    void    (*release)(const void *info);
-    CFStringRef    (*copyDescription)(const void *info);
+    void (*release)(const void *info);
+    CFStringRef (*copyDescription)(const void *info);
 } CFRunLoopObserverContext;
 ```
 ### CFRunLoopTimerRef（struct \__CFRunLoopTimer *）
-&emsp;NSTimer 是与 run loop 息息相关的，CFRunLoopTimerRef 与 NSTimer 是可以 toll-free bridged（免费桥转换）的。当 timer 加到 run loop 的时候，run loop 会注册对应的触发时间点，时间到了，run loop 若处于休眠则会被唤醒，执行 timer 对应的回调函数。
+&emsp;NSTimer 是与 run loop 息息相关的，CFRunLoopTimerRef 与 NSTimer 是可以 toll-free bridged（免费桥接转换）的。当 timer 加到 run loop 的时候，run loop 会注册对应的触发时间点，时间到了，run loop 若处于休眠则会被唤醒，执行 timer 对应的回调函数。
 ```c++
 typedef struct CF_BRIDGED_MUTABLE_TYPE(NSTimer) __CFRunLoopTimer * CFRunLoopTimerRef;
 
@@ -919,8 +891,8 @@ struct __CFRunLoopTimer {
     CFRuntimeBase _base; // 所有 CF "instances" 都是从这个结构开始的
     uint16_t _bits; // 标记 timer 的状态
     pthread_mutex_t _lock; // 互斥锁
-    CFRunLoopRef _runLoop; // timer 对应的 run loop
-    CFMutableSetRef _rlModes; // timer 对应的 run loop modes
+    CFRunLoopRef _runLoop; // timer 对应的 run loop，注册在哪个 run loop 中
+    CFMutableSetRef _rlModes; // timer 对应的 run loop modes，内部保存的也是 run loop mode 的名字，也验证了 timer 可以在多个 run loop mode 中使用
     CFAbsoluteTime _nextFireDate; // timer 的下次触发时机，每次触发后都会再次设置该值
     CFTimeInterval _interval; /* immutable */
     CFTimeInterval _tolerance; /* mutable */ // timer 的允许时间偏差
@@ -930,38 +902,20 @@ struct __CFRunLoopTimer {
     // typedef void (*CFRunLoopTimerCallBack)(CFRunLoopTimerRef timer, void *info);
     CFRunLoopTimerCallBack _callout; /* immutable */ // timer 回调
     
-    CFRunLoopTimerContext _context; /* immutable, except invalidation */ // timer 上下文
+    CFRunLoopTimerContext _context; /* immutable, except invalidation */ // timer 上下文，可用于传递参数到 timer 对象的回调函数中。
 };
 ```
-#### CFRunLoopTimerContext
+&emsp;CFRunLoopTimerContext 的定义。
 ```c++
 typedef struct {
-    CFIndex    version;
-    void *    info;
+    CFIndex version;
+    void * info;
     const void *(*retain)(const void *info);
-    void    (*release)(const void *info);
-    CFStringRef    (*copyDescription)(const void *info);
+    void (*release)(const void *info);
+    CFStringRef (*copyDescription)(const void *info);
 } CFRunLoopTimerContext;
 ```
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+&emsp;本篇主要内容聚焦在 run loop 获取（查找+创建）和 run loop mode 的获取（查找+创建），并大致看下 run loop mode item: CFRunLoopSourceRef、CFRunLoopObserverRef、CFRunLoopTimerRef 的结构定义，下篇我们再详细看它们的操作。
 
 ## 参考链接
 **参考链接:🔗**
@@ -977,3 +931,4 @@ typedef struct {
 + [iOS刨根问底-深入理解RunLoop](https://www.cnblogs.com/kenshincui/p/6823841.html)
 + [RunLoop总结与面试](https://www.jianshu.com/p/3ccde737d3f3)
 + [Runloop-实际开发你想用的应用场景](https://juejin.cn/post/6889769418541252615)
++ [RunLoop 源码阅读](https://juejin.cn/post/6844903592369848328#heading-17)

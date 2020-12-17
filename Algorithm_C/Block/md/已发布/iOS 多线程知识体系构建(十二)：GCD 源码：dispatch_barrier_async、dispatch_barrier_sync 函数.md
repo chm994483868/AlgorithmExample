@@ -462,5 +462,6 @@ _dispatch_continuation_invoke_inline(dispatch_object_t dou,
 + [c/c++:计算可变参数宏 __VA_ARGS__ 的参数个数](https://blog.csdn.net/10km/article/details/80760533)
 + [OC底层探索(二十一)GCD异步、GCD同步、单例、信号量、调度组、栅栏函数等底层分析](https://blog.csdn.net/weixin_40918107/article/details/109520980)
 + [iOS源码解析: GCD的信号量semaphore](https://juejin.cn/post/6844904122370490375)
++ [深入浅出 GCD 之 dispatch_queue](https://xiaozhuanlan.com/topic/7193856240)
 
 
