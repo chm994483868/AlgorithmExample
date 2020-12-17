@@ -315,7 +315,7 @@ CFTypeID _CFRuntimeRegisterClass(const CFRuntimeClass * const cls) {
 }
 ```
 &emsp;至此 CFRunLoop 类就注册完成了。那么下面就是创建 CFRunLoop 的类实例了，使用到了 `_CFRuntimeCreateInstance` 函数，分析该函数之前我们需要先看所有 CF 类中的默认分配器 `kCFAllocatorSystemDefault`。`kCFAllocatorSystemDefault` 是一个静态全局的  struct __CFAllocator 结构体实例。下面先看一下 __CFAllocator 的定义。
-```c++
+```c++ 
 struct __CFAllocator {
     CFRuntimeBase _base; // 所有 CF "instances" 都是从这个结构开始的
 #if DEPLOYMENT_TARGET_MACOSX || DEPLOYMENT_TARGET_EMBEDDED || DEPLOYMENT_TARGET_EMBEDDED_MINI
