@@ -314,46 +314,55 @@ CFTypeID _CFRuntimeRegisterClass(const CFRuntimeClass * const cls) {
     return typeID;
 }
 ```
-&emsp;至此 CFRunLoop 类就注册完成了。那么下面就是创建 CFRunLoop 的类实例了，使用到了 `_CFRuntimeCreateInstance` 函数，分析该函数之前我们需要先看所有 CF 类中的默认分配器 `kCFAllocatorSystemDefault`。`kCFAllocatorSystemDefault` 是一个静态全局的  struct __CFAllocator 结构体实例。下面先看一下 __CFAllocator 的定义。
-```c++ 
+&emsp;至此 CFRunLoop 类就注册完成了。那么下面就是创建 CFRunLoop 的类实例了，使用到了 `_CFRuntimeCreateInstance` 函数，分析该函数之前我们需要先看所有 CF 类中的默认分配器 `kCFAllocatorSystemDefault`。`kCFAllocatorSystemDefault` 是一个指向静态全局的  struct __CFAllocator 结构体实例的指针。下面先看一下 __CFAllocator 的定义，它内部包含一堆函数指针，用来存储一堆相关的处理函数的具体实现的地址，例如 malloc、free、realloc等函数，看到它的各个成员变量和 struct _malloc_zone_t 几乎相同，struct _malloc_zone_t 的定义可在 libmalloc 中查看。
+```c++
 struct __CFAllocator {
     CFRuntimeBase _base; // 所有 CF "instances" 都是从这个结构开始的
 #if DEPLOYMENT_TARGET_MACOSX || DEPLOYMENT_TARGET_EMBEDDED || DEPLOYMENT_TARGET_EMBEDDED_MINI
-    // CFAllocator structure must match struct _malloc_zone_t! CFAllocator 结构必须匹配 struct _malloc_zone_t！
+
+    // CFAllocator structure must match struct _malloc_zone_t! 
     // The first two reserved fields in struct _malloc_zone_t are for us with CFRuntimeBase.
+    // CFAllocator 结构必须匹配 struct _malloc_zone_t!
     // struct _malloc_zone_t 中的前两个保留字段供我们使用 CFRuntimeBase. 
     
-    /* returns the size of a block or 0 if not in this zone; must be fast, especially for negative answers */
+    // 返回块的大小；如果不在此区域，则返回0；否则，返回0。必须快速，尤其是对于 negative answers
     size_t (*size)(struct _malloc_zone_t *zone, const void *ptr);
     
-    void *(*malloc)(struct _malloc_zone_t *zone, size_t size);
-    void *(*calloc)(struct _malloc_zone_t *zone, size_t num_items, size_t size); /* same as malloc, but block returned is set to zero */
-    void *(*valloc)(struct _malloc_zone_t *zone, size_t size); /* same as malloc, but block returned is set to zero and is guaranteed to be page aligned */
-    void (*free)(struct _malloc_zone_t *zone, void *ptr);
-    void *(*realloc)(struct _malloc_zone_t *zone, void *ptr, size_t size);
-    void (*destroy)(struct _malloc_zone_t *zone); /* zone is destroyed and all memory reclaimed */
-    const char *zone_name;
+    void *(*malloc)(struct _malloc_zone_t *zone, size_t size); // malloc 函数指针
+    void *(*calloc)(struct _malloc_zone_t *zone, size_t num_items, size_t size); // 与 malloc 相同，但返回的块设置为零
+    void *(*valloc)(struct _malloc_zone_t *zone, size_t size); // 与 malloc 相同，但返回的块设置为零，并保证是页面对齐的
+    void (*free)(struct _malloc_zone_t *zone, void *ptr); // 释放函数
+    void *(*realloc)(struct _malloc_zone_t *zone, void *ptr, size_t size); // 重新分配
+    void (*destroy)(struct _malloc_zone_t *zone); // 销毁 zone，所有内存被回收
+    const char *zone_name; // zone 的名字
 
-    /* Optional batch callbacks; these may be NULL */
-    unsigned (*batch_malloc)(struct _malloc_zone_t *zone, size_t size, void **results, unsigned num_requested); /* given a size, returns pointers capable of holding that size; returns the number of pointers allocated (maybe 0 or less than num_requested) */
-    void (*batch_free)(struct _malloc_zone_t *zone, void **to_be_freed, unsigned num_to_be_freed); /* frees all the pointers in to_be_freed; note that to_be_freed may be overwritten during the process */
+    
+    // 可选的批处理回调；可能为NULL
+    // 给定大小（size），返回能够保持该大小的指针；返回分配的指针数（可能为 0 或小于 num_requested）
+    //（可能与下面的 free 对应，申请一组指定大小的指针）
+    unsigned (*batch_malloc)(struct _malloc_zone_t *zone, size_t size, void **results, unsigned num_requested); 
+    
+    // 释放 to_be_freed 中的所有指针；请注意，在此过程中，to_be_freed 可能会被覆盖
+    void (*batch_free)(struct _malloc_zone_t *zone, void **to_be_freed, unsigned num_to_be_freed); 
 
     struct malloc_introspection_t *introspect;
     unsigned version;
     
-    /* aligned memory allocation. The callback may be NULL. */
+    // 对齐的内存分配。callback 可能为 NULL。
     void *(*memalign)(struct _malloc_zone_t *zone, size_t alignment, size_t size);
     
-    /* free a pointer known to be in zone and known to have the given size. The callback may be NULL. */
+    // 释放已知在区域（zone）中并且已知具有给定大小（size）的指针（ptr）。callback 可能为 NULL。
     void (*free_definite_size)(struct _malloc_zone_t *zone, void *ptr, size_t size);
 #endif
 
+    // typedef const struct __CFAllocator * CFAllocatorRef;
     CFAllocatorRef _allocator;
-    CFAllocatorContext _context;
+    CFAllocatorContext _context; // 上下文
 };
 ```
-
+&emsp;kCFAllocatorSystemDefault 是一个全局的系统默认的分配器，内部各个函数指针类型的成员变量都有具体的函数来赋值。
 ```c++
+// typedef const struct __CFAllocator * CFAllocatorRef;
 const CFAllocatorRef kCFAllocatorSystemDefault = &__kCFAllocatorSystemDefault;
 
 #if __BIG_ENDIAN__
@@ -366,28 +375,138 @@ static struct __CFAllocator __kCFAllocatorSystemDefault = {
     INIT_CFRUNTIME_BASE(), // 系统准备的默认值，用于初始化 CFRuntimeBase _base，所有 CF "instances" 都是从这个结构开始的
     
 #if DEPLOYMENT_TARGET_MACOSX || DEPLOYMENT_TARGET_EMBEDDED || DEPLOYMENT_TARGET_EMBEDDED_MINI
-    __CFAllocatorCustomSize, // static size_t __CFAllocatorCustomSize(malloc_zone_t *zone, const void *ptr) { return 0; }
-    __CFAllocatorCustomMalloc, // 
+    
+    // 下面一组固定的函数名赋值，函数都有在 CFBase.c 中有具体的实现
+    __CFAllocatorCustomSize,
+    __CFAllocatorCustomMalloc,
     __CFAllocatorCustomCalloc,
     __CFAllocatorCustomValloc,
     __CFAllocatorCustomFree,
     __CFAllocatorCustomRealloc,
     __CFAllocatorNullDestroy,
-    "kCFAllocatorSystemDefault",
-    NULL,
-    NULL,
-    &__CFAllocatorZoneIntrospect,
-    6,
+    
+    "kCFAllocatorSystemDefault", // zone_name zone 的名字
+    NULL, // 两个批处理 batch_malloc 置 NULL 
+    NULL, // batch_free 置 NULL
+    &__CFAllocatorZoneIntrospect, // 内省
+    6, // version 
     NULL,
     NULL,
 #endif
 
     NULL,    // _allocator
+    
+    // __CFAllocatorSystemAllocate 内部实现是 malloc(size)
+    // __CFAllocatorSystemReallocate 内部实现是 realloc(ptr,size)
+    // __CFAllocatorSystemDeallocate 内部实现是 free(ptr)
+    
     {0, NULL, NULL, NULL, NULL, __CFAllocatorSystemAllocate, __CFAllocatorSystemReallocate, __CFAllocatorSystemDeallocate, NULL}
 };
 ```
+&emsp;CFRunLoop 类对象和系统默认分配器都看完了，那下面三行是构建 CFRunLoop 类的实例。
+```c++
+CFRunLoopRef loop = NULL;
+uint32_t size = sizeof(struct __CFRunLoop) - sizeof(CFRuntimeBase);
+loop = (CFRunLoopRef)_CFRuntimeCreateInstance(kCFAllocatorSystemDefault, CFRunLoopGetTypeID(), size, NULL);
+```
+&emsp;下面我们分析一下 `_CFRuntimeCreateInstance` 函数，这里是 `_CFRuntimeCreateInstance` 函数的声明。
+```c++
+// 使用给定的分配器，创建由给定 CFTypeID 指定的类的新 CF 实例，并返回它。如果分配器（kCFAllocatorSystemDefault）返回 NULL，则此函数返回 NULL。
+// CFRuntimeBase 结构在返回实例的开始处初始化。
+// extraBytes 是为实例分配的额外字节数（超出 CFRuntimeBase 所需的字节数）。
+// 如果指定的 CFTypeID 对于 CF 运行时是未知的，则此函数返回 NULL。
+// 除了基址头（CFRuntimeBase）之外，新内存的任何部分都没有初始化（例如，多余的字节不归零）。
+// 使用此函数创建的所有实例只能通过使用 CFRelease() 函数来销毁——不能直接使用 CFAllocatorDeallocate() 销毁实例，即使在类的初始化或创建函数中也是如此。 为 category 参数传递NULL。
 
-
+CF_EXPORT CFTypeRef _CFRuntimeCreateInstance(CFAllocatorRef allocator, CFTypeID typeID, CFIndex extraBytes, unsigned char *category);
+```
+&emsp;`_CFRuntimeCreateInstance` 函数很长，下面对它进行详细分析。
+```c++
+CFTypeRef _CFRuntimeCreateInstance(CFAllocatorRef allocator, CFTypeID typeID, CFIndex extraBytes, unsigned char *category) {
+    // #define HALT do { DebugBreak(); abort(); __builtin_unreachable(); } while (0)
+    // 如果入参 typeID 超过的类表的总长度，则直接中止程序运行
+    if (__CFRuntimeClassTableSize <= typeID) HALT;
+    
+    // 断言，typeID 不等于 0。（0 表示未初始化的类型ID）
+    CFAssert1(typeID != _kCFRuntimeNotATypeID, __kCFLogAssertion, "%s(): Uninitialized type id", __PRETTY_FUNCTION__);
+    
+    // 根据 typeID 从类表中找到类对象的指针
+    CFRuntimeClass *cls = __CFRuntimeClassTable[typeID];
+    
+    // 如果类指针为 NULl 则返回 NULL
+    if (NULL == cls) {
+        return NULL;
+    }
+    
+    // 
+    if (cls->version & _kCFRuntimeRequiresAlignment) {
+        allocator = kCFAllocatorSystemDefault;
+    }
+    
+    Boolean customRC = !!(cls->version & _kCFRuntimeCustomRefCount);
+    if (customRC && !cls->refcount) {
+        CFLog(kCFLogLevelWarning, CFSTR("*** _CFRuntimeCreateInstance() found inconsistent class '%s'."), cls->className);
+        return NULL;
+    }
+    CFAllocatorRef realAllocator = (NULL == allocator) ? __CFGetDefaultAllocator() : allocator;
+    if (kCFAllocatorNull == realAllocator) {
+    return NULL;
+    }
+    Boolean usesSystemDefaultAllocator = _CFAllocatorIsSystemDefault(realAllocator);
+    size_t align = (cls->version & _kCFRuntimeRequiresAlignment) ? cls->requiredAlignment : 16;
+    CFIndex size = sizeof(CFRuntimeBase) + extraBytes + (usesSystemDefaultAllocator ? 0 : sizeof(CFAllocatorRef));
+    size = (size + 0xF) & ~0xF;    // CF objects are multiples of 16 in size
+    // CFType version 0 objects are unscanned by default since they don't have write-barriers and hard retain their innards
+    // CFType version 1 objects are scanned and use hand coded write-barriers to store collectable storage within
+    CFRuntimeBase *memory = NULL;
+    if (cls->version & _kCFRuntimeRequiresAlignment) {
+        memory = malloc_zone_memalign(malloc_default_zone(), align, size);
+    } else {
+        memory = (CFRuntimeBase *)CFAllocatorAllocate(allocator, size, CF_GET_COLLECTABLE_MEMORY_TYPE(cls));
+    }
+    if (NULL == memory) {
+    return NULL;
+    }
+    if (!kCFUseCollectableAllocator || !CF_IS_COLLECTABLE_ALLOCATOR(allocator) || !(CF_GET_COLLECTABLE_MEMORY_TYPE(cls) & __kCFAllocatorGCScannedMemory)) {
+    memset(memory, 0, size);
+    }
+    if (__CFOASafe && category) {
+    __CFSetLastAllocationEventName(memory, (char *)category);
+    } else if (__CFOASafe) {
+    __CFSetLastAllocationEventName(memory, (char *)cls->className);
+    }
+    if (!usesSystemDefaultAllocator) {
+        // add space to hold allocator ref for non-standard allocators.
+        // (this screws up 8 byte alignment but seems to work)
+    *(CFAllocatorRef *)((char *)memory) = (CFAllocatorRef)CFRetain(realAllocator);
+    memory = (CFRuntimeBase *)((char *)memory + sizeof(CFAllocatorRef));
+    }
+    uint32_t rc = 0;
+#if __LP64__
+    if (!kCFUseCollectableAllocator || (1 && 1)) {
+        memory->_rc = 1;
+    }
+    if (customRC) {
+        memory->_rc = 0xFFFFFFFFU;
+        rc = 0xFF;
+    }
+#else
+    if (!kCFUseCollectableAllocator || (1 && 1)) {
+        rc = 1;
+    }
+    if (customRC) {
+        rc = 0xFF;
+    }
+#endif
+    uint32_t *cfinfop = (uint32_t *)&(memory->_cfinfo);
+    *cfinfop = (uint32_t)((rc << 24) | (customRC ? 0x800000 : 0x0) | ((uint32_t)typeID << 8) | (usesSystemDefaultAllocator ? 0x80 : 0x00));
+    memory->_cfisa = 0;
+    if (NULL != cls->init) {
+    (cls->init)(memory);
+    }
+    return memory;
+}
+```
 &emsp;下面看两个超级重要的函数（其实是一个函数），获取主线程的 run loop 和获取当前线程（子线程）的 run loop。
 ### CFRunLoopGetMain/CFRunLoopGetCurrent
 &emsp;`CFRunLoopGetMain/CFRunLoopGetCurrent` 函数可分别用于获取主线程的 run loop 和获取当前线程（子线程）的 run loop。main run loop 使用一个静态变量 \__main 存储，子线程的 run loop 会保存在当前线程的 TSD 中。两者在第一次获取 run loop 时都会调用 \_CFRunLoopGet0 函数根据线程的 pthread_t 对象从静态全局变量 \__CFRunLoops（static CFMutableDictionaryRef）中获取，如果获取不到的话则新建 run loop 对象，并根据线程的 pthread_t 保存在静态全局变量 \__CFRunLoops（static CFMutableDictionaryRef）中，方便后续读取。
@@ -654,27 +773,6 @@ static CFRunLoopRef __CFRunLoopCreate(pthread_t t) {
 }
 ```
 &emsp;`__CFRunLoopCreate` 函数整体看下来涉及的细节和函数调用还挺多的。首先是 `_CFRuntimeCreateInstance` 函数调用中的参数：`CFRunLoopGetTypeID()` 该函数内部使用全局只会进行一次的在 Core Foundation 运行时中为我们注册两个类 run loop（CFRunLoop）和 run loop mode（CFRunLoopMode），并返回 `__kCFRunLoopTypeID` 指定 `_CFRuntimeCreateInstance` 函数构建的是 CFRunLoop 的实例。
-
-&emsp;这里我们仅看一下 `_CFRuntimeCreateInstance` 函数的声明好了。（定义也是开源的但是实在太长了，😣）
-```c++
-// 使用给定的分配器，创建由给定 CFTypeID 指定的类的新 CF 实例，并返回它。如果分配器（kCFAllocatorSystemDefault）返回 NULL，则此函数返回 NULL。
-// CFRuntimeBase 结构在返回实例的开始处初始化。
-// extraBytes 是为实例分配的额外字节数（超出 CFRuntimeBase 所需的字节数）。
-// 如果指定的 CFTypeID 对于 CF 运行时是未知的，则此函数返回 NULL。
-// 除了基址头（CFRuntimeBase）之外，新内存的任何部分都没有初始化（例如，多余的字节不归零）。
-// 使用此函数创建的所有实例只能通过使用 CFRelease() 函数来销毁——不能直接使用 CFAllocatorDeallocate() 销毁实例，即使在类的初始化或创建函数中也是如此。 为 category 参数传递NULL。
-
-// loop = (CFRunLoopRef)_CFRuntimeCreateInstance(kCFAllocatorSystemDefault, CFRunLoopGetTypeID(), size, NULL);
-CF_EXPORT CFTypeRef _CFRuntimeCreateInstance(CFAllocatorRef allocator, CFTypeID typeID, CFIndex extraBytes, unsigned char *category);
-```
-&emsp;kCFAllocatorSystemDefault 是一个静态全局的 struct \__CFAllocator 实例。所有的 CF 实例创建时都共用此分配器，这里不再展开了，源码都比较清晰，这里我们暂时先关注到 run loop 对象的 `CFRuntimeBase _base` 被初始化 `INIT_CFRUNTIME_BASE`。
-```c++
-#if __BIG_ENDIAN__
-#define INIT_CFRUNTIME_BASE(...) {0, {0, 0, 0, 0x80}}
-#else
-#define INIT_CFRUNTIME_BASE(...) {0, {0x80, 0, 0, 0}}
-#endif
-```
 
 &emsp;然后 run loop 的实例 loop 创建好以后是对 loop 的一些成员变量进行初始化。
 + 初始化 loop 的 `_perRunData`。
