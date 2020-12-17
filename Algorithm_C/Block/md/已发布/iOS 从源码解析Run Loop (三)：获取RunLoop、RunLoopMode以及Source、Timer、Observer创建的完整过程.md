@@ -1,6 +1,7 @@
 # iOS 从源码解析Run Loop (三)：获取RunLoop、RunLoopMode以及Source、Timer、Observer创建的完整过程
 
 > &emsp;CFRunLoop.h 文件是 run loop 在 Core Foundation 下的最重要的头文件，与我们前面学习的 Cocoa Foundation 下的 NSRunLoop.h 文件相对应。NSRunLoop 的内容也正是对 \__CFRunLoop 的面向对象的简单封装，CFRunLoop.h 文件包含更多 run loop 的操作以及 run loop 涉及的部分底层数据结构的声明，\__CFRunLoop 结构则是 run loop 在 Core Foundation 下 C 语言的实现。本篇以 CFRunLoop.h 文件为入口通过 Apple 开源的 CF-1151.16 来深入学习 run loop。⛽️⛽️
+
 ## CFRunLoop Overview
 &emsp;CFRunLoop 对象监视任务的输入源（sources of input），并在准备好进行处理时调度控制。输入源（input sources）的示例可能包括用户输入设备、网络连接、周期性或延时事件以及异步回调。
 
@@ -10,7 +11,7 @@
 
 &emsp;Core Foundation 定义了一种特殊的伪模式（pseudo-mode），称为 common modes，允许你将多个 mode 与给定的 source、timer 或 observer 关联起来。要指定 common modes，请在配置对象时为 mode 使用 kCFRunLoopCommonModes 常量。每个 run loop 都有自己独立的 set of common modes，默认 mode（kCFRunlopDefaultMode）始终是该 set 的成员。要向 set of common modes 添加 mode，请使用 `CFRunLoopAddCommonMode` 函数。
 
-&emsp;每个线程只有一个 run loop。既不能创建（系统帮创建，不需要开发者自己手动创建）也不能销毁线程的 run loop。Core Foundation 会根据需要自动为你创建它。使用 `CFRunLoopGetCurrent` 获取当前线程的 run loop。调用 `CFRunLoopRun` 以默认模式运行当前线程的 run loop，直到 run loop 被 `CFRunLoopStop` 停止。也可以调用 `CFRunLoopRunInMode` 以指定的 mode 运行当前线程的 run loop 一段时间（或直到 run loop 停止）。只有在请求的模式至少有一个要监视的 source 或 timer 时，才能运行 run loop。
+&emsp;每个线程只有一个 run loop。既不能创建（系统帮创建，不需要开发者自己手动创建）也不能销毁线程的 run loop（线程销毁时同时也会通过 TSD 使其对应的 run loop 销毁）。Core Foundation 会根据需要自动为你创建它。使用 `CFRunLoopGetCurrent` 获取当前线程的 run loop。调用 `CFRunLoopRun` 以默认模式运行当前线程的 run loop，直到 run loop 被 `CFRunLoopStop` 停止。也可以调用 `CFRunLoopRunInMode` 以指定的 mode 运行当前线程的 run loop 一段时间（或直到 run loop 停止）。只有在请求的模式至少有一个要监视的 source 或 timer 时，才能运行 run loop。
 
 &emsp;Run loop 可以递归运行。你可以从任何运行循环 callout 中调用 `CFRunLoopRun` 或 `CFRunLoopRunInMode`，并在当前线程的调用堆栈上创建嵌套的运行循环激活（run loop activations）。在调用中可以运行的 modes 不受限制。你可以创建另一个在任何可用的运行循环模式下运行的运行循环激活，包括调用堆栈中已经运行的任何模式。（You can create another run loop activation running in any available run loop mode, including any modes already running higher in the call stack.）
 
@@ -18,14 +19,14 @@
 
 &emsp;有关 run loop 的行为的更多信息，请参见 Threading Programming Guide 中的 Run Loops。（即上篇内容）
 
-&emsp;以上是 CFRunLoop 文档的综述，估计对大家而言都是老生常谈的内容了。下面我们则深入源码，看看在代码层面是如何构建 run loop 体系的。
+&emsp;以上是 CFRunLoop 文档的综述，估计对大家而言都是老生常谈的内容了。下面我们则深入源码，看看在代码层面是如何构建 run loop 体系的，即上面的一系列 run loop 概念内容与 run loop 源码实现是一一对应的，下面我们就从代码角度来理解 run loop 概念。
 
 &emsp;Core Foundation 中的 CFRunLoop 都是 C API，提供了 run loop 相当丰富的接口，且都是线程安全的，NSRunLoop 是对 CFRunLoopRef 的封装，提供了面向对象的 API，非线程安全的。使用 NSRunLoop 的 `getCFRunLoop` 方法即可获取相应的 `CFRunLoopRef` 类型。
 
 &emsp;下面我们对 Cocoa Foundation 和 Core Foundation 之间区别做一些拓展。
 
-> &emsp;Core Foundation 框架 (CoreFoundation.framework) 是一组 C 语言接口，它们为 iOS 应用程序提供基本数据管理和服务功能。该框架支持进行管理的数据以及可提供的服务：群体数据类型 (数组、集合等)、程序包、字符串管理、日期和时间管理、原始数据块管理、偏好管理、URL及数据流操作、线程和RunLoop、端口和soket通讯。
-> &emsp;Core Foundation 框架和 Cocoa Foundation 框架紧密相关，它们为相同功能提供接口，但Cocoa Foundation 框架提供 Objective-C 接口。如果你将 Cocoa Foundation 对象和 Core Foundation 类型掺杂使用，则可利用两个框架之间的 “toll-free bridging”。所谓的 Toll-free bridging 是说你可以在某个框架的方法或函数同时使用 Core Foundatio 和 Cocoa Foundation 框架中的某些类型。很多数据类型支持这一特性，其中包括群体和字符串数据类型。每个框架的类和类型描述都会对某个对象是否为 toll-free bridged，应和什么对象桥接进行说明。
+> &emsp;Core Foundation 框架 (CoreFoundation.framework) 是一组 C 语言接口，它们为 iOS 应用程序提供基本数据管理和服务功能。该框架支持进行管理的数据以及可提供的服务：群体数据类型 (数组、集合等)、程序包、字符串管理、日期和时间管理、原始数据块管理、偏好管理、URL 及数据流操作、线程和 Run Loop、端口和 soket 通讯。
+> &emsp;Core Foundation 框架和 Cocoa Foundation 框架紧密相关，它们为相同功能提供接口，但 Cocoa Foundation 框架提供 Objective-C 接口。如果你将 Cocoa Foundation 对象和 Core Foundation 类型掺杂使用，则可利用两个框架之间的 “toll-free bridging”。所谓的 Toll-free bridging 是说你可以在某个框架的方法或函数同时使用 Core Foundatio 和 Cocoa Foundation 框架中的某些类型。很多数据类型支持这一特性，其中包括群体和字符串数据类型。每个框架的类和类型描述都会对某个对象是否为 toll-free bridged，应和什么对象桥接进行说明。
 >
 > &emsp;下面看一下Objective-C 指针与 Core Foundation 指针之间的转换规则：
 >
@@ -138,17 +139,6 @@ struct __CFString {
         struct __inline1 {
     ...
 };
-
-struct __CFDate {
-    CFRuntimeBase _base;
-    CFAbsoluteTime _time;       /* immutable */
-};
-
-struct __CFURL {
-    CFRuntimeBase _cfBase;
-    UInt32 _flags;
-    ...
-};
 ```
 #### \_per_run_data
 &emsp;重置 run loop 时用的数据结构，每次 run loop 运行后都会重置 \_perRunData 的值。
@@ -168,12 +158,235 @@ struct _block_item {
     
     // typedef const void * CFTypeRef; 
     // CFString 或 CFSet 类型，也就是说一个 block 可能对应单个或多个 mode 
-    CFTypeRef _mode;    // CFString or CFSet
+    CFTypeRef _mode; // CFString or CFSet
     
     void (^_block)(void); // 真正要执行的 block 本体
 };
 ```
 &emsp;上面是 CFRunLoopRef 涉及的相关数据结构，特别是其中与 mode 相关的 \_modes、\_commonModes、\_commonModeItems 三个成员变量都是  CFMutableSetRef 可变集合类型，也正对应了前面的一些结论，一个 run loop 对应多个 mode，一个 mode 下可以包含多个 modeItem（更详细的内容在下面的 \__CFRunLoopMode 结构中）。既然 run loop 包含多个 mode 那么它定可以在不同的 mode 下运行，run loop 一次只能在一个 mode 下运行，如果想要切换 mode，只能退出 run loop，然后再根据指定的 mode 运行 run loop，这样可以是使不同的 mode 下的 modeItem 相互隔离，不会相互影响。
+
+&emsp;下面我们需要从 Cocoa Foundation 的 runtime 的角度来理解 Core Foundation 中的 "类" 和 "对象" 是如何构建的。
+
+&emsp;首先在 Core Foundation 中所有的 "类对象" 都是一个静态全局 const 变量，然后所有的 "类对象" 会动态注册在 Core Foundation 的一个全局 "类表" 中，同时每个 "类" 还有一个对应的静态全局变量的索引，当 "类" 注册完成时会为其赋值，以后都用其从 "类表" 中读取 "类对象"，然后我们可以使用 "类对象" 构建对应的 "类的对象（类的实例）"。
+
+&emsp;CFRuntimeClass 是 Core Foundation 的 "基类"。`version` 字段表示不同的版本，系统有固定的 4 个枚举值。下面先看 CFRuntimeClass 的声明，然后我们再看 Core Foundation 中的 CFRunLoop 类对象，会以 CFRunLoop 类注册为例进行验证。
+```c++
+enum { // Version field constants
+    _kCFRuntimeScannedObject =     (1UL << 0),
+    _kCFRuntimeResourcefulObject = (1UL << 2),  // tells CFRuntime to make use of the reclaim field 标示 CFRuntime 可使用 __CFRuntimeClass 的 reclaim 字段
+    _kCFRuntimeCustomRefCount =    (1UL << 3),  // tells CFRuntime to make use of the refcount field 标示 CFRuntime 可使用 __CFRuntimeClass 的 refcount 字段
+    _kCFRuntimeRequiresAlignment = (1UL << 4),  // tells CFRuntime to make use of the requiredAlignment field 标示 CFRuntime 可使用 __CFRuntimeClass 的 requiredAlignment 字段
+};
+
+typedef struct __CFRuntimeClass {
+    CFIndex version; // 位标记值，该字段不同的位代表不同的含义
+    const char *className; // must be a pure ASCII string, nul-terminated 类名
+    void (*init)(CFTypeRef cf); // 初始化函数
+    CFTypeRef (*copy)(CFAllocatorRef allocator, CFTypeRef cf); // copy 函数
+    void (*finalize)(CFTypeRef cf); // 释放内存时的清理函数，同 C++ 的析构函数，同 OC 的 dealloc 函数
+    Boolean (*equal)(CFTypeRef cf1, CFTypeRef cf2); // 判等
+    CFHashCode (*hash)(CFTypeRef cf); // 哈希函数
+    CFStringRef (*copyFormattingDesc)(CFTypeRef cf, CFDictionaryRef formatOptions);    // return str with retain
+    CFStringRef (*copyDebugDesc)(CFTypeRef cf);    // return str with retain
+
+#define CF_RECLAIM_AVAILABLE 1
+    // 当 version 字段值和 _kCFRuntimeResourcefulObject 与操作为真时，指示应使用此字段。
+    void (*reclaim)(CFTypeRef cf); // Or in _kCFRuntimeResourcefulObject in the .version to indicate this field should be used
+
+#define CF_REFCOUNT_AVAILABLE 1
+    // 当 version 字段值和 _kCFRuntimeCustomRefCount 与操作为真时，指示应使用此字段。
+    
+    // 当 version 字段值和 _kCFRuntimeCustomRefCount 与操作为真时，此字段必须为非 NULL。
+    // - 如果回调在 'op' 中传递 1，则应增加 'cf' 的引用计数并返回0
+    // - 如果回调在 'op' 中传递了 0，则应返回 'cf' 的引用计数，最多 32 位
+    // - 如果回调在 'op' 中传递 -1，则应减少 'cf' 的引用计数；
+    // 如果现在为零，则应清理并释放'cf'（除非该进程在 GC 下运行，并且 CF 不会为你分配内存，否则不会调用上述 finalize 回调；如果在 GC 下运行，则 finalize 应该执行拆除对象并释放对象内存）；然后返回0
+    // 记住要使用饱和算术逻辑并在 ref 计数达到 UINT32_MAX 时停止递增和递减，否则你将遇到安全漏洞
+    // 请记住，引用计数的递增/递减必须线程安全/原子地完成
+    // 类创建函数应使用自定义引用计数 1 创建/初始化对象
+    // 不要尝试将 CFRuntimeBase 中的任何位用于你的引用计数；将其存储在 CF 对象的其他字段中。
+    
+    uint32_t (*refcount)(intptr_t op, CFTypeRef cf); // Or in _kCFRuntimeCustomRefCount in the .version to indicate this field should be used
+    
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmissing-field-initializers"
+#define CF_REQUIRED_ALIGNMENT_AVAILABLE 1
+    // 当 version 字段值和 _kCFRuntimeRequiresAlignment 与操作为真时，指示应使用此字段。
+    
+    // 在这种情况下，_CFRuntimeCreateInstance() 的分配器将被忽略；如果这小于系统支持的最小对齐方式，则将获得更高的对齐方式；
+    // 如果这不是系统支持的对齐方式（例如，大多数系统仅支持 2 的幂，或者如果它太高），则结果（结果）将取决于 CF 或系统决定。
+    uintptr_t requiredAlignment; // Or in _kCFRuntimeRequiresAlignment in the .version field to indicate this field should be used; 
+
+} CFRuntimeClass;
+```
+&emsp;全局搜 `static const CFRuntimeClass` 可看到一众 Core Foundation 下的 "类对象"，如 \__CFArrayClass、\__CFDateClass、\__CFSetClass、\__CFStringClass 等等。\__CFRunLoopClass 是 CFRunLoop "类对象"。
+```c++
+static const CFRuntimeClass __CFRunLoopClass = {
+    0,
+    "CFRunLoop",
+    NULL,      // init
+    NULL,      // copy
+    __CFRunLoopDeallocate, // void (*finalize)(CFTypeRef cf) finalize 函数
+    NULL,
+    NULL,
+    NULL,
+    __CFRunLoopCopyDescription
+};
+```
+&emsp;可看到 \__CFRunLoopClass 变量是一个 CFRuntimeClass 结构体实例，`className` 是 `CFRunLoop`。
+
+&emsp;`_CFRuntimeRegisterClass` 函数把指定的类对象注册到 Core Foundation 的静态全局 "类表" 中，全局搜索 `_CFRuntimeRegisterClass` 函数可看到每个它的调用都被包裹在 `dispatch_once` 中，保证每个 "类" 全局注册一次。我们以 \__CFRunLoopClass 类为例继续向下看。
+```c++
+#if __LLP64__
+typedef unsigned long long CFTypeID;
+#else
+typedef unsigned long CFTypeID;
+#endif
+
+// __kCFRunLoopTypeID __kCFRunLoopModeTypeID 初始值都是 0，当执行 CFRunLoopGetTypeID 函数后，会被重新赋值
+static CFTypeID __kCFRunLoopModeTypeID = _kCFRuntimeNotATypeID;
+static CFTypeID __kCFRunLoopTypeID = _kCFRuntimeNotATypeID;
+enum {
+    _kCFRuntimeNotATypeID = 0
+};
+
+CFTypeID CFRunLoopGetTypeID(void) {
+    static dispatch_once_t initOnce;
+    dispatch_once(&initOnce, ^{ 
+        __kCFRunLoopTypeID = _CFRuntimeRegisterClass(&__CFRunLoopClass); 
+        __kCFRunLoopModeTypeID = _CFRuntimeRegisterClass(&__CFRunLoopModeClass); 
+    });
+    return __kCFRunLoopTypeID;
+}
+```
+&emsp;`CFRunLoopGetTypeID` 函数内部完成了 CFRunLoop 和 CFRunLoopMode 类的注册，\__kCFRunLoopTypeID 和 \__kCFRunLoopModeTypeID 都是静态全局变量，分别是它们在类表中的索引，后续构建 CFRunLoop 实例时，都通过 \__kCFRunLoopTypeID 去类表中查找 "类对象"。下面我们看一下 `_CFRuntimeRegisterClass` 函数。
+```c++
+CFTypeID _CFRuntimeRegisterClass(const CFRuntimeClass * const cls) {
+    // className must be pure ASCII string, non-null
+    // 一组判断
+    
+    // 类对象 version 字段中 _kCFRuntimeCustomRefCount 位为真但是 refcount 字段不存在则返回 _kCFRuntimeNotATypeID。（0）
+    if ((cls->version & _kCFRuntimeCustomRefCount) && !cls->refcount) {
+       CFLog(kCFLogLevelWarning, CFSTR("*** _CFRuntimeRegisterClass() given inconsistent class '%s'.  Program will crash soon."), cls->className);
+       return _kCFRuntimeNotATypeID;
+    }
+    
+    // 在 DEPLOYMENT_TARGET_MACOSX，macOS 下 __CFBigRuntimeFunnel 互斥锁。
+    // #define CFLockInit ((pthread_mutex_t)PTHREAD_ERRORCHECK_MUTEX_INITIALIZER)
+    // static CFLock_t __CFBigRuntimeFunnel = CFLockInit;
+    // #define __CFLock(LP) ({ (void)pthread_mutex_lock(LP); })
+    
+    // 加锁
+    __CFLock(&__CFBigRuntimeFunnel);
+    
+    // CF_PRIVATE int32_t __CFRuntimeClassTableCount = 0; // 每次用新类注册就递增
+    // #define __CFMaxRuntimeTypes    65535 // 
+    if (__CFMaxRuntimeTypes <= __CFRuntimeClassTableCount) {
+        CFLog(kCFLogLevelWarning, CFSTR("*** CoreFoundation class table full; registration failing for class '%s'.  Program will crash soon."), cls->className);
+        
+        // 如果类表满了，则解锁并返回 _kCFRuntimeNotATypeID
+        __CFUnlock(&__CFBigRuntimeFunnel);
+        return _kCFRuntimeNotATypeID;
+    }
+    
+    // #define __CFRuntimeClassTableSize 1024  // 1024 和 65535，那最大只能注册 1024 个类
+    if (__CFRuntimeClassTableSize <= __CFRuntimeClassTableCount) {
+        CFLog(kCFLogLevelWarning, CFSTR("*** CoreFoundation class table full; registration failing for class '%s'.  Program will crash soon."), cls->className);
+        
+        // 如果类表满了，则解锁并返回 _kCFRuntimeNotATypeID
+        __CFUnlock(&__CFBigRuntimeFunnel);
+        return _kCFRuntimeNotATypeID;
+    }
+    
+    // 全局类表，是一个长度为 1024 的 CFRuntimeClass 指针的数组
+    // CF_PRIVATE CFRuntimeClass * __CFRuntimeClassTable[__CFRuntimeClassTableSize] = {0};
+    
+    // 然后直接把类对象的地址放在数组里面，并 __CFRuntimeClassTableCount 自增
+    __CFRuntimeClassTable[__CFRuntimeClassTableCount++] = (CFRuntimeClass *)cls;
+    
+    // typeID 就是入参类 cls 在类表中索引 
+    CFTypeID typeID = __CFRuntimeClassTableCount - 1;
+    
+    // 解锁
+    __CFUnlock(&__CFBigRuntimeFunnel);
+    
+    // 返回入参 cls 在类表中索引 
+    return typeID;
+}
+```
+&emsp;至此 CFRunLoop 类就注册完成了。那么下面就是创建 CFRunLoop 的类实例了，使用到了 `_CFRuntimeCreateInstance` 函数，分析该函数之前我们需要先看所有 CF 类中的默认分配器 `kCFAllocatorSystemDefault`。`kCFAllocatorSystemDefault` 是一个静态全局的  struct __CFAllocator 结构体实例。下面先看一下 __CFAllocator 的定义。
+```c++
+struct __CFAllocator {
+    CFRuntimeBase _base; // 所有 CF "instances" 都是从这个结构开始的
+#if DEPLOYMENT_TARGET_MACOSX || DEPLOYMENT_TARGET_EMBEDDED || DEPLOYMENT_TARGET_EMBEDDED_MINI
+    // CFAllocator structure must match struct _malloc_zone_t! CFAllocator 结构必须匹配 struct _malloc_zone_t！
+    // The first two reserved fields in struct _malloc_zone_t are for us with CFRuntimeBase.
+    // struct _malloc_zone_t 中的前两个保留字段供我们使用 CFRuntimeBase. 
+    
+    /* returns the size of a block or 0 if not in this zone; must be fast, especially for negative answers */
+    size_t (*size)(struct _malloc_zone_t *zone, const void *ptr);
+    
+    void *(*malloc)(struct _malloc_zone_t *zone, size_t size);
+    void *(*calloc)(struct _malloc_zone_t *zone, size_t num_items, size_t size); /* same as malloc, but block returned is set to zero */
+    void *(*valloc)(struct _malloc_zone_t *zone, size_t size); /* same as malloc, but block returned is set to zero and is guaranteed to be page aligned */
+    void (*free)(struct _malloc_zone_t *zone, void *ptr);
+    void *(*realloc)(struct _malloc_zone_t *zone, void *ptr, size_t size);
+    void (*destroy)(struct _malloc_zone_t *zone); /* zone is destroyed and all memory reclaimed */
+    const char *zone_name;
+
+    /* Optional batch callbacks; these may be NULL */
+    unsigned (*batch_malloc)(struct _malloc_zone_t *zone, size_t size, void **results, unsigned num_requested); /* given a size, returns pointers capable of holding that size; returns the number of pointers allocated (maybe 0 or less than num_requested) */
+    void (*batch_free)(struct _malloc_zone_t *zone, void **to_be_freed, unsigned num_to_be_freed); /* frees all the pointers in to_be_freed; note that to_be_freed may be overwritten during the process */
+
+    struct malloc_introspection_t *introspect;
+    unsigned version;
+    
+    /* aligned memory allocation. The callback may be NULL. */
+    void *(*memalign)(struct _malloc_zone_t *zone, size_t alignment, size_t size);
+    
+    /* free a pointer known to be in zone and known to have the given size. The callback may be NULL. */
+    void (*free_definite_size)(struct _malloc_zone_t *zone, void *ptr, size_t size);
+#endif
+
+    CFAllocatorRef _allocator;
+    CFAllocatorContext _context;
+};
+```
+
+```c++
+const CFAllocatorRef kCFAllocatorSystemDefault = &__kCFAllocatorSystemDefault;
+
+#if __BIG_ENDIAN__
+#define INIT_CFRUNTIME_BASE(...) {0, {0, 0, 0, 0x80}}
+#else
+#define INIT_CFRUNTIME_BASE(...) {0, {0x80, 0, 0, 0}}
+#endif
+
+static struct __CFAllocator __kCFAllocatorSystemDefault = {
+    INIT_CFRUNTIME_BASE(), // 系统准备的默认值，用于初始化 CFRuntimeBase _base，所有 CF "instances" 都是从这个结构开始的
+    
+#if DEPLOYMENT_TARGET_MACOSX || DEPLOYMENT_TARGET_EMBEDDED || DEPLOYMENT_TARGET_EMBEDDED_MINI
+    __CFAllocatorCustomSize, // static size_t __CFAllocatorCustomSize(malloc_zone_t *zone, const void *ptr) { return 0; }
+    __CFAllocatorCustomMalloc, // 
+    __CFAllocatorCustomCalloc,
+    __CFAllocatorCustomValloc,
+    __CFAllocatorCustomFree,
+    __CFAllocatorCustomRealloc,
+    __CFAllocatorNullDestroy,
+    "kCFAllocatorSystemDefault",
+    NULL,
+    NULL,
+    &__CFAllocatorZoneIntrospect,
+    6,
+    NULL,
+    NULL,
+#endif
+
+    NULL,    // _allocator
+    {0, NULL, NULL, NULL, NULL, __CFAllocatorSystemAllocate, __CFAllocatorSystemReallocate, __CFAllocatorSystemDeallocate, NULL}
+};
+```
+
 
 &emsp;下面看两个超级重要的函数（其实是一个函数），获取主线程的 run loop 和获取当前线程（子线程）的 run loop。
 ### CFRunLoopGetMain/CFRunLoopGetCurrent
