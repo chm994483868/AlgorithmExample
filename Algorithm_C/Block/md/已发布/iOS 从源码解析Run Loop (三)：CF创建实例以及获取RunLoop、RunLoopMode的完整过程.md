@@ -1,4 +1,4 @@
-# iOS 从源码解析Run Loop (三)：获取RunLoop、RunLoopMode以及Source、Timer、Observer创建的完整过程
+# iOS 从源码解析Run Loop (三)：CF创建实例以及获取RunLoop、RunLoopMode的完整过程
 
 > &emsp;CFRunLoop.h 文件是 run loop 在 Core Foundation 下的最重要的头文件，与我们前面学习的 Cocoa Foundation 下的 NSRunLoop.h 文件相对应。NSRunLoop 的内容也正是对 \__CFRunLoop 的面向对象的简单封装，CFRunLoop.h 文件包含更多 run loop 的操作以及 run loop 涉及的部分底层数据结构的声明，\__CFRunLoop 结构则是 run loop 在 Core Foundation 下 C 语言的实现。本篇以 CFRunLoop.h 文件为入口通过 Apple 开源的 CF-1151.16 来深入学习 run loop。⛽️⛽️
 
@@ -123,7 +123,7 @@ struct __CFRunLoop {
 ```c++
 typedef struct __CFRuntimeBase {
     uintptr_t _cfisa; // 类型
-    uint8_t _cfinfo[4]; // 表示 run loop 状态如：Sleeping/Deallocating
+    uint8_t _cfinfo[4]; // 表示 run loop 状态如：Sleeping/Deallocating 等等很多信息
 #if __LP64__
     uint32_t _rc; // 引用计数
 #endif
@@ -165,10 +165,11 @@ struct _block_item {
 ```
 &emsp;上面是 CFRunLoopRef 涉及的相关数据结构，特别是其中与 mode 相关的 \_modes、\_commonModes、\_commonModeItems 三个成员变量都是  CFMutableSetRef 可变集合类型，也正对应了前面的一些结论，一个 run loop 对应多个 mode，一个 mode 下可以包含多个 modeItem（更详细的内容在下面的 \__CFRunLoopMode 结构中）。既然 run loop 包含多个 mode 那么它定可以在不同的 mode 下运行，run loop 一次只能在一个 mode 下运行，如果想要切换 mode，只能退出 run loop，然后再根据指定的 mode 运行 run loop，这样可以是使不同的 mode 下的 modeItem 相互隔离，不会相互影响。
 
+## CF 中的 "Class" 和 Instances
 &emsp;下面我们需要从 Cocoa Foundation 的 runtime 的角度来理解 Core Foundation 中的 "类" 和 "对象" 是如何构建的。
 
 &emsp;首先在 Core Foundation 中所有的 "类对象" 都是一个静态全局 const 变量，然后所有的 "类对象" 会动态注册在 Core Foundation 的一个全局 "类表" 中，同时每个 "类" 还有一个对应的静态全局变量的索引，当 "类" 注册完成时会为其赋值，以后都用其从 "类表" 中读取 "类对象"，然后我们可以使用 "类对象" 构建对应的 "类的对象（类的实例）"。
-
+### CFRuntimeClass
 &emsp;CFRuntimeClass 是 Core Foundation 的 "基类"。`version` 字段表示不同的版本，系统有固定的 4 个枚举值。下面先看 CFRuntimeClass 的声明，然后我们再看 Core Foundation 中的 CFRunLoop 类对象，会以 CFRunLoop 类注册为例进行验证。
 ```c++
 enum { // Version field constants
@@ -181,13 +182,18 @@ enum { // Version field constants
 typedef struct __CFRuntimeClass {
     CFIndex version; // 位标记值，该字段不同的位代表不同的含义
     const char *className; // must be a pure ASCII string, nul-terminated 类名
+    
+    // typedef const void * CFTypeRef;
     void (*init)(CFTypeRef cf); // 初始化函数
     CFTypeRef (*copy)(CFAllocatorRef allocator, CFTypeRef cf); // copy 函数
     void (*finalize)(CFTypeRef cf); // 释放内存时的清理函数，同 C++ 的析构函数，同 OC 的 dealloc 函数
     Boolean (*equal)(CFTypeRef cf1, CFTypeRef cf2); // 判等
     CFHashCode (*hash)(CFTypeRef cf); // 哈希函数
-    CFStringRef (*copyFormattingDesc)(CFTypeRef cf, CFDictionaryRef formatOptions);    // return str with retain
-    CFStringRef (*copyDebugDesc)(CFTypeRef cf);    // return str with retain
+    
+    // 这里的两个函数都是返回 retain 后的字符串，可对应理解为 NSObject 的 description 和 debugDescription 函数，
+    //（返回当前实例的描述字符串）
+    CFStringRef (*copyFormattingDesc)(CFTypeRef cf, CFDictionaryRef formatOptions); // return str with retain
+    CFStringRef (*copyDebugDesc)(CFTypeRef cf); // return str with retain
 
 #define CF_RECLAIM_AVAILABLE 1
     // 当 version 字段值和 _kCFRuntimeResourcefulObject 与操作为真时，指示应使用此字段。
@@ -219,23 +225,27 @@ typedef struct __CFRuntimeClass {
 
 } CFRuntimeClass;
 ```
+#### \__CFRunLoopClass
 &emsp;全局搜 `static const CFRuntimeClass` 可看到一众 Core Foundation 下的 "类对象"，如 \__CFArrayClass、\__CFDateClass、\__CFSetClass、\__CFStringClass 等等。\__CFRunLoopClass 是 CFRunLoop "类对象"。
 ```c++
 static const CFRuntimeClass __CFRunLoopClass = {
     0,
-    "CFRunLoop",
+    "CFRunLoop", // 类名正是 CFRunLoop
     NULL,      // init
     NULL,      // copy
-    __CFRunLoopDeallocate, // void (*finalize)(CFTypeRef cf) finalize 函数
+    __CFRunLoopDeallocate, // CFRunLoop 类实例的销毁函数，做的事情就是 CFRunLoop 对象销毁时的清理工作，等下我们会进行分析，这个函数还挺重要的，可以帮我们理解 run loop 的结构（这里相当于忽略父类的销毁函数，然后子类重写了自己的销毁函数）
     NULL,
     NULL,
     NULL,
-    __CFRunLoopCopyDescription
+    __CFRunLoopCopyDescription // 对应上面的 CFStringRef (*copyDebugDesc)(CFTypeRef cf); 函数指针赋值，DEBUG 模式下 CFRuntimeClass 实例的描述函数，返回对当前的 CFRunLoop 实例进行描述的字符串，等下我们也分析下。
+    
+    // __CFRunLoopDeallocate 和 __CFRunLoopCopyDescription 准备留在 run loop 对象创建时再分析，这样正好和 run loop mode 和 run loop mode item 相关的内容对应起来。
 };
 ```
 &emsp;可看到 \__CFRunLoopClass 变量是一个 CFRuntimeClass 结构体实例，`className` 是 `CFRunLoop`。
 
-&emsp;`_CFRuntimeRegisterClass` 函数把指定的类对象注册到 Core Foundation 的静态全局 "类表" 中，全局搜索 `_CFRuntimeRegisterClass` 函数可看到每个它的调用都被包裹在 `dispatch_once` 中，保证每个 "类" 全局注册一次。我们以 \__CFRunLoopClass 类为例继续向下看。
+### Core Foundation 注册类（\_CFRuntimeRegisterClass）
+&emsp;`_CFRuntimeRegisterClass` 函数把指定的类对象注册到 Core Foundation 的静态全局 "类表" 中，全局搜索 `_CFRuntimeRegisterClass` 函数可看到每个它的调用都被包裹在 `dispatch_once` 中，保证每个 "类" 全局注册一次。我们以 \__CFRunLoopClass 类注册为例继续向下看。
 ```c++
 #if __LLP64__
 typedef unsigned long long CFTypeID;
@@ -259,7 +269,7 @@ CFTypeID CFRunLoopGetTypeID(void) {
     return __kCFRunLoopTypeID;
 }
 ```
-&emsp;`CFRunLoopGetTypeID` 函数内部完成了 CFRunLoop 和 CFRunLoopMode 类的注册，\__kCFRunLoopTypeID 和 \__kCFRunLoopModeTypeID 都是静态全局变量，分别是它们在类表中的索引，后续构建 CFRunLoop 实例时，都通过 \__kCFRunLoopTypeID 去类表中查找 "类对象"。下面我们看一下 `_CFRuntimeRegisterClass` 函数。
+&emsp;`CFRunLoopGetTypeID` 函数内部完成了 CFRunLoop 和 CFRunLoopMode 类的注册，\__kCFRunLoopTypeID 和 \__kCFRunLoopModeTypeID 都是静态全局变量，分别是它们在类表中的索引，后续构建 CFRunLoop 实例时，都通过 \__kCFRunLoopTypeID 去类表中查找 "类对象"。下面我们看一下 `_CFRuntimeRegisterClass` 函数，它的内部比较简单，就是把类对象的地址放在类表中，然后返回其索引，并且可看到每个类都会有一个 static CFTypeID 类型的全局变量用来记录每个类对象的地址在类表中的索引。（看到这里忽然想到了看 NSObject 时，runtime 会为类的每个成员变量准备一个静态全局值用来记录每个成员变量的偏移量，以加快成员变量的查找以及读取。）
 ```c++
 CFTypeID _CFRuntimeRegisterClass(const CFRuntimeClass * const cls) {
     // className must be pure ASCII string, non-null
@@ -314,7 +324,9 @@ CFTypeID _CFRuntimeRegisterClass(const CFRuntimeClass * const cls) {
     return typeID;
 }
 ```
-&emsp;至此 CFRunLoop 类就注册完成了。那么下面就是创建 CFRunLoop 的类实例了，使用到了 `_CFRuntimeCreateInstance` 函数，分析该函数之前我们需要先看所有 CF 类中的默认分配器 `kCFAllocatorSystemDefault`。`kCFAllocatorSystemDefault` 是一个指向静态全局的  struct __CFAllocator 结构体实例的指针。下面先看一下 __CFAllocator 的定义，它内部包含一堆函数指针，用来存储一堆相关的处理函数的具体实现的地址，例如 malloc、free、realloc等函数，看到它的各个成员变量和 struct _malloc_zone_t 几乎相同，struct _malloc_zone_t 的定义可在 libmalloc 中查看。
+&emsp;至此 CFRunLoop 类就注册完成了。
+### \__CFAllocator
+&emsp;那么下面就是创建 CFRunLoop 的类实例了，使用到了 `_CFRuntimeCreateInstance` 函数，分析该函数之前我们需要先看所有 CF 类中的默认分配器 `kCFAllocatorSystemDefault`。`kCFAllocatorSystemDefault` 是一个指向静态全局的  struct __CFAllocator 结构体实例的指针。下面先看一下 __CFAllocator 的定义，它内部包含一堆函数指针，用来存储一堆相关的处理函数的具体实现的地址，例如 malloc、free、realloc等函数，看到它的各个成员变量和 struct _malloc_zone_t 几乎相同，struct _malloc_zone_t 的定义可在 libmalloc 库中查看。
 ```c++
 struct __CFAllocator {
     CFRuntimeBase _base; // 所有 CF "instances" 都是从这个结构开始的
@@ -325,7 +337,7 @@ struct __CFAllocator {
     // CFAllocator 结构必须匹配 struct _malloc_zone_t!
     // struct _malloc_zone_t 中的前两个保留字段供我们使用 CFRuntimeBase. 
     
-    // 返回块的大小；如果不在此区域，则返回0；否则，返回0。必须快速，尤其是对于 negative answers
+    // 返回块的大小；如果不在此 zone 中，则返回 0；否则，返回 0。必须快速，尤其是对于 negative answers
     size_t (*size)(struct _malloc_zone_t *zone, const void *ptr);
     
     void *(*malloc)(struct _malloc_zone_t *zone, size_t size); // malloc 函数指针
@@ -336,12 +348,10 @@ struct __CFAllocator {
     void (*destroy)(struct _malloc_zone_t *zone); // 销毁 zone，所有内存被回收
     const char *zone_name; // zone 的名字
 
-    
-    // 可选的批处理回调；可能为NULL
+    // 可选的批处理回调；可能为 NULL
     // 给定大小（size），返回能够保持该大小的指针；返回分配的指针数（可能为 0 或小于 num_requested）
     //（可能与下面的 free 对应，申请一组指定大小的指针）
     unsigned (*batch_malloc)(struct _malloc_zone_t *zone, size_t size, void **results, unsigned num_requested); 
-    
     // 释放 to_be_freed 中的所有指针；请注意，在此过程中，to_be_freed 可能会被覆盖
     void (*batch_free)(struct _malloc_zone_t *zone, void **to_be_freed, unsigned num_to_be_freed); 
 
@@ -360,7 +370,8 @@ struct __CFAllocator {
     CFAllocatorContext _context; // 上下文
 };
 ```
-&emsp;kCFAllocatorSystemDefault 是一个全局的系统默认的分配器，内部各个函数指针类型的成员变量都有具体的函数来赋值。
+#### kCFAllocatorSystemDefault
+&emsp;kCFAllocatorSystemDefault 是一个全局的系统默认的分配器，内部各个函数指针类型的成员变量都有具体的函数来赋值。看到 CF 还准备了另外两个分配器 __kCFAllocatorMalloc 和 __kCFAllocatorMallocZone。下面我们看一下  kCFAllocatorSystemDefault 的各个成员变量的初值都是什么。
 ```c++
 // typedef const struct __CFAllocator * CFAllocatorRef;
 const CFAllocatorRef kCFAllocatorSystemDefault = &__kCFAllocatorSystemDefault;
@@ -388,13 +399,13 @@ static struct __CFAllocator __kCFAllocatorSystemDefault = {
     "kCFAllocatorSystemDefault", // zone_name zone 的名字
     NULL, // 两个批处理 batch_malloc 置 NULL 
     NULL, // batch_free 置 NULL
-    &__CFAllocatorZoneIntrospect, // 内省
+    &__CFAllocatorZoneIntrospect, // zone 的内省函数，其内部也是一组函数指针。
     6, // version 
     NULL,
     NULL,
 #endif
 
-    NULL,    // _allocator
+    NULL, // _allocator
     
     // __CFAllocatorSystemAllocate 内部实现是 malloc(size)
     // __CFAllocatorSystemReallocate 内部实现是 realloc(ptr,size)
@@ -403,10 +414,11 @@ static struct __CFAllocator __kCFAllocatorSystemDefault = {
     {0, NULL, NULL, NULL, NULL, __CFAllocatorSystemAllocate, __CFAllocatorSystemReallocate, __CFAllocatorSystemDeallocate, NULL}
 };
 ```
+### \_CFRuntimeCreateInstance 创建
 &emsp;CFRunLoop 类对象和系统默认分配器都看完了，那下面三行是构建 CFRunLoop 类的实例。
 ```c++
 CFRunLoopRef loop = NULL;
-uint32_t size = sizeof(struct __CFRunLoop) - sizeof(CFRuntimeBase);
+uint32_t size = sizeof(struct __CFRunLoop) - sizeof(CFRuntimeBase); // 为实例分配的额外字节数（即 __CFRunLoop 超出 CFRuntimeBase 部分成员变量所需的字节数），等内部具体申请空间时还会加回来。
 loop = (CFRunLoopRef)_CFRuntimeCreateInstance(kCFAllocatorSystemDefault, CFRunLoopGetTypeID(), size, NULL);
 ```
 &emsp;下面我们分析一下 `_CFRuntimeCreateInstance` 函数，这里是 `_CFRuntimeCreateInstance` 函数的声明。
@@ -415,77 +427,121 @@ loop = (CFRunLoopRef)_CFRuntimeCreateInstance(kCFAllocatorSystemDefault, CFRunLo
 // CFRuntimeBase 结构在返回实例的开始处初始化。
 // extraBytes 是为实例分配的额外字节数（超出 CFRuntimeBase 所需的字节数）。
 // 如果指定的 CFTypeID 对于 CF 运行时是未知的，则此函数返回 NULL。
-// 除了基址头（CFRuntimeBase）之外，新内存的任何部分都没有初始化（例如，多余的字节不归零）。
+// 除了基址头（CFRuntimeBase）之外，新内存的任何部分都没有初始化（例如，多余的字节不是零）。
 // 使用此函数创建的所有实例只能通过使用 CFRelease() 函数来销毁——不能直接使用 CFAllocatorDeallocate() 销毁实例，即使在类的初始化或创建函数中也是如此。 为 category 参数传递NULL。
 
 CF_EXPORT CFTypeRef _CFRuntimeCreateInstance(CFAllocatorRef allocator, CFTypeID typeID, CFIndex extraBytes, unsigned char *category);
 ```
-&emsp;`_CFRuntimeCreateInstance` 函数很长，下面对它进行详细分析。
+&emsp;`_CFRuntimeCreateInstance` 函数很长，下面对它进行详细分析，看似很长，其实没做多少事情，主要是为 CF 对象申请空间，然后对 CFRuntimeBase 的 `_cfinfo` 赋值，如果其 `init` 函数不为空的话，则调用，上面看到我们的 \__CFRunLoopClass 类对象仅有 `__CFRunLoopDeallocate` 和 `__CFRunLoopCopyDescription`（销毁函数和描述函数）。这也印证了声明部分的注释：“除了基址头（CFRuntimeBase）之外，新内存的任何部分都没有初始化（例如，多余的字节不是零）。”。
 ```c++
 CFTypeRef _CFRuntimeCreateInstance(CFAllocatorRef allocator, CFTypeID typeID, CFIndex extraBytes, unsigned char *category) {
     // #define HALT do { DebugBreak(); abort(); __builtin_unreachable(); } while (0)
+    // 枚举用一个 do {...} while(0) 包裹，这样构造后的宏定义不会受到大括号、分号等的影响，总是会按你期望的方式调用运行。
     // 如果入参 typeID 超过的类表的总长度，则直接中止程序运行
     if (__CFRuntimeClassTableSize <= typeID) HALT;
     
     // 断言，typeID 不等于 0。（0 表示未初始化的类型ID）
     CFAssert1(typeID != _kCFRuntimeNotATypeID, __kCFLogAssertion, "%s(): Uninitialized type id", __PRETTY_FUNCTION__);
     
-    // 根据 typeID 从类表中找到类对象的指针
+    // 根据 typeID 从类表中找到类对象的指针（这里我们以 __CFRunLoopClass 类对象为例）
     CFRuntimeClass *cls = __CFRuntimeClassTable[typeID];
     
-    // 如果类指针为 NULl 则返回 NULL
+    // 如果类指针为 NULl 则返回 NULL（这里我们以 __CFRunLoopClass 类对象为例）
     if (NULL == cls) {
         return NULL;
     }
     
-    // 
+    // 如果 cls 的 viersion 的 _kCFRuntimeRequiresAlignment 位的值为 1，则分配器使用 kCFAllocatorSystemDefault
     if (cls->version & _kCFRuntimeRequiresAlignment) {
         allocator = kCFAllocatorSystemDefault;
     }
     
+    // !! 把一个任意类型转换为 Boolean 类型。
+    // 是否使用 CFRuntime 的 refcount 字段
     Boolean customRC = !!(cls->version & _kCFRuntimeCustomRefCount);
+    
+    // 如果 customRC 为真但是类对象的 refcount 为空，即没有提供引用计数操作函数，则返回 NULL
     if (customRC && !cls->refcount) {
         CFLog(kCFLogLevelWarning, CFSTR("*** _CFRuntimeCreateInstance() found inconsistent class '%s'."), cls->className);
         return NULL;
     }
+    
+    // 如果 allocator 为 NULL，则从当前线程的 TSD 中查找，如果未找到则返回 kCFAllocatorSystemDefault
     CFAllocatorRef realAllocator = (NULL == allocator) ? __CFGetDefaultAllocator() : allocator;
+    
+    // kCFAllocatorNull 并不是一个 NULL，是一个几乎所有成员变量的值都是 NULL 的结构体实例，其中的赋值的函数内部实现都是为空或者返回 NULL 
     if (kCFAllocatorNull == realAllocator) {
-    return NULL;
+        return NULL;
     }
+    
+    // 判断 realAllocator 是否是 kCFAllocatorSystemDefault
     Boolean usesSystemDefaultAllocator = _CFAllocatorIsSystemDefault(realAllocator);
+    
+    // 如果 cls 指定了内存对齐的长度，则返回，否则返回 16
     size_t align = (cls->version & _kCFRuntimeRequiresAlignment) ? cls->requiredAlignment : 16;
+    
+    // 计算实例需要的总长度，当分配器不是 kCFAllocatorSystemDefault 时，增加一个指针的长度。
+    //（前面减的 sizeof(CFRuntimeBase) 又加回来了）
     CFIndex size = sizeof(CFRuntimeBase) + extraBytes + (usesSystemDefaultAllocator ? 0 : sizeof(CFAllocatorRef));
+    
+    // 然后整体进行 16 字节对齐（先加 15 然后把后 4 bit 置为 0）
     size = (size + 0xF) & ~0xF;    // CF objects are multiples of 16 in size
+    
     // CFType version 0 objects are unscanned by default since they don't have write-barriers and hard retain their innards
     // CFType version 1 objects are scanned and use hand coded write-barriers to store collectable storage within
+    
+    // 到这里就都判断准备完成了，下面开始申请空间
+    
     CFRuntimeBase *memory = NULL;
     if (cls->version & _kCFRuntimeRequiresAlignment) {
+        // #define malloc_zone_memalign(zone,align,size) malloc(size)
+        // 使用自定义的对齐长度，申请空间
         memory = malloc_zone_memalign(malloc_default_zone(), align, size);
     } else {
+        // 调用 CFAllocatorAllocate 申请空间。
+        //（CFAllocatorAllocate 函数内部挺长的，大概是整体是为了保证内存申请成功，这里不再展开了）
         memory = (CFRuntimeBase *)CFAllocatorAllocate(allocator, size, CF_GET_COLLECTABLE_MEMORY_TYPE(cls));
     }
+    
+    // 如果申请失败，则返回 NULL
     if (NULL == memory) {
-    return NULL;
+        return NULL;
     }
+    
+    // 判断是否把 memory 内存空间全部置为 0
     if (!kCFUseCollectableAllocator || !CF_IS_COLLECTABLE_ALLOCATOR(allocator) || !(CF_GET_COLLECTABLE_MEMORY_TYPE(cls) & __kCFAllocatorGCScannedMemory)) {
-    memset(memory, 0, size);
+        memset(memory, 0, size);
     }
+    
+    // 大概是做最后一次 Allocation 事件统计
     if (__CFOASafe && category) {
-    __CFSetLastAllocationEventName(memory, (char *)category);
+        __CFSetLastAllocationEventName(memory, (char *)category);
     } else if (__CFOASafe) {
-    __CFSetLastAllocationEventName(memory, (char *)cls->className);
+        __CFSetLastAllocationEventName(memory, (char *)cls->className);
     }
+    
+    // 判断 realAllocator 是否是 kCFAllocatorSystemDefault（以 __CFRunLoopClass 类对象为例时，不执行 if 里面的内容）
     if (!usesSystemDefaultAllocator) {
         // add space to hold allocator ref for non-standard allocators.
         // (this screws up 8 byte alignment but seems to work)
-    *(CFAllocatorRef *)((char *)memory) = (CFAllocatorRef)CFRetain(realAllocator);
-    memory = (CFRuntimeBase *)((char *)memory + sizeof(CFAllocatorRef));
+        
+        // CFRetain realAllocator 后赋值给 memory。
+        *(CFAllocatorRef *)((char *)memory) = (CFAllocatorRef)CFRetain(realAllocator);
+        // memory 移动一个指针的距离
+        memory = (CFRuntimeBase *)((char *)memory + sizeof(CFAllocatorRef));
     }
+    
+    // 临时变量，记录引用计数
     uint32_t rc = 0;
+    
 #if __LP64__
+    // 在 x86_64 macOS 下，以 _CFRuntimeCreateInstance(kCFAllocatorSystemDefault, CFRunLoopGetTypeID(), size, NULL) 调用为例：
+    // kCFUseCollectableAllocator 值为 NO
     if (!kCFUseCollectableAllocator || (1 && 1)) {
+        // 现在 memory 是 CFRuntimeBase 指针，把其 _rc 字段置为 1
         memory->_rc = 1;
     }
+    // customRC 为 NO
     if (customRC) {
         memory->_rc = 0xFFFFFFFFU;
         rc = 0xFF;
@@ -498,29 +554,50 @@ CFTypeRef _CFRuntimeCreateInstance(CFAllocatorRef allocator, CFTypeID typeID, CF
         rc = 0xFF;
     }
 #endif
+    // cfinfop 指向 _cfinfo 字段（ uint8_t _cfinfo[4]; ） 
     uint32_t *cfinfop = (uint32_t *)&(memory->_cfinfo);
+    
+    // 在 x86_64 macOS 下，以 _CFRuntimeCreateInstance(kCFAllocatorSystemDefault, CFRunLoopGetTypeID(), size, NULL) 调用为例：
+    // rc = 0
+    // customRC = NO
+    // typeID 是 __kCFRunLoopTypeID（CFRunLoop 类在类表中的索引）
+    // usesSystemDefaultAllocator = true
+    // 0 | 0x0 | ((uint32_t)typeID << 8) | 0b1000 0000
+    // 这里大概是把 CFRunLoop 类的索引放在 CFRuntimeBase 的 _cfinfo 字段中，[1, 1024] 需要两个字节，
+    // _cfinfo 是长度为 4 的 uint8_t 数组，即中间两个字节用来保存类的索引。
+    
     *cfinfop = (uint32_t)((rc << 24) | (customRC ? 0x800000 : 0x0) | ((uint32_t)typeID << 8) | (usesSystemDefaultAllocator ? 0x80 : 0x00));
     memory->_cfisa = 0;
+    
+    // 如果类对象的 init 字段不为 NULL，则调用该函数。
+    // （__CFRunLoopClass 类对象 init 是 NULL）
     if (NULL != cls->init) {
-    (cls->init)(memory);
+        (cls->init)(memory);
     }
+    
     return memory;
 }
 ```
+&emsp;至此 `_CFRuntimeCreateInstance` 函数就看完了，申请实例长度的空间，然后初始化 `CFRuntimeBase _base` 字段，`_rc` 引用计数置为 1， 然后 `_cfinfo` 字段的量中间两个字节用来保存类索引，`_cfisa` 字段是 0，并没有明确指向，然后 CFRunLoop 类对象的 `init` 函数指针又是 NULL，可能小伙伴会奇怪了，那 CFRunLoop 后面的一众成员变量什么时候初始化呢，不要着急，它们是在 `_CFRuntimeCreateInstance` 函数返回 CFRunLoop 实例后进行初始化的，下面会细讲。
+
+&emsp;至此以 CFRunLoop 类为例，CF 下创建实例的过程就全部结束了，下面我们开始看怎么获取线程的 run loop 对象。（`static const CFRuntimeClass __CFRunLoopModeClass` 是 CFRunLoopMode 的类对象，等下我们再学习。）
+
 &emsp;下面看两个超级重要的函数（其实是一个函数），获取主线程的 run loop 和获取当前线程（子线程）的 run loop。
-### CFRunLoopGetMain/CFRunLoopGetCurrent
+## CFRunLoopGetMain/CFRunLoopGetCurrent 获取 Run Loop
 &emsp;`CFRunLoopGetMain/CFRunLoopGetCurrent` 函数可分别用于获取主线程的 run loop 和获取当前线程（子线程）的 run loop。main run loop 使用一个静态变量 \__main 存储，子线程的 run loop 会保存在当前线程的 TSD 中。两者在第一次获取 run loop 时都会调用 \_CFRunLoopGet0 函数根据线程的 pthread_t 对象从静态全局变量 \__CFRunLoops（static CFMutableDictionaryRef）中获取，如果获取不到的话则新建 run loop 对象，并根据线程的 pthread_t 保存在静态全局变量 \__CFRunLoops（static CFMutableDictionaryRef）中，方便后续读取。
 ```c++
 CFRunLoopRef CFRunLoopGetMain(void) {
-    // 用于检查给定的进程是否被分叉
+    // 用于检查给定的进程是否被 fork
     CHECK_FOR_FORK();
+    
     // __main 是一个静态变量，只能初始化一次，用于保存主线程关联的 run loop 对象
     static CFRunLoopRef __main = NULL; // no retain needed
     
-    // 只有第一个获取 main run loop 时 __main 值为 NULL，
+    // 只有第一次获取 main run loop 时 __main 值为 NULL，
     // 然后从静态全局的 CFMutableDictionaryRef __CFRunLoops 中根据主线程查找 main run loop，
-    // 赋值给 __main，以后再获取 main run loop，即直接返回 __main。
+    // 赋值给 __main，以后再获取 main run loop，即可直接返回 __main。 
     //（主线程和 main run loop 都是全局唯一的，pthread_main_thread_np() 获取主线程）
+    
     if (!__main) __main = _CFRunLoopGet0(pthread_main_thread_np()); // no CAS needed
     
     // 返回 main run loop
@@ -528,7 +605,7 @@ CFRunLoopRef CFRunLoopGetMain(void) {
 }
 
 CFRunLoopRef CFRunLoopGetCurrent(void) {
-    // 用于检查给定的进程是否被分叉
+    // 用于检查给定的进程是否被 fork
     CHECK_FOR_FORK();
     
     // 从当前线程的 TSD 中获取其 run loop，
@@ -716,7 +793,7 @@ static CFRunLoopRef __CFRunLoopCreate(pthread_t t) {
     //（__CFRunLoopLockInit 内部使用的 PTHREAD_MUTEX_RECURSIVE 表示递归锁，允许同一个线程对同一锁加锁多次，且需要对应次数的解锁操作）
     __CFRunLoopLockInit(&loop->_lock);
     
-    // 给 loop 的 _wakeUpPort 唤醒端口赋值
+    // 给 loop 的 _wakeUpPort 唤醒端口赋值，这里 loop 会持有 port 对象，在合适的时候需要进行一次释放。
     loop->_wakeUpPort = __CFPortAllocate();
     if (CFPORT_NULL == loop->_wakeUpPort) HALT;
     
@@ -725,7 +802,7 @@ static CFRunLoopRef __CFRunLoopCreate(pthread_t t) {
     // 0x57414B45 表示忽略，0x00000000 表示不忽略。
     __CFRunLoopSetIgnoreWakeUps(loop);
     
-    // _commonModes 是 CFMutableSetRef 类型，CFSetCreateMutable 是为其申请空间。 
+    // _commonModes 是 CFMutableSetRef 类型，CFSetCreateMutable 是为其申请空间，这里 loop 会持有返回的 CFSet 实例，在合适的时候 loop 要对其进行一次释放。 
     loop->_commonModes = CFSetCreateMutable(kCFAllocatorSystemDefault, 0, &kCFTypeSetCallBacks);
     // 把 kCFRunLoopDefaultMode 添加到 loop 的 _commonModes 集合中，
     // 同时也验证了 _commonModes 中存放的是 mode 对应的字符串（"kCFRunLoopDefaultMode"）并不是 CFRunLoopModeRef，
@@ -735,7 +812,7 @@ static CFRunLoopRef __CFRunLoopCreate(pthread_t t) {
     // loop 的其它一些成员变量赋初值为 NULL
     loop->_commonModeItems = NULL;
     loop->_currentMode = NULL;
-    // 同上面的 _commonModes，也是为 _modes 申请空间。
+    // 同上面的 _commonModes，也是为 _modes 申请空间，这里 loop 会持有返回的 CFSet 实例，在合适的时候 loop 要对其进行一次释放。
     loop->_modes = CFSetCreateMutable(kCFAllocatorSystemDefault, 0, &kCFTypeSetCallBacks);
     loop->_blocks_head = NULL;
     loop->_blocks_tail = NULL;
@@ -863,9 +940,158 @@ CF_PRIVATE void __THE_PROCESS_HAS_FORKED_AND_YOU_CANNOT_USE_THIS_COREFOUNDATION_
 //    HALT;
 }
 ```
-&emsp;看到这里 run loop 创建的相关的内容就看完了，其中比较重要的 `__CFRunLoopFindMode` 函数，留在下 CFRunLoopModeRef 节再分析。
+&emsp;看到这里 run loop 创建的相关的内容就看完了，上面的我们预留的两个函数 \__CFRunLoopDeallocate 是 run loop 的销毁函数， \__CFRunLoopCopyDescription 是返回 run loop 对象的描述，下面我们来一起看一下。
+
+### \__CFRunLoopDeallocate
+```c++
+static void __CFRunLoopDeallocate(CFTypeRef cf) {
+    // 指针转换为 CFRunLoopRef 类型
+    CFRunLoopRef rl = (CFRunLoopRef)cf;
+
+    // 如果是想要错误销毁主线程的 run loop 则直接中止程序运行
+    if (_CFRunLoopGet0b(pthread_main_thread_np()) == cf) HALT;
+
+    /* We try to keep the run loop in a valid state as long as possible, since sources may have non-retained references to the run loop.
+       Another reason is that we don't want to lock the run loop for callback reasons, if we can get away without that.  We start by eliminating the sources, since they are the most likely to call back into the run loop during their "cancellation". Common mode items will be removed from the mode indirectly by the following three lines. */
+       
+    // 我们尝试将运行循环尽可能长时间地保持在有效状态，因为 sources 可能对运行循环具有非保留（non-retained references）的引用。
+    // 另一个原因是，如果没有回调，我们不想出于回调原因而锁定运行循环。
+    // 我们从消除源开始，因为它们最有可能在其 "cancellation" 期间回调到运行循环中。
+    // Common mode items 将从 mode 中移除，通过以下三行间接模式。
+    
+    // #define CF_INFO_BITS (!!(__CF_BIG_ENDIAN__) * 3) // 0 
+    // #define __CF_BIG_ENDIAN__ 0 // macOS 下是小端模式
+    // __CFBitfieldSetValue(((CFRuntimeBase *)rl)->_cfinfo[CF_INFO_BITS], 2, 2, 1) // 
+    // #define __CFBitfieldSetValue(V, N1, N2, X)   ((V) = ((V) & ~__CFBitfieldMask(N1, N2)) | (((X) << (N2)) & __CFBitfieldMask(N1, N2)))
+    // #define __CFBitfieldMask(N1, N2)   ((((UInt32)~0UL) << (31UL - (N1) + (N2))) >> (31UL - N1))
+    
+    // 把 rl 标记为正在销毁
+    __CFRunLoopSetDeallocating(rl);
+    
+    // 如果 rl 的 _modes 不为 NULL，则
+    if (NULL != rl->_modes) {
+        // 删除引用
+        CFSetApplyFunction(rl->_modes, (__CFRunLoopCleanseSources), rl); // remove references to rl
+        // 销毁 sources
+        CFSetApplyFunction(rl->_modes, (__CFRunLoopDeallocateSources), rl);
+        // 销毁 run loop observer 
+        CFSetApplyFunction(rl->_modes, (__CFRunLoopDeallocateObservers), rl);
+        // 销毁 timer 
+        CFSetApplyFunction(rl->_modes, (__CFRunLoopDeallocateTimers), rl);
+    }
+    
+    // 加锁
+    __CFRunLoopLock(rl);
+    
+    // 取得 rl 的 block 链表的头节点
+    struct _block_item *item = rl->_blocks_head;
+    
+    // 遍历释放 block 持有的 mode 以及 block 本身
+    while (item) {
+        struct _block_item *curr = item;
+        item = item->_next;
+        
+        // 释放 block 持有的 _mode
+        CFRelease(curr->_mode);
+        // 释放 block
+        Block_release(curr->_block);
+        // 释放内存空间
+        free(curr);
+    }
+    
+    // CF 下的 release
+    // rl 会持有 _commonModeItems、_commonModes、_modes，所以这里要进行一次释放
+    if (NULL != rl->_commonModeItems) {
+        CFRelease(rl->_commonModeItems);
+    }
+    
+    // 释放 _commonModes
+    if (NULL != rl->_commonModes) {
+        CFRelease(rl->_commonModes);
+    }
+    
+    // 释放 _modes
+    if (NULL != rl->_modes) {
+        CFRelease(rl->_modes);
+    }
+    
+    // 释放唤醒端口
+    __CFPortFree(rl->_wakeUpPort);
+    // #define CFPORT_NULL MACH_PORT_NULL
+    // 并置为 MACH_PORT_NULL
+    rl->_wakeUpPort = CFPORT_NULL;
+    
+    // 释放 rl 当前的 _perRunData，并把 _perRunData 置为 NULL
+    __CFRunLoopPopPerRunData(rl, NULL);
+    
+    // 解锁
+    __CFRunLoopUnlock(rl);
+    
+    // 销毁 rl 中的互斥递归锁
+    pthread_mutex_destroy(&rl->_lock);
+    
+    // sizeof(CFRuntimeBase) 是 16。
+    // 把 cf 内存空间除开头 16 个字节外，后面的每个自己都置为 0x8C
+    memset((char *)cf + sizeof(CFRuntimeBase), 0x8C, sizeof(struct __CFRunLoop) - sizeof(CFRuntimeBase));
+}
+```
+### \__CFRunLoopCopyDescription
+```c++
+static CFStringRef __CFRunLoopCopyDescription(CFTypeRef cf) {
+    // 指针转换为 CFRunLoopRef 类型
+    CFRunLoopRef rl = (CFRunLoopRef)cf;
+    
+    // 创建一个 CFMutableStringRef，__CFRunLoopCopyDescription 函数的调用者需要释放返回值，否则会发生内存泄漏
+    CFMutableStringRef result;
+    result = CFStringCreateMutable(kCFAllocatorSystemDefault, 0);
+    
+#if DEPLOYMENT_TARGET_WINDOWS
+    CFStringAppendFormat(result, NULL, CFSTR("<CFRunLoop %p [%p]>{wakeup port = 0x%x, stopped = %s, ignoreWakeUps = %s, \ncurrent mode = %@,\n"), cf, CFGetAllocator(cf), rl->_wakeUpPort, __CFRunLoopIsStopped(rl) ? "true" : "false", __CFRunLoopIsIgnoringWakeUps(rl) ? "true" : "false", rl->_currentMode ? rl->_currentMode->_name : CFSTR("(none)"));
+#else
+    // 拼接字符串
+    // cf 的地址、cf 的分配器地址、是否停止、是否忽略唤醒、当前 mode 的名字
+    CFStringAppendFormat(result, NULL, CFSTR("<CFRunLoop %p [%p]>{wakeup port = 0x%x, stopped = %s, ignoreWakeUps = %s, \ncurrent mode = %@,\n"), cf, CFGetAllocator(cf), rl->_wakeUpPort, __CFRunLoopIsStopped(rl) ? "true" : "false", __CFRunLoopIsIgnoringWakeUps(rl) ? "true" : "false", rl->_currentMode ? rl->_currentMode->_name : CFSTR("(none)"));
+#endif
+
+    // 再接着拼接 _commonModes、_commonModeItems、_modes
+    CFStringAppendFormat(result, NULL, CFSTR("common modes = %@,\ncommon mode items = %@,\nmodes = %@}\n"), rl->_commonModes, rl->_commonModeItems, rl->_modes);
+    return result;
+}
+```
+&emsp;看到这里 run loop 创建以及销毁的相关的内容就看完了，其中比较重要的 `__CFRunLoopFindMode` 函数，留在下 CFRunLoopModeRef 节再分析。
 ### CFRunLoopModeRef（struct \__CFRunLoopMode *）
-&emsp;每次 run loop 开始 run 的时候，都必须指定一个 mode，称为 run loop mode（运行循环模式）。mode 指定了在这次 run 中，run loop 可以处理的任务，对于不属于当前 mode 的任务，则需要切换 run loop 至对应 mode 下，再重新调用 run 方法，才能够被处理，这样也保证了不同 mode 的 source/timer/observer 互不影响，使不同 mode 下的数据做到相互隔离的。下面我们就从代码层面看下 mode 的数据结构及一些相关的函数。
+&emsp;每次 run loop 开始 run 的时候，都必须指定一个 mode，称为 run loop mode（运行循环模式）。mode 指定了在这次 run 中，run loop 可以处理的任务，对于不属于当前 mode 的任务，则需要切换 run loop 至对应 mode 下，再重新调用 run 方法，才能够被处理，这样也保证了不同 mode 的 source/timer/observer 互不影响，使不同 mode 下的数据做到相互隔离的。下面我们就从代码层面看下 mode 的数据结构、CFRunLoopMode 类对象及一些相关的函数。
+
+&emsp;`__CFRunLoopModeClass` run loop mode 的 "类对象"，
+```c++
+static const CFRuntimeClass __CFRunLoopModeClass = {
+    0,
+    "CFRunLoopMode",
+    NULL,      // init
+    NULL,      // copy
+    __CFRunLoopModeDeallocate, // 销毁函数
+    __CFRunLoopModeEqual, // 比较函数
+    __CFRunLoopModeHash, // 哈希函数（很重要，从 run loop 的 _modes 哈希表中查找 run loop mode ）
+    NULL, // 
+    __CFRunLoopModeCopyDescription // 描述函数
+};
+```
+&emsp;`__CFRunLoopModeHash` 哈希函数，取 run loop mode 的名字的哈希值。
+```c++
+static CFHashCode __CFRunLoopModeHash(CFTypeRef cf) {
+    CFRunLoopModeRef rlm = (CFRunLoopModeRef)cf;
+    return CFHash(rlm->_name);
+}
+```
+&emsp;`__CFRunLoopModeEqual` run loop mode 的判等函数也是对其 `_name` 进行比较。
+```c++
+static Boolean __CFRunLoopModeEqual(CFTypeRef cf1, CFTypeRef cf2) {
+    CFRunLoopModeRef rlm1 = (CFRunLoopModeRef)cf1;
+    CFRunLoopModeRef rlm2 = (CFRunLoopModeRef)cf2;
+    return CFEqual(rlm1->_name, rlm2->_name);
+}
+```
+&emsp;`__CFRunLoopMode` 定义。
 ```c++
 typedef struct __CFRunLoopMode *CFRunLoopModeRef;
 
@@ -1076,157 +1302,7 @@ static CFRunLoopModeRef __CFRunLoopFindMode(CFRunLoopRef rl, CFStringRef modeNam
 
 &emsp;在 macOS 下 run loop mode 的 `_timerSource` 的计时器的回调事件内部会把 run loop mode 的 `_timerFired` 字段置为 true，表示计时器被触发。
 
-&emsp;run loop mode 创建好了，看到 source/timer/observer 三者对应的 `_sources0`、`_sources1`、`_observers`、`_timers` 四个字段初始状态都是空，需要我们自己添加 run loop mode item，它们在代码层中对应的数据类型分别是: CFRunLoopSourceRef、CFRunLoopObserverRef、CFRunLoopTimerRef，下面我们看一下它们的具体定义。
-
-### CFRunLoopSourceRef（struct \__CFRunLoopSource *）
-&emsp;CFRunLoopSourceRef 是事件源（输入源），通过源码可以发现它内部的 `_context` 联合体中有两个成员变量 `version0` 和 `version1`，它们正分别对应了我们前面提到过多次的 source0 和 source1。
-
-&emsp;
-```c++
-typedef struct __CFRunLoopSource * CFRunLoopSourceRef;
-
-struct __CFRunLoopSource {
-    CFRuntimeBase _base; // 所有 CF "instances" 都是从这个结构开始的
-    uint32_t _bits;
-    pthread_mutex_t _lock; // 互斥锁
-    CFIndex _order; /* immutable */ source 的优先级，值为小，优先级越高
-    CFMutableBagRef _runLoops; // run loop 集合
-    union {
-        CFRunLoopSourceContext version0; /* immutable, except invalidation */
-        CFRunLoopSourceContext1 version1; /* immutable, except invalidation */
-    } _context;
-};
-```
-&emsp;当 \__CFRunLoopSource 表示 source0 的数据结构时 `_context` 中使用 `CFRunLoopSourceContext version0`，下面是 CFRunLoopSourceContext 的定义。 
-```c++
-// #if __LLP64__
-//  typedef unsigned long long CFOptionFlags;
-//  typedef unsigned long long CFHashCode;
-//  typedef signed long long CFIndex;
-// #else
-//  typedef unsigned long CFOptionFlags;
-//  typedef unsigned long CFHashCode;
-//  typedef signed long CFIndex;
-// #endif
-
-typedef struct {
-    CFIndex version;
-    void * info; // source 的信息
-    const void *(*retain)(const void *info); // retain 函数
-    void (*release)(const void *info); // release 函数
-    CFStringRef (*copyDescription)(const void *info); // 
-    Boolean (*equal)(const void *info1, const void *info2); // 判断 source 相等的函数
-    CFHashCode (*hash)(const void *info); // 哈希函数
-    
-    // 上面是 CFRunLoopSourceContext 和 CFRunLoopSourceContext1 的基础内容双方完成等同，
-    // 两者的区别主要在下面，同时它们也表示了 source0 和 source1 的不同功能。
-    
-    void (*schedule)(void *info, CFRunLoopRef rl, CFStringRef mode); // 当 source 加入到 run loop 时触发的回调函数
-    void (*cancel)(void *info, CFRunLoopRef rl, CFStringRef mode); // 当 source 从 run loop 中移除时触发的回调函数
-    void (*perform)(void *info); // source 要执行的任务块，当 source 事件被触发时的回调, 使用 CFRunLoopSourceSignal 函数触发
-} CFRunLoopSourceContext;
-```
-&emsp;当 \__CFRunLoopSource 表示 source1 的数据结构时 `_context` 中使用 `CFRunLoopSourceContext1 version1`，下面是 CFRunLoopSourceContext1 的定义。
-```c++
-typedef struct {
-    CFIndex version;
-    void * info; // source 的信息
-    const void *(*retain)(const void *info); // retain 函数
-    void (*release)(const void *info); // release 函数
-    CFStringRef (*copyDescription)(const void *info); // 
-    Boolean (*equal)(const void *info1, const void *info2); // 判断 source 相等的函数
-    CFHashCode (*hash)(const void *info); // 哈希函数
-    
-    // 上面是 CFRunLoopSourceContext 和 CFRunLoopSourceContext1 的基础内容双方完成等同，
-    // 两者的区别主要在下面，同时它们也表示了 source0 和 source1 的不同功能。
-    
-#if (TARGET_OS_MAC && !(TARGET_OS_EMBEDDED || TARGET_OS_IPHONE)) || (TARGET_OS_EMBEDDED || TARGET_OS_IPHONE)
-    mach_port_t (*getPort)(void *info); // getPort 函数指针，用于当 source 被添加到 run loop 中的时候，从该函数中获取具体的 mach_port_t 对象.
-    void * (*perform)(void *msg, CFIndex size, CFAllocatorRef allocator, void *info); // perform 函数指针即指向 run loop 被唤醒后将要处理的事情
-#else
-    void * (*getPort)(void *info);
-    void (*perform)(void *info);
-#endif
-} CFRunLoopSourceContext1;
-```
-### CFRunLoopObserverRef（struct \__CFRunLoopObserver *）
-&emsp;CFRunLoopObserverRef 是观察者，每个 observer 都包含了一个回调（函数指针），当 run loop 的状态发生变化时，观察者就能通过回调接受到这个变化。主要是用来向外界报告 run loop 当前的状态的更改。
-```c++
-typedef struct __CFRunLoopObserver * CFRunLoopObserverRef;
-
-struct __CFRunLoopObserver {
-    CFRuntimeBase _base; // 所有 CF "instances" 都是从这个结构开始的
-    pthread_mutex_t _lock; // 互斥锁
-    CFRunLoopRef _runLoop; // observer 所观察的 run loop
-    CFIndex _rlCount; // observer 观察了多少个 run loop
-    CFOptionFlags _activities; /* immutable */ // 所监听的事件，通过位异或，可以监听多种事件，_activities 用来说明要观察 runloop 的哪些状态，一旦指定了就不可变。
-    CFIndex _order; /* immutable */ // observer 优先级
-    
-    // typedef void (*CFRunLoopObserverCallBack)(CFRunLoopObserverRef observer, CFRunLoopActivity activity, void *info);
-    CFRunLoopObserverCallBack _callout; /* immutable */ // observer 回调函数，观察到 run loop 状态变化后的回调
-    
-    CFRunLoopObserverContext _context; /* immutable, except invalidation */ // observer 上下文
-};
-```
-&emsp;observer 也包含一个回调函数，在监听的 run loop 状态出现时触发该回调函数。run loop 对 observer 的使用逻辑，基本与 timer 一致，都需要指定 callback 函数，然后通过 context 可传递参数。
-
-&emsp;`CFRunLoopActivity` 是一组枚举值用于表示 run loop 的活动。
-```c++
-/* Run Loop Observer Activities */
-typedef CF_OPTIONS(CFOptionFlags, CFRunLoopActivity) {
-    kCFRunLoopEntry = (1UL << 0), // 进入 RunLoop 循环(这里其实还没进入)
-    kCFRunLoopBeforeTimers = (1UL << 1), // Run Loop 要处理 timer 了
-    kCFRunLoopBeforeSources = (1UL << 2), // Run Loop 要处理 source 了
-    kCFRunLoopBeforeWaiting = (1UL << 5), // Run Loop 要休眠了
-    kCFRunLoopAfterWaiting = (1UL << 6), // Run Loop 醒了
-    kCFRunLoopExit = (1UL << 7), // Run Loop 退出（和 kCFRunLoopEntry 对应，Entry 和 Exit 在每次 Run Loop 循环中仅调用一次，用于表示即将进入循环和退出循环。）
-    kCFRunLoopAllActivities = 0x0FFFFFFFU
-};
-```
-&emsp;CFRunLoopObserverContext 的定义。
-```c++
-typedef struct {
-    CFIndex version;
-    void * info;
-    const void *(*retain)(const void *info);
-    void (*release)(const void *info);
-    CFStringRef (*copyDescription)(const void *info);
-} CFRunLoopObserverContext;
-```
-### CFRunLoopTimerRef（struct \__CFRunLoopTimer *）
-&emsp;NSTimer 是与 run loop 息息相关的，CFRunLoopTimerRef 与 NSTimer 是可以 toll-free bridged（免费桥接转换）的。当 timer 加到 run loop 的时候，run loop 会注册对应的触发时间点，时间到了，run loop 若处于休眠则会被唤醒，执行 timer 对应的回调函数。
-```c++
-typedef struct CF_BRIDGED_MUTABLE_TYPE(NSTimer) __CFRunLoopTimer * CFRunLoopTimerRef;
-
-struct __CFRunLoopTimer {
-    CFRuntimeBase _base; // 所有 CF "instances" 都是从这个结构开始的
-    uint16_t _bits; // 标记 timer 的状态
-    pthread_mutex_t _lock; // 互斥锁
-    CFRunLoopRef _runLoop; // timer 对应的 run loop，注册在哪个 run loop 中
-    CFMutableSetRef _rlModes; // timer 对应的 run loop modes，内部保存的也是 run loop mode 的名字，也验证了 timer 可以在多个 run loop mode 中使用
-    CFAbsoluteTime _nextFireDate; // timer 的下次触发时机，每次触发后都会再次设置该值
-    CFTimeInterval _interval; /* immutable */
-    CFTimeInterval _tolerance; /* mutable */ // timer 的允许时间偏差
-    uint64_t _fireTSR; /* TSR units */ // timer 本次需要被触发的时间
-    CFIndex _order; /* immutable */
-    
-    // typedef void (*CFRunLoopTimerCallBack)(CFRunLoopTimerRef timer, void *info);
-    CFRunLoopTimerCallBack _callout; /* immutable */ // timer 回调
-    
-    CFRunLoopTimerContext _context; /* immutable, except invalidation */ // timer 上下文，可用于传递参数到 timer 对象的回调函数中。
-};
-```
-&emsp;CFRunLoopTimerContext 的定义。
-```c++
-typedef struct {
-    CFIndex version;
-    void * info;
-    const void *(*retain)(const void *info);
-    void (*release)(const void *info);
-    CFStringRef (*copyDescription)(const void *info);
-} CFRunLoopTimerContext;
-```
-&emsp;本篇主要内容聚焦在 run loop 获取（查找+创建）和 run loop mode 的获取（查找+创建），并大致看下 run loop mode item: CFRunLoopSourceRef、CFRunLoopObserverRef、CFRunLoopTimerRef 的结构定义，下篇我们再详细看它们的操作。
+&emsp;run loop mode 创建好了，看到 source/timer/observer 三者对应的 `_sources0`、`_sources1`、`_observers`、`_timers` 四个字段初始状态都是空，需要我们自己添加 run loop mode item，它们在代码层中对应的数据类型分别是: CFRunLoopSourceRef、CFRunLoopObserverRef、CFRunLoopTimerRef，那么就把它们放在下篇进行分析吧！
 
 ## 参考链接
 **参考链接:🔗**
@@ -1243,3 +1319,6 @@ typedef struct {
 + [RunLoop总结与面试](https://www.jianshu.com/p/3ccde737d3f3)
 + [Runloop-实际开发你想用的应用场景](https://juejin.cn/post/6889769418541252615)
 + [RunLoop 源码阅读](https://juejin.cn/post/6844903592369848328#heading-17)
++ [do {...} while (0) 在宏定义中的作用](https://www.cnblogs.com/lanxuezaipiao/p/3535626.html)
++ [CFRunLoop 源码学习笔记(CF-1151.16)](https://www.cnblogs.com/chengsh/p/8629605.html)
++ [操作系统大端模式和小端模式](https://www.cnblogs.com/wuyuankun/p/3930829.html)
