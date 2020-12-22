@@ -633,7 +633,8 @@ static int32_t __CFRunLoopRun(CFRunLoopRef rl,
         didDispatchPortLastTime = false;
         
         // 若需要 poll 为假，（则需要上面 sourceHandledThisLoop 为假即 rlm 的 _sources0 中没有 source 需要处理且 0ULL == timeout_context->termTSR）
-        // 则调用 __CFRunLoopDoObservers 函数回调 rl 切换到 kCFRunLoopBeforeWaiting，即 rl 即将进入休眠状态
+        // 则调用 __CFRunLoopDoObservers 函数回调 rl 切换到 kCFRunLoopBeforeWaiting，即 rl 即将进入休眠状态。
+        
         if (!poll && (rlm->_observerMask & kCFRunLoopBeforeWaiting)) __CFRunLoopDoObservers(rl, rlm, kCFRunLoopBeforeWaiting);
         
         // 设置 __CFBitfieldSetValue(((CFRuntimeBase *)rl)->_cfinfo[CF_INFO_BITS], 1, 1, 1)，标记 rl 进入休眠状态
