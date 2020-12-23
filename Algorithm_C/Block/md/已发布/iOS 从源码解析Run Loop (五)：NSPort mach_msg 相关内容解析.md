@@ -111,11 +111,37 @@ FOUNDATION_EXPORT NSNotificationName const NSPortDidBecomeInvalidNotification;
 &emsp;NSSocketPort 对象无法检测到其与远程端口的连接何时丢失，即使远程端口位于同一台计算机上。因此，它不能使自己失效并发布此通知。相反，你必须在发送下一条消息时检测超时错误。
 
 &emsp;发布此通知的 NSPort 对象不再有用，因此所有接收者都应该注销自己的任何涉及 NSPort 的通知。接收此通知的方法应在尝试执行任何操作之前检查哪个端口无效。特别是，接收所有 NSPortDidBecomeInvalidNotification 消息的观察者应该知道，与 window server 的通信是通过 NSPort 处理的。如果此端口无效，drawing operations 将导致致命错误。
+## NSMachPort
+&emsp;可以用作分布式对象连接（distributed object connections）（或原始消息传递）端点的端口。
+```c++
+@interface NSMachPort : NSPort {
+    @private
+    id _delegate;
+    NSUInteger _flags;
+    uint32_t _machPort;
+    NSUInteger _reserved;
+}
+```
+&emsp;NSMachPort 是 NSPort 的一个子类，它封装了 Mach 端口，macOS 中的基本通信端口。NSMachPort 只允许本地（在同一台机器上）通信。附带类 NSSocketPort 允许本地和远程分布式对象通信，但是对于本地情况，可能比 NSMachPort 更昂贵。
 
+&emsp;要有效地使用 NSMachPort，你应该熟悉 Mach 端口、端口访问权限和 Mach 消息。有关更多信息，可参阅 Mach OS 文档。
 
+&emsp;NSMachPort 符合 NSCoding 协议，但只支持 NSPortCoder 进行编码。NSPort 及其子类不支持 archiving。
+### portWithMachPort:
+&emsp;创建并返回一个用给定 Mach 端口配置的端口对象。
+```c++
++ (NSPort *)portWithMachPort:(uint32_t)machPort;
+```
+&emsp;`machPort`：新端口的 Mach 端口。此参数原始应为 mach_port_t 类型。
 
+&emsp;返回值是使用 machPort 发送或接收消息的 NSMachPort 对象。
 
+&emsp;如果需要，创建端口对象。根据与 machPort 相关联的访问权限，新端口对象可能仅用于发送消息。
+### portWithMachPort:options:
+&emsp;
+```c++
 
+```
 
 
 
