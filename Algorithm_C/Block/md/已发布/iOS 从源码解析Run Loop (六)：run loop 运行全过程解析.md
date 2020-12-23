@@ -542,7 +542,6 @@ static int32_t __CFRunLoopRun(CFRunLoopRef rl,
         timeout_context->termTSR = UINT64_MAX;
     }
     
-    // 
     Boolean didDispatchPortLastTime = true;
     // 返回值
     int32_t retVal = 0;
@@ -587,8 +586,8 @@ static int32_t __CFRunLoopRun(CFRunLoopRef rl,
         //（我们开始收集这种名字大写的函数，在 run loop 学习过程中我们会遇到多个这种命名方式的函数，当我们都收集完了，那么 run loop 的学习就很熟悉了）
         
         // 目前我们收集到两个：
-        // __CFRUNLOOP_IS_CALLING_OUT_TO_AN_OBSERVER_CALLBACK_FUNCTION__ // run loop observer 回调函数执行
-        // __CFRUNLOOP_IS_CALLING_OUT_TO_A_BLOCK__ // run loop block 链表中的 block 执行
+        // __CFRUNLOOP_IS_CALLING_OUT_TO_AN_OBSERVER_CALLBACK_FUNCTION__ // run loop 的状态发生变化前执行 run loop observer 的回调函数
+        // __CFRUNLOOP_IS_CALLING_OUT_TO_A_BLOCK__ // 执行 run loop 的 block 链表中的 block（block 执行完以后会被释放并移除）
         
         //（可跳到下面先看一下 __CFRunLoopDoBlocks 函数实现）
         __CFRunLoopDoBlocks(rl, rlm); // 5⃣️
@@ -596,30 +595,33 @@ static int32_t __CFRunLoopRun(CFRunLoopRef rl,
         // 处理 rlm 的 _sources0 中的所的 source
         
         // 目前我们收集到三个：
-        // __CFRUNLOOP_IS_CALLING_OUT_TO_AN_OBSERVER_CALLBACK_FUNCTION__
-        // __CFRUNLOOP_IS_CALLING_OUT_TO_A_BLOCK__
-        // __CFRUNLOOP_IS_CALLING_OUT_TO_A_SOURCE0_PERFORM_FUNCTION__
+        // __CFRUNLOOP_IS_CALLING_OUT_TO_AN_OBSERVER_CALLBACK_FUNCTION__ // run loop 的状态发生变化前执行 run loop observer 的回调函数
+        // __CFRUNLOOP_IS_CALLING_OUT_TO_A_BLOCK__ // 执行 run loop 的 block 链表中的 block（block 执行完以后会被释放并移除）
+        // __CFRUNLOOP_IS_CALLING_OUT_TO_A_SOURCE0_PERFORM_FUNCTION__ // 执行 run loop mode 的 _source0 中的 CFRunLoopSourceRef 的 perfom 函数（以其 info 为参数）
         
-        // 处理 rlm 的 _source0 中的 source
+        // 遍历 rlm 的 _source0 中的 CFRunLoopSourceRef 执行其回调函数（ perform(info) ），当执行了 source0 的 perform 函数则返回 true，否则返回 false
         Boolean sourceHandledThisLoop = __CFRunLoopDoSources0(rl, rlm, stopAfterHandle); // 6⃣️
         
-        // sourceHandledThisLoop 的值表示在 __CFRunLoopDoSources0 函数内部是否对 rlm 的 _sources0 中的 CFRunLoopSourceRef 进行了处理，
-        // void (*perform)(void *info) 函数指针指向 _source0 要执行的任务块，当 _source0 事件被触发时的回调
+        // sourceHandledThisLoop 的值表示在 __CFRunLoopDoSources0 函数内部是否对 rlm 的 _sources0 中的 CFRunLoopSourceRef 执行了它的 void (*perform)(void *info) 函数
         
-        // 如果为真则遍历 rl 的 block 链表中的指定在 rlm 下的 block 执行，
-        // 会首先把 rl 的 _blocks_head 和 _blocks_tail 置为 NULL，然后每个 block 执行完毕后会调用 Block_release 函数。
+        // 如果为真则再次遍历 rl 的 block 链表中的在指定 rlm 下执行的 block
         if (sourceHandledThisLoop) {
             __CFRunLoopDoBlocks(rl, rlm);
         }
         
-        // 如果 rlm 的 _sources0 中有 CFRunLoopSourceRef 进行了处理或者 timeout_context->termTSR 等于 0，则 poll 的值为 true 否则为 false
+        // 如果 rlm 的 _sources0 中有 CFRunLoopSourceRef 执行了 perform 函数 或者 timeout_context->termTSR 等于 0，则 poll 的值为 true 否则为 false。
+        // timeout_context->termTSR == 0ULL 的情况：
+        // 1. 当 seconds 入参小于等于 0 时（入参的 run loop 运行时间小于等于 0）
+        // 2. 当👆创建的 timeout_timer 计时被回调时（入参的 run loop 运行时间到了）
+        
         Boolean poll = sourceHandledThisLoop || (0ULL == timeout_context->termTSR);
         
-        // 如果当前是主线程并且 dispatchPort 不为空且 didDispatchPortLastTime 为 false
+        // 如果当前是主线程并且 dispatchPort 不为空且 didDispatchPortLastTime 为 false（ didDispatchPortLastTime 是在 do while 外声明的局部变量，初值为 true）
         if (MACH_PORT_NULL != dispatchPort && !didDispatchPortLastTime) {
 #if DEPLOYMENT_TARGET_MACOSX || DEPLOYMENT_TARGET_EMBEDDED || DEPLOYMENT_TARGET_EMBEDDED_MINI
             // macOS 下执行
             msg = (mach_msg_header_t *)msg_buffer;
+            // 通过端口执行
             if (__CFRunLoopServiceMachPort(dispatchPort,
                                            &msg,
                                            sizeof(msg_buffer),
@@ -630,6 +632,7 @@ static int32_t __CFRunLoopRun(CFRunLoopRef rl,
                 // 执行 handle_msg
                 goto handle_msg;
             }
+            
 #elif DEPLOYMENT_TARGET_WINDOWS
             if (__CFRunLoopWaitForMultipleObjects(NULL, &dispatchPort, 0, 0, &livePort, NULL)) {
                 goto handle_msg;
@@ -640,9 +643,10 @@ static int32_t __CFRunLoopRun(CFRunLoopRef rl,
         // didDispatchPortLastTime 置为 false
         didDispatchPortLastTime = false;
         
-        // 若需要 poll 为假，（则需要上面 sourceHandledThisLoop 为假即 rlm 的 _sources0 中没有 source 需要处理且 0ULL == timeout_context->termTSR）
+        // 若需要 poll 为假，则需要上面 sourceHandledThisLoop 为假即 rlm 的 _sources0 中没有 source 需要执行且 0ULL == timeout_context->termTSR，
         // 则调用 __CFRunLoopDoObservers 函数回调 rl 切换到 kCFRunLoopBeforeWaiting，即 rl 即将进入休眠状态。
-        // 那么这里可以得出一个结论，当 run loop 处理完毕 source0 中的事件后，run loop 就可以进入休眠状态了。
+        
+        // 那么这里可以得出一个结论，当 run loop 执行完 source0 中的事件函数并且入参的 seconds 小于等于 0 或者达到了入参 seconds 的运行时间，则 run loop 可以进入休眠
         
         if (!poll && (rlm->_observerMask & kCFRunLoopBeforeWaiting)) __CFRunLoopDoObservers(rl, rlm, kCFRunLoopBeforeWaiting);
         
@@ -672,11 +676,7 @@ static int32_t __CFRunLoopRun(CFRunLoopRef rl,
 #if USE_DISPATCH_SOURCE_FOR_TIMERS
         // 如果 rlm 使用 dispatch_source 构建的计时器
         
-        // 这个内层的 do while 循环主要是用于 "阻塞" rl 的睡眠状态的，直到需要被唤醒了才会跳出这个 do while 循环，
-        // 
-        //
-        //
-        // 
+        // 这个内层的 do while 循环主要是用于 "保持" run looop 的睡眠状态的，直到需要被唤醒了才会跳出这个 do while 循环
         do {
             if (kCFUseCollectableAllocator) {
                 // objc_clear_stack(0);
@@ -686,10 +686,14 @@ static int32_t __CFRunLoopRun(CFRunLoopRef rl,
                 memset(msg_buffer, 0, sizeof(msg_buffer));
             }
             
-            // 
+            // 强转为 mach_msg_header_t 指针
+            // uint8_t msg_buffer[3 * 1024];
+            // mach_msg_header_t *msg = NULL;
+            
             msg = (mach_msg_header_t *)msg_buffer;
             
             // MachPort
+            // 端口消息（mach_msg）
             __CFRunLoopServiceMachPort(waitSet,
                                        &msg,
                                        sizeof(msg_buffer),
@@ -701,8 +705,9 @@ static int32_t __CFRunLoopRun(CFRunLoopRef rl,
             // modeQueuePort = _dispatch_runloop_root_queue_get_port_4CF(rlm->_queue) 来自于 rlm 的 _queue 队列端口
             if (modeQueuePort != MACH_PORT_NULL && livePort == modeQueuePort) {
                 // Drain the internal queue. If one of the callout blocks sets the timerFired flag, break out and service the timer.
-                // 清空内部队列。如果其中一个标注块设置了timerFired标志，请中断并为计时器提供服务。
+                // 清空内部队列。如果其中一个标注块设置了 timerFired 标志，请中断并为计时器提供服务。
                 
+                // 如果一直能取到 rlm 的 _queue 的端口则一直 while 循环
                 while (_dispatch_runloop_root_queue_perform_4CF(rlm->_queue));
                 
                 // _timerFired 首先赋值为 false，然后在 timer 的回调函数执行的时候会赋值为 true
@@ -712,6 +717,8 @@ static int32_t __CFRunLoopRun(CFRunLoopRef rl,
                 // dispatch_source_set_event_handler(rlm->_timerSource, ^{
                 //     *timerFiredPointer = true;
                 // });
+                // rlm 的 _timerSource 是启动时间是 DISPATCH_TIME_FOREVER，间隔是 DISPATCH_TIME_FOREVER 的计时器
+                // _dispatch_source_set_runloop_timer_4CF(rlm->_timerSource, DISPATCH_TIME_FOREVER, DISPATCH_TIME_FOREVER, 321);
             
                 if (rlm->_timerFired) {
                     // Leave livePort as the queue port, and service timers below
@@ -719,6 +726,7 @@ static int32_t __CFRunLoopRun(CFRunLoopRef rl,
                     
                     // rlm 的 _timerSource 计时器回调后 run loop 会结束休眠
                     rlm->_timerFired = false;
+                    // 离开内循环。
                     break;
                 } else {
                     if (msg && msg != (mach_msg_header_t *)msg_buffer) free(msg);
@@ -726,7 +734,6 @@ static int32_t __CFRunLoopRun(CFRunLoopRef rl,
             } else {
                 // Go ahead and leave the inner loop.
                 // 继续并离开内循环。
-                
                 break;
             }
         } while (1);
@@ -761,7 +768,7 @@ static int32_t __CFRunLoopRun(CFRunLoopRef rl,
         // CFRunLoopMode 加锁
         __CFRunLoopModeLock(rlm);
         
-        // 统计 rl 的休眠时间，CFAbsoluteTimeGetCurrent() 当前时间减去 sleepStart
+        // 统计 rl 的休眠时间，CFAbsoluteTimeGetCurrent() 当前时间减去 sleepStart 休眠开始时间
         rl->_sleepTime += (poll ? 0.0 : (CFAbsoluteTimeGetCurrent() - sleepStart));
         
         // Must remove the local-to-this-activation ports in on every loop iteration, 
@@ -782,6 +789,7 @@ static int32_t __CFRunLoopRun(CFRunLoopRef rl,
         __CFRunLoopUnsetSleeping(rl);
         
         // 调用 __CFRunLoopDoObservers 函数，回调 rl 切换到 kCFRunLoopAfterWaiting 状态了 
+        // !poll 条件用于判断上面有进入休眠状态
         if (!poll && (rlm->_observerMask & kCFRunLoopAfterWaiting)) __CFRunLoopDoObservers(rl, rlm, kCFRunLoopAfterWaiting);
         
     handle_msg:;
@@ -825,7 +833,6 @@ static int32_t __CFRunLoopRun(CFRunLoopRef rl,
             // If we have a new live port then it will be handled below as normal
         }
 #endif
-
         if (MACH_PORT_NULL == livePort) {
             // #define CFRUNLOOP_WAKEUP_FOR_NOTHING() do { } while (0)
             // 如果 livePort 为 NULL，什么也不做
@@ -845,22 +852,25 @@ static int32_t __CFRunLoopRun(CFRunLoopRef rl,
             ResetEvent(rl->_wakeUpPort);
 #endif
         }
+        
         // 如果计时器是使用 dispatch_source 实现的
 #if USE_DISPATCH_SOURCE_FOR_TIMERS
         else if (modeQueuePort != MACH_PORT_NULL && livePort == modeQueuePort) {
-            // 如果 modeQueuePort 不为 NULL，且 modeQueuePort 等于 livePort
+            // 如果 rlm 的 queue 的 modeQueuePort 不为 NULL，且 modeQueuePort 等于 livePort
+            
             // #define CFRUNLOOP_WAKEUP_FOR_TIMER() do { } while (0)
             CFRUNLOOP_WAKEUP_FOR_TIMER();
             
-            if (!__CFRunLoopDoTimers(rl, rlm, mach_absolute_time())) {
+            // 遍历执行 rlm 的 _timers 集合中的 CFRunLoopTimerRef 的回调函数并更新其 `_fireTSR` 和 `_nextFireDate`
+            if (!__CFRunLoopDoTimers(rl, rlm, mach_absolute_time())) { // 7⃣️
                 // Re-arm the next timer, because we apparently fired early
                 // 执行 rlm 的 _timers 中的 CFRunLoopTimerRef。
                 
                 // 目前我们收集到四个：
-                // __CFRUNLOOP_IS_CALLING_OUT_TO_AN_OBSERVER_CALLBACK_FUNCTION__
-                // __CFRUNLOOP_IS_CALLING_OUT_TO_A_BLOCK__
-                // __CFRUNLOOP_IS_CALLING_OUT_TO_A_SOURCE0_PERFORM_FUNCTION__
-                // __CFRUNLOOP_IS_CALLING_OUT_TO_A_TIMER_CALLBACK_FUNCTION__
+                // __CFRUNLOOP_IS_CALLING_OUT_TO_AN_OBSERVER_CALLBACK_FUNCTION__ // run loop 的状态发生变化前执行 run loop observer 的回调函数
+                // __CFRUNLOOP_IS_CALLING_OUT_TO_A_BLOCK__ // 执行 run loop 的 block 链表中的 block（block 执行完以后会被释放并移除）
+                // __CFRUNLOOP_IS_CALLING_OUT_TO_A_SOURCE0_PERFORM_FUNCTION__ // 执行 run loop mode 的 _source0 中的 CFRunLoopSourceRef 的 perfom 函数（以其 info 为参数）
+                // __CFRUNLOOP_IS_CALLING_OUT_TO_A_TIMER_CALLBACK_FUNCTION__ // 执行 run loop mode 的 _timers 中的 CFRunLoopTimerRef 的 _callout 函数（以其 _context.info 为参数）
                 
                 __CFArmNextTimerInMode(rlm, rl);
             }
@@ -871,12 +881,15 @@ static int32_t __CFRunLoopRun(CFRunLoopRef rl,
         else if (rlm->_timerPort != MACH_PORT_NULL && livePort == rlm->_timerPort) {
             // 如果计时器是使用 MK 实现的
             
+            // #define   CFRUNLOOP_WAKEUP_FOR_TIMER() do { } while (0)
             CFRUNLOOP_WAKEUP_FOR_TIMER();
+            
             // On Windows, we have observed an issue where the timer port is set before the time which we requested it to be set. For example, we set the fire time to be TSR 167646765860, but it is actually observed firing at TSR 167646764145, which is 1715 ticks early. The result is that, when __CFRunLoopDoTimers checks to see if any of the run loop timers should be firing, it appears to be 'too early' for the next timer, and no timers are handled.
             // 在 Windows 上，我们发现了一个问题，即在我们要求设置定时器端口之前设置了定时器端口。例如，我们将开火时间设置为 TSR 167646765860，但实际上可以观察到以 TSR 167646764145 开火，这是提早 1715 滴答。结果是，当 __CFRunLoopDoTimers 检查是否应触发任何运行循环计时器时，下一个计时器似乎为时过早，并且不处理任何计时器。
             
             // In this case, the timer port has been automatically reset (since it was returned from MsgWaitForMultipleObjectsEx), and if we do not re-arm it, then no timers will ever be serviced again unless something adjusts the timer list (e.g. adding or removing timers). The fix for the issue is to reset the timer here if CFRunLoopDoTimers did not handle a timer itself. 9308754
             // 在 Windows 上，我们发现了一个问题，即在我们要求设置定时器端口之前设置了定时器端口。例如，我们将开火时间设置为 TSR 167646765860，但实际上可以观察到以 TSR 167646764145开火，这是提早 1715 滴答。结果是，当 __CFRunLoopDoTimers 检查是否应触发任何运行循环计时器时，下一个计时器似乎为时过早，并且不处理任何计时器。
+            
             if (!__CFRunLoopDoTimers(rl, rlm, mach_absolute_time())) {
                 // Re-arm the next timer
                 __CFArmNextTimerInMode(rlm, rl);
@@ -914,14 +927,14 @@ static int32_t __CFRunLoopRun(CFRunLoopRef rl,
             // 设置 TSD 中的 __CFTSDKeyIsInGCDMainQ
             _CFSetTSD(__CFTSDKeyIsInGCDMainQ, (void *)0, NULL);
             
-            // CFRunLoop 加锁
+            // CFRunLoop CFRunLoopMode 加锁
             __CFRunLoopLock(rl);
-            // CFRunLoopMode 加锁
             __CFRunLoopModeLock(rlm);
             
             sourceHandledThisLoop = true;
             didDispatchPortLastTime = true;
         } else {
+            // #define   CFRUNLOOP_WAKEUP_FOR_SOURCE() do { } while (0)
             CFRUNLOOP_WAKEUP_FOR_SOURCE();
             
             // If we received a voucher from this mach_msg, then put a copy of the new voucher into TSD. 
@@ -942,7 +955,11 @@ static int32_t __CFRunLoopRun(CFRunLoopRef rl,
 #if DEPLOYMENT_TARGET_MACOSX || DEPLOYMENT_TARGET_EMBEDDED || DEPLOYMENT_TARGET_EMBEDDED_MINI
                 // macOS 下
                 mach_msg_header_t *reply = NULL;
+                
+                // 执行 source1 回调
+                // __CFRUNLOOP_IS_CALLING_OUT_TO_A_SOURCE1_PERFORM_FUNCTION__
                 sourceHandledThisLoop = __CFRunLoopDoSource1(rl, rlm, rls, msg, msg->msgh_size, &reply) || sourceHandledThisLoop;
+                
                 if (NULL != reply) {
                     (void)mach_msg(reply, MACH_SEND_MSG, reply->msgh_size, 0, MACH_PORT_NULL, 0, MACH_PORT_NULL);
                     CFAllocatorDeallocate(kCFAllocatorSystemDefault, reply);
@@ -955,8 +972,7 @@ static int32_t __CFRunLoopRun(CFRunLoopRef rl,
             
             // Restore the previous voucher
             _CFSetTSD(__CFTSDKeyMachMessageHasVoucher, previousVoucher, os_release);
-            
-        } 
+        }
 #if DEPLOYMENT_TARGET_MACOSX || DEPLOYMENT_TARGET_EMBEDDED || DEPLOYMENT_TARGET_EMBEDDED_MINI
         // 释放 msg 的内存空间
         if (msg && msg != (mach_msg_header_t *)msg_buffer) free(msg);
@@ -965,24 +981,23 @@ static int32_t __CFRunLoopRun(CFRunLoopRef rl,
         // 执行 rl 的 block 链表中的 block
         __CFRunLoopDoBlocks(rl, rlm);
         
-        // 
         if (sourceHandledThisLoop && stopAfterHandle) {
             // 已处理过一个源，继续处理
-            retVal = kCFRunLoopRunHandledSource;
+            retVal = kCFRunLoopRunHandledSource; // 4
         } else if (timeout_context->termTSR < mach_absolute_time()) {
             // 超时
-            retVal = kCFRunLoopRunTimedOut;
+            retVal = kCFRunLoopRunTimedOut; // 3
         } else if (__CFRunLoopIsStopped(rl)) {
             // 停止
             __CFRunLoopUnsetStopped(rl);
-            retVal = kCFRunLoopRunStopped;
+            retVal = kCFRunLoopRunStopped; // 2
         } else if (rlm->_stopped) {
             // rlm 停止
             rlm->_stopped = false;
-            retVal = kCFRunLoopRunStopped;
+            retVal = kCFRunLoopRunStopped; // 2
         } else if (__CFRunLoopModeIsEmpty(rl, rlm, previousMode)) {
             // rlm 为的  source/timer/ block 为空
-            retVal = kCFRunLoopRunFinished;
+            retVal = kCFRunLoopRunFinished; // 1
         }
         
 #if DEPLOYMENT_TARGET_MACOSX || DEPLOYMENT_TARGET_EMBEDDED || DEPLOYMENT_TARGET_EMBEDDED_MINI
@@ -994,7 +1009,6 @@ static int32_t __CFRunLoopRun(CFRunLoopRef rl,
         
     } while (0 == retVal); // 外层的 do while 循环结束的条件是 retVal 不等于 0 时
     
-    // 释放 
     if (timeout_timer) {
         // 取消计时器，会在取消的回调函数 __CFRunLoopTimeoutCancel 里面做清理工作 
         dispatch_source_cancel(timeout_timer);
@@ -1002,7 +1016,7 @@ static int32_t __CFRunLoopRun(CFRunLoopRef rl,
         dispatch_release(timeout_timer);
     } else {
         // 释放 timeout_context，
-        // 对应前面的 timeout_context = (struct __timeout_context *)malloc(sizeof(*timeout_context))，malloc 申请空间
+        // 对应前面的 timeout_context = (struct __timeout_context *)malloc(sizeof(*timeout_context))，malloc 的申请空间。
         free(timeout_context);
     }
     
@@ -1262,7 +1276,7 @@ static void __CFRUNLOOP_IS_CALLING_OUT_TO_A_BLOCK__(void (^block)(void)) {
 }
 ```
 #### \__CFRunLoopDoSources0
-&emsp;`__CFRunLoopDoSources0` 函数
+&emsp;`__CFRunLoopDoSources0` 函数是遍历收集 rlm 的 _source0 把 Valid、Signaled 的 CFRunLoopSourceRef 收集起来，然后执行以 source0 的 info 为参数执行 source0 的 perform 函数，且会把 CFRunLoopSourceRef 置为 UnsetSignaled，防止再次执行。
 ```c++
 /* rl is locked, rlm is locked on entrance and exit */
 
@@ -1293,34 +1307,63 @@ static Boolean __CFRunLoopDoSources0(CFRunLoopRef rl, CFRunLoopModeRef rlm, Bool
         __CFRunLoopUnlock(rl);
         
         // sources is either a single (retained) CFRunLoopSourceRef or an array of (retained) CFRunLoopSourceRef
+        // 源可以是单个（保留的）CFRunLoopSourceRef，也可以是（保留的）CFRunLoopSourceRef 数组
+        
         if (CFGetTypeID(sources) == CFRunLoopSourceGetTypeID()) {
+            // 如果 sources 是 CFRunLoopSourceRef
             CFRunLoopSourceRef rls = (CFRunLoopSourceRef)sources;
+            
             // CFRunLoopSource 加锁
             __CFRunLoopSourceLock(rls);
+            
+            // (Boolean)__CFBitfieldGetValue(rls->_bits, 1, 1) 
+            // 判断 _bits  位
             if (__CFRunLoopSourceIsSignaled(rls)) {
+                // __CFBitfieldSetValue(rls->_bits, 1, 1, 0);
+                // 置为 0，表示 unset 状态
+                
+                //（这里把 rls 设置为 UnsetSignaled 的以后，此 rls 以后就不会再被执行了，这里同 run loop 的 block 链表不同，
+                // block 链表是 block 执行完以后直接把 block 从链表中移除了，source0 这里则是把执行过的 CFRunLoopSource 置为一个状态（相当于已经被执行过的状态了）。）
                 __CFRunLoopSourceUnsetSignaled(rls);
+                
+                // (Boolean)__CFBitfieldGetValue(((const CFRuntimeBase *)cf)->_cfinfo[CF_INFO_BITS], 3, 3)
+                // _cfinfo 位表示有效有效
                 if (__CFIsValid(rls)) {
+                    // CFRunLoopSource 解锁
                     __CFRunLoopSourceUnlock(rls);
+                    
+                    // 以 source0 的 void * info 为参数，执行 source0 的 void (*perform)(void *info) 函数
                     __CFRUNLOOP_IS_CALLING_OUT_TO_A_SOURCE0_PERFORM_FUNCTION__(rls->_context.version0.perform, rls->_context.version0.info);
+                    
                     CHECK_FOR_FORK();
+                    // 标记 source0 被执行了
                     sourceHandled = true;
                 } else {
+                    // CFRunLoopSource 解锁
                     __CFRunLoopSourceUnlock(rls);
                 }
             } else {
+                // CFRunLoopSource 解锁
                 __CFRunLoopSourceUnlock(rls);
             }
         } else {
             CFIndex cnt = CFArrayGetCount((CFArrayRef)sources);
+            // 对数组中的 CFRunLoopSourceRef 进行排序，排序规则是 __CFRunLoopSourceComparator，其内部是根据 CFRunLoopSourceRef 的 _order 字段进行排序
             CFArraySortValues((CFMutableArrayRef)sources, CFRangeMake(0, cnt), (__CFRunLoopSourceComparator), NULL);
+            
+            // 然后就遍历数组中的 CFRunLoopSourceRef，同上以 source0 的 info 为参数执行 source0 的 perform 函数
             for (CFIndex idx = 0; idx < cnt; idx++) {
                 CFRunLoopSourceRef rls = (CFRunLoopSourceRef)CFArrayGetValueAtIndex((CFArrayRef)sources, idx);
                 __CFRunLoopSourceLock(rls);
                 if (__CFRunLoopSourceIsSignaled(rls)) {
+                    // 置为 UnsetSignaled
                     __CFRunLoopSourceUnsetSignaled(rls);
                     if (__CFIsValid(rls)) {
                         __CFRunLoopSourceUnlock(rls);
+                        
+                        // 执行 
                         __CFRUNLOOP_IS_CALLING_OUT_TO_A_SOURCE0_PERFORM_FUNCTION__(rls->_context.version0.perform, rls->_context.version0.info);
+                        
                         CHECK_FOR_FORK();
                         sourceHandled = true;
                     } else {
@@ -1345,7 +1388,7 @@ static Boolean __CFRunLoopDoSources0(CFRunLoopRef rl, CFRunLoopModeRef rlm, Bool
 }
 ```
 ##### \__CFRunLoopCollectSources0
-&emsp;`__CFRunLoopCollectSources0` 函数
+&emsp;`__CFRunLoopCollectSources0` 函数是把 Valid、Signaled 的 source0 的  CFRunLoopSourceRef 收集到入参 `context` 中。
 ```c++
 static void __CFRunLoopCollectSources0(const void *value, void *context) {
     // 类型转换，
@@ -1381,14 +1424,67 @@ static void __CFRunLoopCollectSources0(const void *value, void *context) {
     }
 }
 ```
+##### \_\_CFRUNLOOP_IS_CALLING_OUT_TO_A_SOURCE0_PERFORM_FUNCTION\_\_
+&emsp;`__CFRUNLOOP_IS_CALLING_OUT_TO_A_SOURCE0_PERFORM_FUNCTION__` 函数以 info 做参执行 source0 中 perform 函数。
+```c++
+static void __CFRUNLOOP_IS_CALLING_OUT_TO_A_SOURCE0_PERFORM_FUNCTION__(void (*perform)(void *), void *info) {
+    if (perform) {
+        perform(info);
+    }
+    asm __volatile__(""); // thwart tail-call optimization
+}
+```
+#### \__CFRunLoopDoTimers
+&emsp;`__CFRunLoopDoTimers` 函数执行 CFRunLoopTimerRef 的回调函数并更新其 `_fireTSR` 和 `_nextFireDate`。
+```c++
+/* rl and rlm are locked on entry and exit */
 
+/* 
+* 进入 __CFRunLoopDoTimers 函数前 rl 和 rlm 的 _lock 都已经加锁了，
+* 在 __CFRunLoopDoTimers 函数内部当需要执行回调时，会对 rl 和 rlm 进行解锁，
+* 然后在回调函数执行完成后，会重新对 rl 和 rlm 进行加锁。
+*/
 
-
-
-
-
-
-
+static Boolean __CFRunLoopDoTimers(CFRunLoopRef rl, CFRunLoopModeRef rlm, uint64_t limitTSR) {    /* DOES CALLOUT */
+    // timerHandled 标记是否执行了 timer 的回调事件
+    Boolean timerHandled = false;
+    
+    CFMutableArrayRef timers = NULL;
+    
+    // 遍历 rlm 的 _timers 数组中的 CFRunLoopTimerRef，如果 CFRunLoopTimerRef 是 Valid 并且非 Firing 状态并且其 _fireTSR 小于等于 limitTSR 时间，则把其添加到 timers 中
+    // （小于等于 limitTSR 本次的 timer 回调会被忽略）
+    for (CFIndex idx = 0, cnt = rlm->_timers ? CFArrayGetCount(rlm->_timers) : 0; idx < cnt; idx++) {
+        CFRunLoopTimerRef rlt = (CFRunLoopTimerRef)CFArrayGetValueAtIndex(rlm->_timers, idx);
+        if (__CFIsValid(rlt) && !__CFRunLoopTimerIsFiring(rlt)) {
+            if (rlt->_fireTSR <= limitTSR) {
+                // 首次进来需要为 timers 申请空间
+                if (!timers) timers = CFArrayCreateMutable(kCFAllocatorSystemDefault, 0, &kCFTypeArrayCallBacks);
+                
+                // 把 rlt 添加到 timers 中
+                CFArrayAppendValue(timers, rlt);
+            }
+        }
+    }
+    
+    // 遍历 timers 数组，执行 CFRunLoopTimerRef 的回调函数
+    for (CFIndex idx = 0, cnt = timers ? CFArrayGetCount(timers) : 0; idx < cnt; idx++) {
+        CFRunLoopTimerRef rlt = (CFRunLoopTimerRef)CFArrayGetValueAtIndex(timers, idx);
+        
+        // __CFRUNLOOP_IS_CALLING_OUT_TO_A_TIMER_CALLBACK_FUNCTION__ 执行 CFRunLoopTimerRef 的回调函数，
+        // 并更新其 _fireTSR 和 _nextFireDate。
+        
+        Boolean did = __CFRunLoopDoTimer(rl, rlm, rlt);
+        
+        // did 为 true 则 timerHandled 也为 true，否则为 false
+        timerHandled = timerHandled || did;
+    }
+    
+    // 释放 timers
+    if (timers) CFRelease(timers);
+    return timerHandled;
+}
+```
+&emsp;`__CFRunLoopRun` 函数到这里就看完了，包含 observer/source0/source1/timer/block 的执行逻辑，以及 run loop 休眠唤醒的逻辑。 port 和 mach_msg 相关的内容还要开一篇系统学习一下。⛽️⛽️
 
 ## 参考链接
 **参考链接:🔗**
