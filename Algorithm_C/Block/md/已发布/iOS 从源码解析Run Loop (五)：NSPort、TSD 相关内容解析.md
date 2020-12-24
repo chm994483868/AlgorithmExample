@@ -6,6 +6,8 @@
 
 &emsp;下面看一段 NSMachPort 的实例代码：
 ```c++
+// ViewController 遵守 NSMachPortDelegate 协议
+
 - (void)viewDidLoad {
     [super viewDidLoad];
     // Do any additional setup after loading the view.
@@ -24,6 +26,16 @@
 - (void)handleMachMessage:(void *)msg {
     NSLog(@"📢📢 Mach port %s", msg);
 }
+
+// 也可以用 handlePortMessage: 委托函数，这样则是把 mach msg 包装成 NSPortMessage，
+// 如果两个委托函数都实现的话则只执行 handleMachMessage:，
+// NSMachPortDelegate 协议是继承自 NSPortDelegate协议的，
+// handlePortMessage: 是 NSPortDelegate 协议下的可选委托函数，
+// handleMachMessage: 是 NSMachPortDelegate 协议下的可选委托函数。
+
+//- (void)handlePortMessage:(NSPortMessage *)message {
+//    NSLog(@"📢📢 Mach port %@", message);
+//}
 
 - (void)customThread:(NSMachPort *)sender {
     NSLog(@"😻😻 %@", sender);
