@@ -1,7 +1,48 @@
-# iOS 从源码解析Run Loop (五)：NSPort mach_msg 相关内容解析
+# iOS 从源码解析Run Loop (五)：NSPort、TSD 相关内容解析
 
 > &emsp;Port 相关的内容不知道如何入手学习，那么就从 NSPort 开始吧。
 
+&emsp; Cocoa Foundation 为 iOS 线程间通信提供 2 种方式，1 种是 performSelector，另 1 种是 Port。performSelector 在前面文章我们已经详细学习过，这里只看第二中：NSMachPort 方式。NSPort 有 3 个子类，NSSocketPort、NSMessagePort、NSMachPort，但在 iOS 下只有 NSMachPort 可用。使用的方式为接收线程中注册 NSMachPort，在另外的线程中使用此 port 发送消息，则被注册线程会收到相应消息，然后最终在主线程里调用某个回调函数。可以看到，使用 NSMachPort 的结果为调用了其它线程的 1 个函数，而这正是 performSelector 所做的事情，所以，NSMachPort 是个鸡肋，线程间通信应该都通过 performSelector 来搞定。
+
+&emsp;下面看一段 NSMachPort 的实例代码：
+```c++
+- (void)viewDidLoad {
+    [super viewDidLoad];
+    // Do any additional setup after loading the view.
+    NSLog(@"🔞 START: %@", [NSThread currentThread]);
+
+    NSMachPort *port = [[NSMachPort alloc] init];
+    [port setDelegate:self];
+    
+    [[NSRunLoop currentRunLoop] addPort:port forMode:NSRunLoopCommonModes];
+    NSLog(@"🙀🙀 %@", port);
+    [NSThread detachNewThreadSelector:@selector(customThread:) toTarget:self withObject:port];
+    
+    NSLog(@"🔞 END: %@", [NSThread currentThread]);
+}
+
+- (void)handleMachMessage:(void *)msg {
+    NSLog(@"📢📢 Mach port %s", msg);
+}
+
+- (void)customThread:(NSMachPort *)sender {
+    NSLog(@"😻😻 %@", sender);
+    
+    NSMachPort *p = [[NSMachPort alloc] init];
+    [sender sendBeforeDate:[NSDate distantFuture] components:nil from:p reserved:0];
+    
+    NSLog(@"🤏🤏 subthread=%@", [NSThread currentThread]);
+}
+
+// 控制台打印:
+🔞 START: <NSThread: 0x6000022883c0>{number = 1, name = main}
+🙀🙀 <NSMachPort: 0x600000098210>
+🔞 END: <NSThread: 0x6000022883c0>{number = 1, name = main}
+😻😻 <NSMachPort: 0x600000098210>
+🤏🤏 subthread=<NSThread: 0x6000022c6500>{number = 6, name = (null)}
+📢📢 Mach port 
+```
+&emsp;相比 performSelector 而言，没有那么灵活，但是 Port 的功能绝不拘泥于此，下面详细看下 NSPort 的文档。
 ## NSPort 
 &emsp;`NSPort` 表示通信通道（communication channel）的抽象类。
 ```c++
@@ -684,9 +725,11 @@ if (pthread_equal(t, pthread_self())) {
 }
 ...
 ```
-&emsp;判断当前调用 `_CFRunLoopGet0` 函数的线程是否和参数 t 是同一条线程，如果是的话则调用 `_CFSetTSD(__CFTSDKeyRunLoop, (void *)loop, NULL);` 函数把创建好的当前线程的 run loop 对象 loop 存储在当前线程 TSD 中 \__CFTSDTable 实例的 data 数组的  `__CFTSDKeyRunLoop`（10）索引处。
+&emsp;首先外层 if 判断当前调用 `_CFRunLoopGet0` 函数的线程是否和参数 t 是同一条线程，如果是的话则调用 `_CFSetTSD(__CFTSDKeyRunLoop, (void *)loop, NULL);` 函数把创建好的当前线程的 run loop 对象 loop 存储在当前线程 TSD 中 \__CFTSDTable 实例的 data 数组的  `__CFTSDKeyRunLoop`（10）索引处。
 
 &emsp;`_CFSetTSD(__CFTSDKeyRunLoopCntr, (void *)(PTHREAD_DESTRUCTOR_ITERATIONS-1), (void (*)(void *))__CFFinalizeRunLoop);` 函数把 `PTHREAD_DESTRUCTOR_ITERATIONS-1` 存储在当前线程 TSD 中 \__CFTSDTable 实例的 data 数组的  `__CFTSDKeyRunLoopCntr`（11） 索引处，把 `__CFFinalizeRunLoop` 存储在当前线程 TSD 中 \__CFTSDTable 实例的 destructors 数组的  `__CFTSDKeyRunLoopCntr`（11） 索引处。`__CFFinalizeRunLoop` 函数是 run loop 对象的析构函数。
+
+&emsp;看到 run loop 对象和 run loop 对象的析构函数都保存在了线程的 TSD 中。在 `__CFTSDGetTable` 函数中我们看到 `pthread_key_init_np(CF_TSD_KEY, __CFTSDFinalize);` 即线程销毁时会调用 `__CFTSDFinalize` 函数，而在 `__CFTSDFinalize` 函数内，则会遍历 \__CFTSDTable 实例中的 data 数组，把 data 数组每个元素置为 NULL，并以每个 data 数组元素为参数执行 destructors 数组中对应的析构函数。
 
 &emsp;`PTHREAD_DESTRUCTOR_ITERATIONS` 是线程退出时销毁其私有数据 TSD 的最大次数。
 
@@ -709,3 +752,8 @@ if (pthread_equal(t, pthread_self())) {
 + [CFRunLoop 源码学习笔记(CF-1151.16)](https://www.cnblogs.com/chengsh/p/8629605.html)
 + [操作系统大端模式和小端模式](https://www.cnblogs.com/wuyuankun/p/3930829.html)
 + [CFBag](https://nshipster.cn/cfbag/)
++ [iOS 线程通信 NSPort](http://blog.sina.com.cn/s/blog_7815a31f0101ea0n.html)
++ [iOS开发·RunLoop源码与用法完全解析(输入源，定时源，观察者，线程间通信，端口间通信，NSPort，NSMessagePort，NSMachPort，NSPortMessage)](https://cloud.tencent.com/developer/article/1332254)
++ [RunLoop NSMachPort 详解](https://blog.csdn.net/jeffasd/article/details/52027733)
++ [iOS-NSRunLoop编程详解](https://www.cnblogs.com/fanyiyao-980404514/p/4227536.html)
++ [iOS开发之线程间的MachPort通信与子线程中的Notification转发](https://www.cnblogs.com/ludashi/p/7460907.html)
