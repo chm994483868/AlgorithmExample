@@ -1,7 +1,37 @@
 # iOS 从源码解析Run Loop (七)：mach msg 解析
-> &emsp;经过前面 NSPort 内容的学习，我们大概能对 port 有一点模糊的概念，那么本篇我们学习一下 Mach 消息。
+> &emsp;经过前面 NSPort 内容的学习，我们大概对 port 在线程通信中的使用有一点模糊的概念了，那么本篇我们学习一下 Mach。
+
+&emsp;Run Loop 最核心的事情就是保证线程在没有消息时休眠以避免占用系统资源，有消息时能够及时唤醒。Run Loop 的这个机制完全依靠系统内核来完成，具体来说是苹果操作系统核心组件 Darwin 中的 Mach 来完成的。**Mach 与 BSD、File System、Mach、Networking 共同位于 Kernel and Device Drivers 层。**
+
+&emsp;Mach 是 Darwin 的核心，可以说是内核的核心，提供了进程间通信（IPC）、处理器调度等基础服务。在 Mach 中，进程、线程间的通信是以消息的方式来完成的，消息在两个 Port 之间进行传递（这也正是 Source1 之所以称之为 Port-based Source 的原因，因为它就是依靠系统发送消息到指定的 Port 来触发）。消息的发送和接收使用 `mach_msg` 函数，而 `mach_msg` 的本质是调用了 `mach_msg_trap`，这相当于一个系统调用，会触发内核态与用户态的切换。
+
+&emsp;当程序没有 source/timer 需要处理时，run loop 会进入休眠状态。通过上篇 \__CFRunLoopRun 函数的学习，已知 run loop 进入休眠状态时会调用 \__CFRunLoopServiceMachPort 函数，该函数内部即调用了 `mach_msg` 相关的函数操作使得系统内核状态发生改变：用户态切换至内核态。
+
+&emsp;点击 App 图标，App 启动完成处于静止状态时，此时主线程的 run loop 会进入休眠状态，通过在主线程的 run loop 添加 CFRunLoopObserverRef 在回调函数中可看到主线程的 run loop 的最后活动状态是 kCFRunLoopBeforeWaiting，此时点击 Xcode 控制台底部的 Pause program execution 按钮，可看到主线程的调用栈停在了 mach_msg_trap，在控制台输入 bt 回车，可看到如下调用栈：
+```c++
+(lldb) bt
+* thread #1, queue = 'com.apple.main-thread', stop reason = signal SIGSTOP
+  * frame #0: 0x00007fff60c51e6e libsystem_kernel.dylib`mach_msg_trap + 10 // ⬅️ mach_msg_trap
+    frame #1: 0x00007fff60c521e0 libsystem_kernel.dylib`mach_msg + 60
+    frame #2: 0x00007fff2038e9bc CoreFoundation`__CFRunLoopServiceMachPort + 316 // ⬅️ __CFRunLoopServiceMachPort 进入休眠
+    frame #3: 0x00007fff203890c5 CoreFoundation`__CFRunLoopRun + 1284 // ⬅️ __CFRunLoopRun
+    frame #4: 0x00007fff203886d6 CoreFoundation`CFRunLoopRunSpecific + 567 // ⬅️  CFRunLoopRunSpecific
+    frame #5: 0x00007fff2bededb3 GraphicsServices`GSEventRunModal + 139
+    frame #6: 0x00007fff24690e0b UIKitCore`-[UIApplication _run] + 912 // ⬅️ main run loop 启动
+    frame #7: 0x00007fff24695cbc UIKitCore`UIApplicationMain + 101
+    frame #8: 0x0000000107121d4a Simple_iOS`main(argc=1, argv=0x00007ffee8addcf8) at main.m:20:12
+    frame #9: 0x00007fff202593e9 libdyld.dylib`start + 1
+    frame #10: 0x00007fff202593e9 libdyld.dylib`start + 1
+(lldb) 
+```
+&emsp;可看到 run loop 从启动函数一步步进入到 mach_msg_trap。
+
+&emsp;mach_msg 函数可以设置 timeout 参数，如果在 timeout 到来之前没有读到 msg，当前线程的 run loop 会处于休眠状态。
+
+
 
 &emsp;在前面 NSPort 的学习中提到：`handleMachMessage:` 提供以 msg_header_t（mach_msg_header_t） 结构开头的 "原始 Mach 消息" 的消息，以及 NSMachPort 中： `+ (NSPort *)portWithMachPort:(uint32_t)machPort;` 函数中 `machPort` 参数原始为 mach_port_t 类型。
+
 ## mach_msg_header_t
 &emsp;
 ```c++
@@ -9,8 +39,11 @@ typedef struct{
     // typedef unsigned int mach_msg_bits_t;
     mach_msg_bits_t       msgh_bits;
     
-    // typedef natural_t mach_msg_size_t; => typedef __darwin_natural_t natural_t; => typedef unsigned int __darwin_natural_t;
-    mach_msg_size_t       msgh_size;
+    // typedef natural_t mach_msg_size_t; => 
+    // typedef __darwin_natural_t natural_t; => 
+    // typedef unsigned int __darwin_natural_t;
+    // 实际类型是 unsigned int
+    mach_msg_size_t       msgh_size; 
     
     // typedef __darwin_mach_port_t mach_port_t; => 
     mach_port_t           msgh_remote_port;
