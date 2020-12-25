@@ -28,6 +28,34 @@
 
 &emsp;mach_msg 函数可以设置 timeout 参数，如果在 timeout 到来之前没有读到 msg，当前线程的 run loop 会处于休眠状态。
 
+&emsp;通过上面简略的分析大概我们知道了 `mach_msg` 函数的使用是和 Port 相关的，那么从第一看 run loop 到现在我们在代码层面有遇到过哪些 Port 呢？下面我们就一起回顾一下。
+## \__CFRunLoop \_wakeUpPort
+&emsp;struct \__CFRunLoop 结构体的成员变量 \__CFPort \_wakeUpPort 应该是我们见到的第一个 Port，它被用于 `CFRunLoopWakeUp` 函数来唤醒 run loop。
+```c++
+struct __CFRunLoop {
+    ...
+    // typedef mach_port_t __CFPort;
+    __CFPort _wakeUpPort; // used for CFRunLoopWakeUp 用于 CFRunLoopWakeUp 函数
+    ...
+};
+```
+&emsp;当为线程创建 run loop 对象时会对直接对 run loop 的 \_wakeUpPort 成员变量进行初始化。在 `__CFRunLoopCreate` 函数中初始化 \_wakeUpPort。
+```c++
+static CFRunLoopRef __CFRunLoopCreate(pthread_t t) {
+    ...
+    loop->_wakeUpPort = __CFPortAllocate();
+    if (CFPORT_NULL == loop->_wakeUpPort) HALT; // 创建失败的话会直接 crash
+    ...
+}
+```
+
+
+
+
+
+
+
+
 
 
 &emsp;在前面 NSPort 的学习中提到：`handleMachMessage:` 提供以 msg_header_t（mach_msg_header_t） 结构开头的 "原始 Mach 消息" 的消息，以及 NSMachPort 中： `+ (NSPort *)portWithMachPort:(uint32_t)machPort;` 函数中 `machPort` 参数原始为 mach_port_t 类型。
