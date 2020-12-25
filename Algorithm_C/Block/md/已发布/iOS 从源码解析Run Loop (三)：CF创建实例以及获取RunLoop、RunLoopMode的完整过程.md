@@ -795,7 +795,7 @@ static CFRunLoopRef __CFRunLoopCreate(pthread_t t) {
     
     // 给 loop 的 _wakeUpPort 唤醒端口赋值，这里 loop 会持有 port 对象，在合适的时候需要进行一次释放。
     loop->_wakeUpPort = __CFPortAllocate();
-    if (CFPORT_NULL == loop->_wakeUpPort) HALT;
+    if (CFPORT_NULL == loop->_wakeUpPort) HALT; // 这里超级重要，_wakeUpPort 必须创建成功并且直接关乎到 run loop 的唤醒，如果创建失败的话则直接 crash。
     
     // 设置 loop 的 _perRunData->ignoreWakeUps 为 0x57414B45，
     // 前面 __CFRunLoopPushPerRunData 初始化时 _perRunData->ignoreWakeUps 的值是 0x00000000。

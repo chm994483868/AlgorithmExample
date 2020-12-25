@@ -1,28 +1,34 @@
 # iOS 从源码解析Run Loop (五)：NSPort、TSD 相关内容解析
 
-> &emsp;Port 相关的内容不知道如何入手学习，那么就从 NSPort 开始吧。
+> &emsp;Port 相关的内容不知道如何入手学习，那么就从 NSPort 开始吧。Port 相关的内容是极其重要的，source1（port-based input sources） 以及 run loop 的唤醒相关的内容都是通过端口来实现的，不要焦虑不要浮躁静下心来，死磕下去！！⛽️⛽️
 
-&emsp; Cocoa Foundation 为 iOS 线程间通信提供 2 种方式，1 种是 performSelector，另 1 种是 Port。performSelector 在前面文章我们已经详细学习过，这里只看第二中：NSMachPort 方式。NSPort 有 3 个子类，NSSocketPort、NSMessagePort、NSMachPort，但在 iOS 下只有 NSMachPort 可用。使用的方式为接收线程中注册 NSMachPort，在另外的线程中使用此 port 发送消息，则被注册线程会收到相应消息，然后最终在主线程里调用某个回调函数。可以看到，使用 NSMachPort 的结果为调用了其它线程的 1 个函数，而这正是 performSelector 所做的事情，所以，NSMachPort 是个鸡肋，线程间通信应该都通过 performSelector 来搞定。
-
-&emsp;下面看一段 NSMachPort 的实例代码：
+&emsp; Cocoa Foundation 为 iOS 线程间通信提供 2 种方式，1 种是 performSelector，另 1 种是 Port。performSelector 在前面文章我们已经详细学习过，这里只看第二种：NSMachPort 方式。NSPort 有 3 个子类，NSSocketPort、NSMessagePort、NSMachPort，但在 iOS 下只有 NSMachPort 可用。使用的方式为接收线程中注册 NSMachPort，在另外的线程中使用此 port 发送消息，则被注册线程会收到相应消息，然后最终在主线程里调用某个回调函数（handleMachMessage:/handlePortMessage:）。可以看到，使用 NSMachPort 的结果为调用了其它线程的 1 个函数，而这也正是 performSelector 所做的事情。
+## NSMachPort 使用
+&emsp;下面看一段 NSMachPort 的实例代码：（也可以先看下面的 NSPort 相关的文档然后再回过头来看此处的使用示例）
 ```c++
-// ViewController 遵守 NSMachPortDelegate 协议
+// ViewController 遵循 NSMachPortDelegate 协议
 
 - (void)viewDidLoad {
     [super viewDidLoad];
     // Do any additional setup after loading the view.
     NSLog(@"🔞 START: %@", [NSThread currentThread]);
 
+    // 1. 创建 NSMachPort 对象，并把当前 vc 设置为它的 delegate
     NSMachPort *port = [[NSMachPort alloc] init];
     [port setDelegate:self];
     
+    // 2. 把 NSMachPort 对象添加到主线程的 run loop 的 NSRunLoopCommonModes 模式下
     [[NSRunLoop currentRunLoop] addPort:port forMode:NSRunLoopCommonModes];
     NSLog(@"🙀🙀 %@", port);
+    
+    // 3. 开辟子线程并把 main run loop 的 NSMachPort 对象作为参数传递，下面需要在子线程中使用 NSMachPort 对象向主线程的 run loop 发送消息，
+    //   （当主线程的 run loop 收到消息时调用下面的 handleMachMessage: 代理方法，这样子线程就通过 NSMachPort 对象完成了与主线程的通信）
     [NSThread detachNewThreadSelector:@selector(customThread:) toTarget:self withObject:port];
     
     NSLog(@"🔞 END: %@", [NSThread currentThread]);
 }
 
+// 4. 在当前 VC 实现 NSMachPortDelegate 协议的委托方法
 - (void)handleMachMessage:(void *)msg {
     NSLog(@"📢📢 Mach port %s", msg);
 }
@@ -41,6 +47,8 @@
     NSLog(@"😻😻 %@", sender);
     
     NSMachPort *p = [[NSMachPort alloc] init];
+    
+    // 5. 通过和主线程关联的 NSMachPort 对象向主线程的 run loop 发送消息
     [sender sendBeforeDate:[NSDate distantFuture] components:nil from:p reserved:0];
     
     NSLog(@"🤏🤏 subthread=%@", [NSThread currentThread]);
@@ -54,13 +62,36 @@
 🤏🤏 subthread=<NSThread: 0x6000022c6500>{number = 6, name = (null)}
 📢📢 Mach port 
 ```
-&emsp;相比 performSelector 而言，没有那么灵活，但是 Port 的功能绝不拘泥于此，下面详细看下 NSPort 的文档。
-## NSPort 
+&emsp;MachPort 的工作方式其实是将 NSMachPort 对象添加到一个线程所对应的 run loop 中，并给 NSMachPort 对象设置相应的代理。在其他线程中调用该 MachPort 对象发消息时会在 MachPort 所关联的线程中执行相关的代理方法。
+
+&emsp;[iOS开发之线程间的MachPort通信与子线程中的Notification转发](https://www.cnblogs.com/ludashi/p/7460907.html) 大佬的文章描述了一个使用 NSMachPort 在线程间通信的场景。
+```c++
+- (void)viewDidLoad {
+    [super viewDidLoad];
+    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(customNotify) name:@"NOMO" object:nil];
+    NSLog(@"✉️✉️: %@", [NSThread currentThread]);
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSLog(@"✉️✉️ SEND: %@", [NSThread currentThread]);
+        [[NSNotificationCenter defaultCenter] postNotificationName:@"NOMO" object:nil];
+    });
+}
+
+- (void)customNotify {
+    NSLog(@"✉️✉️ RECEIVE: %@", [NSThread currentThread]);
+}
+
+// 控制台打印：
+✉️✉️: <NSThread: 0x283379a40>{number = 1, name = main}
+✉️✉️ SEND: <NSThread: 0x28331ed40>{number = 5, name = (null)}
+✉️✉️ RECEIVE: <NSThread: 0x28331ed40>{number = 5, name = (null)}
+```
+&emsp;看大佬的文章时学到一个新知识点，就是上面的示例代码中，虽然是在主线程中添加的观察者，但是如果在子线程中发出通知，那么就在该子线程中处理通知所关联的方法。[Delivering Notifications To Particular Threads](https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/Notifications/Articles/Threading.html#//apple_ref/doc/uid/20001289-CEGJFDFG)
+## NSPort（官方文档翻译）
 &emsp;`NSPort` 表示通信通道（communication channel）的抽象类。
 ```c++
 @interface NSPort : NSObject <NSCopying, NSCoding>
 ```
-&emsp;通信发生在 NSPort 对象之间，这些对象通常位于不同的线程或任务中。分布式对象系统（distributed objects system）使用 NSPort 对象来回发送 NSPortMessage 对象。尽可能使用分布式对象（distributed objects）实现应用程序间通信（interapplication communication），并且仅在必要时使用 NSPort 对象。
+&emsp;通信发生在 NSPort 对象之间，这些对象通常位于不同的线程或任务中。分布式对象系统（distributed objects system）使用 NSPort 对象来回发送 NSPortMessage（定义在 macOS 中） 对象。尽可能使用分布式对象（distributed objects）实现应用程序间通信（interapplication communication），并且仅在必要时使用 NSPort 对象。
 
 &emsp;要接收传入的消息，必须将 NSPort 对象作为 input sources 添加到 NSRunLoop 对象中。 NSConnection 对象在初始化时会自动添加其接收端口（receive port）。
 
@@ -436,7 +467,7 @@ typedef int NSSocketNativeHandle;
 @property (readonly) NSSocketNativeHandle socket;
 ```
 ## NSPortMessage
-&emsp;一个低级的、与操作系统无关的类型用于描述应用程序间（和线程间）的消息。 
+&emsp;一个低级的、与操作系统无关的类型用于描述应用程序间（和线程间）的消息。（仅定义在 macOS 下） 
 ```c++
 @interface NSPortMessage : NSObject
 ```
@@ -517,7 +548,7 @@ void* _Nullable pthread_getspecific(pthread_key_t);
 
 &emsp;（这里还有一个隐藏点，我们不能以面向对象的思想看待这两个接口，调用 `pthread_getspecific` 和 `pthread_setspecific` 时我们是不需要传入 pthread_t 对象的，如果我们想要在某条线程内读取其存储空间的数据，那么我们只能在当前线程内执行 `pthread_getspecific` 函数，存储同理，即我们想要操作哪条线程，那么我们只能在哪条线程内执行操作。）
 
-&emsp;在前面的学习中我们多次用到 TSD 技术，例如自动释放池、autorelease 优化等等，在 run loop 的学习过程中我们又与 TSD 再次相遇。在 `CFRunLoopGetMain` 和 `CFRunLoopGetCurrent` 两个函数学习过程中，看到线程对应的 run loop 会被直接保存在线程的 TSD 中。在 CFPlatform.c 文件中我们直接翻看其源码，看到 run loop 中使用 TSD 时又进行了一次 “封装”，emmm...大概可以理解为又包装了一下，前面我们使用到 TSD 时都是直接类似以 Key-Value 的形式存储数据，这里则又提供了一个中间数据结构 struct __CFTSDTable，构建一个  \__CFTSDTable 实例然后以 CF_TSD_KEY 为 Key 把 \__CFTSDTable 实例 保存在 TSD 中，然后在 \__CFTSDTable 实例以数组形式保存数据，如 run loop 对象、run loop 对象的销毁函数等等数据，下面我们先看一下源码然后再看在 run loop 中的应用。
+&emsp;在前面的学习中我们多次用到 TSD 技术，例如自动释放池、autorelease 优化等等，在 run loop 的学习过程中我们又与 TSD 再次相遇。在 `CFRunLoopGetMain` 和 `CFRunLoopGetCurrent` 两个函数学习过程中，看到线程对应的 run loop 会被 “直接” 保存在线程的 TSD 中。在 CFPlatform.c 文件中我们直接翻看其源码，看到 run loop 中使用 TSD 时又进行了一次 “封装”，emmm...大概可以理解为又包装了一下，前面我们使用到 TSD 时都是直接类似以 Key-Value 的形式存储数据，这里则又提供了一个中间数据结构 struct __CFTSDTable，构建一个  \__CFTSDTable 实例然后以 CF_TSD_KEY 为 Key 把 \__CFTSDTable 实例 保存在 TSD 中，然后在 \__CFTSDTable 实例以数组形式保存数据，如 run loop 对象、run loop 对象的销毁函数等等数据，下面我们先看一下源码然后再看在 run loop 中的应用。
 
 &emsp;（CFPlatform.c 文件 Thread Local Data 块中包含 WINDOWS、MACOSX、LINUX 平台的代码，这里我们只看 MACOSX 下的实现。）
 ### CF_TSD_MAX_SLOTS
@@ -568,6 +599,7 @@ static void __CFTSDFinalize(void *arg) {
     // It will call the destructor PTHREAD_DESTRUCTOR_ITERATIONS times as long as a value is set in the thread specific data. 
     // We handle each case below.
     // 设置我们的 TSD，以便 pthread 再次调用我们。只要在线程特定数据中设置了值，它将调用析构函数 PTHREAD_DESTRUCTOR_ITERATIONS 次。我们在下面处理每种情况。
+    // PTHREAD_DESTRUCTOR_ITERATIONS 是线程退出时销毁其私有数据 TSD 的最大次数，在 x86_64 macOS/iOS 下打印其值都是 4。
     
     __CFTSDSetSpecific(arg);
     
@@ -592,6 +624,11 @@ static void __CFTSDFinalize(void *arg) {
     // 这种逻辑基本上与 pthreads 相同。我们只是跳过 'created' 标志。
     
     // 遍历 table 中的 data 数组，把 data 数组每个元素置为 NULL，并以每个 data 数组元素为参数执行 destructors 数组中对应的析构函数
+    
+    //（CF_PRIVATE void __CFFinalizeRunLoop(uintptr_t data) 可以理解是 run loop 对象的析构函数，data 参数理解为是 run loop 对象的引用计数，
+    //  __CFFinalizeRunLoop 只要在当前线程执行那么就能以当前线程为 key 从 __CFRunLoops 全局字典中找到其对应的 run loop 对象，
+    //  所以不同与我们的 OC/C++ 的实例函数，需要把对象作为参数传入释放函数，__CFFinalizeRunLoop 函数调用时不需要我们主动传入 run loop 对象）
+    
     for (int32_t i = 0; i < CF_TSD_MAX_SLOTS; i++) {
         if (table->data[i] && table->destructors[i]) {
             uintptr_t old = table->data[i];
@@ -601,6 +638,7 @@ static void __CFTSDFinalize(void *arg) {
     }
     
     // 如果 destructorCount 等于 PTHREAD_DESTRUCTOR_ITERATIONS - 1 则释放 table 的内存空间。
+    // PTHREAD_DESTRUCTOR_ITERATIONS 是线程退出时销毁其私有数据 TSD 的最大次数，在 x86_64 macOS/iOS 下打印其值都是 4。
     if (table->destructorCount == PTHREAD_DESTRUCTOR_ITERATIONS - 1) {    // On PTHREAD_DESTRUCTOR_ITERATIONS-1 call, destroy our data
         free(table);
         
@@ -732,6 +770,10 @@ enum {
 if (pthread_equal(t, pthread_self())) {
     _CFSetTSD(__CFTSDKeyRunLoop, (void *)loop, NULL);
     if (0 == _CFGetTSD(__CFTSDKeyRunLoopCntr)) {
+    
+        // PTHREAD_DESTRUCTOR_ITERATIONS 是线程退出时销毁其私有数据 TSD 的最大次数，在 x86_64 macOS/iOS 下打印其值都是 4，
+        // 那么这里 __CFFinalizeRunLoop 析构函数对应的 data 数字就是 3。（不知道为什么是 3 ？虽然 __CFFinalizeRunLoop 函数调用时会有个 data - 1 的操作，
+        // 但是线程和 run loop 是一一对应的，那么一次调用 __CFFinalizeRunLoop 函数把当前线程的 run loop 对象释放了不好吗？）
         _CFSetTSD(__CFTSDKeyRunLoopCntr, (void *)(PTHREAD_DESTRUCTOR_ITERATIONS-1), (void (*)(void *))__CFFinalizeRunLoop);
     }
 }
@@ -741,9 +783,78 @@ if (pthread_equal(t, pthread_self())) {
 
 &emsp;`_CFSetTSD(__CFTSDKeyRunLoopCntr, (void *)(PTHREAD_DESTRUCTOR_ITERATIONS-1), (void (*)(void *))__CFFinalizeRunLoop);` 函数把 `PTHREAD_DESTRUCTOR_ITERATIONS-1` 存储在当前线程 TSD 中 \__CFTSDTable 实例的 data 数组的  `__CFTSDKeyRunLoopCntr`（11） 索引处，把 `__CFFinalizeRunLoop` 存储在当前线程 TSD 中 \__CFTSDTable 实例的 destructors 数组的  `__CFTSDKeyRunLoopCntr`（11） 索引处。`__CFFinalizeRunLoop` 函数是 run loop 对象的析构函数。
 
-&emsp;看到 run loop 对象和 run loop 对象的析构函数都保存在了线程的 TSD 中。在 `__CFTSDGetTable` 函数中我们看到 `pthread_key_init_np(CF_TSD_KEY, __CFTSDFinalize);` 即线程销毁时会调用 `__CFTSDFinalize` 函数，而在 `__CFTSDFinalize` 函数内，则会遍历 \__CFTSDTable 实例中的 data 数组，把 data 数组每个元素置为 NULL，并以每个 data 数组元素为参数执行 destructors 数组中对应的析构函数。
+&emsp;看到 run loop 对象和 run loop 对象的析构函数都保存在了线程的 TSD 中。在 `__CFTSDGetTable` 函数中我们看到 `pthread_key_init_np(CF_TSD_KEY, __CFTSDFinalize);` 即线程销毁时会调用 `__CFTSDFinalize` 函数，而在 `__CFTSDFinalize` 函数内，则会遍历 \__CFTSDTable 实例中的数组（data、destructors 数组），把 data 数组每个元素置为 NULL，并以每个 data 数组元素为参数执行 destructors 数组中对应的析构函数。（那么 `__CFTSDKeyRunLoopCntr`（11） 索引处，调用 \__CFFinalizeRunLoop 函数则是：`__CFFinalizeRunLoop(3)`，好疑惑呀，为什么不是直接是 1 ？）
 
-&emsp;`PTHREAD_DESTRUCTOR_ITERATIONS` 是线程退出时销毁其私有数据 TSD 的最大次数。
+&emsp;`PTHREAD_DESTRUCTOR_ITERATIONS` 是线程退出时销毁其私有数据 TSD 的最大次数，在 x86_64 macOS/iOS 下打印其值都是 4。
+
+### \__CFFinalizeRunLoop
+&emsp;`CF_PRIVATE void __CFFinalizeRunLoop(uintptr_t data)` 可以理解是 run loop 对象的析构函数，data 参数大概可以理解为 run loop 对象的引用计数。
+
+&emsp;\__CFFinalizeRunLoop 只要在当前线程执行那么就能以当前线程为 key（pthreadPointer(pthread_self())） 从 \__CFRunLoops 全局字典中找到其对应的 run loop 对象，所以不同与我们的 OC/C++ 的实例函数，需要把对象作为参数传入释放函数才能进行释放，\__CFFinalizeRunLoop 函数调用时只要是在当前线程执行就不需要我们主动传入 run loop 对象，其内部会自己找到 run loop 对象。
+
+&emsp;全局搜索 `__CFTSDKeyRunLoopCntr` 看到只有三处 `_CFSetTSD` 函数的调用。
+1. `_CFRunLoopGet0` 函数内当 `0 == _CFGetTSD(__CFTSDKeyRunLoopCntr)` 读到是 0 的时候调用:`_CFSetTSD(__CFTSDKeyRunLoopCntr, (void *)(PTHREAD_DESTRUCTOR_ITERATIONS-1), (void (*)(void *))__CFFinalizeRunLoop);`  把 data 数组对应的值设置为 3。
+2. `__CFFinalizeRunLoop` 函数中如果 data 大于 1，则执行 `_CFSetTSD(__CFTSDKeyRunLoopCntr, (void *)(data - 1), (void (*)(void *))__CFFinalizeRunLoop);` 把 `__CFTSDTable` 中的 data 数组中  `__CFTSDKeyRunLoopCntr` 处的值减 1。
+3. `_CFRunLoopSetCurrent` 函数中调用 `_CFSetTSD(__CFTSDKeyRunLoopCntr, 0, (void (*)(void *))__CFFinalizeRunLoop);` 更新为 0。
+
+```c++
+// Called for each thread as it exits
+// 每个线程退出时调用
+
+CF_PRIVATE void __CFFinalizeRunLoop(uintptr_t data) {
+    CFRunLoopRef rl = NULL;
+    
+    if (data <= 1) {
+        // 当 data 小于等于 1 开始执行销毁
+        
+        // static CFLock_t loopsLock = CFLockInit;
+        // loopsLock 是一个全局的锁，执行加锁
+        __CFLock(&loopsLock);
+        
+        // 从 __CFRunLoops 全局字典中读出当前线程的 run loop 对象
+        if (__CFRunLoops) {
+            // 以 pthreadPointer(pthread_self()) 为 key 读取 run loop
+            rl = (CFRunLoopRef)CFDictionaryGetValue(__CFRunLoops, pthreadPointer(pthread_self()));
+            
+            // 这里的 retain 是为了下面继续使用 rl，这里从 __CFRunLoops 字典中移除 rl，它的引用计数会减 1
+            if (rl) CFRetain(rl);
+            CFDictionaryRemoveValue(__CFRunLoops, pthreadPointer(pthread_self()));
+        }
+        
+        __CFUnlock(&loopsLock);
+    } else {
+        // 初始时是 PTHREAD_DESTRUCTOR_ITERATIONS-1 是 3，那么 __CFFinalizeRunLoop 函数需要调用两次减 1，才能真正的执行 run loop 对象的销毁工作 
+        _CFSetTSD(__CFTSDKeyRunLoopCntr, (void *)(data - 1), (void (*)(void *))__CFFinalizeRunLoop);
+    }
+    // 这里的判断主线程的 run loop 是绝对不能销毁的，只能销毁子线程的 run loop，话说除了我们自己开辟的子线程外，系统会创建启动了 run loop 的子线程吗？
+    if (rl && CFRunLoopGetMain() != rl) { // protect against cooperative threads
+        // 如果 _counterpart 存在则进行释放
+        if (NULL != rl->_counterpart) {
+            CFRelease(rl->_counterpart);
+            rl->_counterpart = NULL;
+        }
+        
+        // purge all sources before deallocation
+        // 在销毁 run loop 之前清除所有来源
+        
+        // 取得 mode 数组
+        CFArrayRef array = CFRunLoopCopyAllModes(rl);
+        
+        // 遍历 mode 数组，移除 mode 中的所有 sources
+        for (CFIndex idx = CFArrayGetCount(array); idx--;) {
+            CFStringRef modeName = (CFStringRef)CFArrayGetValueAtIndex(array, idx);
+            __CFRunLoopRemoveAllSources(rl, modeName);
+        }
+        
+        // 移除 common mode 中的所有 sources
+        __CFRunLoopRemoveAllSources(rl, kCFRunLoopCommonModes);
+        CFRelease(array);
+    }
+    // 释放 rl
+    if (rl) CFRelease(rl);
+}
+```
+&emsp;销毁 run loop 对象之前，要先将其从 \__CFRunLoops 全局字典中移除，同时遍历其所有的 mode，依次移除每个 mode 中的所有 sources，最后销毁 run loop 对象。mode 销毁前同样也会释放所有的 mode item，前面已经讲解过这里就不复制粘贴了。
 
 ## 参考链接
 **参考链接:🔗**
