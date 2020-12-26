@@ -5,6 +5,8 @@
 ## AutoreleasePool 大致结构图:
 ![AutoreleasePool结构图](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/99d0db09905044b0acd46ccde17ee813~tplv-k3u1fbpfcp-zoom-1.image)
 
+（这里的图片在 github iOS 客户端上不显示）
+
 &emsp;在 `main.m` 中编写如下函数，然后使用 `clang -rewrite-objc main.m` 指令，把 `main.m` 转化为 `main.cpp` 文件：
 ```c++
 // main.m 文件中:
