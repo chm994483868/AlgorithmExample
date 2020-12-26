@@ -3,13 +3,11 @@
 
 &emsp;Run Loop 最核心的事情就是保证线程在没有消息时休眠以避免占用系统资源，有消息时能够及时唤醒。Run Loop 的这个机制完全依靠系统内核来完成，具体来说是苹果操作系统核心组件 Darwin 中的 Mach 来完成的。**Mach 与 BSD、File System、Mach、Networking 共同位于 Kernel and Device Drivers 层。**
 
-&emsp;Mach 是 Darwin 的核心，可以说是内核的核心，提供了进程间通信（IPC）、处理器调度等基础服务。在 Mach 中，进程、线程间的通信是以消息（mach msg）的方式来完成的，而消息则是在两个 Port 之间进行传递（或者说是通过 Port 进行消息的传递）（这也正是 Source1 之所以称之为 Port-based Source 的原因，因为它就是依靠系统发送消息到指定的 Port 来触发）。消息的发送和接收则统一使用 `mach_msg` 函数，而 `mach_msg` 的本质是调用了 `mach_msg_trap`，这相当于一个系统调用，会触发内核态与用户态的切换。
+&emsp;Mach 是 Darwin 的核心，可以说是内核的核心，提供了进程间通信（IPC）、处理器调度等基础服务。在 Mach 中，进程、线程间的通信是以消息（mach msg）的方式来完成的，而消息则是在两个 Mach Port 之间进行传递（或者说是通过 Mach Port 进行消息的传递）（这也正是 Source1 之所以称之为 Port-based Source 的原因，因为它就是依靠 mach msg 发送消息到指定的 Mach Port 来唤醒 run loop）。
 
 &emsp;（概念理解起来可能过于干涩特别是内核什么的，如果没有学习过操作系统相关的知识可能更是只识字不识意，那么下面我们从源码中找线索，从函数的使用上找线索，慢慢的理出头绪来。）
 ## mach_msg
-&emsp;当程序没有 source/timer 需要处理时，run loop 会进入休眠状态。通过上篇 \__CFRunLoopRun 函数的学习，已知 run loop 进入休眠状态时会调用 \__CFRunLoopServiceMachPort 函数，该函数内部即调用了 `mach_msg` 相关的函数操作使得系统内核的状态发生改变：用户态切换至内核态。
-
-&emsp;mach_msg 函数声明:
+&emsp;首先看一下 mach_msg 函数声明:
 ```c++
 /*
  *    Routine:    mach_msg
@@ -28,6 +26,9 @@ extern mach_msg_return_t mach_msg(mach_msg_header_t *msg,
                                   mach_msg_timeout_t timeout,
                                   mach_port_name_t notify);
 ```
+&emsp;当程序没有 source/timer 需要处理时，run loop 会进入休眠状态。通过上篇 \__CFRunLoopRun 函数的学习，已知 run loop 进入休眠状态时会调用 \__CFRunLoopServiceMachPort 函数，该函数内部即调用了 `mach_msg` 相关的函数操作使得系统内核的状态发生改变：用户态切换至内核态。
+
+&emsp;消息的发送和接收统一使用 `mach_msg` 函数，而 `mach_msg` 的本质是调用了 `mach_msg_trap`，这相当于一个系统调用，会触发内核态与用户态的切换。
 
 &emsp;点击 App 图标，App 启动完成后处于静止状态（一般如果没有 timer 需要一遍一遍执行的话），此时主线程的 run loop 会进入休眠状态，通过在主线程的 run loop 添加 CFRunLoopObserverRef 在回调函数中可看到主线程的 run loop 的最后活动状态是 kCFRunLoopBeforeWaiting，此时点击 Xcode 控制台底部的 Pause program execution 按钮，可看到主线程的调用栈停在了 mach_msg_trap，在控制台输入 bt 后回车，可看到如下调用栈：
 ```c++
