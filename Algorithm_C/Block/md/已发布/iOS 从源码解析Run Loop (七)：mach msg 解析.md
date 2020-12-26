@@ -3,11 +3,33 @@
 
 &emsp;Run Loop 最核心的事情就是保证线程在没有消息时休眠以避免占用系统资源，有消息时能够及时唤醒。Run Loop 的这个机制完全依靠系统内核来完成，具体来说是苹果操作系统核心组件 Darwin 中的 Mach 来完成的。**Mach 与 BSD、File System、Mach、Networking 共同位于 Kernel and Device Drivers 层。**
 
-&emsp;Mach 是 Darwin 的核心，可以说是内核的核心，提供了进程间通信（IPC）、处理器调度等基础服务。在 Mach 中，进程、线程间的通信是以消息的方式来完成的，消息在两个 Port 之间进行传递（这也正是 Source1 之所以称之为 Port-based Source 的原因，因为它就是依靠系统发送消息到指定的 Port 来触发）。消息的发送和接收使用 `mach_msg` 函数，而 `mach_msg` 的本质是调用了 `mach_msg_trap`，这相当于一个系统调用，会触发内核态与用户态的切换。
+&emsp;Mach 是 Darwin 的核心，可以说是内核的核心，提供了进程间通信（IPC）、处理器调度等基础服务。在 Mach 中，进程、线程间的通信是以消息（mach msg）的方式来完成的，而消息则是在两个 Port 之间进行传递（或者说是通过 Port 进行消息的传递）（这也正是 Source1 之所以称之为 Port-based Source 的原因，因为它就是依靠系统发送消息到指定的 Port 来触发）。消息的发送和接收则统一使用 `mach_msg` 函数，而 `mach_msg` 的本质是调用了 `mach_msg_trap`，这相当于一个系统调用，会触发内核态与用户态的切换。
 
-&emsp;当程序没有 source/timer 需要处理时，run loop 会进入休眠状态。通过上篇 \__CFRunLoopRun 函数的学习，已知 run loop 进入休眠状态时会调用 \__CFRunLoopServiceMachPort 函数，该函数内部即调用了 `mach_msg` 相关的函数操作使得系统内核状态发生改变：用户态切换至内核态。
+&emsp;（概念理解起来可能过于干涩特别是内核什么的，如果没有学习过操作系统相关的知识可能更是只识字不识意，那么下面我们从源码中找线索，从函数的使用上找线索，慢慢的理出头绪来。）
+## mach_msg
+&emsp;当程序没有 source/timer 需要处理时，run loop 会进入休眠状态。通过上篇 \__CFRunLoopRun 函数的学习，已知 run loop 进入休眠状态时会调用 \__CFRunLoopServiceMachPort 函数，该函数内部即调用了 `mach_msg` 相关的函数操作使得系统内核的状态发生改变：用户态切换至内核态。
 
-&emsp;点击 App 图标，App 启动完成处于静止状态时，此时主线程的 run loop 会进入休眠状态，通过在主线程的 run loop 添加 CFRunLoopObserverRef 在回调函数中可看到主线程的 run loop 的最后活动状态是 kCFRunLoopBeforeWaiting，此时点击 Xcode 控制台底部的 Pause program execution 按钮，可看到主线程的调用栈停在了 mach_msg_trap，在控制台输入 bt 回车，可看到如下调用栈：
+&emsp;mach_msg 函数声明:
+```c++
+/*
+ *    Routine:    mach_msg
+ *    Purpose:
+ *        Send and/or receive a message.  If the message operation
+ *        is interrupted, and the user did not request an indication
+ *        of that fact, then restart the appropriate parts of the
+ *        operation silently (trap version does not restart).
+ */
+__WATCHOS_PROHIBITED __TVOS_PROHIBITED
+extern mach_msg_return_t mach_msg(mach_msg_header_t *msg,
+                                  mach_msg_option_t option,
+                                  mach_msg_size_t send_size,
+                                  mach_msg_size_t rcv_size,
+                                  mach_port_name_t rcv_name,
+                                  mach_msg_timeout_t timeout,
+                                  mach_port_name_t notify);
+```
+
+&emsp;点击 App 图标，App 启动完成后处于静止状态（一般如果没有 timer 需要一遍一遍执行的话），此时主线程的 run loop 会进入休眠状态，通过在主线程的 run loop 添加 CFRunLoopObserverRef 在回调函数中可看到主线程的 run loop 的最后活动状态是 kCFRunLoopBeforeWaiting，此时点击 Xcode 控制台底部的 Pause program execution 按钮，可看到主线程的调用栈停在了 mach_msg_trap，在控制台输入 bt 后回车，可看到如下调用栈：
 ```c++
 (lldb) bt
 * thread #1, queue = 'com.apple.main-thread', stop reason = signal SIGSTOP
@@ -24,13 +46,18 @@
     frame #10: 0x00007fff202593e9 libdyld.dylib`start + 1
 (lldb) 
 ```
-&emsp;可看到 run loop 从启动函数一步步进入到 mach_msg_trap。
+&emsp;可看到 run loop 从启动函数一步步进入到 mach_msg_trap，而 mach_msg_trap 正是由 mach_msg 函数调用的。
 
 &emsp;mach_msg 函数可以设置 timeout 参数，如果在 timeout 到来之前没有读到 msg，当前线程的 run loop 会处于休眠状态。
 
-&emsp;通过上面简略的分析大概我们知道了 `mach_msg` 函数的使用是和 Port 相关的，那么从第一看 run loop 到现在我们在代码层面有遇到过哪些 Port 呢？下面我们就一起回顾一下。
+
+## mach_msg_trap
+&emsp;
+
+
+&emsp;mach_msg 函数的使用是与 Port 相关，那么从 run loop 创建开始到现在我们在代码层面遇到过哪些 Port 呢？下面我们就一起回顾一下。
 ## \__CFRunLoop \_wakeUpPort
-&emsp;struct \__CFRunLoop 结构体的成员变量 \__CFPort \_wakeUpPort 应该是我们见到的第一个 Port，它被用于 `CFRunLoopWakeUp` 函数来唤醒 run loop。
+&emsp;struct \__CFRunLoop 结构体的成员变量 \__CFPort \_wakeUpPort 应该是我们在 run loop 里见到的第一个 Port，它被用于 `CFRunLoopWakeUp` 函数来唤醒 run loop，它的类型是 mach_port_t。
 ```c++
 struct __CFRunLoop {
     ...
@@ -39,15 +66,96 @@ struct __CFRunLoop {
     ...
 };
 ```
-&emsp;当为线程创建 run loop 对象时会对直接对 run loop 的 \_wakeUpPort 成员变量进行初始化。在 `__CFRunLoopCreate` 函数中初始化 \_wakeUpPort。
+&emsp;在前面 NSMachPort 的学习中我们已知 `+(NSPort *)portWithMachPort:(uint32_t)machPort;` 函数中 `machPort` 参数原始为 mach_port_t 类型。
+
+&emsp;当为线程创建 run loop 对象时会直接对 run loop 的 \_wakeUpPort 成员变量进行初始化。在 `__CFRunLoopCreate` 函数中初始化 \_wakeUpPort。
 ```c++
 static CFRunLoopRef __CFRunLoopCreate(pthread_t t) {
     ...
+    // __CFPortAllocate 创建具有发送和接收权限的 mach_port_t
     loop->_wakeUpPort = __CFPortAllocate();
     if (CFPORT_NULL == loop->_wakeUpPort) HALT; // 创建失败的话会直接 crash
     ...
 }
 ```
+&emsp;在 \__CFRunLoopDeallocate run loop 销毁函数中会释放 \_wakeUpPort。
+```c++
+static void __CFRunLoopDeallocate(CFTypeRef cf) {
+    ...
+    // __CFPortFree 内部是 mach_port_destroy(mach_task_self(), rl->_wakeUpPort) 调用
+    __CFPortFree(rl->_wakeUpPort);
+    rl->_wakeUpPort = CFPORT_NULL;
+    ...
+}
+```
+&emsp;全局搜索 \_wakeUpPort 看到相关的结果仅有：创建、释放、被插入到 run loop mode 的 \_portSet 和 CFRunLoopWakeUp 函数唤醒 run loop 时使用，下面我们看一下以 run loop 对象的 \_wakeUpPort 端口为参调用 \__CFSendTrivialMachMessage 函数来唤醒 run loop 的过程。
+### CFRunLoopWakeUp
+&emsp;`CFRunLoopWakeUp` 函数是用来唤醒 run loop 的，唤醒的方式是以 run loop 对象的 \_wakeUpPort 端口为参数调用 `__CFSendTrivialMachMessage` 函数
+```c++
+void CFRunLoopWakeUp(CFRunLoopRef rl) {
+    CHECK_FOR_FORK();
+    // This lock is crucial to ignorable wakeups, do not remove it.
+    // 此锁对于可唤醒系统至关重要，请不要删除它。
+    
+    // CRRunLoop 加锁
+    __CFRunLoopLock(rl);
+    
+    // 如果 rl 被标记为忽略唤醒的状态，则直接解锁并返回
+    if (__CFRunLoopIsIgnoringWakeUps(rl)) {
+        __CFRunLoopUnlock(rl);
+        return;
+    }
+    
+#if DEPLOYMENT_TARGET_MACOSX || DEPLOYMENT_TARGET_EMBEDDED || DEPLOYMENT_TARGET_EMBEDDED_MINI
+    kern_return_t ret;
+    
+    /* We unconditionally try to send the message, since we don't want to lose a wakeup,
+    but the send may fail if there is already a wakeup pending, since the queue length is 1. */
+    // 因为我们不想丢失唤醒，所以我们无条件地尝试发送消息，但由于队列长度为 1，因此如果已经存在唤醒等待，则发送可能会失败。
+    
+    // 向 rl->_wakeUpPort 端口发送消息，内部是调用了 mach_msg
+    ret = __CFSendTrivialMachMessage(rl->_wakeUpPort, 0, MACH_SEND_TIMEOUT, 0);
+    if (ret != MACH_MSG_SUCCESS && ret != MACH_SEND_TIMED_OUT) CRASH("*** Unable to send message to wake up port. (%d) ***", ret);
+    
+#elif DEPLOYMENT_TARGET_WINDOWS
+    SetEvent(rl->_wakeUpPort);
+#endif
+
+    // CFRunLoop 解锁
+    __CFRunLoopUnlock(rl);
+}
+```
+### \__CFSendTrivialMachMessage
+&emsp;`__CFSendTrivialMachMessage` 函数内部主要是调用 `mach_msg` 函数向 port 发送消息。
+```c++
+static uint32_t __CFSendTrivialMachMessage(mach_port_t port, uint32_t msg_id, CFOptionFlags options, uint32_t timeout) {
+    // 记录 mach_msg 函数返回结果
+    kern_return_t result;
+    
+    // 构建 mach_msg_header_t 用于发送消息
+    mach_msg_header_t header;
+    
+    // #define MACH_MSG_TYPE_COPY_SEND 19 // Must hold send right(s) 必须持有发送权限
+    // #define MACH_MSGH_BITS(remote, local) ((remote) | ((local) << 8)) // 位操作
+    header.msgh_bits = MACH_MSGH_BITS(MACH_MSG_TYPE_COPY_SEND, 0);
+    
+    header.msgh_size = sizeof(mach_msg_header_t);
+    
+    header.msgh_remote_port = port; // 远程端口
+    
+    header.msgh_local_port = MACH_PORT_NULL;
+    header.msgh_id = msg_id; // 0 
+    
+    // #define MACH_SEND_TIMEOUT 0x00000010 /* timeout value applies to send */ 超时值应用于发送
+    // 调用 mach_msg 函数发送消息
+    result = mach_msg(&header, MACH_SEND_MSG|options, header.msgh_size, 0, MACH_PORT_NULL, timeout, MACH_PORT_NULL);
+    
+    if (result == MACH_SEND_TIMED_OUT) mach_msg_destroy(&header);
+    
+    return result;
+}
+```
+&emsp;可看到 `CFRunLoopWakeUp` 函数的功能就是调用 mach_msg 函数向 run loop 的 \_wakeUpPort 端口发送消息来唤醒 run loop。
 
 
 
@@ -58,7 +166,9 @@ static CFRunLoopRef __CFRunLoopCreate(pthread_t t) {
 
 
 
-&emsp;在前面 NSPort 的学习中提到：`handleMachMessage:` 提供以 msg_header_t（mach_msg_header_t） 结构开头的 "原始 Mach 消息" 的消息，以及 NSMachPort 中： `+ (NSPort *)portWithMachPort:(uint32_t)machPort;` 函数中 `machPort` 参数原始为 mach_port_t 类型。
+
+
+
 
 ## mach_msg_header_t
 &emsp;
@@ -85,7 +195,7 @@ typedef struct{
 
 
 
-
+&emsp;在前面 NSPort 的学习中提到：`handleMachMessage:` 提供以 msg_header_t（mach_msg_header_t） 结构开头的 "原始 Mach 消息" 的消息，以及 NSMachPort 中： `+ (NSPort *)portWithMachPort:(uint32_t)machPort;` 函数中 `machPort` 参数原始为 mach_port_t 类型。
 
 ## 参考链接
 **参考链接:🔗**
