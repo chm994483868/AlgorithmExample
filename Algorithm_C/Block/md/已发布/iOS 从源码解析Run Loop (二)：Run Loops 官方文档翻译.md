@@ -107,21 +107,23 @@ cancelPreviousPerformRequestsWithTarget:selector:object: | 使你可以取消使
 ### The Run Loop Sequence of Events
 &emsp;每次运行它时，线程的 run loop 都会处理待办事件（pending events），并为所有附加的 observers 生成通知。它执行此操作的顺序非常 具体/明确，如下所示：
 
-1. 通知 observers 已进入 run loop。
+1. 通知 observers 即将进入 run loop。
 2. 通知 observers 任何准备就绪的 timers 即将触发。
-3. 通知 observers 任何不基于端口（not port based）的 input sources 都将被触发。
-4. 触发所有准备触发的非基于端口的输入源（non-port-based input sources）。
+3. 通知 observers 任何不基于端口（not port based）的 input sources（source0）都将被触发。
+4. 触发所有准备触发的非基于端口的输入源（non-port-based input sources）(source0)。
 5. 如果基于端口的输入源（port-based input source）已准备好并等待启动，请立即处理事件。**转到步骤 9**。
 6. 通知 observers，线程即将进入休眠状态。
-7. 使线程进入休眠状态，直到发生以下事件之一：
-  + 基于端口的输入源（port-based input source）的事件到达。
+
+7. 使线程进入休眠状态并等待唤醒，直到发生以下事件之一时会被唤醒：
+  + 基于端口的输入源（port-based input source）（source1）的事件到达。
   + timers 触发。
   + 为 run loop 设置的超时时间过期。
   + run loop 被显式唤醒。
+  
 8. 通知 observer，线程刚刚唤醒。
-9. 处理待办事件。
-  + 如果触发了用户定义的 timer，处理 timer 事件并重新启动循环。**转到步骤2**。
-  + 如果触发了 input source，传递事件。
+9. 处理唤醒时收到的待办事件。
+  + 如果触发了用户定义的 timer（处理 timer 事件并重新启动循环）。**转到步骤2**。
+  + 如果触发了 input source，传递事件。（source1）
   + 如果 run loop 被明确唤醒但尚未超时，重新启动循环。**转到步骤2**。
 10. 通知 observer，run loop 已退出。
 

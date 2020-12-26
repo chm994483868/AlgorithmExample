@@ -1,22 +1,70 @@
 # iOS 从源码解析Run Loop (七)：mach msg 解析
-> &emsp;经过前面 NSPort 内容的学习，我们大概对 port 在线程通信中的使用有一点模糊的概念了，那么本篇我们学习一下 Mach。
+> &emsp;经过前面 NSPort 内容的学习，我们大概对 port 在线程通信中的使用有一点模糊的概念了。macOS/iOS 中利用 Run Loop 实现了自动释放池、延迟回调、触摸事件、屏幕刷新等等功能，关于 Run Loop 的各种应用我们下篇再进行全面的学习。那么本篇我们学习一下 Mach。
 
-&emsp;Run Loop 最核心的事情就是保证线程在没有消息时休眠以避免占用系统资源，有消息时能够及时唤醒。Run Loop 的这个机制完全依靠系统内核来完成，具体来说是苹果操作系统核心组件 Darwin 中的 Mach 来完成的。**Mach 与 BSD、File System、Mach、Networking 共同位于 Kernel and Device Drivers 层。**
+&emsp;Run Loop 最核心的事情就是保证线程在没有消息时休眠以避免系统资源占用，有消息时能够及时唤醒。Run Loop 的这个机制完全依靠系统内核来完成，具体来说是苹果操作系统核心组件 Darwin 中的 Mach 来完成的。**Mach 与 BSD、File System、Mach、Networking 共同位于 Kernel and Device Drivers 层。**
 
-&emsp;Mach 是 Darwin 的核心，可以说是内核的核心，提供了进程间通信（IPC）、处理器调度等基础服务。在 Mach 中，进程、线程间的通信是以消息（mach msg）的方式来完成的，而消息则是在两个 Mach Port 之间进行传递（或者说是通过 Mach Port 进行消息的传递）（这也正是 Source1 之所以称之为 Port-based Source 的原因，因为它就是依靠 mach msg 发送消息到指定的 Mach Port 来唤醒 run loop）。
+&emsp;在 Mach 中，所有的东西都是通过自己的对象实现的，进程、线程和虚拟内存都被称为 “对象”，和其他架构不同， Mach 的对象间不能直接调用，只能通过消息传递的方式实现对象间的通信。“消息”（mach msg）是 Mach 中最基础的概念，消息在两个端口 (mach port) 之间传递，这就是 Mach 的 IPC (进程间通信) 的核心。
+
+&emsp;Mach 是 Darwin 的核心，可以说是内核的核心，提供了进程间通信（IPC）、处理器调度等基础服务。在 Mach 中，进程、线程间的通信是以消息（mach msg）的方式来完成的，而消息则是在两个 mach port 之间进行传递（或者说是通过 mach port 进行消息的传递）（这也正是 Source1 之所以称之为 Port-based Source 的原因，因为它就是依靠 mach msg 发送消息到指定的 mach port 来唤醒 run loop）。
+
+&emsp;关于 Darwin 的信息可以看 ibireme 大佬的文章，5 年前的文章放在今天依然是目前能看到的关于 run loop 最深入的文章，可能这就是大佬吧！：[RunLoop 的底层实现](https://blog.ibireme.com/2015/05/18/runloop/#core)
 
 &emsp;（概念理解起来可能过于干涩特别是内核什么的，如果没有学习过操作系统相关的知识可能更是只识字不识意，那么下面我们从源码中找线索，从函数的使用上找线索，慢慢的理出头绪来。）
+
+## mach_msg_header_t
+&emsp;Mach 消息相关的数据结构：mach_msg_base_t、mach_msg_header_t、mach_msg_body_t 定义在 <mach/message.h> 头文件中：
+```c++
+typedef struct{
+    mach_msg_header_t       header;
+    mach_msg_body_t         body;
+} mach_msg_base_t;
+
+typedef struct{
+    mach_msg_bits_t       msgh_bits;
+    mach_msg_size_t       msgh_size; // 消息传递数据大小
+    
+    // typedef __darwin_mach_port_t mach_port_t; =>
+    // typedef __darwin_mach_port_name_t __darwin_mach_port_t; /* Used by mach */
+    // typedef __darwin_natural_t __darwin_mach_port_name_t; /* Used by mach */
+    // typedef unsigned int __darwin_natural_t;
+    // mach_port_t 实际上是一个整数类型，用于标记端口。
+    
+    mach_port_t           msgh_remote_port;
+    mach_port_t           msgh_local_port;
+    
+    // mach_port_name_t 是 mach port 的本地标识
+    mach_port_name_t      msgh_voucher_port;
+    
+    mach_msg_id_t         msgh_id;
+} mach_msg_header_t;
+
+typedef struct{
+    mach_msg_size_t msgh_descriptor_count;
+} mach_msg_body_t;
+
+#define MACH_PORT_NULL 0  /* intentional loose typing */
+#define MACH_PORT_DEAD ((mach_port_name_t) ~0)
+```
+&emsp;每条消息均以 message header 开头。mach_msg_header_t 中存储了 mach msg 的基本信息，包括端口信息等。如本地端口 msgh_local_port 和远程端口 msgh_remote_port，mach msg 的传递方向在 header 中已经非常明确了。
++ msgh_remote_port 字段指定消息的目的地。它必须指定为一个有效的发送端口或有一次发送权限的端口。
++ msgh_local_port 字段指定 "reply port"。通常，此字段带有一次发送权限，接收方将使用该一次发送权限来回复消息。It may carry the values MACH_PORT_NULL, MACH_PORT_DEAD, a send-once right, or a send right. 
++ msgh_voucher_port 字段指定一个 Mach 凭证端口。除 MACH_PORT_NULL 或 MACH_PORT_DEAD 之外，只能传递对内核实现的 Mach Voucher 内核对象的发送权限。
++ 消息原语（message primitives）不解释 msgh_id 字段。它通常携带指定消息格式或含义的信息。
+
+&emsp;一条 Mach 消息实际上就是一个二进制数据包 (BLOB)，其头部定义了当前端口 local_port 和目标端口 remote_port，发送和接受消息是通过同一个 API（mach_msg） 进行的，其 option 标记了消息传递的方向。
 ## mach_msg
 &emsp;首先看一下 mach_msg 函数声明:
 ```c++
 /*
- *    Routine:    mach_msg
+ *    Routine: mach_msg
  *    Purpose:
  *        Send and/or receive a message.  If the message operation
  *        is interrupted, and the user did not request an indication
  *        of that fact, then restart the appropriate parts of the
  *        operation silently (trap version does not restart).
  */
+ // 发送和/或接收消息。如果消息操作被中断，并且用户没有请求指示该事实，
+ // 则静默地重新启动操作的相应部分（trap 版本不会重新启动）。
 __WATCHOS_PROHIBITED __TVOS_PROHIBITED
 extern mach_msg_return_t mach_msg(mach_msg_header_t *msg,
                                   mach_msg_option_t option,
@@ -26,11 +74,14 @@ extern mach_msg_return_t mach_msg(mach_msg_header_t *msg,
                                   mach_msg_timeout_t timeout,
                                   mach_port_name_t notify);
 ```
-&emsp;当程序没有 source/timer 需要处理时，run loop 会进入休眠状态。通过上篇 \__CFRunLoopRun 函数的学习，已知 run loop 进入休眠状态时会调用 \__CFRunLoopServiceMachPort 函数，该函数内部即调用了 `mach_msg` 相关的函数操作使得系统内核的状态发生改变：用户态切换至内核态。
+> &emsp;为了实现消息的发送和接收，mach_msg 函数实际上是调用了一个 Mach 陷阱 (trap)，即函数 mach_msg_trap，陷阱这个概念在 Mach 中等同于系统调用。当在用户态调用 mach_msg_trap 时会触发陷阱机制，切换到内核态；内核态中内核实现的 mach_msg 函数会完成实际的工作。
+> &emsp;run loop 的核心就是一个 mach_msg ，run loop 调用这个函数去接收消息，如果没有别人发送 port 消息过来，内核会将线程置于等待状态。例如在模拟器里跑起一个 iOS 的 App，然后在 App 静止时点击暂停，会看到主线程调用栈是停留在 mach_msg_trap 这个地方。[深入理解RunLoop](https://blog.ibireme.com/2015/05/18/runloop/)
+
+&emsp;（mach_msg 函数可以设置 timeout 参数，如果在 timeout 到来之前没有读到 msg，当前线程的 run loop 会处于休眠状态。）
 
 &emsp;消息的发送和接收统一使用 `mach_msg` 函数，而 `mach_msg` 的本质是调用了 `mach_msg_trap`，这相当于一个系统调用，会触发内核态与用户态的切换。
 
-&emsp;点击 App 图标，App 启动完成后处于静止状态（一般如果没有 timer 需要一遍一遍执行的话），此时主线程的 run loop 会进入休眠状态，通过在主线程的 run loop 添加 CFRunLoopObserverRef 在回调函数中可看到主线程的 run loop 的最后活动状态是 kCFRunLoopBeforeWaiting，此时点击 Xcode 控制台底部的 Pause program execution 按钮，可看到主线程的调用栈停在了 mach_msg_trap，在控制台输入 bt 后回车，可看到如下调用栈：
+&emsp;点击 App 图标，App 启动完成后处于静止状态（一般如果没有 timer 需要一遍一遍执行的话），此时主线程的 run loop 会进入休眠状态，通过在主线程的 run loop 添加 CFRunLoopObserverRef 在回调函数中可看到主线程的 run loop 的最后活动状态是 kCFRunLoopBeforeWaiting，此时点击 Xcode 控制台底部的 Pause program execution 按钮，从 Xcode 左侧的 Debug navigator 可看到主线程的调用栈停在了 mach_msg_trap，然后在控制台输入 bt 后回车，可看到如下调用栈，看到 mach_msg_trap 是由 mach_msg 函数调用的。
 ```c++
 (lldb) bt
 * thread #1, queue = 'com.apple.main-thread', stop reason = signal SIGSTOP
@@ -47,18 +98,13 @@ extern mach_msg_return_t mach_msg(mach_msg_header_t *msg,
     frame #10: 0x00007fff202593e9 libdyld.dylib`start + 1
 (lldb) 
 ```
-&emsp;可看到 run loop 从启动函数一步步进入到 mach_msg_trap，而 mach_msg_trap 正是由 mach_msg 函数调用的。
-
-&emsp;mach_msg 函数可以设置 timeout 参数，如果在 timeout 到来之前没有读到 msg，当前线程的 run loop 会处于休眠状态。
-
-
+&emsp;通过上篇 \__CFRunLoopRun 函数的学习，已知 run loop 进入休眠状态时会调用 \__CFRunLoopServiceMachPort 函数，该函数内部即调用了 `mach_msg` 相关的函数操作使得系统内核的状态发生改变：用户态切换至内核态。
 ## mach_msg_trap
-&emsp;
+&emsp;mach_msg 内部实际上是调用了 mach_msg_trap  系统调用。陷阱（trap）是操作系统层面的基本概念，用于操作系统状态的更改，如触发内核态与用户态的切换操作。trap 通常由异常条件触发，如断点、除 0 操作、无效内存访问等。
 
-
-&emsp;mach_msg 函数的使用是与 Port 相关，那么从 run loop 创建开始到现在我们在代码层面遇到过哪些 Port 呢？下面我们就一起回顾一下。
-## \__CFRunLoop \_wakeUpPort
-&emsp;struct \__CFRunLoop 结构体的成员变量 \__CFPort \_wakeUpPort 应该是我们在 run loop 里见到的第一个 Port，它被用于 `CFRunLoopWakeUp` 函数来唤醒 run loop，它的类型是 mach_port_t。
+&emsp;当 run loop 休眠时，通过 mach port 消息可以唤醒 run loop，那么从 run loop 创建开始到现在我们在代码层面的学习过程中遇到过哪些 mach port 呢？下面我们就一起回顾一下。最典型的应该当数 \__CFRunLoop 中的 \_wakeUpPort 和 \__CFRunLoopMode 中的 \_timerPort。
+## \__CFRunLoop-\_wakeUpPort
+&emsp;struct \__CFRunLoop 结构体的成员变量 \__CFPort \_wakeUpPort 应该是我们在 run loop 里见到的第一个 mach port 了，创建 run loop 对象时即会同时创建一个 mach_port_t 实例为 \_wakeUpPort 赋值。\_wakeUpPort 被用于在 CFRunLoopWakeUp 函数中调用 \__CFSendTrivialMachMessage 函数时作为其参数来唤醒 run loop。\_wakeUpPort 声明类型是 \__CFPort，实际类型是 mach_port_t。
 ```c++
 struct __CFRunLoop {
     ...
@@ -67,7 +113,7 @@ struct __CFRunLoop {
     ...
 };
 ```
-&emsp;在前面 NSMachPort 的学习中我们已知 `+(NSPort *)portWithMachPort:(uint32_t)machPort;` 函数中 `machPort` 参数原始为 mach_port_t 类型。
+&emsp;在前面 NSMachPort 的学习中我们已知 `+(NSPort *)portWithMachPort:(uint32_t)machPort;` 函数中 `machPort` 参数原始即为 mach_port_t 类型。
 
 &emsp;当为线程创建 run loop 对象时会直接对 run loop 的 \_wakeUpPort 成员变量进行初始化。在 `__CFRunLoopCreate` 函数中初始化 \_wakeUpPort。
 ```c++
@@ -83,7 +129,7 @@ static CFRunLoopRef __CFRunLoopCreate(pthread_t t) {
 ```c++
 static void __CFRunLoopDeallocate(CFTypeRef cf) {
     ...
-    // __CFPortFree 内部是 mach_port_destroy(mach_task_self(), rl->_wakeUpPort) 调用
+    // __CFPortFree 内部是调用 mach_port_destroy(mach_task_self(), rl->_wakeUpPort) 函数
     __CFPortFree(rl->_wakeUpPort);
     rl->_wakeUpPort = CFPORT_NULL;
     ...
@@ -158,45 +204,56 @@ static uint32_t __CFSendTrivialMachMessage(mach_port_t port, uint32_t msg_id, CF
 ```
 &emsp;可看到 `CFRunLoopWakeUp` 函数的功能就是调用 mach_msg 函数向 run loop 的 \_wakeUpPort 端口发送消息来唤醒 run loop。
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-## mach_msg_header_t
-&emsp;
+## \__CFRunLoopMode-\_timerPort
+&emsp;在 macOS 下同时支持 dispatch_source 和 mk 构建 timer，在 iOS 下则只支持使用 mk。这里我们只关注 \_timerPort。
 ```c++
-typedef struct{
-    // typedef unsigned int mach_msg_bits_t;
-    mach_msg_bits_t       msgh_bits;
+#if DEPLOYMENT_TARGET_MACOSX
+#define USE_DISPATCH_SOURCE_FOR_TIMERS 1
+#define USE_MK_TIMER_TOO 1
+#else
+#define USE_DISPATCH_SOURCE_FOR_TIMERS 0
+#define USE_MK_TIMER_TOO 1
+#endif
+
+struct __CFRunLoopMode {
+    ...
+#if USE_DISPATCH_SOURCE_FOR_TIMERS
+    dispatch_source_t _timerSource;
+    dispatch_queue_t _queue;
+    Boolean _timerFired; // set to true by the source when a timer has fired
+    Boolean _dispatchTimerArmed;
+#endif
+
+#if USE_MK_TIMER_TOO
+    mach_port_t _timerPort;
+    Boolean _mkTimerArmed;
+#endif
+    ...
+};
+```
+&emsp;首先是创建同样也是跟着 CFRunLoopModeRef 一起创建的。在 \__CFRunLoopFindMode 函数中当创建 CFRunLoopModeRef 时会同时创建一个 mach_port_t 实例并赋值给 \_timerPort。并同时会把 \_timerPort 插入到 CFRunLoopModeRef 的 \_portSet 中。
+```c++
+static CFRunLoopModeRef __CFRunLoopFindMode(CFRunLoopRef rl, CFStringRef modeName, Boolean create) {
+    ...
+#if USE_MK_TIMER_TOO
+    // 创建 
+    rlm->_timerPort = mk_timer_create();
+    ret = __CFPortSetInsert(rlm->_timerPort, rlm->_portSet);
+    if (KERN_SUCCESS != ret) CRASH("*** Unable to insert timer port into port set. (%d) ***", ret);
+#endif
     
-    // typedef natural_t mach_msg_size_t; => 
-    // typedef __darwin_natural_t natural_t; => 
-    // typedef unsigned int __darwin_natural_t;
-    // 实际类型是 unsigned int
-    mach_msg_size_t       msgh_size; 
-    
-    // typedef __darwin_mach_port_t mach_port_t; => 
-    mach_port_t           msgh_remote_port;
-    mach_port_t           msgh_local_port;
-    
-    mach_port_name_t      msgh_voucher_port;
-    mach_msg_id_t         msgh_id;
-} mach_msg_header_t;
+    // 把 rl 的 _wakeUpPort 插入到 _portSet 中
+    ret = __CFPortSetInsert(rl->_wakeUpPort, rlm->_portSet);
+    // 插入失败的话会 crash 
+    if (KERN_SUCCESS != ret) CRASH("*** Unable to insert wake up port into port set. (%d) ***", ret);
+    ...
+}
 ```
 
 
 
 
-&emsp;在前面 NSPort 的学习中提到：`handleMachMessage:` 提供以 msg_header_t（mach_msg_header_t） 结构开头的 "原始 Mach 消息" 的消息，以及 NSMachPort 中： `+ (NSPort *)portWithMachPort:(uint32_t)machPort;` 函数中 `machPort` 参数原始为 mach_port_t 类型。
+
 
 ## 参考链接
 **参考链接:🔗**
@@ -222,20 +279,4 @@ typedef struct{
 + [iOS多线程——RunLoop与GCD、AutoreleasePool你要知道的iOS多线程NSThread、GCD、NSOperation、RunLoop都在这里](https://cloud.tencent.com/developer/article/1089330)
 + [Mach原语：一切以消息为媒介](https://www.jianshu.com/p/284b1777586c?nomobile=yes)
 + [操作系统双重模式和中断机制和定时器概念](https://blog.csdn.net/zcmuczx/article/details/79937023)
-
-
-## Mach Overview
-&emsp;OS X 内核的基本服务和原语（fundamental services and primitives）基于 Mach 3.0。苹果已经修改并扩展了 Mach，以更好地满足 OS X 的功能和性能目标。
-
-&emsp;Mach 3.0 最初被认为是一个简单，可扩展的通信微内核。它能够作为独立的内核运行，并与其他传统的操作系统服务（例如 I/O，文件系统和作为用户模式服务器运行的网络堆栈）一起运行。
-
-&emsp;但是，在 OS X 中，Mach 与其他内核组件链接到单个内核地址空间中。这主要是为了提高性能；在链接的组件之间进行直接调用比在单独的任务之间发送消息或进行远程过程调用（RPC）要快得多。这种模块化结构导致了比单核内核所允许的更健壮和可扩展的系统，而没有纯微内核的性能损失。
-
-&emsp;因此，在 OS X 中，Mach 主要不是客户端和服务器之间的通信中心。相反，它的价值包括其抽象性，可扩展性和灵活性。特别是，Mach 提供:
-+ 以通信通道（communication channels）（例如 port）作为对象引用的 object-based 的 APIs。（NSPort 文档第一句话：`NSPort` 表示通信通道（communication channel）的抽象类。）
-+ 高度并行执行，包括抢占调度线程和对 SMP 的支持。
-+ 灵活的调度框架，支持实时使用。
-+ 一组完整的 IPC 原语，包括消息传递、RPC、同步和通知。
-+ 支持大型虚拟地址空间、共享内存区域和持久存储支持的内存对象。
-+ 经验证的可扩展性和可移植性，例如跨指令集体系结构和分布式环境。
-+ 安全和资源管理作为设计的基本原则；所有资源都是虚拟化的。
++ [iOS底层原理 RunLoop 基础总结和随心所欲掌握子线程 RunLoop 生命周期 --(9)](http://www.cocoachina.com/articles/28800)
