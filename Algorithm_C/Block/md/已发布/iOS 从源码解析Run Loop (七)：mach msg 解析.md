@@ -236,9 +236,11 @@ struct __CFRunLoopMode {
 static CFRunLoopModeRef __CFRunLoopFindMode(CFRunLoopRef rl, CFStringRef modeName, Boolean create) {
     ...
 #if USE_MK_TIMER_TOO
-    // 创建 
+    // 为 _timerPort 赋值
     rlm->_timerPort = mk_timer_create();
+    // 同时也把 _timerPort 插入 _portSet 集合中
     ret = __CFPortSetInsert(rlm->_timerPort, rlm->_portSet);
+    // 如果插入失败则 crash
     if (KERN_SUCCESS != ret) CRASH("*** Unable to insert timer port into port set. (%d) ***", ret);
 #endif
     
@@ -249,9 +251,22 @@ static CFRunLoopModeRef __CFRunLoopFindMode(CFRunLoopRef rl, CFStringRef modeNam
     ...
 }
 ```
+&emsp;在 \__CFRunLoopModeDeallocate run loop mode 的销毁函数中同样会销毁 \_timerPort。
+```c++
+static void __CFRunLoopModeDeallocate(CFTypeRef cf) {
+    ...
+#if USE_MK_TIMER_TOO
+    // 调用 mk_timer_destroy 函数销毁 _timerPort
+    if (MACH_PORT_NULL != rlm->_timerPort) mk_timer_destroy(rlm->_timerPort);
+#endif
+    ...
+}
+```
+### \__CFArmNextTimerInMode
+&emsp;在 `__CFArmNextTimerInMode` 函数中
 
-
-
++ mk_timer_arm(mach_port_t, expire_time) 在 expire_time 的时候给指定了 mach_port 的 mach_msg 发送消息
++ mk_timer_cancel(mach_port_t, &result_time) 取消 mk_timer_arm 注册的消息
 
 
 
@@ -280,3 +295,4 @@ static CFRunLoopModeRef __CFRunLoopFindMode(CFRunLoopRef rl, CFStringRef modeNam
 + [Mach原语：一切以消息为媒介](https://www.jianshu.com/p/284b1777586c?nomobile=yes)
 + [操作系统双重模式和中断机制和定时器概念](https://blog.csdn.net/zcmuczx/article/details/79937023)
 + [iOS底层原理 RunLoop 基础总结和随心所欲掌握子线程 RunLoop 生命周期 --(9)](http://www.cocoachina.com/articles/28800)
++ [从NSRunLoop说起](https://zhuanlan.zhihu.com/p/63184073)
