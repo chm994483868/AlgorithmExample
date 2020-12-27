@@ -607,7 +607,9 @@ static int32_t __CFRunLoopRun(CFRunLoopRef rl,
         // __CFRUNLOOP_IS_CALLING_OUT_TO_A_BLOCK__ // 执行 run loop 的 block 链表中的 block（block 执行完以后会被释放并移除）
         // __CFRUNLOOP_IS_CALLING_OUT_TO_A_SOURCE0_PERFORM_FUNCTION__ // 执行 run loop mode 的 _source0 中的 CFRunLoopSourceRef 的 perfom 函数（以其 info 为参数）
         
-        // 遍历 rlm 的 _source0 中的 Valid 和 Signaled 的 CFRunLoopSourceRef，执行其 perform 函数（perform(info)），当有执行 source0 的 perform 函数时则返回 true，否则返回 false
+        // 遍历 rlm 的 _source0 中的 Valid 和 Signaled 的 CFRunLoopSourceRef，执行其 perform 函数（perform(info)），且要执行的 CFRunLoopSourceRef 会被置为 UnsetSignaled， 
+        // 那么下次 run loop 循环便不再执行这个 UnsetSignaled 的 CFRunLoopSourceRef 了。
+        // 当有执行 source0 的 perform 函数时则返回 true，否则返回 false。
         Boolean sourceHandledThisLoop = __CFRunLoopDoSources0(rl, rlm, stopAfterHandle); // 6⃣️
         
         // sourceHandledThisLoop 的值表示 __CFRunLoopDoSources0 函数内部是否对 rlm 的 _sources0 中的 CFRunLoopSourceRef 执行了它的 void (*perform)(void *info) 函数。
@@ -621,16 +623,20 @@ static int32_t __CFRunLoopRun(CFRunLoopRef rl,
         // 如果 rlm 的 _sources0 中有 CFRunLoopSourceRef 执行了 perform 函数 或者 timeout_context->termTSR 等于 0，则 poll 的值为 true 否则为 false。
         // timeout_context->termTSR == 0ULL 的情况：
         // 1. 当 seconds 入参小于等于 0 时（入参的 run loop 运行时间小于等于 0）
-        // 2. 当👆创建的 timeout_timer 计时被回调时（入参的 run loop 运行时间到了）
+        // 2. 当👆创建的 timeout_timer 计时被回调时（即入参的 run loop 运行时间到了，表示 run loop 要退出了）
         
         Boolean poll = sourceHandledThisLoop || (0ULL == timeout_context->termTSR);
         
+        
+        
+        // ⬇️⬇️⬇️⬇️⬇️⬇️⬇️⬇️⬇️⬇️⬇️⬇️⬇️⬇️⬇️⬇️⬇️⬇️⬇️⬇️⬇️⬇️⬇️⬇️⬇️
         // 如果当前是主线程并且 dispatchPort 不为空且 didDispatchPortLastTime 为 false（ didDispatchPortLastTime 是在 do while 外声明的局部变量，初值为 true）
         if (MACH_PORT_NULL != dispatchPort && !didDispatchPortLastTime) {
 #if DEPLOYMENT_TARGET_MACOSX || DEPLOYMENT_TARGET_EMBEDDED || DEPLOYMENT_TARGET_EMBEDDED_MINI
             // macOS 下执行
             msg = (mach_msg_header_t *)msg_buffer;
-            // 通过端口执行
+            
+            // 通过端口执行，如果有 Source1 是 ready 状态的话，就会跳转到 handle_msg 去处理消息
             if (__CFRunLoopServiceMachPort(dispatchPort,
                                            &msg,
                                            sizeof(msg_buffer),
@@ -648,6 +654,8 @@ static int32_t __CFRunLoopRun(CFRunLoopRef rl,
             }
 #endif
         }
+        // ⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️
+        
         
         // didDispatchPortLastTime 置为 false
         didDispatchPortLastTime = false;
@@ -655,11 +663,12 @@ static int32_t __CFRunLoopRun(CFRunLoopRef rl,
         // 若需要 poll 为假，则需要上面 sourceHandledThisLoop 为假即 rlm 的 _sources0 中没有 source 需要执行且 0ULL == timeout_context->termTSR，
         // 则调用 __CFRunLoopDoObservers 函数回调 rl 切换到 kCFRunLoopBeforeWaiting，即 rl 即将进入休眠状态。
         
-        // 那么这里可以得出一个结论，当 run loop 执行完 source0 中的事件函数并且入参的 seconds 小于等于 0 或者达到了入参 seconds 的运行时间，则 run loop 可以进入休眠
-        
+        // 那么这里可以得出一个结论，当 run loop mode 中 source0 为空，或者 run loop 前一轮循环中 source0 中的 CFRunLoopSourceRef 的 perform 函数都已经执行完并被标记为 UnsetSignaled，
+        // 并且入参的 seconds 小于等于 0 或者达到了入参 seconds 的运行时间，则 run loop 可以进入休眠
         if (!poll && (rlm->_observerMask & kCFRunLoopBeforeWaiting)) __CFRunLoopDoObservers(rl, rlm, kCFRunLoopBeforeWaiting);
         
-        // 设置 __CFBitfieldSetValue(((CFRuntimeBase *)rl)->_cfinfo[CF_INFO_BITS], 1, 1, 1)，标记 rl 进入休眠状态
+        // 设置 __CFBitfieldSetValue(((CFRuntimeBase *)rl)->_cfinfo[CF_INFO_BITS], 1, 1, 1)，
+        // 标记 rl 进入休眠状态
         __CFRunLoopSetSleeping(rl);
         
         // do not do any user callouts after this point (after notifying of sleeping)
@@ -677,7 +686,7 @@ static int32_t __CFRunLoopRun(CFRunLoopRef rl,
         // CFRunLoop 解锁
         __CFRunLoopUnlock(rl);
         
-        // sleepStart 用于记录睡眠开始的时间
+        // sleepStart 用于记录睡眠开始的时间，poll 为 false 时预示着进入休眠状态
         CFAbsoluteTime sleepStart = poll ? 0.0 : CFAbsoluteTimeGetCurrent();
         
 #if DEPLOYMENT_TARGET_MACOSX || DEPLOYMENT_TARGET_EMBEDDED || DEPLOYMENT_TARGET_EMBEDDED_MINI
@@ -685,7 +694,11 @@ static int32_t __CFRunLoopRun(CFRunLoopRef rl,
 #if USE_DISPATCH_SOURCE_FOR_TIMERS
         // 如果 rlm 使用 dispatch_source 构建的计时器
         
-        // 这个内层的 do while 循环主要是用于 "保持" run looop 的睡眠状态的，直到需要被唤醒了才会跳出这个 do while 循环
+        // 这个内层的 do while 循环主要是用于 "保持" run looop 的睡眠状态的，直到需要被唤醒了才会跳出这个 do while 循环。只有在下面的事件发生时才会进行唤醒：
+        // 1. 基于端口的输入源（port-based input source）（source1）的事件到达。
+        // 2. CFRunLoopMode 中的 timers 触发。
+        // 3. 为 run loop 设置的超时时间过期。
+        // 4. run loop 被显式唤醒。
         do {
             if (kCFUseCollectableAllocator) {
                 // objc_clear_stack(0);
@@ -712,6 +725,7 @@ static int32_t __CFRunLoopRun(CFRunLoopRef rl,
                                        &voucherCopy);
             
             // modeQueuePort = _dispatch_runloop_root_queue_get_port_4CF(rlm->_queue) 来自于 rlm 的 _queue 队列端口
+            // 基于 port 的 source 事件 或 调用者唤醒
             if (modeQueuePort != MACH_PORT_NULL && livePort == modeQueuePort) {
                 // Drain the internal queue. If one of the callout blocks sets the timerFired flag, break out and service the timer.
                 // 清空内部队列。如果其中一个标注块设置了 timerFired 标志，请中断并为计时器提供服务。
@@ -729,6 +743,7 @@ static int32_t __CFRunLoopRun(CFRunLoopRef rl,
                 // rlm 的 _timerSource 是启动时间是 DISPATCH_TIME_FOREVER，间隔是 DISPATCH_TIME_FOREVER 的计时器
                 // _dispatch_source_set_runloop_timer_4CF(rlm->_timerSource, DISPATCH_TIME_FOREVER, DISPATCH_TIME_FOREVER, 321);
             
+                //  timer 时间到 或 run loop 超时
                 if (rlm->_timerFired) {
                     // Leave livePort as the queue port, and service timers below
                     // 将 livePort 保留为队列端口，并在下面保留服务计时器。 
@@ -753,6 +768,8 @@ static int32_t __CFRunLoopRun(CFRunLoopRef rl,
             memset(msg_buffer, 0, sizeof(msg_buffer));
         }
         msg = (mach_msg_header_t *)msg_buffer;
+        
+        // 大概是监听 waitSet 中的端口，的等待接收消息
         __CFRunLoopServiceMachPort(waitSet,
                                    &msg,
                                    sizeof(msg_buffer),
@@ -776,6 +793,8 @@ static int32_t __CFRunLoopRun(CFRunLoopRef rl,
         __CFRunLoopLock(rl);
         // CFRunLoopMode 加锁
         __CFRunLoopModeLock(rlm);
+        
+        // 此时 run loop 要被唤醒了...
         
         // 统计 rl 的休眠时间，CFAbsoluteTimeGetCurrent() 当前时间减去 sleepStart 休眠开始时间
         rl->_sleepTime += (poll ? 0.0 : (CFAbsoluteTimeGetCurrent() - sleepStart));
