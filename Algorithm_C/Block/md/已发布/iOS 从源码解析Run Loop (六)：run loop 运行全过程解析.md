@@ -78,7 +78,7 @@ SInt32 CFRunLoopRunSpecific(CFRunLoopRef rl,
     __CFRunLoopLock(rl);
     
     // 调用 __CFRunLoopFindMode 函数从 rl 的 _modes 中找到名字是 modeName 的 run loop mode，
-    // 如果找不到的话第三个参数传的是 false，则直接返回 NULL。 
+    // 如果找不到的话第三个参数传的是 false 则不进行新建 run loop mode，则直接返回 NULL。 
     //（CFRunLoopMode 加锁）
     CFRunLoopModeRef currentMode = __CFRunLoopFindMode(rl, modeName, false);
     
@@ -175,16 +175,19 @@ static Boolean __CFRunLoopModeIsEmpty(CFRunLoopRef rl, CFRunLoopModeRef rlm, CFR
                                ((HANDLE_DISPATCH_ON_BASE_INVOCATION_ONLY && NULL == previousMode) ||
                                (!HANDLE_DISPATCH_ON_BASE_INVOCATION_ONLY && 0 == _CFGetTSD(__CFTSDKeyIsInGCDMainQ)));
                                
-    // 在主线程，rl 的 _commonModes 包含 rlm->_name，则返回 false，表示 rlm 不是空的，rl 在此 mode 下可以运行
+    // 1. 当前在主线程，且 0 == _CFGetTSD(__CFTSDKeyIsInGCDMainQ)(在当前线程的 TSD 中获取 __CFTSDKeyIsInGCDMainQ 的值)
+    // 2. rl 是主线程的 run loop，
+    // 3. rl 的 _commonModes 包含 rlm->_name，
+    // 满足以上 3 个条件则返回 false，表示 rlm 不是空的，rl 在此入参的 rlm 下可以运行
     if (libdispatchQSafe && (CFRunLoopGetMain() == rl) && CFSetContainsValue(rl->_commonModes, rlm->_name)) return false; // represents the libdispatch main queue
     
     // 下面三条分别判断 rlm 的 _sources0 集合不为空、_sources1 集合不为空、_timers 数组不为空，
-    // 都可以直接表示 rlm 不是空的，rl 可以在此 mode 下运行。
+    // 只要有任一不为空即可直接表示 rlm 不是空的，rl 可以在此入参 rlm 下运行。
     if (NULL != rlm->_sources0 && 0 < CFSetGetCount(rlm->_sources0)) return false;
     if (NULL != rlm->_sources1 && 0 < CFSetGetCount(rlm->_sources1)) return false;
     if (NULL != rlm->_timers && 0 < CFArrayGetCount(rlm->_timers)) return false;
     
-    // 下面还有一点判断 run loop mode 不为空的依据，判断 rl 的 block 链表中包含的 block 的 _mode 是否和入参的 rlm 相同。
+    // 下面还有一点判断 run loop mode 不为空的依据，判断 rl 的 block 链表中包含的 block 的 _mode 是否和入参的 rlm 的 name 相同。
     // 这里是一个新知识点，前面我们说过无数次如果 run loop mode 的 source/timer 为空时 run loop 则不能在此 mode 下运行，
     // 下面涉及到了一个新的点，还有一种情况下，此情况对应了 run loop observer。
     
@@ -334,7 +337,8 @@ static void __CFRunLoopDoObservers(CFRunLoopRef rl, CFRunLoopModeRef rlm, CFRunL
             __CFRunLoopObserverUnlock(rlo);
             
             // 执行回调函数，函数名超长，而且都是大写，其中的 OBSERVER 标记这是一个 rlo 的回调，
-            // 不过其内部实现很简单，就是带着参数调用 rlo 的 _callout 函数
+            // 不过其内部实现很简单，就是把 rlo 的 _context 的 info 和 activity 做参数然后调用 rlo 的 _callout 函数。
+            //（activity 标记了此次 run loop 的状态变化的状态值） 
             __CFRUNLOOP_IS_CALLING_OUT_TO_AN_OBSERVER_CALLBACK_FUNCTION__(rlo->_callout,
                                                                           rlo,
                                                                           activity,
@@ -384,7 +388,7 @@ static void __CFRUNLOOP_IS_CALLING_OUT_TO_AN_OBSERVER_CALLBACK_FUNCTION__(CFRunL
 
 &emsp;现在 `CFRunLoopRunSpecific` 函数内部调用的其它函数就只剩下 `__CFRunLoopRun` 函数了...超长...!
 ### \__CFRunLoopRun
-&emsp;`__CFRunLoopRun` 函数是 run loop 真正的运行函数，超长（并且里面包含了一些在 windows 平台下的代码）。因为其是 run loop 最最核心的函数，下面我们就一行一行看一下吧，耐心看完后相信会对 run loop 能有一个全面的认识。
+&emsp;`__CFRunLoopRun` 函数是 run loop 真正的运行函数，超长（并且里面包含了一些在 windows 平台下的代码）。因为其是 run loop 最最核心的函数，下面我们就一行一行看一下吧，耐心看完后相信会对 run loop 能有一个全面彻底的认识。
 ```c++
 /* rl, rlm are locked on entrance and exit */
 // 同上面的 __CFRunLoopDoObservers 函数
@@ -566,13 +570,15 @@ static int32_t __CFRunLoopRun(CFRunLoopRef rl,
         HANDLE livePort = NULL;
         Boolean windowsMessageReceived = false;
 #endif
+
         // do while 循环进来，macOS 下连续申请了 5 个局部变量：voucherState、voucherCopy、msg_buffer、msg、livePort。 3⃣️
         
         // 取得 rlm 的端口集合 _portSet
         __CFPortSet waitSet = rlm->_portSet;
         
         // 设置 rl->_perRunData->ignoreWakeUps = 0x0，表示未设置 IgnoreWakeUps 标记位。
-        // rl->_perRunData->ignoreWakeUps = 0x57414B45/0x0，当值是 0x57414B45 时表示未设置忽略唤醒标记位（IgnoreWakeUps）
+        // rl->_perRunData->ignoreWakeUps = 0x57414B45/0x0，当值是 0x57414B45 时表示设置为 "忽略唤醒" 标记（IgnoreWakeUps），
+        // 当值是 0x0 时表示未设置 "忽略唤醒"，此时 CFRunLoopWakeUp 函数才能正常唤醒 run loop，否则会直接 return。
         // Unset 
         __CFRunLoopUnsetIgnoreWakeUps(rl);
         
@@ -580,31 +586,34 @@ static int32_t __CFRunLoopRun(CFRunLoopRef rl,
         if (rlm->_observerMask & kCFRunLoopBeforeTimers) __CFRunLoopDoObservers(rl, rlm, kCFRunLoopBeforeTimers);
         if (rlm->_observerMask & kCFRunLoopBeforeSources) __CFRunLoopDoObservers(rl, rlm, kCFRunLoopBeforeSources);
         
-        // 遍历 rl 的 block 链表中的指定在 rlm 下的 block 执行，
-        // 会首先把 rl 的 _blocks_head 和 _blocks_tail 置为 NULL，然后每个 block 执行完毕后会调用 Block_release 函数。
+        // 遍历 rl 的 block 链表中的可在当前 run loop 运行模式下执行的 block，执行它们，执行完会把它们从链表中移除，并调用 Block_release 函数释放，
+        // 得不到执行的 block 则继续留在链表中，等待 run loop 切换到 block 适合的 run loop mode 时再执行，
+        // 会首先把 rl 的 _blocks_head 和 _blocks_tail 置为 NULL，然后得到执行的 block 执行完毕后会从链表中移除并调用 Block_release 函数。
         //（block 执行时调用的是 __CFRUNLOOP_IS_CALLING_OUT_TO_A_BLOCK__ 函数）
         //（我们开始收集这种名字大写的函数，在 run loop 学习过程中我们会遇到多个这种命名方式的函数，当我们都收集完了，那么 run loop 的学习就很熟悉了）
         
         // 目前我们收集到两个：
         // __CFRUNLOOP_IS_CALLING_OUT_TO_AN_OBSERVER_CALLBACK_FUNCTION__ // run loop 的状态发生变化前执行 run loop observer 的回调函数
-        // __CFRUNLOOP_IS_CALLING_OUT_TO_A_BLOCK__ // 执行 run loop 的 block 链表中的 block（block 执行完以后会被释放并移除）
+        // __CFRUNLOOP_IS_CALLING_OUT_TO_A_BLOCK__ // 执行 run loop 的 block 链表中的 block（在 run loop 当前运行模式下可执行的链表中的 block，
+        //                                            会得到执行，执行完以后会被释放并移除，不能在此模式下执行的 block 则还会保留在 block 链表中）
         
         //（可跳到下面先看一下 __CFRunLoopDoBlocks 函数实现）
         __CFRunLoopDoBlocks(rl, rlm); // 5⃣️
         
-        // 处理 rlm 的 _sources0 中的所的 source
+        // 执行 rlm 的 _sources0 集合中的 Valid 和 Signaled 的 source，（执行 CFRunLoopSourceRef 的 perform 回调函数）
         
         // 目前我们收集到三个：
         // __CFRUNLOOP_IS_CALLING_OUT_TO_AN_OBSERVER_CALLBACK_FUNCTION__ // run loop 的状态发生变化前执行 run loop observer 的回调函数
         // __CFRUNLOOP_IS_CALLING_OUT_TO_A_BLOCK__ // 执行 run loop 的 block 链表中的 block（block 执行完以后会被释放并移除）
         // __CFRUNLOOP_IS_CALLING_OUT_TO_A_SOURCE0_PERFORM_FUNCTION__ // 执行 run loop mode 的 _source0 中的 CFRunLoopSourceRef 的 perfom 函数（以其 info 为参数）
         
-        // 遍历 rlm 的 _source0 中的 CFRunLoopSourceRef 执行其回调函数（ perform(info) ），当执行了 source0 的 perform 函数则返回 true，否则返回 false
+        // 遍历 rlm 的 _source0 中的 Valid 和 Signaled 的 CFRunLoopSourceRef，执行其 perform 函数（perform(info)），当有执行 source0 的 perform 函数时则返回 true，否则返回 false
         Boolean sourceHandledThisLoop = __CFRunLoopDoSources0(rl, rlm, stopAfterHandle); // 6⃣️
         
-        // sourceHandledThisLoop 的值表示在 __CFRunLoopDoSources0 函数内部是否对 rlm 的 _sources0 中的 CFRunLoopSourceRef 执行了它的 void (*perform)(void *info) 函数
+        // sourceHandledThisLoop 的值表示 __CFRunLoopDoSources0 函数内部是否对 rlm 的 _sources0 中的 CFRunLoopSourceRef 执行了它的 void (*perform)(void *info) 函数。
         
-        // 如果为真则再次遍历 rl 的 block 链表中的在指定 rlm 下执行的 block
+        // 如果为真则再次遍历 rl 的 block 链表中的在指定 rlm 下执行的 block，
+        //（这里没看出来 __CFRunLoopDoSources0 和 rl 的 block 链表有啥联系呀，为什么又执行链表 block 呢？难道 source0 执行会改变 run loop 的运行模式吗？也不对呀，这里入参还是 rl 和 rlm）
         if (sourceHandledThisLoop) {
             __CFRunLoopDoBlocks(rl, rlm);
         }
