@@ -75,6 +75,7 @@ extern mach_msg_return_t mach_msg(mach_msg_header_t *msg,
                                   mach_port_name_t notify);
 ```
 > &emsp;为了实现消息的发送和接收，mach_msg 函数实际上是调用了一个 Mach 陷阱 (trap)，即函数 mach_msg_trap，陷阱这个概念在 Mach 中等同于系统调用。当在用户态调用 mach_msg_trap 时会触发陷阱机制，切换到内核态；内核态中内核实现的 mach_msg 函数会完成实际的工作。
+> 
 > &emsp;run loop 的核心就是一个 mach_msg ，run loop 调用这个函数去接收消息，如果没有别人发送 port 消息过来，内核会将线程置于等待状态。例如在模拟器里跑起一个 iOS 的 App，然后在 App 静止时点击暂停，会看到主线程调用栈是停留在 mach_msg_trap 这个地方。[深入理解RunLoop](https://blog.ibireme.com/2015/05/18/runloop/)
 
 &emsp;（mach_msg 函数可以设置 timeout 参数，如果在 timeout 到来之前没有读到 msg，当前线程的 run loop 会处于休眠状态。）
@@ -203,9 +204,27 @@ static uint32_t __CFSendTrivialMachMessage(mach_port_t port, uint32_t msg_id, CF
 }
 ```
 &emsp;可看到 `CFRunLoopWakeUp` 函数的功能就是调用 mach_msg 函数向 run loop 的 \_wakeUpPort 端口发送消息来唤醒 run loop。
-
 ## \__CFRunLoopMode-\_timerPort
-&emsp;在 macOS 下同时支持 dispatch_source 和 mk 构建 timer，在 iOS 下则只支持使用 mk。这里我们只关注 \_timerPort。
+&emsp;在 macOS 下同时支持 dispatch_source 和 mk 构建 timer，在 iOS 下则只支持使用 mk。这里我们只关注 \_timerPort。我们在 Cocoa Foundation 层会通过手动创建并添加计时器 NSTimer 到  run loop 的指定 run loop mode 下，同样在 Core Foundation 层会通过创建 CFRunLoopTimerRef 实例并把它添加到 run loop 的指定 run loop mode 下，内部实现是则是把 CFRunLoopTimerRef 实例添加到 run loop mode 的 \_timers 集合中，当 \_timers 集合中的计时器需要执行时则正是通过 \_timerPort 来唤醒 run loop，且 run loop mode 的 \_timers 集合中的所有计时器共用这一个 \_timerPort。
+
+&emsp;这里我们可以做一个验证，我们为主线程添加一个 CFRunLoopOberver 观察 main run loop 的状态变化和一个 1 秒执行一次的 NSTimer。程序运行后可看到一直如下的重复打印：(代码过于简单，这里就不贴出来了)
+```c++
+...
+⏰⏰⏰ timer 回调...
+🎯... kCFRunLoopBeforeTimers
+🎯... kCFRunLoopBeforeSources
+🎯... kCFRunLoopBeforeWaiting
+🎯... kCFRunLoopAfterWaiting
+⏰⏰⏰ timer 回调...
+🎯... kCFRunLoopBeforeTimers
+🎯... kCFRunLoopBeforeSources
+🎯... kCFRunLoopBeforeWaiting
+🎯... kCFRunLoopAfterWaiting
+...
+```
+&emsp;计时器到了触发时间唤醒 run loop（kCFRunLoopAfterWaiting）执行计时器的回调，计时器回调执行完毕后 run loop 又进入休眠状态（kCFRunLoopBeforeWaiting）然后到达下次计时器触发时间时 run loop 再次被唤醒，如果不手动停止计时器的话则会这样一直无限重复下去。 
+
+&emsp;下面我们看一下其中唤醒 run loop 的关键 \_timerPort 的创建和使用逻辑。
 ```c++
 #if DEPLOYMENT_TARGET_MACOSX
 #define USE_DISPATCH_SOURCE_FOR_TIMERS 1
@@ -262,13 +281,41 @@ static void __CFRunLoopModeDeallocate(CFTypeRef cf) {
     ...
 }
 ```
-### \__CFArmNextTimerInMode
-&emsp;在 `__CFArmNextTimerInMode` 函数中
+&emsp;可看到 \_timerPort 和 CFRunLoopModeRef 一同创建一同销毁的。
 
-+ mk_timer_arm(mach_port_t, expire_time) 在 expire_time 的时候给指定了 mach_port 的 mach_msg 发送消息
-+ mk_timer_cancel(mach_port_t, &result_time) 取消 mk_timer_arm 注册的消息
+&emsp;看到 \_timerPort 创建时调用了 mk_timer_create 函数，销毁时调用了  mk_timer_destroy 函数，大概这种 mk_timer 做前缀的函数还是第一次见到其中还有两个比较重要的函数：[mk_timer.h](https://opensource.apple.com/source/xnu/xnu-1228/osfmk/mach/mk_timer.h.auto.html)
 
+```c++
+#if USE_MK_TIMER_TOO
+extern mach_port_name_t mk_timer_create(void); // 创建
+extern kern_return_t mk_timer_destroy(mach_port_name_t name); // 销毁
+extern kern_return_t mk_timer_arm(mach_port_name_t name, AbsoluteTime expire_time); // 在指定时间发送消息
+extern kern_return_t mk_timer_cancel(mach_port_name_t name, AbsoluteTime *result_time); // 取消未发送的消息
+...
+#endif
+```
++ `mk_timer_arm(mach_port_t, expire_time)` 在 expire_time 的时候给指定了 mach_port（\_timerPort） 的 mach_msg 发送消息。
++ `mk_timer_cancel(mach_port_t, &result_time)` 取消 mk_timer_arm 注册的消息。
 
+&emsp;同一个 run loop mode 下的多个 timer 共享同一个 \_timerPort，这是一个循环的流程：注册 timer(mk_timer_arm)—接收 timer(mach_msg)—根据多个 timer 计算离当前最近的下次 handle 时间—注册 timer(mk_timer_arm)。
+
+&emsp;在使用 CFRunLoopAddTimer 添加 timer 时的调用堆栈是：
+```c++
+CFRunLoopAddTimer
+__CFRepositionTimerInMode
+    __CFArmNextTimerInMode
+        mk_timer_arm
+```
+&emsp;mach_msg 收到 timer 事件时的调用堆栈是：
+```c++
+__CFRunLoopRun
+__CFRunLoopDoTimers
+    __CFRunLoopDoTimer
+        CALL_OUT_Timer
+__CFArmNextTimerInMode
+    mk_timer_arm 
+```
+&emsp;至此 mach_msg 和一些 run loop 相关的 mach port 都看完了，mach_msg 依靠用户态和内核态的切换完成了 run loop 的休眠与唤醒，唤醒操作则是离不开向指定的 mach port 发送消息。那么 mach_msg 就看到这里吧，下篇我们开始学习系统中 run loop 的各种应用。⛽️⛽️
 
 ## 参考链接
 **参考链接:🔗**

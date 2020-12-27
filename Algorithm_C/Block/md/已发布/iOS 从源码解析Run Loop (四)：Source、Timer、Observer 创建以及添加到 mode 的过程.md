@@ -1033,7 +1033,7 @@ void CFRunLoopAddTimer(CFRunLoopRef rl, CFRunLoopTimerRef rlt, CFStringRef modeN
                 // 如果 rlt->_runLoop 为 NULL，则为 rlt 的 _runLoop 赋值
                 rlt->_runLoop = rl;
             } else if (rl != rlt->_runLoop) {
-                // 如果 rlt 的 _runLoop 不为 rl，即此时 rlt 的 _runLoop 有值，
+                // 如果 rlt 的 _runLoop 不为 rl，即此时 rlt 的 _runLoop 有值，一般 rlt 创建好后 _runLoop 字段是 NULL，
                 // 则纷纷解锁后直接 return（即如果 timer 被添加过一个 run loop 了，就不能再被添加到别的 run loop 了。）
                 
                 __CFRunLoopTimerUnlock(rlt);
