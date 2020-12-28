@@ -49,8 +49,8 @@ typedef struct {
 
 2. CFRunLoopTimerRef 是基于时间的触发器，它和 NSTimer 是 toll-free bridged 的，可以混用。其包含一个时间长度和一个回调（函数指针）。当其加入到 run loop 时，run loop 会注册对应的时间点，当时间点到时，run loop会被唤醒以执行那个回调。
 3. CFRunLoopObserverRef 是观察者，每个 Observer 都包含了一个回调（函数指针），当 run loop 的状态发生变化时，观察者就能通过回调接受到这个变化。
-## 观察 run loop 状态变化
-&emsp;下面是观察主线程 run loop 的状态变化的示例代码:
+## 观察 run loop 状态变化/观察 run loop mode 切换
+&emsp;下面是观察主线程 run loop 的状态变化以及当前 run loop mode 切换（kCFRunLoopDefaultMode 和 UITrackingRunLoopMode 的切换）的部分示例代码，其中在 ViewController 上添加一个能滚动的 tableView 的代码可自行添加:
 ```c++
 - (void)viewDidLoad {
     [super viewDidLoad];
@@ -68,16 +68,87 @@ typedef struct {
     if (observer) {
         // 把 observer 添加到 main run loop 的 kCFRunLoopCommonModes 模式下
         CFRunLoopAddObserver(CFRunLoopGetMain(), observer, kCFRunLoopCommonModes);
+        CFRelease(observer);
     }
 }
 
+int count = 0; // 定义全局变量来计算一个 mode 中状态切换的统计数据
 void mainRunLoopActivitie(CFRunLoopObserverRef observer, CFRunLoopActivity activity, void *info) {
     // observer：上面 viewDidLoad 函数中添加到 main run loop 的 CFRunLoopObserverRef 实例
     // activity：本次的状态变化：kCFRunLoopEntry、kCFRunLoopBeforeTimers、kCFRunLoopBeforeSources、kCFRunLoopBeforeWaiting、kCFRunLoopAfterWaiting、kCFRunLoopExit、（kCFRunLoopAllActivities）
     // info： 上面 viewDidLoad 函数中 CFRunLoopObserverContext 实例的 info 成员变量，上面是 (__bridge void *)(self)
+    
+    ++count;
+    switch (activity) {
+        case kCFRunLoopEntry:
+            count = 0;
+            NSLog(@"🤫 - %d kCFRunLoopEntry 即将进入: %@", count, CFRunLoopCopyCurrentMode(CFRunLoopGetCurrent()));
+            break;
+        case kCFRunLoopBeforeTimers:
+            NSLog(@"🤫 - %d kCFRunLoopBeforeTimers 即将处理 timers", count);
+            break;
+        case kCFRunLoopBeforeSources:
+            NSLog(@"🤫 - %d kCFRunLoopBeforeSources 即将处理 sources", count);
+            break;
+        case kCFRunLoopBeforeWaiting:
+            count = 0;
+            NSLog(@"🤫 - %d kCFRunLoopBeforeWaiting 即将进入休眠", count);
+            break;
+        case kCFRunLoopAfterWaiting:
+            NSLog(@"🤫 - %d kCFRunLoopAfterWaiting 即将从休眠中醒来", count);
+            break;
+        case kCFRunLoopExit:
+            count = 0;
+            NSLog(@"🤫 - %d kCFRunLoopExit 即将退出: %@", count, CFRunLoopCopyCurrentMode(CFRunLoopGetCurrent()));
+            break;
+        case kCFRunLoopAllActivities:
+            NSLog(@"🤫 kCFRunLoopAllActivities");
+            break;
+    }
 }
+
+- (void)touchesBegan:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
+    NSLog(@"%s",__func__);
+}
+
+// 从静止状态点击屏幕空白区域:
+ 🤫 - 1 kCFRunLoopAfterWaiting 即将从休眠中醒来
+ 🤫 - 2 kCFRunLoopBeforeTimers 即将处理 timers
+ 🤫 - 3 kCFRunLoopBeforeSources 即将处理 sources
+ 🤫 - 0 kCFRunLoopBeforeWaiting 即将进入休眠
+ 🤫 - 1 kCFRunLoopAfterWaiting 即将从休眠中醒来
+ 🤫 - 2 kCFRunLoopBeforeTimers 即将处理 timers
+ 🤫 - 3 kCFRunLoopBeforeSources 即将处理 sources
+ -[ViewController touchesBegan:withEvent:] // 由 App 静止状态点击屏幕开始，上面是固定的循环两次才进入 touche 事件
+ 🤫 - 4 kCFRunLoopBeforeTimers 即将处理 timers
+ 🤫 - 5 kCFRunLoopBeforeSources 即将处理 sources
+ 🤫 - 0 kCFRunLoopBeforeWaiting 即将进入休眠
+ 🤫 - 1 kCFRunLoopAfterWaiting 即将从休眠中醒来
+ 🤫 - 2 kCFRunLoopBeforeTimers 即将处理 timers
+ 🤫 - 3 kCFRunLoopBeforeSources 即将处理 sources
+ 🤫 - 4 kCFRunLoopBeforeTimers 即将处理 timers
+ 🤫 - 5 kCFRunLoopBeforeSources 即将处理 sources
+ 🤫 - 0 kCFRunLoopBeforeWaiting 即将进入休眠
+ 🤫 - 1 kCFRunLoopAfterWaiting 即将从休眠中醒来
+ 🤫 - 2 kCFRunLoopBeforeTimers 即将处理 timers
+ 🤫 - 3 kCFRunLoopBeforeSources 即将处理 sources
+ 🤫 - 4 kCFRunLoopBeforeTimers 即将处理 timers
+ 🤫 - 5 kCFRunLoopBeforeSources 即将处理 sources
+ 🤫 - 0 kCFRunLoopBeforeWaiting 即将进入休眠 // 下面则是固定的循环两次后 App 进入静止状态。
+ 🤫 - 1 kCFRunLoopAfterWaiting 即将从休眠中醒来
+ 🤫 - 2 kCFRunLoopBeforeTimers 即将处理 timers
+ 🤫 - 3 kCFRunLoopBeforeSources 即将处理 sources
+ 🤫 - 0 kCFRunLoopBeforeWaiting 即将进入休眠
+ 🤫 - 1 kCFRunLoopAfterWaiting 即将从休眠中醒来
+ 🤫 - 2 kCFRunLoopBeforeTimers 即将处理 timers
+ 🤫 - 3 kCFRunLoopBeforeSources 即将处理 sources
+ 🤫 - 0 kCFRunLoopBeforeWaiting 即将进入休眠
 ```
-&emsp;当 main run loop 的状态发生变化时会调用 mainRunLoopActivitie 函数，我们可以在其中根据 activity 做想要的处理。具体详细的 CFRunLoopObserverCreate 和 CFRunLoopAddObserver 函数的实现在前面都已经分析过，可以参考前面 [iOS 从源码解析Run Loop (四)：Source、Timer、Observer 创建以及添加到 mode 的过程](https://juejin.cn/post/6908639874857828366)
+&emsp;首先运行模式切换相关，当我们从静止状态滚动 tableView 的时候，会看到 “🤫 - 0 kCFRunLoopExit 即将退出: kCFRunLoopDefaultMode” 和 “🤫 - 0 kCFRunLoopEntry 即将进入: UITrackingRunLoopMode”，当滑动停止的时候又会看到 “🤫 - 0 kCFRunLoopExit 即将退出: UITrackingRunLoopMode” 和 “🤫 - 0 kCFRunLoopEntry 即将进入: kCFRunLoopDefaultMode”。即从 Default 退出进入 UITracking，然后滑动停止后是退出 UITracking 再进入 Default。
+
+&emsp;状态切换的话是，从程序静止状态时，点击屏幕空白区域，则是固定的 “AfterWaiting -> BeforeTimers -> BeforeSources” 然后进入休眠 “BeforeWaiting”，然后是再来一次 “AfterWaiting -> BeforeTimers -> BeforeSources” 后才会真正的触发 touchesBegan:withEvent:，即 run loop 唤醒之后不是立马处理事件的，而是看看 timer 有没有事情，然后是 sources，且第一轮是不执行触摸事件，第二轮才会执行 touch 事件回调，然后最后是固定循环两轮后 App 进入静止状态。
+
+&emsp;当 main run loop 的状态发生变化时会调用 mainRunLoopActivitie 函数，我们可以在其中根据 activity 做想要的处理。具体详细的 CFRunLoopObserverCreate 和 CFRunLoopAddObserver 函数的实现分析在前面都已经分析过，可以参考前面 [iOS 从源码解析Run Loop (四)：Source、Timer、Observer 创建以及添加到 mode 的过程](https://juejin.cn/post/6908639874857828366)
 ## 线程保活
 &emsp;如果想让子线程永久保持活性那么就在子线程内调用其 run loop 实例的 run 函数，如果想自由控制线程 run loop 结束时机的话则使用一个变量控制 do while 循环，在循环内部调用子线程的 run loop 实例的 runMode: beforeDate: 函数，当需要停止子线程的 run loop 时则在子线程内调用 CFRunLoopStop(CFRunLoopGetCurrent()); 并结束 do while 循环，详细内容可参考前面 [iOS 从源码解析Run Loop (一)：run loop 基本概念理解与 NSRunLoop 文档](https://juejin.cn/post/6904921175546298375)
 ## 控制自动释放池的 push 和 pop
@@ -234,3 +305,187 @@ int main(int argc, char * argv[]) {
 + [runloop 与autorelase对象、Autorelease Pool 在什么时候释放](https://blog.csdn.net/leikezhu1981/article/details/51246684)
 + [内存管理：autoreleasepool与runloop](https://www.jianshu.com/p/d769c1653347)
 + [Objective-C的AutoreleasePool与Runloop的关联](https://blog.csdn.net/zyx196/article/details/50824564)
+
+
+
+
+
+//
+//  ViewController.m
+//  Simple_iOS
+//
+//  Created by CHM on 2020/9/24.
+//  Copyright © 2020 CHM. All rights reserved.
+//
+
+#import "ViewController.h"
+
+#import "NSObject+Custom.h"
+#import <pthread.h>
+
+#import "CommonThread.h"
+
+@interface ViewController () <NSMachPortDelegate, UITableViewDelegate, UITableViewDataSource>
+
+@property (nonatomic, strong) CommonThread *commonThread;
+@property (nonatomic, assign) NSInteger touchCount;
+@property (weak, nonatomic) IBOutlet UITableView *tableView;
+
+@end
+
+@implementation ViewController
+
+- (void)viewDidLoad {
+    [super viewDidLoad];
+    // Do any additional setup after loading the view.
+    
+//    dispatch_queue_t concurrentQueue = dispatch_queue_create("com.concurrent", DISPATCH_QUEUE_CONCURRENT);
+//    dispatch_queue_t globalQueue = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0);
+//    dispatch_queue_t serialQueue = dispatch_queue_create("com.serial", DISPATCH_QUEUE_SERIAL);
+//    dispatch_queue_t serialQueue1 = dispatch_queue_create("com.com.1", DISPATCH_QUEUE_SERIAL);
+//    dispatch_queue_t serialQueue2 = dispatch_queue_create("com.com.2", DISPATCH_QUEUE_SERIAL);
+//    dispatch_queue_t serialQueue3 = dispatch_queue_create("com.com.3", DISPATCH_QUEUE_SERIAL);
+//    dispatch_queue_t mainQueue = dispatch_get_main_queue();
+    
+//    self.touchCount = 0;
+    NSLog(@"🔞 START: %@", [NSThread currentThread]);
+//    {
+//        CommonThread *commonThread = [[CommonThread alloc] initWithBlock:^{
+//            NSLog(@"🏃‍♀️🏃‍♀️ %@", [NSThread currentThread]);
+//
+//            NSRunLoop *commonRunLoop = [NSRunLoop currentRunLoop];
+//            NSPort *port = [[NSPort alloc] init];
+//            NSLog(@"🗣 %p %@", port, port);
+//            [commonRunLoop addPort:port forMode:NSDefaultRunLoopMode];
+//            NSLog(@"♻️ %p %@", commonRunLoop, commonRunLoop);
+//            [commonRunLoop run];
+//            NSLog(@"♻️♻️ %p %@", commonRunLoop, commonRunLoop);
+//        }];
+//        [commonThread start];
+//    }
+    
+//    NSMachPort *port = [[NSMachPort alloc] init];
+//    [port setDelegate:self];
+//
+//    [[NSRunLoop currentRunLoop] addPort:port forMode:NSRunLoopCommonModes];
+//    NSLog(@"🙀🙀 %@", port);
+//    [NSThread detachNewThreadSelector:@selector(customThread:) toTarget:self withObject:port];
+    
+    CFRunLoopObserverContext context = {0, (__bridge void *)(self), NULL, NULL, NULL};
+    CFRunLoopObserverRef observer = CFRunLoopObserverCreate(kCFAllocatorDefault, kCFRunLoopAllActivities, YES, 0, &mainRunLoopObserver, &context);
+    if (observer){
+        CFRunLoopAddObserver(CFRunLoopGetMain(), observer, kCFRunLoopCommonModes);
+        CFRelease(observer);
+    }
+    
+    NSLog(@"🔞 END: %@", [NSThread currentThread]);
+}
+
+int count = 0; //定义全局变量来计算一个 mode 中状态切换的统计数据
+void mainRunLoopObserver(CFRunLoopObserverRef observer, CFRunLoopActivity activity, void *info) {
+    ++count;
+    switch (activity) {
+        case kCFRunLoopEntry:
+            count = 0;
+            NSLog(@"🤫 - %d kCFRunLoopEntry 即将进入: %@", count, CFRunLoopCopyCurrentMode(CFRunLoopGetCurrent()));
+            break;
+        case kCFRunLoopBeforeTimers:
+            NSLog(@"🤫 - %d kCFRunLoopBeforeTimers 即将处理 timers", count);
+            break;
+        case kCFRunLoopBeforeSources:
+            NSLog(@"🤫 - %d kCFRunLoopBeforeSources 即将处理 sources", count);
+            break;
+        case kCFRunLoopBeforeWaiting:
+            count = 0;
+            NSLog(@"🤫 - %d kCFRunLoopBeforeWaiting 即将进入休眠", count);
+            break;
+        case kCFRunLoopAfterWaiting:
+            NSLog(@"🤫 - %d kCFRunLoopAfterWaiting 即将从休眠中醒来", count);
+            break;
+        case kCFRunLoopExit:
+            count = 0;
+            NSLog(@"🤫 - %d kCFRunLoopExit 即将退出: %@", count, CFRunLoopCopyCurrentMode(CFRunLoopGetCurrent()));
+            break;
+        case kCFRunLoopAllActivities:
+            NSLog(@"🤫 kCFRunLoopAllActivities");
+            break;
+    }
+}
+
+- (void)touchesBegan:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
+    NSLog(@"%s",__func__);
+}
+
+- (void)handleMachMessage:(void *)msg {
+    NSLog(@"📢📢 Mach port %s", msg);
+}
+
+//- (void)handlePortMessage:(NSPortMessage *)message {
+//    NSLog(@"📢📢 Mach port %@", message);
+//}
+
+- (void)customThread:(NSMachPort *)sender {
+    NSLog(@"😻😻 %@", sender);
+    
+    NSMachPort *p = [[NSMachPort alloc] init];
+    [sender sendBeforeDate:[NSDate distantFuture] components:nil from:p reserved:0];
+    
+    NSLog(@"🤏🤏 subthread=%@", [NSThread currentThread]);
+}
+
+//- (void)run:(NSObject *)param {
+//    NSLog(@"🏃🏃🏃 %@ param: %p", [NSThread currentThread], param);
+    
+//    NSRunLoop *commonRunLoop = [NSRunLoop currentRunLoop];
+//    NSPort *port = [[NSPort alloc] init];
+//    NSLog(@"🗣 %p %@", port, port);
+//    [commonRunLoop addPort:port forMode:NSDefaultRunLoopMode];
+//    NSLog(@"♻️ %p %@", commonRunLoop, commonRunLoop);
+//    [commonRunLoop run];
+//    NSLog(@"♻️♻️ %p %@", commonRunLoop, commonRunLoop);
+//}
+
+//- (void)touchesBegan:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
+//    NSLog(@"📺📺📺 START...");
+//
+//    if (self.touchCount == 0) {
+//        [self performSelector:@selector(run:) onThread:self.commonThread withObject:nil waitUntilDone:NO];
+//    }
+//
+//    if (self.touchCount != 0) {
+//        [self performSelector:@selector(run:) onThread:self.commonThread withObject:nil waitUntilDone:YES modes:@[NSDefaultRunLoopMode]];
+//    }
+//
+//    [self performSelector:@selector(run:) withObject:nil afterDelay:5];
+//
+//    self.touchCount++;
+//
+//    NSLog(@"📺📺📺 END...");
+//}
+
+- (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView {
+    return 1;
+}
+
+- (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
+    return 100;
+}
+
+- (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
+    UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:@"Cell"];
+    return cell;
+}
+
+@end
+
+
+/* Run Loop Observer Activities */
+//    typedef CF_OPTIONS(CFOptionFlags, CFRunLoopActivity) {
+//        kCFRunLoopEntry = (1UL << 0),
+//        kCFRunLoopBeforeTimers = (1UL << 1),
+//        kCFRunLoopBeforeSources = (1UL << 2),
+//        kCFRunLoopBeforeWaiting = (1UL << 5),
+//        kCFRunLoopAfterWaiting = (1UL << 6),
+//        kCFRunLoopExit = (1UL << 7),
+//        kCFRunLoopAllActivities = 0x0FFFFFFFU
+//    };
