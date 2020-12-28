@@ -205,7 +205,7 @@ static uint32_t __CFSendTrivialMachMessage(mach_port_t port, uint32_t msg_id, CF
 ```
 &emsp;可看到 `CFRunLoopWakeUp` 函数的功能就是调用 mach_msg 函数向 run loop 的 \_wakeUpPort 端口发送消息来唤醒 run loop。
 ## \__CFRunLoopMode-\_timerPort
-&emsp;在 macOS 下同时支持 dispatch_source 和 mk 构建 timer，在 iOS 下则只支持使用 mk。这里我们只关注 \_timerPort。我们在 Cocoa Foundation 层会通过手动创建并添加计时器 NSTimer 到  run loop 的指定 run loop mode 下，同样在 Core Foundation 层会通过创建 CFRunLoopTimerRef 实例并把它添加到 run loop 的指定 run loop mode 下，内部实现是则是把 CFRunLoopTimerRef 实例添加到 run loop mode 的 \_timers 集合中，当 \_timers 集合中的计时器需要执行时则正是通过 \_timerPort 来唤醒 run loop，且 run loop mode 的 \_timers 集合中的所有计时器共用这一个 \_timerPort。
+&emsp;\_timerPort 是 \__CFRunLoopMode 的一个成员变量。在 macOS 下同时支持 dispatch_source 和 mk 构建 timer，在 iOS 下则只支持使用 mk。这里我们只关注 \_timerPort。我们在 Cocoa Foundation 层会通过手动创建并添加计时器 NSTimer 到  run loop 的指定 run loop mode 下，同样在 Core Foundation 层会通过创建 CFRunLoopTimerRef 实例并把它添加到 run loop 的指定 run loop mode 下，内部实现是则是把 CFRunLoopTimerRef 实例添加到 run loop mode 的 \_timers 集合中，当 \_timers 集合中的计时器需要执行时则正是通过 \_timerPort 来唤醒 run loop，且 run loop mode 的 \_timers 集合中的所有计时器共用这一个 \_timerPort。
 
 &emsp;这里我们可以做一个验证，我们为主线程添加一个 CFRunLoopOberver 观察 main run loop 的状态变化和一个 1 秒执行一次的 NSTimer。程序运行后可看到一直如下的重复打印：(代码过于简单，这里就不贴出来了)
 ```c++

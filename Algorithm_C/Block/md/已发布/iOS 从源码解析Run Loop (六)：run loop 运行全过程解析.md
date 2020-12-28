@@ -696,9 +696,9 @@ static int32_t __CFRunLoopRun(CFRunLoopRef rl,
         
         // 这个内层的 do while 循环主要是用于 "保持" run looop 的睡眠状态的，直到需要被唤醒了才会跳出这个 do while 循环。只有在下面的事件发生时才会进行唤醒：
         // 1. 基于端口的输入源（port-based input source）（source1）的事件到达。
-        // 2. CFRunLoopMode 中的 timers 触发。
+        // 2. CFRunLoopMode 中的 timers 触发。（CFRunLoopMode 可添加多个 timer，它们共用一个 _timerPort 唤醒 run loop，并且会计算所有 timer 中最近的下次要触发的 timer 的时间）
         // 3. 为 run loop 设置的超时时间过期。
-        // 4. run loop 被显式唤醒。
+        // 4. run loop 被显式唤醒。（被其他什么调用者手动唤醒）
         do {
             if (kCFUseCollectableAllocator) {
                 // objc_clear_stack(0);
@@ -1494,12 +1494,14 @@ static Boolean __CFRunLoopDoTimers(CFRunLoopRef rl, CFRunLoopModeRef rlm, uint64
     // timerHandled 标记是否执行了 timer 的回调事件
     Boolean timerHandled = false;
     
+    // 用于收集 rlm->_timers 中待要触发的计时器
     CFMutableArrayRef timers = NULL;
     
     // 遍历 rlm 的 _timers 数组中的 CFRunLoopTimerRef，如果 CFRunLoopTimerRef 是 Valid 并且非 Firing 状态并且其 _fireTSR 小于等于 limitTSR 时间，则把其添加到 timers 中
-    // （小于等于 limitTSR 本次的 timer 回调会被忽略）
+    // （大于 limitTSR 的本次 timer 回调会被忽略）
     for (CFIndex idx = 0, cnt = rlm->_timers ? CFArrayGetCount(rlm->_timers) : 0; idx < cnt; idx++) {
         CFRunLoopTimerRef rlt = (CFRunLoopTimerRef)CFArrayGetValueAtIndex(rlm->_timers, idx);
+        // rlt 是 Valid 的并且当前是未在执行的
         if (__CFIsValid(rlt) && !__CFRunLoopTimerIsFiring(rlt)) {
             if (rlt->_fireTSR <= limitTSR) {
                 // 首次进来需要为 timers 申请空间
