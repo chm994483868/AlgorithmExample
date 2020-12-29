@@ -918,20 +918,27 @@ CFRunLoopTimerRef CFRunLoopTimerCreate(CFAllocatorRef allocator,
     memory->_interval = interval;
     memory->_tolerance = 0.0;
     
+    // 下面这一部分代码保证计时器第一次触发的时间点正常。
     // #define TIMER_DATE_LIMIT    4039289856.0
+    // 如果入参 fireDate 过大，则置为 TIMER_DATE_LIMIT
     if (TIMER_DATE_LIMIT < fireDate) fireDate = TIMER_DATE_LIMIT;
     
     // 下次触发的时间
     memory->_nextFireDate = fireDate;
     memory->_fireTSR = 0ULL;
     
+    // 取得当前时间
     uint64_t now2 = mach_absolute_time();
     CFAbsoluteTime now1 = CFAbsoluteTimeGetCurrent();
+    
     if (fireDate < now1) {
+        // 如果第一次触发的时间已经过了，则把 _fireTSR 置为当前
         memory->_fireTSR = now2;
     } else if (TIMER_INTERVAL_LIMIT < fireDate - now1) {
+        // 如果第一次触发的时间点与当前是时间差距超过了 TIMER_INTERVAL_LIMIT，则把 _fireTSR 置为 TIMER_INTERVAL_LIMIT
         memory->_fireTSR = now2 + __CFTimeIntervalToTSR(TIMER_INTERVAL_LIMIT);
     } else {
+        // 这里则是正常的，如果第一次触发的时间还没有到，则把触发时间设置为当前时间和第一次触发时间点的差值
         memory->_fireTSR = now2 + __CFTimeIntervalToTSR(fireDate - now1);
     }
     

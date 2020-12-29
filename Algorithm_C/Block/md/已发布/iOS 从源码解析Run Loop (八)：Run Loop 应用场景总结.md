@@ -1,17 +1,19 @@
 # iOS 从源码解析Run Loop (八)：Run Loop 应用场景总结
 
-> &emsp;苹果使用 run loop 实现了：子线程保活、控制自动释放池的 push 和 pop、
+> &emsp;本篇学习我们日常开发中涉及到 run loop 的一些知识点，我们使用它们的时候可能不会想到这些知识点的背后其实都是 run loop 在做支撑的。
 
 
-延迟回调、触摸事件、屏幕刷新等功能。下面我们就对涉及到 run loop 的各个功能点进行详细的学习。⛽️⛽️
+**子线程保活、在 run loop 循环过程中执行自动释放池的 push 和 pop、延迟回调、触摸事件、屏幕刷新等功能。下面我们就对涉及到 run loop 的各个功能点进行详细的学习。**
 
-&emsp;我们首先再次回顾一下 Source/Timer/Observer。
+
+## 回顾 run loop mode item
+&emsp;我们首先再次回顾一下 Source/Timer/Observer，因为 run loop 正是通过这些 run loop mode item 来向外提供功能支持的。
 
 1. CFRunLoopSourceRef 是事件产生的地方。Source 有两个版本：Source0 和 Source1。
 + Source0 只包含了一个回调（函数指针），它并不能主动触发事件。使用时，你需要先调用 CFRunLoopSourceSignal(source)，将这个 Source 标记为待处理，然后手动调用 CFRunLoopWakeUp(runloop) 来唤醒 RunLoop，让其处理这个事件。
-+ Source1 包含了一个 mach_port 和一个回调（函数指针），被用于通过内核和其他线程相互发送消息。这种 Source 能主动唤醒 RunLoop 的线程。
++ Source1 包含了一个 mach_port 和一个回调（函数指针），被用于通过内核和其他线程相互发送消息（mach_msg），这种 Source 能主动唤醒 RunLoop 的线程。
 
-&emsp;从它们的数据结构中也能看出区别，CFRunLoopSourceContext 和 CFRunLoopSourceContext1 具有一些相同的部分和不同部分。
+&emsp;下面看一下它们相关的数据结构，CFRunLoopSourceContext 和 CFRunLoopSourceContext1 具有一些相同的字段和不同字段。
 ```c++
 typedef struct {
     CFIndex version;
@@ -23,7 +25,7 @@ typedef struct {
     CFHashCode (*hash)(const void *info); // 哈希函数
 } CFRunLoopSourceContext/1;
 ```
-&emsp;version、info、retain 函数、release 函数、描述字符串的函数、判断 source 对象是否相等的函数、哈希函数，是 CFRunLoopSourceContext 和 CFRunLoopSourceContext1 的基础内容双方完成等同，两者的区别主要在下面，同时它们也表示了 source0 和 source1 的不同功能。
+&emsp;version、info、retain 函数、release 函数、描述字符串的函数、判断 source 对象是否相等的函数、哈希函数，是 CFRunLoopSourceContext 和 CFRunLoopSourceContext1 的基础内容双方完成等同，两者的区别主要在下面，它们表示了 source0 和 source1 的不同功能。
 ```c++
 typedef struct {
     ...
@@ -45,11 +47,11 @@ typedef struct {
 #endif
 } CFRunLoopSourceContext1;
 ```
-&emsp;可看到 Source0 中仅有一些回调函数，而 Source1 中有 mach port 可用来唤醒 run loop。
+&emsp;可看到 Source0 中仅有一些回调函数会在 run loop 的本次循环中执行，而 Source1 中有 mach port 可用来主动唤醒 run loop。
 
 2. CFRunLoopTimerRef 是基于时间的触发器，它和 NSTimer 是 toll-free bridged 的，可以混用。其包含一个时间长度和一个回调（函数指针）。当其加入到 run loop 时，run loop 会注册对应的时间点，当时间点到时，run loop会被唤醒以执行那个回调。
-3. CFRunLoopObserverRef 是观察者，每个 Observer 都包含了一个回调（函数指针），当 run loop 的状态发生变化时，观察者就能通过回调接受到这个变化。
-## 观察 run loop 状态变化/观察 run loop mode 切换
+3. CFRunLoopObserverRef 是观察者，每个 Observer 都包含了一个回调（函数指针），当 run loop 的状态发生变化时，观察者就能通过这个回调接收到。
+## 观察 run loop 的状态变化/观察 run loop mode 的切换
 &emsp;下面是观察主线程 run loop 的状态变化以及当前 run loop mode 切换（kCFRunLoopDefaultMode 和 UITrackingRunLoopMode 的切换）的部分示例代码，其中在 ViewController 上添加一个能滚动的 tableView 的代码可自行添加:
 ```c++
 - (void)viewDidLoad {
@@ -91,7 +93,7 @@ void mainRunLoopActivitie(CFRunLoopObserverRef observer, CFRunLoopActivity activ
             NSLog(@"🤫 - %d kCFRunLoopBeforeSources 即将处理 sources", count);
             break;
         case kCFRunLoopBeforeWaiting:
-            count = 0;
+            count = 0; // 每次 run loop 即将进入休眠时，count 置为 0，可表示一轮 run loop 循环结束
             NSLog(@"🤫 - %d kCFRunLoopBeforeWaiting 即将进入休眠", count);
             break;
         case kCFRunLoopAfterWaiting:
@@ -111,46 +113,55 @@ void mainRunLoopActivitie(CFRunLoopObserverRef observer, CFRunLoopActivity activ
     NSLog(@"%s",__func__);
 }
 
-// 从静止状态点击屏幕空白区域:
+// 从 App 静止状态点击屏幕空白区域可看到如下打印:
  🤫 - 1 kCFRunLoopAfterWaiting 即将从休眠中醒来
  🤫 - 2 kCFRunLoopBeforeTimers 即将处理 timers
  🤫 - 3 kCFRunLoopBeforeSources 即将处理 sources
- 🤫 - 0 kCFRunLoopBeforeWaiting 即将进入休眠
+ 🤫 - 0 kCFRunLoopBeforeWaiting 即将进入休眠 // run loop 1⃣️ 组循环结束
+ 
  🤫 - 1 kCFRunLoopAfterWaiting 即将从休眠中醒来
  🤫 - 2 kCFRunLoopBeforeTimers 即将处理 timers
  🤫 - 3 kCFRunLoopBeforeSources 即将处理 sources
  -[ViewController touchesBegan:withEvent:] // 由 App 静止状态点击屏幕开始，上面是固定的循环两次才进入 touche 事件
  🤫 - 4 kCFRunLoopBeforeTimers 即将处理 timers
  🤫 - 5 kCFRunLoopBeforeSources 即将处理 sources
- 🤫 - 0 kCFRunLoopBeforeWaiting 即将进入休眠
+ 🤫 - 0 kCFRunLoopBeforeWaiting 即将进入休眠 // run loop 2⃣️ 组循环结束
+ 
  🤫 - 1 kCFRunLoopAfterWaiting 即将从休眠中醒来
  🤫 - 2 kCFRunLoopBeforeTimers 即将处理 timers
  🤫 - 3 kCFRunLoopBeforeSources 即将处理 sources
  🤫 - 4 kCFRunLoopBeforeTimers 即将处理 timers
  🤫 - 5 kCFRunLoopBeforeSources 即将处理 sources
- 🤫 - 0 kCFRunLoopBeforeWaiting 即将进入休眠
+ 🤫 - 0 kCFRunLoopBeforeWaiting 即将进入休眠 // run loop 3⃣️ 组循环结束
+ 
  🤫 - 1 kCFRunLoopAfterWaiting 即将从休眠中醒来
  🤫 - 2 kCFRunLoopBeforeTimers 即将处理 timers
  🤫 - 3 kCFRunLoopBeforeSources 即将处理 sources
  🤫 - 4 kCFRunLoopBeforeTimers 即将处理 timers
  🤫 - 5 kCFRunLoopBeforeSources 即将处理 sources
- 🤫 - 0 kCFRunLoopBeforeWaiting 即将进入休眠 // 下面则是固定的循环两次后 App 进入静止状态。
+ 🤫 - 0 kCFRunLoopBeforeWaiting 即将进入休眠 // run loop 4⃣️ 组循环结束
+ // 下面则是固定的循环两次后 App 进入静止状态。
+ 
  🤫 - 1 kCFRunLoopAfterWaiting 即将从休眠中醒来
  🤫 - 2 kCFRunLoopBeforeTimers 即将处理 timers
  🤫 - 3 kCFRunLoopBeforeSources 即将处理 sources
- 🤫 - 0 kCFRunLoopBeforeWaiting 即将进入休眠
+ 🤫 - 0 kCFRunLoopBeforeWaiting 即将进入休眠 // run loop 5⃣️ 组循环结束
+ 
  🤫 - 1 kCFRunLoopAfterWaiting 即将从休眠中醒来
  🤫 - 2 kCFRunLoopBeforeTimers 即将处理 timers
  🤫 - 3 kCFRunLoopBeforeSources 即将处理 sources
- 🤫 - 0 kCFRunLoopBeforeWaiting 即将进入休眠
+ 🤫 - 0 kCFRunLoopBeforeWaiting 即将进入休眠 // run loop 6⃣️ 组循环结束
+ // 此后 run loop 进入长久休眠
 ```
-&emsp;首先运行模式切换相关，当我们从静止状态滚动 tableView 的时候，会看到 “🤫 - 0 kCFRunLoopExit 即将退出: kCFRunLoopDefaultMode” 和 “🤫 - 0 kCFRunLoopEntry 即将进入: UITrackingRunLoopMode”，当滑动停止的时候又会看到 “🤫 - 0 kCFRunLoopExit 即将退出: UITrackingRunLoopMode” 和 “🤫 - 0 kCFRunLoopEntry 即将进入: kCFRunLoopDefaultMode”。即从 Default 退出进入 UITracking，然后滑动停止后是退出 UITracking 再进入 Default。
+&emsp;首先运行模式切换相关，当我们从静止状态滚动 tableView 的时候，会看到 `🤫 - 0 kCFRunLoopExit 即将退出: kCFRunLoopDefaultMode` 和 `🤫 - 0 kCFRunLoopEntry 即将进入: UITrackingRunLoopMode`，当滑动停止的时候又会看到 `🤫 - 0 kCFRunLoopExit 即将退出: UITrackingRunLoopMode` 和 `🤫 - 0 kCFRunLoopEntry 即将进入: kCFRunLoopDefaultMode`。即从 Default 退出进入 UITracking，然后滑动停止后是退出 UITracking 再进入 Default。
 
-&emsp;状态切换的话是，从程序静止状态时，点击屏幕空白区域，则是固定的 “AfterWaiting -> BeforeTimers -> BeforeSources” 然后进入休眠 “BeforeWaiting”，然后是再来一次 “AfterWaiting -> BeforeTimers -> BeforeSources” 后才会真正的触发 touchesBegan:withEvent:，即 run loop 唤醒之后不是立马处理事件的，而是看看 timer 有没有事情，然后是 sources，且第一轮是不执行触摸事件，第二轮才会执行 touch 事件回调，然后最后是固定循环两轮后 App 进入静止状态。
+&emsp;状态切换的话是，从程序静止状态时，点击屏幕空白区域，则是固定的 `AfterWaiting -> BeforeTimers -> BeforeSources` 然后进入休眠 `BeforeWaiting`，然后是再来一次 `AfterWaiting -> BeforeTimers -> BeforeSources` 后才会执行 `touchesBegan:withEvent:` 回调，即 run loop 唤醒之后不是立马处理 touch 事件的，而是看看 timer 有没有事情，然后是 sources（这里是一个 source0），且第一轮是不执行 touch 事件回调，第二轮才会执行 touch 事件回调，然后是固定循环两轮后程序进入长久休眠状态。
 
-&emsp;当 main run loop 的状态发生变化时会调用 mainRunLoopActivitie 函数，我们可以在其中根据 activity 做想要的处理。具体详细的 CFRunLoopObserverCreate 和 CFRunLoopAddObserver 函数的实现分析在前面都已经分析过，可以参考前面 [iOS 从源码解析Run Loop (四)：Source、Timer、Observer 创建以及添加到 mode 的过程](https://juejin.cn/post/6908639874857828366)
+&emsp;当 main run loop 的状态发生变化时会调用 mainRunLoopActivitie 函数，我们可以在其中根据 activity 做想要的处理。具体详细的 CFRunLoopObserverCreate 和 CFRunLoopAddObserver 函数的实现过程在前面都已经分析过，可以参考前面 [iOS 从源码解析Run Loop (四)：Source、Timer、Observer 创建以及添加到 mode 的过程](https://juejin.cn/post/6908639874857828366)
 ## 线程保活
-&emsp;如果想让子线程永久保持活性那么就在子线程内调用其 run loop 实例的 run 函数，如果想自由控制线程 run loop 结束时机的话则使用一个变量控制 do while 循环，在循环内部调用子线程的 run loop 实例的 runMode: beforeDate: 函数，当需要停止子线程的 run loop 时则在子线程内调用 CFRunLoopStop(CFRunLoopGetCurrent()); 并结束 do while 循环，详细内容可参考前面 [iOS 从源码解析Run Loop (一)：run loop 基本概念理解与 NSRunLoop 文档](https://juejin.cn/post/6904921175546298375)
+&emsp;线程为什么需要保活？性能其实很大的瓶颈是在于空间的申请和释放，当我们执行一个任务的时候创建了一个线程，任务结束就释放该线程，如果任务频率比较高，那么一个一直活跃的线程来执行我们的任务就省去申请和释放空间的时间和性能。前面已经讲过了 run loop 需要有 source0/source1/timer/block（\__CFRunLoopModeIsEmpty 函数前面详细分析过） 才能不退出，总不可能直接让他执行 while(1) 吧，这种方法明显不对的，由源码得知，当有监测端口（mach port）的时候（即有 source1 时），也不会退出，也不会影响性能，所以在线程初始化的时候可以使用 `[[NSRunLoop currentRunLoop] addPort:[NSPort port] forMode:NSRunLoopCommonModes];` 来保证 run loop 启动后保活。（CFRunLoopRunSpecific 函数内调用 \__CFRunLoopModeIsEmpty 函数返回 ture 的话，会直接返回 kCFRunLoopRunFinished）
+
+&emsp;如果想让子线程永久保持活性那么就在子线程内调用其 run loop 实例的 run 函数，如果想自由控制线程 run loop 结束时机的话则使用一个变量控制 do while 循环，在循环内部调用子线程的 run loop 实例的 runMode: beforeDate: 函数，当需要停止子线程的 run loop 时则在子线程内调用 `CFRunLoopStop(CFRunLoopGetCurrent());` 并结束 do while 循环，详细内容可参考前面 [iOS 从源码解析Run Loop (一)：run loop 基本概念理解与 NSRunLoop 文档](https://juejin.cn/post/6904921175546298375)
 ## 控制自动释放池的 push 和 pop
 &emsp;自动释放池什么时候执行 pop 操作把池中的对象的都执行一次 release  呢？这里要分两种情况：
 + 一种是我们手动以 `@autoreleasepool {...}`  的形式添加的自动释放池，使用 clang -rewrite-objc 转换为 C++ 后其实是
@@ -259,12 +270,111 @@ int main(int argc, char * argv[]) {
 
 &emsp;从上面 run loop observer 工作便知，每一次 loop，便会有一次 pop 和 push，因此我们得出：
 1. 如果手动添加 autoreleasePool，autoreleasePool 作用域里的自动释放对象会在出 pool 作用域的那一刻释放。
-2. 如果非手动添加的，那么自动释放的对象会在每一次 run loop 循环结束时，释放当前这次循环所创建的自动释放对象。
+2. 如果是 run loop 自动添加的 autoreleasePool，那么在每一次 run loop 循环结束时，autoreleasePool 执行 pop 操作 释放这次循环中所有的自动释放对象。在 run loop 循环开启时再 push 新的自动释放池，保证 run loop 的每次循环中的对象都能得到释放。
 ## NSTimer 实现过程
-&emsp;涉及到 UITrackingRunLoopMode 和 kCFRunLoopDefaultMode 的切换。
+&emsp;NSTimer.h 中提供了一组 NSTimer 的创建方法，其中不同构造函数的 NSInvocation、SEL、block 类型的参数分别代表 NSTimer 对象的不同的回调方式。其中 block  的回调形式是 iOS 10.0 后新增的，可以帮助我们避免 NSTimer 对象和其 target 的循环引用问题，`timerWithTimeInterval...` 和 `initWithFireDate` 返回的 NSTimer 对象还需要我们手动添加到当前线程的 run loop 中，`scheduledTimerWithTimeInterval...` 构建的 NSTimer 对象则是默认添加到当前线程的 run loop 的 NSDefaultRunLoopMode 模式下的。
 
+&emsp;block 回调的形式都有一个 `API_AVAILABLE(macosx(10.12), ios(10.0), watchos(3.0), tvos(10.0));`。
+### NSTimer 创建函数
+&emsp;下面五个方法返回的 NSTimer 对象需要手动调用 NSRunLoop 的 `-(void)addTimer:(NSTimer *)timer forMode:(NSRunLoopMode)mode;` 函数添加到指定线程的指定 mode 下。
+```c++
++ (NSTimer *)timerWithTimeInterval:(NSTimeInterval)ti invocation:(NSInvocation *)invocation repeats:(BOOL)yesOrNo;
++ (NSTimer *)timerWithTimeInterval:(NSTimeInterval)ti target:(id)aTarget selector:(SEL)aSelector userInfo:(nullable id)userInfo repeats:(BOOL)yesOrNo;
++ (NSTimer *)timerWithTimeInterval:(NSTimeInterval)interval repeats:(BOOL)repeats block:(void (^)(NSTimer *timer))block API_AVAILABLE(macosx(10.12), ios(10.0), watchos(3.0), tvos(10.0));
+- (instancetype)initWithFireDate:(NSDate *)date interval:(NSTimeInterval)interval repeats:(BOOL)repeats block:(void (^)(NSTimer *timer))block API_AVAILABLE(macosx(10.12), ios(10.0), watchos(3.0), tvos(10.0));
+- (instancetype)initWithFireDate:(NSDate *)date interval:(NSTimeInterval)ti target:(id)t selector:(SEL)s userInfo:(nullable id)ui repeats:(BOOL)rep NS_DESIGNATED_INITIALIZER;
+```
+&emsp;下面三个方法返回的 NSTimer 对象会被自动添加到当前线程的 run loop 的 default mode 下。
+```c++
++ (NSTimer *)scheduledTimerWithTimeInterval:(NSTimeInterval)ti invocation:(NSInvocation *)invocation repeats:(BOOL)yesOrNo;
++ (NSTimer *)scheduledTimerWithTimeInterval:(NSTimeInterval)ti target:(id)aTarget selector:(SEL)aSelector userInfo:(nullable id)userInfo repeats:(BOOL)yesOrNo;
++ (NSTimer *)scheduledTimerWithTimeInterval:(NSTimeInterval)interval repeats:(BOOL)repeats block:(void (^)(NSTimer *timer))block API_AVAILABLE(macosx(10.12), ios(10.0), watchos(3.0), tvos(10.0));
+```
+&emsp;如果使用 `scheduledTimerWithTimeInterval...` 则需要注意 run loop 的 mode 切换到 UITrackingRunLoopMode 模式时，计时器会停止回调，当滑动停止 run loop 切回到 kCFRunLoopDefaultMode 模式时计时器又开始正常回调，当手动添加到 run loop 时则尽量添加到  NSRunLoopCommonModes 模式下可保证 run loop 的 mode 切换不影响计时器的回调。
 
+&emsp;还有一个知识点需要注意一下，添加到 run loop 指定 mode 下的 NSTimer 会被 retain，因为它会被加入到 run loop mode 的 \_timers 中去，如果 mode 是 NSRunLoopCommonModes 的话，同时还会被加入到 run loop 的 \_commonModeItems 中。所以  NSTimer 最终必须调用 invalidate 函数把它从指定的集合中移除。
+### NSTimer 执行流程
+&emsp;CFRunLoopTimerRef 与 NSTimer 是可以 toll-free bridged（免费桥接转换）的。当 timer 加到 run loop 的时候，run loop 会注册对应的触发时间点，时间到了，run loop 若处于休眠则会被唤醒，执行 timer 对应的回调函数。下面我们沿着 CFRunLoopTimerRef 的源码来完整分析一下计时器的流程。
+#### CFRunLoopTimerRef 创建
+&emsp;首先是 CFRunLoopTimerRef 的创建函数：(详细分析可参考前面的：[iOS 从源码解析Run Loop (四)：Source、Timer、Observer 创建以及添加到 mode 的过程](https://juejin.cn/post/6908639874857828366))
+```c++
+CFRunLoopTimerRef CFRunLoopTimerCreate(CFAllocatorRef allocator,
+                                       CFAbsoluteTime fireDate,
+                                       CFTimeInterval interval,
+                                       CFOptionFlags flags,
+                                       CFIndex order,
+                                       CFRunLoopTimerCallBack callout,
+                                       CFRunLoopTimerContext *context);
+```
+&emsp;`allocator` 是 CF 下为新对象分配内存的分配器，可传 NULL 或 kCFAllocatorDefault。
 
+&emsp;`fireDate` 是计时器第一次触发回调的时间点，然后后续沿着 `interval` 间隔时间连续回调。
+
+&emsp;`interval` 是计时器的连续回调的时间间隔，如果为 0 或负数，计时器将触发一次，然后自动失效。
+
+&emsp;`order` 优先级索引，指示 CFRunLoopModeRef 的 _timers 中不同计时器的回调执行顺序。当前忽略此参数，传递 0。
+
+&emsp;`callout` 计时器触发时调用的回调函数。
+
+&emsp;`context` 保存计时器的上下文信息的结构。该函数将信息从结构中复制出来，因此上下文所指向的内存不需要在函数调用之后继续存在。如果回调函数不需要上下文的信息指针来跟踪状态，则可以为 NULL。其中的 void * info 字段内容是 `callout` 函数执行时的参数。
+
+&emsp;CFRunLoopTimerCreate 函数中比较重要的是对触发时间的设置：
+```c++
+...
+// #define TIMER_DATE_LIMIT    4039289856.0
+// 如果入参 fireDate 过大，则置为 TIMER_DATE_LIMIT
+if (TIMER_DATE_LIMIT < fireDate) fireDate = TIMER_DATE_LIMIT;
+
+// 下次触发的时间
+memory->_nextFireDate = fireDate;
+memory->_fireTSR = 0ULL;
+
+// 取得当前时间
+uint64_t now2 = mach_absolute_time();
+CFAbsoluteTime now1 = CFAbsoluteTimeGetCurrent();
+
+if (fireDate < now1) {
+    // 如果第一次触发的时间已经过了，则把 _fireTSR 置为当前
+    memory->_fireTSR = now2;
+} else if (TIMER_INTERVAL_LIMIT < fireDate - now1) {
+    // 如果第一次触发的时间点与当前是时间差距超过了 TIMER_INTERVAL_LIMIT，则把 _fireTSR 置为 TIMER_INTERVAL_LIMIT
+    memory->_fireTSR = now2 + __CFTimeIntervalToTSR(TIMER_INTERVAL_LIMIT);
+} else {
+    // 这里则是正常的，如果第一次触发的时间还没有到，则把触发时间设置为当前时间和第一次触发时间点的差值
+    memory->_fireTSR = now2 + __CFTimeIntervalToTSR(fireDate - now1);
+}
+...
+```
+&emsp;这一部分代码保证计时器第一次触发的时间点正常。下面看一下把创建好的 CFRunLoopModeRef 添加到指定的 run loop 的指定的 run loop mode 下。
+
+#### CFRunLoopAddTimer
+&emsp;CFRunLoopAddTimer 函数主要完成把 CFRunLoopTimerRef rlt 插入到 CFRunLoopRef rl 的 CFStringRef modeName 模式下的 \_timer 集合中，如果 modeName 是 kCFRunLoopCommonModes 的话，则把 rlt 插入到 rl 的 \_commonModeItems 中，然后调用 \__CFRunLoopAddItemToCommonModes 函数把 rlt 添加到所有被标记为 common 的 mode 的 \_timer 中，同时也会把 modeName 添加到 rlt 的 \_rlModes 中，记录 rlt 都能在那种 run loop mode 下执行。 
+```c++
+void CFRunLoopAddTimer(CFRunLoopRef rl, CFRunLoopTimerRef rlt, CFStringRef modeName);
+```
+&emsp;上面添加完成后，会调用 \__CFRepositionTimerInMode 函数，然后调用 \__CFArmNextTimerInMode，再调用 mk_timer_arm 函数把 CFRunLoopModeRef 的 \_timerPort 和一个时间点注册到系统中，等待着 mach_msg 发消息唤醒 run loop 执行到达时间的计时器。
+#### \__CFArmNextTimerInMode
+&emsp;同一个 run loop mode 下的多个 timer 共享同一个 \_timerPort，这是一个循环的流程：注册 timer(mk_timer_arm)—接收 timer(mach_msg)—根据多个 timer 计算离当前最近的下次 handle 时间—注册 timer(mk_timer_arm)。
+
+&emsp;在使用 CFRunLoopAddTimer 添加 timer 时的调用堆栈如下：
+```c++
+CFRunLoopAddTimer
+__CFRepositionTimerInMode
+    __CFArmNextTimerInMode
+        mk_timer_arm
+```
+&emsp;然后 mach_msg 收到 timer 事件时的调用堆栈如下：
+```c++
+__CFRunLoopRun
+__CFRunLoopDoTimers
+    __CFRunLoopDoTimer
+        __CFRUNLOOP_IS_CALLING_OUT_TO_A_TIMER_CALLBACK_FUNCTION__
+__CFArmNextTimerInMode
+    mk_timer_arm 
+```
+&emsp;每次计时器都会调用 \__CFArmNextTimerInMode 函数，注册计时器的下次回调。`__CFRUNLOOP_IS_CALLING_OUT_TO_A_TIMER_CALLBACK_FUNCTION__(rlt->_callout, rlt, context_info);` 则是执行计时器的 \_callout 函数。
+### NSTimer 不准时问题
+&emsp;通过上面的 NSTimer 执行流程可看到计时器的回调完全依赖 run loop 的正常循环，那就是 NSTimer 不是一种实时机制，以 main run loop 来说它负责了所有的主线程事件，例如 UI 界面的操作，负责的运算使当前 run loop 持续的时间超过了计时器的间隔时间，那么下一次定时就被延后，这样就造成 timer 的不准时，计时器有个属性叫做 Tolerance (宽容度)，标示了当时间点到后，容许有多少最大误差。如果延后时间过长的话会直接导致计时器本次回调被忽略。
 
 
 ## 监控主线程卡顿
@@ -305,187 +415,3 @@ int main(int argc, char * argv[]) {
 + [runloop 与autorelase对象、Autorelease Pool 在什么时候释放](https://blog.csdn.net/leikezhu1981/article/details/51246684)
 + [内存管理：autoreleasepool与runloop](https://www.jianshu.com/p/d769c1653347)
 + [Objective-C的AutoreleasePool与Runloop的关联](https://blog.csdn.net/zyx196/article/details/50824564)
-
-
-
-
-
-//
-//  ViewController.m
-//  Simple_iOS
-//
-//  Created by CHM on 2020/9/24.
-//  Copyright © 2020 CHM. All rights reserved.
-//
-
-#import "ViewController.h"
-
-#import "NSObject+Custom.h"
-#import <pthread.h>
-
-#import "CommonThread.h"
-
-@interface ViewController () <NSMachPortDelegate, UITableViewDelegate, UITableViewDataSource>
-
-@property (nonatomic, strong) CommonThread *commonThread;
-@property (nonatomic, assign) NSInteger touchCount;
-@property (weak, nonatomic) IBOutlet UITableView *tableView;
-
-@end
-
-@implementation ViewController
-
-- (void)viewDidLoad {
-    [super viewDidLoad];
-    // Do any additional setup after loading the view.
-    
-//    dispatch_queue_t concurrentQueue = dispatch_queue_create("com.concurrent", DISPATCH_QUEUE_CONCURRENT);
-//    dispatch_queue_t globalQueue = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0);
-//    dispatch_queue_t serialQueue = dispatch_queue_create("com.serial", DISPATCH_QUEUE_SERIAL);
-//    dispatch_queue_t serialQueue1 = dispatch_queue_create("com.com.1", DISPATCH_QUEUE_SERIAL);
-//    dispatch_queue_t serialQueue2 = dispatch_queue_create("com.com.2", DISPATCH_QUEUE_SERIAL);
-//    dispatch_queue_t serialQueue3 = dispatch_queue_create("com.com.3", DISPATCH_QUEUE_SERIAL);
-//    dispatch_queue_t mainQueue = dispatch_get_main_queue();
-    
-//    self.touchCount = 0;
-    NSLog(@"🔞 START: %@", [NSThread currentThread]);
-//    {
-//        CommonThread *commonThread = [[CommonThread alloc] initWithBlock:^{
-//            NSLog(@"🏃‍♀️🏃‍♀️ %@", [NSThread currentThread]);
-//
-//            NSRunLoop *commonRunLoop = [NSRunLoop currentRunLoop];
-//            NSPort *port = [[NSPort alloc] init];
-//            NSLog(@"🗣 %p %@", port, port);
-//            [commonRunLoop addPort:port forMode:NSDefaultRunLoopMode];
-//            NSLog(@"♻️ %p %@", commonRunLoop, commonRunLoop);
-//            [commonRunLoop run];
-//            NSLog(@"♻️♻️ %p %@", commonRunLoop, commonRunLoop);
-//        }];
-//        [commonThread start];
-//    }
-    
-//    NSMachPort *port = [[NSMachPort alloc] init];
-//    [port setDelegate:self];
-//
-//    [[NSRunLoop currentRunLoop] addPort:port forMode:NSRunLoopCommonModes];
-//    NSLog(@"🙀🙀 %@", port);
-//    [NSThread detachNewThreadSelector:@selector(customThread:) toTarget:self withObject:port];
-    
-    CFRunLoopObserverContext context = {0, (__bridge void *)(self), NULL, NULL, NULL};
-    CFRunLoopObserverRef observer = CFRunLoopObserverCreate(kCFAllocatorDefault, kCFRunLoopAllActivities, YES, 0, &mainRunLoopObserver, &context);
-    if (observer){
-        CFRunLoopAddObserver(CFRunLoopGetMain(), observer, kCFRunLoopCommonModes);
-        CFRelease(observer);
-    }
-    
-    NSLog(@"🔞 END: %@", [NSThread currentThread]);
-}
-
-int count = 0; //定义全局变量来计算一个 mode 中状态切换的统计数据
-void mainRunLoopObserver(CFRunLoopObserverRef observer, CFRunLoopActivity activity, void *info) {
-    ++count;
-    switch (activity) {
-        case kCFRunLoopEntry:
-            count = 0;
-            NSLog(@"🤫 - %d kCFRunLoopEntry 即将进入: %@", count, CFRunLoopCopyCurrentMode(CFRunLoopGetCurrent()));
-            break;
-        case kCFRunLoopBeforeTimers:
-            NSLog(@"🤫 - %d kCFRunLoopBeforeTimers 即将处理 timers", count);
-            break;
-        case kCFRunLoopBeforeSources:
-            NSLog(@"🤫 - %d kCFRunLoopBeforeSources 即将处理 sources", count);
-            break;
-        case kCFRunLoopBeforeWaiting:
-            count = 0;
-            NSLog(@"🤫 - %d kCFRunLoopBeforeWaiting 即将进入休眠", count);
-            break;
-        case kCFRunLoopAfterWaiting:
-            NSLog(@"🤫 - %d kCFRunLoopAfterWaiting 即将从休眠中醒来", count);
-            break;
-        case kCFRunLoopExit:
-            count = 0;
-            NSLog(@"🤫 - %d kCFRunLoopExit 即将退出: %@", count, CFRunLoopCopyCurrentMode(CFRunLoopGetCurrent()));
-            break;
-        case kCFRunLoopAllActivities:
-            NSLog(@"🤫 kCFRunLoopAllActivities");
-            break;
-    }
-}
-
-- (void)touchesBegan:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
-    NSLog(@"%s",__func__);
-}
-
-- (void)handleMachMessage:(void *)msg {
-    NSLog(@"📢📢 Mach port %s", msg);
-}
-
-//- (void)handlePortMessage:(NSPortMessage *)message {
-//    NSLog(@"📢📢 Mach port %@", message);
-//}
-
-- (void)customThread:(NSMachPort *)sender {
-    NSLog(@"😻😻 %@", sender);
-    
-    NSMachPort *p = [[NSMachPort alloc] init];
-    [sender sendBeforeDate:[NSDate distantFuture] components:nil from:p reserved:0];
-    
-    NSLog(@"🤏🤏 subthread=%@", [NSThread currentThread]);
-}
-
-//- (void)run:(NSObject *)param {
-//    NSLog(@"🏃🏃🏃 %@ param: %p", [NSThread currentThread], param);
-    
-//    NSRunLoop *commonRunLoop = [NSRunLoop currentRunLoop];
-//    NSPort *port = [[NSPort alloc] init];
-//    NSLog(@"🗣 %p %@", port, port);
-//    [commonRunLoop addPort:port forMode:NSDefaultRunLoopMode];
-//    NSLog(@"♻️ %p %@", commonRunLoop, commonRunLoop);
-//    [commonRunLoop run];
-//    NSLog(@"♻️♻️ %p %@", commonRunLoop, commonRunLoop);
-//}
-
-//- (void)touchesBegan:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
-//    NSLog(@"📺📺📺 START...");
-//
-//    if (self.touchCount == 0) {
-//        [self performSelector:@selector(run:) onThread:self.commonThread withObject:nil waitUntilDone:NO];
-//    }
-//
-//    if (self.touchCount != 0) {
-//        [self performSelector:@selector(run:) onThread:self.commonThread withObject:nil waitUntilDone:YES modes:@[NSDefaultRunLoopMode]];
-//    }
-//
-//    [self performSelector:@selector(run:) withObject:nil afterDelay:5];
-//
-//    self.touchCount++;
-//
-//    NSLog(@"📺📺📺 END...");
-//}
-
-- (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView {
-    return 1;
-}
-
-- (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
-    return 100;
-}
-
-- (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
-    UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:@"Cell"];
-    return cell;
-}
-
-@end
-
-
-/* Run Loop Observer Activities */
-//    typedef CF_OPTIONS(CFOptionFlags, CFRunLoopActivity) {
-//        kCFRunLoopEntry = (1UL << 0),
-//        kCFRunLoopBeforeTimers = (1UL << 1),
-//        kCFRunLoopBeforeSources = (1UL << 2),
-//        kCFRunLoopBeforeWaiting = (1UL << 5),
-//        kCFRunLoopAfterWaiting = (1UL << 6),
-//        kCFRunLoopExit = (1UL << 7),
-//        kCFRunLoopAllActivities = 0x0FFFFFFFU
-//    };

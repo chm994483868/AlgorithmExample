@@ -312,8 +312,8 @@ __CFRunLoopRun
 __CFRunLoopDoTimers
     __CFRunLoopDoTimer
         CALL_OUT_Timer
-__CFArmNextTimerInMode
-    mk_timer_arm 
+            __CFArmNextTimerInMode
+                mk_timer_arm 
 ```
 &emsp;至此 mach_msg 和一些 run loop 相关的 mach port 都看完了，mach_msg 依靠用户态和内核态的切换完成了 run loop 的休眠与唤醒，唤醒操作则是离不开向指定的 mach port 发送消息。那么 mach_msg 就看到这里吧，下篇我们开始学习系统中 run loop 的各种应用。⛽️⛽️
 
