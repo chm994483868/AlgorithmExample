@@ -272,11 +272,11 @@ int main(int argc, char * argv[]) {
 1. 如果手动添加 autoreleasePool，autoreleasePool 作用域里的自动释放对象会在出 pool 作用域的那一刻释放。
 2. 如果是 run loop 自动添加的 autoreleasePool，那么在每一次 run loop 循环结束时，autoreleasePool 执行 pop 操作 释放这次循环中所有的自动释放对象。在 run loop 循环开启时再 push 新的自动释放池，保证 run loop 的每次循环中的对象都能得到释放。
 ## NSTimer 实现过程
-&emsp;NSTimer.h 中提供了一组 NSTimer 的创建方法，其中不同构造函数的 NSInvocation、SEL、block 类型的参数分别代表 NSTimer 对象的不同的回调方式。其中 block  的回调形式是 iOS 10.0 后新增的，可以帮助我们避免 NSTimer 对象和其 target 的循环引用问题，`timerWithTimeInterval...` 和 `initWithFireDate` 返回的 NSTimer 对象还需要我们手动添加到当前线程的 run loop 中，`scheduledTimerWithTimeInterval...` 构建的 NSTimer 对象则是默认添加到当前线程的 run loop 的 NSDefaultRunLoopMode 模式下的。
+&emsp;NSTimer.h 中提供了一组 NSTimer 的创建方法，其中不同构造函数的 NSInvocation、SEL、block 类型的参数分别代表 NSTimer 对象的不同的回调方式。其中 block  的回调形式是 iOS 10.0 后新增的，可以帮助我们避免 NSTimer 对象和其 target 参数的循环引用问题，`timerWithTimeInterval...` 和 `initWithFireDate` 返回的 NSTimer 对象还需要我们手动添加到当前线程的 run loop 中，`scheduledTimerWithTimeInterval...` 构建的 NSTimer 对象则是默认添加到当前线程的 run loop 的 NSDefaultRunLoopMode 模式下的。
 
 &emsp;block 回调的形式都有一个 `API_AVAILABLE(macosx(10.12), ios(10.0), watchos(3.0), tvos(10.0));`。
 ### NSTimer 创建函数
-&emsp;下面五个方法返回的 NSTimer 对象需要手动调用 NSRunLoop 的 `-(void)addTimer:(NSTimer *)timer forMode:(NSRunLoopMode)mode;` 函数添加到指定线程的指定 mode 下。
+&emsp;下面五个方法返回的 NSTimer 对象需要手动调用 NSRunLoop 的 `-(void)addTimer:(NSTimer *)timer forMode:(NSRunLoopMode)mode;` 函数添加到指定 run loop 的指定 mode 下。
 ```c++
 + (NSTimer *)timerWithTimeInterval:(NSTimeInterval)ti invocation:(NSInvocation *)invocation repeats:(BOOL)yesOrNo;
 + (NSTimer *)timerWithTimeInterval:(NSTimeInterval)ti target:(id)aTarget selector:(SEL)aSelector userInfo:(nullable id)userInfo repeats:(BOOL)yesOrNo;
@@ -290,9 +290,9 @@ int main(int argc, char * argv[]) {
 + (NSTimer *)scheduledTimerWithTimeInterval:(NSTimeInterval)ti target:(id)aTarget selector:(SEL)aSelector userInfo:(nullable id)userInfo repeats:(BOOL)yesOrNo;
 + (NSTimer *)scheduledTimerWithTimeInterval:(NSTimeInterval)interval repeats:(BOOL)repeats block:(void (^)(NSTimer *timer))block API_AVAILABLE(macosx(10.12), ios(10.0), watchos(3.0), tvos(10.0));
 ```
-&emsp;如果使用 `scheduledTimerWithTimeInterval...` 则需要注意 run loop 的 mode 切换到 UITrackingRunLoopMode 模式时，计时器会停止回调，当滑动停止 run loop 切回到 kCFRunLoopDefaultMode 模式时计时器又开始正常回调，当手动添加到 run loop 时则尽量添加到  NSRunLoopCommonModes 模式下可保证 run loop 的 mode 切换不影响计时器的回调。
+&emsp;如果使用 `scheduledTimerWithTimeInterval...` 则需要注意 run loop 的 mode 切换到 UITrackingRunLoopMode 模式时，计时器会停止回调，当滑动停止 run loop 切回到 kCFRunLoopDefaultMode 模式时计时器又开始正常回调，当手动添加到 run loop 时则尽量添加到  NSRunLoopCommonModes 模式下可保证 run loop 的 mode 切换不影响计时器的回调（此时的计时器对象会被同时添加到多个 common 标记的 run loop mode 的 \_timers 中）。
 
-&emsp;还有一个知识点需要注意一下，添加到 run loop 指定 mode 下的 NSTimer 会被 retain，因为它会被加入到 run loop mode 的 \_timers 中去，如果 mode 是 NSRunLoopCommonModes 的话，同时还会被加入到 run loop 的 \_commonModeItems 中。所以  NSTimer 最终必须调用 invalidate 函数把它从指定的集合中移除。
+&emsp;还有一个知识点需要注意一下，添加到 run loop 指定 mode 下的 NSTimer 会被 mode 所持有，因为它会被加入到 run loop mode 的 \_timers 中去，如果 mode 是 NSRunLoopCommonModes 的话，同时还会被加入到 run loop 的 \_commonModeItems 中，所以  NSTimer 最终必须调用 invalidate 函数把它从 \_timers 和 \_commonModeItems 集合中移除。
 ### NSTimer 执行流程
 &emsp;CFRunLoopTimerRef 与 NSTimer 是可以 toll-free bridged（免费桥接转换）的。当 timer 加到 run loop 的时候，run loop 会注册对应的触发时间点，时间到了，run loop 若处于休眠则会被唤醒，执行 timer 对应的回调函数。下面我们沿着 CFRunLoopTimerRef 的源码来完整分析一下计时器的流程。
 #### CFRunLoopTimerRef 创建
@@ -316,7 +316,7 @@ CFRunLoopTimerRef CFRunLoopTimerCreate(CFAllocatorRef allocator,
 
 &emsp;`callout` 计时器触发时调用的回调函数。
 
-&emsp;`context` 保存计时器的上下文信息的结构。该函数将信息从结构中复制出来，因此上下文所指向的内存不需要在函数调用之后继续存在。如果回调函数不需要上下文的信息指针来跟踪状态，则可以为 NULL。其中的 void * info 字段内容是 `callout` 函数执行时的参数。
+&emsp;`context` 保存计时器的上下文信息的结构。该函数将信息从结构中复制出来，因此上下文所指向的内存不需要在函数调用之后继续存在。如果回调函数不需要上下文的信息指针来跟踪状态，则可以为 NULL。其中的 `void * info` 字段内容是 `callout` 函数执行时的参数。
 
 &emsp;CFRunLoopTimerCreate 函数中比较重要的是对触发时间的设置：
 ```c++
@@ -352,7 +352,7 @@ if (fireDate < now1) {
 ```c++
 void CFRunLoopAddTimer(CFRunLoopRef rl, CFRunLoopTimerRef rlt, CFStringRef modeName);
 ```
-&emsp;上面添加完成后，会调用 \__CFRepositionTimerInMode 函数，然后调用 \__CFArmNextTimerInMode，再调用 mk_timer_arm 函数把 CFRunLoopModeRef 的 \_timerPort 和一个时间点注册到系统中，等待着 mach_msg 发消息唤醒 run loop 执行到达时间的计时器。
+&emsp;上面添加完成后，会调用 \__CFRepositionTimerInMode 函数，然后调用 \__CFArmNextTimerInMode，再调用 mk_timer_arm 函数把 CFRunLoopModeRef 的 \_timerPort 和一个时间点注册到系统中，等待着 mach_msg 发消息唤醒休眠中的 run loop 起来执行到达时间的计时器。
 #### \__CFArmNextTimerInMode
 &emsp;同一个 run loop mode 下的多个 timer 共享同一个 \_timerPort，这是一个循环的流程：注册 timer(mk_timer_arm)—接收 timer(mach_msg)—根据多个 timer 计算离当前最近的下次 handle 时间—注册 timer(mk_timer_arm)。
 
@@ -372,7 +372,7 @@ __CFRunLoopDoTimers
 __CFArmNextTimerInMode
     mk_timer_arm 
 ```
-&emsp;每次计时器都会调用 \__CFArmNextTimerInMode 函数，注册计时器的下次回调。`__CFRUNLOOP_IS_CALLING_OUT_TO_A_TIMER_CALLBACK_FUNCTION__(rlt->_callout, rlt, context_info);` 则是执行计时器的 \_callout 函数。
+&emsp;每次计时器都会调用 \__CFArmNextTimerInMode 函数，注册计时器的下次回调。休眠中的 run loop 通过当前的 run loop mode 的 \_timerPort 端口唤醒后，在本次 run loop 循环中在 \__CFRunLoopDoTimers 函数中循环调用 \__CFRunLoopDoTimer 函数，执行达到触发时间的 timer 的 \_callout 函数。`__CFRUNLOOP_IS_CALLING_OUT_TO_A_TIMER_CALLBACK_FUNCTION__(rlt->_callout, rlt, context_info);` 则是执行计时器的 \_callout 函数。
 ### NSTimer 不准时问题
 &emsp;通过上面的 NSTimer 执行流程可看到计时器的回调完全依赖 run loop 的正常循环，那就是 NSTimer 不是一种实时机制，以 main run loop 来说它负责了所有的主线程事件，例如 UI 界面的操作，负责的运算使当前 run loop 持续的时间超过了计时器的间隔时间，那么下一次定时就被延后，这样就造成 timer 的不准时，计时器有个属性叫做 Tolerance (宽容度)，标示了当时间点到后，容许有多少最大误差。如果延后时间过长的话会直接导致计时器本次回调被忽略。
 
