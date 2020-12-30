@@ -410,7 +410,7 @@
 		D20B5C8024EBCEFE0077EF6D /* iOS weak 底层实现原理(三)：weak变量从初始化到被置为nil 都经历了什么.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS weak 底层实现原理(三)：weak变量从初始化到被置为nil 都经历了什么.md"; sourceTree = "<group>"; };
 		D20B5C8224ED0D270077EF6D /* =default 和 = delete使用.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "=default 和 = delete使用.md"; sourceTree = "<group>"; };
 		D20B5D3024ED2B890077EF6D /* constexpr关键字使用.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "constexpr关键字使用.md"; sourceTree = "<group>"; };
-		D21287CC25983A89005A744C /* iOS 从源码解析Run Loop (八)：Run Loop 应用场景总结.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 从源码解析Run Loop (八)：Run Loop 应用场景总结.md"; sourceTree = "<group>"; };
+		D21287CC25983A89005A744C /* iOS 从源码解析Run Loop (八)：Run Loop 与 Autorelease、NSTimer、performSelector.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 从源码解析Run Loop (八)：Run Loop 与 Autorelease、NSTimer、performSelector.md"; sourceTree = "<group>"; };
 		D21333F224E63B6C00A6175C /* 深入理解Objective-C中的alloc和init.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "深入理解Objective-C中的alloc和init.md"; sourceTree = "<group>"; };
 		D21333F324E6610E00A6175C /* 内存对齐原则.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "内存对齐原则.md"; sourceTree = "<group>"; };
 		D2164F0524EE10650000A6AA /* volatile关键字使用.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "volatile关键字使用.md"; sourceTree = "<group>"; };
@@ -1414,7 +1414,7 @@
 				D2DA95EA2591F17A007D4669 /* iOS 从源码解析Run Loop (五)：NSPort、TSD 相关内容解析.md */,
 				D2DA95E92590A3D6007D4669 /* iOS 从源码解析Run Loop (六)：run loop 运行全过程解析.md */,
 				8E189A782594D1910048E34F /* iOS 从源码解析Run Loop (七)：mach msg 解析.md */,
-				D21287CC25983A89005A744C /* iOS 从源码解析Run Loop (八)：Run Loop 应用场景总结.md */,
+				D21287CC25983A89005A744C /* iOS 从源码解析Run Loop (八)：Run Loop 与 Autorelease、NSTimer、performSelector.md */,
 			);
 			path = "已发布";
 			sourceTree = "<group>";

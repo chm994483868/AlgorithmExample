@@ -1,10 +1,6 @@
-# iOS 从源码解析Run Loop (八)：Run Loop 应用场景总结
+# iOS 从源码解析Run Loop (八)：Run Loop 与 Autorelease、NSTimer、performSelector
 
 > &emsp;本篇学习我们日常开发中涉及到 run loop 的一些知识点，我们使用它们的时候可能不会想到这些知识点的背后其实都是 run loop 在做支撑的。
-
-
-**子线程保活、在 run loop 循环过程中执行自动释放池的 push 和 pop、延迟回调、触摸事件、屏幕刷新等功能。下面我们就对涉及到 run loop 的各个功能点进行详细的学习。**
-
 
 ## 回顾 run loop mode item
 &emsp;我们首先再次回顾一下 Source/Timer/Observer，因为 run loop 正是通过这些 run loop mode item 来向外提供功能支持的。
@@ -292,7 +288,72 @@ int main(int argc, char * argv[]) {
 ```
 &emsp;如果使用 `scheduledTimerWithTimeInterval...` 则需要注意 run loop 的 mode 切换到 UITrackingRunLoopMode 模式时，计时器会停止回调，当滑动停止 run loop 切回到 kCFRunLoopDefaultMode 模式时计时器又开始正常回调，当手动添加到 run loop 时则尽量添加到  NSRunLoopCommonModes 模式下可保证 run loop 的 mode 切换不影响计时器的回调（此时的计时器对象会被同时添加到多个 common 标记的 run loop mode 的 \_timers 中）。
 
-&emsp;还有一个知识点需要注意一下，添加到 run loop 指定 mode 下的 NSTimer 会被 mode 所持有，因为它会被加入到 run loop mode 的 \_timers 中去，如果 mode 是 NSRunLoopCommonModes 的话，同时还会被加入到 run loop 的 \_commonModeItems 中，所以  NSTimer 最终必须调用 invalidate 函数把它从 \_timers 和 \_commonModeItems 集合中移除。
+&emsp;还有一个知识点需要注意一下，添加到 run loop 指定 mode 下的 NSTimer 会被 mode 所持有，因为它会被加入到 run loop mode 的 \_timers 中去，如果 mode name 是 NSRunLoopCommonModes 的话，同时还会被加入到 run loop 的 \_commonModeItems 中，所以当不再需要使用  NSTimer 对象计时时必须调用 invalidate 函数把它从 \_timers 和 \_commonModeItems 集合中移除。如下代码在 ARC 下打印各个计时器的引用计数可进行证实：
+```c++
+// timer 默认添加到 run loop 的 NSDefaultRunLoopMode 下，觉的引用计数应该是 2 的，但是打印是 3，下面的手动添加的都是正常 +1
+NSTimer *timer = [NSTimer scheduledTimerWithTimeInterval:1 repeats:YES block:^(NSTimer * _Nonnull timer) { }]; // 3
+
+// 起始引用计数是 1
+NSTimer *timer2 = [[NSTimer alloc] initWithFireDate:[NSDate date] interval:1 repeats:YES block:^(NSTimer * _Nonnull timer) { }]; // 1
+// 把 timer2 添加到 run loop 的 NSDefaultRunLoopMode 时引用计数 +1  
+// 被 timer2 和 NSDefaultRunLoopMode 的 _timers 持有
+[[NSRunLoop currentRunLoop] addTimer:timer2 forMode:NSDefaultRunLoopMode]; // 2
+
+NSTimer *timer3 = [NSTimer timerWithTimeInterval:1 repeats:YES block:^(NSTimer * _Nonnull timer) { }]; // 1
+[[NSRunLoop currentRunLoop] addTimer:timer3 forMode:NSDefaultRunLoopMode]; // 2
+
+// 把 timer3 添加到 run loop 的 NSRunLoopCommonModes 时引用计数 +3 
+// 被 timer3、UITrackingRunLoopMode 的 _timers、NSDefaultRunLoopMode 的 _timers、run loop 的 _commonModeItems 持有
+[[NSRunLoop currentRunLoop] addTimer:timer3 forMode:NSRunLoopCommonModes]; // 4
+
+// timer3 调用 invalidate 函数后引用计数变回 1
+// 被从两个 _timers 和 _commonModeItems 中移除后 -3
+[timer3 invalidate]; // 1
+```
+
+&emsp;NSTimer 创建时会持有传入的 target:
+```c++
++ (NSTimer *)timerWithTimeInterval:(NSTimeInterval)ti target:(id)aTarget selector:(SEL)aSelector userInfo:(nullable id)userInfo repeats:(BOOL)yesOrNo;
+- (instancetype)initWithFireDate:(NSDate *)date interval:(NSTimeInterval)ti target:(id)t selector:(SEL)s userInfo:(nullable id)ui repeats:(BOOL)rep NS_DESIGNATED_INITIALIZER;
++ (NSTimer *)scheduledTimerWithTimeInterval:(NSTimeInterval)ti target:(id)aTarget selector:(SEL)aSelector userInfo:(nullable id)userInfo repeats:(BOOL)yesOrNo;
+```
+&emsp;使用以上三个函数构建或初始化 NSTimer 对象时，NSTimer 对象会持有传入的 target 的，因为 NSTimer 对象回调时要执行 target 的 aSelector 函数，如果此时 target 持有 NSTimer 对象的话则会构成循环引用导致内存泄漏，一般在 ViewController 中添加 NSTimer 属性会遇到此问题。解决这个问题的方法通常有两种：一种是将 target 分离出来独立成一个对象（在这个对象中弱引用 NSTimer 并将对象本身作为 NSTimer 的 target），控制器通过这个对象间接使用 NSTimer；另一种方式的思路仍然是转移 target，只是可以直接增加 NSTimer 扩展（分类），让 NSTimer 类对象做为 target，同时可以将操作 selector 封装到 block 中，示例代码如下。（类对象全局唯一且不需要也不能释放）[iOS刨根问底-深入理解RunLoop](https://www.cnblogs.com/kenshincui/p/6823841.html)
+```c++
+#import "NSTimer+Block.h"
+
+@implementation NSTimer (Block)
+
+- (instancetype)initWithFireDate:(NSDate *)date interval:(NSTimeInterval)seconds repeats:(BOOL)repeats block:(void (^)(void))block {
+    // target 传入的是 self.class 即 NSTimer 类对象，然后计时器的回调函数就是 NSTimer 类对象的 runBlock: 函数，runBlock 是一个类方法，
+    // 把回调的 block 放在 userInfo 中，然后在计时器的触发函数 runBlock: 中根据 NSTimer 对象读出其 userInfo 即为 block，执行即可。
+    return [self initWithFireDate:date interval:seconds target:self.class selector:@selector(runBlock:) userInfo:block repeats:repeats];
+}
+
++ (NSTimer *)scheduledTimerWithTimeInterval:(NSTimeInterval)seconds repeats:(BOOL)repeats block:(void (^)(void))block {
+    // self 即为 NSTimer 类对象
+    return [self scheduledTimerWithTimeInterval:seconds target:self selector:@selector(runBlock:) userInfo:block repeats:repeats];
+}
+
++ (NSTimer *)timerWithTimeInterval:(NSTimeInterval)seconds repeats:(BOOL)repeats block:(void (^)(void))block {
+    // self 即为 NSTimer 类对象
+    return [self timerWithTimeInterval:seconds target:self selector:@selector(runBlock:) userInfo:block repeats:repeats];
+}
+
+#pragma mark - Private methods
+
++ (void)runBlock:(NSTimer *)timer {
+    // 从入参 timer 对象中读出 block 执行
+    if ([timer.userInfo isKindOfClass:NSClassFromString(@"NSBlock")]) {
+        void (^block)(void) = timer.userInfo;
+        block();
+    }
+}
+
+@end
+```
+&emsp;iOS 10.0 以后苹果也提供了 block 形式的 NSTimer 构建函数，我们直接使用即可。（大概现在还有 iOS 10.0 之前的用户吗）
+
+&emsp;看到这里会发现计时器是不能暂停的，invalidate 函数是移除计数器使用的，所以无论是重复执行的计时器还是一次性的计时器只要调用 invalidate 方法则会变得无效，只是一次性的计时器执行完操作后会自动调用 invalidate 方法。所以想要暂停和恢复计时器的只能 invalidate 旧计时器然后再新建计时器，且当我们不再需要使用计时器时必须调用 invalidate 方法。
 ### NSTimer 执行流程
 &emsp;CFRunLoopTimerRef 与 NSTimer 是可以 toll-free bridged（免费桥接转换）的。当 timer 加到 run loop 的时候，run loop 会注册对应的触发时间点，时间到了，run loop 若处于休眠则会被唤醒，执行 timer 对应的回调函数。下面我们沿着 CFRunLoopTimerRef 的源码来完整分析一下计时器的流程。
 #### CFRunLoopTimerRef 创建
@@ -372,14 +433,93 @@ __CFRunLoopDoTimers
 __CFArmNextTimerInMode
     mk_timer_arm 
 ```
-&emsp;每次计时器都会调用 \__CFArmNextTimerInMode 函数，注册计时器的下次回调。休眠中的 run loop 通过当前的 run loop mode 的 \_timerPort 端口唤醒后，在本次 run loop 循环中在 \__CFRunLoopDoTimers 函数中循环调用 \__CFRunLoopDoTimer 函数，执行达到触发时间的 timer 的 \_callout 函数。`__CFRUNLOOP_IS_CALLING_OUT_TO_A_TIMER_CALLBACK_FUNCTION__(rlt->_callout, rlt, context_info);` 则是执行计时器的 \_callout 函数。
+&emsp;每次计时器都会调用 \__CFArmNextTimerInMode 函数，注册计时器的下次回调。休眠中的 run loop 通过当前的 run loop mode 的 \_timerPort 端口唤醒后，在本次 run loop 循环中在 \__CFRunLoopDoTimers 函数中循环调用 \__CFRunLoopDoTimer 函数，执行达到触发时间的 timer 的 \_callout 函数。`__CFRUNLOOP_IS_CALLING_OUT_TO_A_TIMER_CALLBACK_FUNCTION__(rlt->_callout, rlt, context_info);` 是执行计时器的 \_callout 函数。
 ### NSTimer 不准时问题
-&emsp;通过上面的 NSTimer 执行流程可看到计时器的回调完全依赖 run loop 的正常循环，那就是 NSTimer 不是一种实时机制，以 main run loop 来说它负责了所有的主线程事件，例如 UI 界面的操作，负责的运算使当前 run loop 持续的时间超过了计时器的间隔时间，那么下一次定时就被延后，这样就造成 timer 的不准时，计时器有个属性叫做 Tolerance (宽容度)，标示了当时间点到后，容许有多少最大误差。如果延后时间过长的话会直接导致计时器本次回调被忽略。
+&emsp;通过上面的 NSTimer 执行流程可看到计时器的触发回调完全依赖 run loop 的运行（macOS 和 iOS 下都是使用 mk_timer 来唤醒 run loop），使用 NSTimer 之前必须注册到 run loop，但是 run loop 为了节省资源并不会在非常准确的时间点调用计时器，如果一个任务执行时间较长（例如本次 run loop 循环中 source0 事件执行时间过长或者计时器自身回调执行时间过长，都会导致计时器下次正常时间点的回调被延后或者延后时间过长的话则直接忽略这次回调（计时器回调执行之前会判断当前的执行状态 !__CFRunLoopTimerIsFiring(rlt)，如果是计时器自身回调执行时间过长导致下次回调被忽略的情况大概与此标识有关 ）），那么当错过一个时间点后只能等到下一个时间点执行，并不会延后执行（NSTimer 提供了一个 tolerance 属性用于设置宽容度，即当前时间点已经过了计时器的本次触发点，但是超过的时间长度小于 tolerance 的话，那么本次计时器回调还可以正常执行，不过是不准时的延后执行。 tolerance 的值默认是 0，最大值的话是计时器间隔时间 \_interval 的一半，可以根据自身的情况酌情设置 tolerance 的值，（其实还是觉得如果自己的计时器不准时了还是应该从自己写的代码中找原因，自己去找该优化的点，或者是主线实在优化不动的话就把计时器放到子线程中去））。
+
+&emsp;（NSTimer 不是一种实时机制，以 main run loop 来说它负责了所有的主线程事件，例如 UI 界面的操作，负责的运算使当前 run loop 持续的时间超过了计时器的间隔时间，那么计时器下一次回调就被延后，这样就造成 timer 的不准时，计时器有个属性叫做 tolerance (宽容度)，标示了当时间点到后，容许有多少最大误差。如果延后时间过长的话会直接导致计时器本次回调被忽略。）
+
+&emsp;在苹果的 Timer 文档中可看到关于计时精度的描述：[Timer Programming Topics](https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/Timers/Articles/timerConcepts.html#//apple_ref/doc/uid/20000806-SW2)
+> &emsp;Timing Accuracy
+> &emsp;A timer is not a real-time mechanism; it fires only when one of the run loop modes to which the timer has been added is running and able to check if the timer’s firing time has passed. Because of the various input sources a typical run loop manages, the effective resolution of the time interval for a timer is limited to on the order of 50-100 milliseconds. If a timer’s firing time occurs while the run loop is in a mode that is not monitoring the timer or during a long callout, the timer does not fire until the next time the run loop checks the timer. Therefore, the actual time at which the timer fires potentially can be a significant period of time after the scheduled firing time.
+> &emsp;
+> &emsp;A repeating timer reschedules itself based on the scheduled firing time, not the actual firing time. For example, if a timer is scheduled to fire at a particular time and every 5 seconds after that, the scheduled firing time will always fall on the original 5 second time intervals, even if the actual firing time gets delayed. If the firing time is delayed so far that it passes one or more of the scheduled firing times, the timer is fired only once for that time period; the timer is then rescheduled, after firing, for the next scheduled firing time in the future.
+
+&emsp;计时器不是一种实时机制；仅当已添加计时器的 run loop mode 之一正在运行并且能够检查计时器的触发时间是否经过时，它才会触发。由于典型的 run loop 管理着各种输入源，因此计时器时间间隔的有效分辨率被限制在 50-100 毫秒的数量级。如果在运行循环处于不监视计时器的模式下或长时间调用期间，计时器的触发时间发生，则直到下一次运行循环检查计时器时，计时器才会启动。因此，计时器可能实际触发的时间可能是在计划的触发时间之后的相当长的一段时间。
+
+&emsp;重复计时器会根据计划的触发时间而不是实际的触发时间重新安排自身的时间。例如，如果计划将计时器在特定时间触发，然后每5秒触发一次，则即使实际触发时间被延迟，计划的触发时间也将始终落在原始的5秒时间间隔上。如果触发时间延迟得太远，以至于超过了计划的触发时间中的一个或多个，则计时器在该时间段仅触发一次；计时器会在触发后重新安排为将来的下一个计划的触发时间。
+
+&emsp;如下代码申请一条子线程然后启动它的 run loop，可观察 timer 回调的时间点。
+```c++
+- (void)viewDidLoad {
+    [super viewDidLoad];
+    // Do any additional setup after loading the view.
+    
+    NSThread *thread = [[NSThread alloc] initWithBlock:^{
+    [NSTimer scheduledTimerWithTimeInterval:1 repeats:YES block:^(NSTimer * _Nonnull timer) {
+    //  sleep(1);
+        NSLog(@"⏰⏰⏰ timer 回调...");
+    }];
+    
+    // 2 秒后在 thread 线程中执行 caculate 函数
+    [self performSelector:@selector(caculate) withObject:nil afterDelay:2];
+    
+    [[NSRunLoop currentRunLoop] run];
+    }];
+    [thread start];
+}
+
+- (void)caculate {
+    NSLog(@"👘👘 %@", [NSThread currentThread]);
+    sleep(2);
+}
+```
+&emsp;运行代码根据打印时间可看到前两秒计时器正常执行，然后 caculate 的执行导致定时器执行被延后两秒，两秒以后计时器继续正常的每秒执行一次。如果把计时器的回调中的  sleep(1) 注释打开，会发现计时器是每两秒执行一次。
+
+## performSelector 系列函数
+&emsp;当调用 NSObject 的 performSelecter:afterDelay: 后，实际上其内部会创建一个 Timer 并添加到当前线程的 run loop 中。所以如果当前线程没有 run loop，则这个方法会失效。
+```c++
+@interface NSObject (NSDelayedPerforming)
+// 
+- (void)performSelector:(SEL)aSelector withObject:(nullable id)anArgument afterDelay:(NSTimeInterval)delay inModes:(NSArray<NSRunLoopMode> *)modes;
+// 
+- (void)performSelector:(SEL)aSelector withObject:(nullable id)anArgument afterDelay:(NSTimeInterval)delay;
+
++ (void)cancelPreviousPerformRequestsWithTarget:(id)aTarget selector:(SEL)aSelector object:(nullable id)anArgument;
++ (void)cancelPreviousPerformRequestsWithTarget:(id)aTarget;
+@end
+```
 
 
-## 监控主线程卡顿
-&emsp;
+&emsp;当调用 performSelector:onThread: 时，实际上其会创建一个 Timer 加到对应的线程去，同样的，如果对应线程没有 RunLoop 该方法也会失效。
 
+```c++
+
+/****************     Delayed perform     ******************/
+
+
+
+@interface NSRunLoop (NSOrderedPerform)
+
+- (void)performSelector:(SEL)aSelector target:(id)target argument:(nullable id)arg order:(NSUInteger)order modes:(NSArray<NSRunLoopMode> *)modes;
+- (void)cancelPerformSelector:(SEL)aSelector target:(id)target argument:(nullable id)arg;
+- (void)cancelPerformSelectorsWithTarget:(id)target;
+
+@end
+
+@interface NSObject (NSThreadPerformAdditions)
+
+- (void)performSelectorOnMainThread:(SEL)aSelector withObject:(nullable id)arg waitUntilDone:(BOOL)wait modes:(nullable NSArray<NSString *> *)array;
+- (void)performSelectorOnMainThread:(SEL)aSelector withObject:(nullable id)arg waitUntilDone:(BOOL)wait;
+    // equivalent to the first method with kCFRunLoopCommonModes
+
+- (void)performSelector:(SEL)aSelector onThread:(NSThread *)thr withObject:(nullable id)arg waitUntilDone:(BOOL)wait modes:(nullable NSArray<NSString *> *)array API_AVAILABLE(macos(10.5), ios(2.0), watchos(2.0), tvos(9.0));
+- (void)performSelector:(SEL)aSelector onThread:(NSThread *)thr withObject:(nullable id)arg waitUntilDone:(BOOL)wait API_AVAILABLE(macos(10.5), ios(2.0), watchos(2.0), tvos(9.0));
+    // equivalent to the first method with kCFRunLoopCommonModes
+- (void)performSelectorInBackground:(SEL)aSelector withObject:(nullable id)arg API_AVAILABLE(macos(10.5), ios(2.0), watchos(2.0), tvos(9.0));
+
+@end
+```
 
 
 

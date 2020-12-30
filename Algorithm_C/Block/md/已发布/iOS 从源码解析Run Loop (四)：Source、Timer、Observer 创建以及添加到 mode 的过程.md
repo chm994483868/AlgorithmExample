@@ -804,8 +804,12 @@ struct __CFRunLoopTimer {
     CFMutableSetRef _rlModes; // timer 对应的 run loop modes，内部保存的也是 run loop mode 的名字，也验证了 timer 可以在多个 run loop mode 中使用
     CFAbsoluteTime _nextFireDate; // timer 的下次触发时机，每次触发后都会再次设置该值
     CFTimeInterval _interval; /* immutable */ // timer 的时间间隔
+    
+    // _tolerance 默认值是 0.0， 然后 CFRunLoopTimerSetTolerance 函数中 当入参小于 0 的话，设置 tolerance = 0.0，
+    // 如果大于 0 的话，设置 rlt->_tolerance = MIN(tolerance, rlt->_interval / 2)，即控制容忍的偏差值最大为 _interval 的一半。
     CFTimeInterval _tolerance; /* mutable */ // timer 的允许时间偏差
-    uint64_t _fireTSR; /* TSR units */ // timer 本次需要被触发的时间
+    
+    uint64_t _fireTSR; /* TSR units */ // timer 本次被触发的时间点
     CFIndex _order; /* immutable */ // timer 优先级
     
     // typedef void (*CFRunLoopTimerCallBack)(CFRunLoopTimerRef timer, void *info);
