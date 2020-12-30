@@ -1,4 +1,4 @@
-# iOS 从源码解析Run Loop (八)：Run Loop 与 Autorelease、NSTimer、performSelector
+# iOS 从源码解析Run Loop (八)：Run Loop 与 AutoreleasePool、NSTimer、PerformSelector 系列函数
 
 > &emsp;本篇学习我们日常开发中涉及到 run loop 的一些知识点，我们使用它们的时候可能不会想到这些知识点的背后其实都是 run loop 在做支撑的。
 
@@ -478,53 +478,123 @@ __CFArmNextTimerInMode
 
 ## performSelector 系列函数
 &emsp;当调用 NSObject 的 performSelecter:afterDelay: 后，实际上其内部会创建一个 Timer 并添加到当前线程的 run loop 中。所以如果当前线程没有 run loop，则这个方法会失效。
+
+### NSObject + NSDelayedPerforming
+&emsp;在 NSObject 的 NSDelayedPerforming 分类下声明了如下函数。 
 ```c++
 @interface NSObject (NSDelayedPerforming)
-// 
+// 指定 NSRunLoopMode
 - (void)performSelector:(SEL)aSelector withObject:(nullable id)anArgument afterDelay:(NSTimeInterval)delay inModes:(NSArray<NSRunLoopMode> *)modes;
-// 
+// 默认在 NSDefaultRunLoopMode
 - (void)performSelector:(SEL)aSelector withObject:(nullable id)anArgument afterDelay:(NSTimeInterval)delay;
 
 + (void)cancelPreviousPerformRequestsWithTarget:(id)aTarget selector:(SEL)aSelector object:(nullable id)anArgument;
 + (void)cancelPreviousPerformRequestsWithTarget:(id)aTarget;
 @end
 ```
+&emsp;performSelector:withObject:afterDelay:inModes: 在延迟之后使用指定的模式在当前线程上调用接收方（NSObject 及其子类对象）的方法。
+&emsp;`aSelector`：一个选择器，用于标识要调用的方法。该方法应该没有明显的返回值（void），并且应该采用 id 类型的单个参数，或者不带参数。
 
+&emsp;`anArgument`：调用时传递给方法的参数。如果该方法不接受参数，则传递 nil。
 
-&emsp;当调用 performSelector:onThread: 时，实际上其会创建一个 Timer 加到对应的线程去，同样的，如果对应线程没有 RunLoop 该方法也会失效。
+&emsp;`delay`：发送消息之前的最短时间。指定延迟 0 不一定会导致选择器立即执行。选择器仍在线程的 run loop 中排队并尽快执行。
 
+&emsp;`modes`：一个字符串数组，用于标识与执行选择器的 timer 关联的模式。此数组必须至少包含一个字符串。如果为此参数指定 nil 或空数组，则此方法将返回而不执行指定的选择器。
+
+&emsp;此方法设置一个 timer，以便在当前线程的 run loop 上执行 aSelector 消息。timer 配置在 modes 参数指定的模式下运行。当 timer 触发时，线程尝试从 run loop 中取出消息并执行选择器。如果 run loop 正在运行并且处于指定的模式之一，则它成功；否则， timer 将等待直到 run loop 处于这些模式之一。
+
+&emsp;如果希望在 run loop 处于默认模式以外的模式时使消息出列，请使用 `performSelector:withObject:afterDelay:inModes:` 方法。如果不确定当前线程是否为主线程，可以使用 `performSelectorOnMainThread:withObject:waitUntilDone:` 或 `performSelectorOnMainThread:withObject:waitUntilDone:modes:` 方法来确保选择器在主线程上执行。要取消排队的消息，请使用 `cancelPreviousPerformRequestsWithTarget:` 或 `cancelPreviousPerformRequestsWithTarget:selector:object:` 方法。
+
+&emsp;此方法向其当前上下文的 runloop 注册，并依赖于定期运行的 runloop 才能正确执行。一个常见的上下文是当调度队列调用时，你可能调用此方法并最终注册到一个不自动定期运行的 runloop。如果在调度队列上运行时需要此类功能，则应使用 dispatch_after 和相关方法来获得所需的行为。（类似的还有 NSTimer 不准时时，也可以使用 dispatch_source 来替代）
+### NSRunLoop + NSOrderedPerform
 ```c++
-
-/****************     Delayed perform     ******************/
-
-
-
 @interface NSRunLoop (NSOrderedPerform)
-
 - (void)performSelector:(SEL)aSelector target:(id)target argument:(nullable id)arg order:(NSUInteger)order modes:(NSArray<NSRunLoopMode> *)modes;
 - (void)cancelPerformSelector:(SEL)aSelector target:(id)target argument:(nullable id)arg;
 - (void)cancelPerformSelectorsWithTarget:(id)target;
-
 @end
+```
+&emsp;performSelector:target:argument:order:modes: 安排在接收方（NSRunLoop 实例对象）上发送消息。
 
+&emsp;`aSelector`：一个选择器，用于标识要调用的方法。此方法应该没有明显的返回值，并且应该采用 id 类型的单个参数。
+
+&emsp;`target`：在 aSelector 中定义选择器的对象。
+
+&emsp;`anArgument`：调用时传递给方法的参数。如果该方法不接受参数，则传递 nil。
+
+&emsp;`order`：消息的优先级。如果计划了多条消息，则顺序值较低的消息将在具有较高顺序值的消息之前发送。
+
+&emsp;`modes`：可以为其发送消息的输入模式的数组。你可以指定自定义模式或使用 Run Loop Modes 中列出的模式之一。
+
+&emsp;此方法设置一个 timer，以便在下一次 run loop 迭代开始时在 target 上执行 aSelector 消息。timer 被配置为在 modes 参数指定的模式下运行。当 timer 触发时，线程将尝试从 run loop 中取消消息队列并执行选择器。如果 run loop 正在运行并且处于指定的模式之一，则会成功；否则，timer 将等待直到 run loop 处于这些模式之一。
+
+&emsp;发送 aSelector 消息之前，此方法返回。接收器会保留 target 和 anArgument 对象，直到选择器的 timer 触发，然后将其释放作为清理的一部分。
+
+&emsp;如果要在处理当前事件后发送多个消息，并且要确保这些消息按特定顺序发送，请使用此方法。
+### NSObject + NSThreadPerformAdditions
+&emsp;当调用 performSelector:onThread: 时，实际上其会创建一个 timer 加到对应的线程去，同样的，如果对应线程没有 run loop 该方法也会失效。
+```c++
 @interface NSObject (NSThreadPerformAdditions)
 
+// 主线程
 - (void)performSelectorOnMainThread:(SEL)aSelector withObject:(nullable id)arg waitUntilDone:(BOOL)wait modes:(nullable NSArray<NSString *> *)array;
-- (void)performSelectorOnMainThread:(SEL)aSelector withObject:(nullable id)arg waitUntilDone:(BOOL)wait;
-    // equivalent to the first method with kCFRunLoopCommonModes
+- (void)performSelectorOnMainThread:(SEL)aSelector withObject:(nullable id)arg waitUntilDone:(BOOL)wait; // equivalent to the first method with kCFRunLoopCommonModes
 
-- (void)performSelector:(SEL)aSelector onThread:(NSThread *)thr withObject:(nullable id)arg waitUntilDone:(BOOL)wait modes:(nullable NSArray<NSString *> *)array API_AVAILABLE(macos(10.5), ios(2.0), watchos(2.0), tvos(9.0));
-- (void)performSelector:(SEL)aSelector onThread:(NSThread *)thr withObject:(nullable id)arg waitUntilDone:(BOOL)wait API_AVAILABLE(macos(10.5), ios(2.0), watchos(2.0), tvos(9.0));
-    // equivalent to the first method with kCFRunLoopCommonModes
-- (void)performSelectorInBackground:(SEL)aSelector withObject:(nullable id)arg API_AVAILABLE(macos(10.5), ios(2.0), watchos(2.0), tvos(9.0));
+// 指定线程
+- (void)performSelector:(SEL)aSelector onThread:(NSThread *)thr withObject:(nullable id)arg waitUntilDone:(BOOL)wait modes:(nullable NSArray<NSString *> *)array;
+- (void)performSelector:(SEL)aSelector onThread:(NSThread *)thr withObject:(nullable id)arg waitUntilDone:(BOOL)wait; // equivalent to the first method with kCFRunLoopCommonModes
+
+// 后台线程
+- (void)performSelectorInBackground:(SEL)aSelector withObject:(nullable id)arg;
 
 @end
 ```
+&emsp;performSelectorOnMainThread:withObject:waitUntilDone:modes: 使用指定的模式在主线程上调用 receiver 的方法。
 
+emsp;`aSelector`: 一个选择器，用于标识要调用的方法。该方法不应有明显的返回值，并且应采用 id 类型的单个参数或不带参数。
 
+&emsp;`arg`: 调用时传递给 `aSelector` 的参数。如果该方法不接受参数，则传递 `nil`。
 
+&emsp;`wait`: 一个布尔值，指定当前线程是否在主线程上的接收器上执行指定的选择器之后才阻塞。指定 YES 是阻止该线程；否则，请指定 NO 以使此方法立即返回。如果当前线程也是主线程，并且你传递 YES，则立即执行该消息，否则将执行队列排队，以使其下次通过 run loop 运行。
 
+&emsp;`array`: 字符串数组，标识允许执行指定选择器的模式。该数组必须至少包含一个字符串。如果为该参数指定 nil 或空数组，则此方法将返回而不执行指定的选择器。
 
+&emsp;你可以使用此方法将消息传递到应用程序的主线程。主线程包含应用程序的 main run loop，并且是 NSApplication 对象接收事件的地方。在这种情况下，消息是你要在线程上执行的当前对象的方法。
+
+&emsp;此方法使用 array 参数中指定的 run loop 模式，将消息在主线程的 run loop 中排队。作为其正常 run loop 处理的一部分，主线程使消息出队（假定它正在以指定的模式之一运行）并调用所需的方法。假设每个选择器的关联 run loop 模式相同，那么从同一线程对该方法的多次调用会导致相应的选择器排队，并以与调用相同的顺序执行。如果为每个选择器指定不同的模式，则其关联模式与当前 run loop 模式不匹配的所有选择器都将被跳过，直到 runloop 随后在该模式下执行。
+
+&emsp;你无法取消使用此方法排队的消息。如果要取消当前线程上的消息的选项，则必须使用 performSelector:withObject:afterDelay: 或 performSelector:withObject:afterDelay:inModes: 方法。
+
+&emsp;该方法向其当前上下文的 run loop 进行注册，并依赖于定期运行的 run loop 才能正确执行。一个常见的上下文是调用 dispatch queue 时调用，可能会调用此方法并最终向不是定期自动运行的 run loop 注册。如果在一个 dispatch queue 上运行时需要这种功能，则应使用 dispatch_after 和相关方法来获取所需的行为。
+### NSObject 协议中的 performSelector 方法
+&emsp;在 NSObject 类中实现的 NSObject 协议的 performSelector 方法，则与 run loop 无关，它们相当于直接调用 recevier 的方法。
+```c++
+@protocol NSObject
+...
+- (id)performSelector:(SEL)aSelector;
+- (id)performSelector:(SEL)aSelector withObject:(id)object;
+- (id)performSelector:(SEL)aSelector withObject:(id)object1 withObject:(id)object2;
+...
+@end
+```
+&emsp;在 NSObject 类下的实现，可看到相当于直接调用函数。
+```c++
+- (id)performSelector:(SEL)sel {
+    if (!sel) [self doesNotRecognizeSelector:sel];
+    return ((id(*)(id, SEL))objc_msgSend)(self, sel);
+}
+
+- (id)performSelector:(SEL)sel withObject:(id)obj {
+    if (!sel) [self doesNotRecognizeSelector:sel];
+    return ((id(*)(id, SEL, id))objc_msgSend)(self, sel, obj);
+}
+
+- (id)performSelector:(SEL)sel withObject:(id)obj1 withObject:(id)obj2 {
+    if (!sel) [self doesNotRecognizeSelector:sel];
+    return ((id(*)(id, SEL, id, id))objc_msgSend)(self, sel, obj1, obj2);
+}
+```
+&emsp;本篇主要分析了自动释放池和计时器与 run loop 相关的一些内容，计时器相关的内容在我们的日常开发中还挺常用的，需要认真学习总结，下篇我们继续学习 iOS 系统中与 run loop 相关的内容。
 
 ## 参考链接
 **参考链接:🔗**
