@@ -201,7 +201,9 @@ typedef struct {
     
     void (*schedule)(void *info, CFRunLoopRef rl, CFStringRef mode); // 当 source0 加入到 run loop 时触发的回调函数（在下面的 CFRunLoopAddSource 函数中可看到其被调用了）
     void (*cancel)(void *info, CFRunLoopRef rl, CFStringRef mode); // 当 source0 从 run loop 中移除时触发的回调函数
-    void (*perform)(void *info); // source0 要执行的任务块，当 source0 事件被触发时的回调, 使用 CFRunLoopSourceSignal 函数触发
+    
+    // source0 要执行的任务块，当 source0 事件被触发时的回调, 最后调用 __CFRUNLOOP_IS_CALLING_OUT_TO_A_SOURCE0_PERFORM_FUNCTION__ 函数来执行 perform(info)
+    void (*perform)(void *info);
 } CFRunLoopSourceContext;
 ```
 &emsp;当 \__CFRunLoopSource 表示 source1 的数据结构时 `_context` 中使用 `CFRunLoopSourceContext1 version1`，下面是 `CFRunLoopSourceContext1` 的定义。
@@ -499,7 +501,7 @@ void CFRunLoopAddSource(CFRunLoopRef rl, CFRunLoopSourceRef rls, CFStringRef mod
     }
 }
 ```
-&emsp;`CFRunLoopAddSource` 函数随长但思路清晰，也都能和我们之前的结论对上，特别是当 source 添加到的 mode 是 common mode 时，会自动把 souce 同步到每个 common mode 中去。（注释已经极其清晰了，这里就不再总结了）
+&emsp;`CFRunLoopAddSource` 函数虽长但思路清晰，也都能和我们之前的结论对上，特别是当 source 添加到的 mode 是 common mode 时，会自动把 souce 同步到每个 common mode 中去。（注释已经极其清晰了，这里就不再总结了）
 
 &emsp;CFRunLoopSource 的创建和添加就看完了，下面我们看 CFRunLoopObserverRef。（关于 CFRunLoopSource 中的 source0 和 souce1 的区别以及 source1 中的 port 相关的内容我们在下一篇再展开分析）
 ## CFRunLoopObserverRef（struct \__CFRunLoopObserver *）

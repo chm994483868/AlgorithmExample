@@ -6,36 +6,44 @@
 &emsp;我们首先再次回顾一下 Source/Timer/Observer，因为 run loop 正是通过这些 run loop mode item 来向外提供功能支持的。
 
 1. CFRunLoopSourceRef 是事件产生的地方。Source 有两个版本：Source0 和 Source1。
-+ Source0 只包含了一个回调（函数指针），它并不能主动触发事件。使用时，你需要先调用 CFRunLoopSourceSignal(source)，将这个 Source 标记为待处理，然后手动调用 CFRunLoopWakeUp(runloop) 来唤醒 RunLoop，让其处理这个事件。
-+ Source1 包含了一个 mach_port 和一个回调（函数指针），被用于通过内核和其他线程相互发送消息（mach_msg），这种 Source 能主动唤醒 RunLoop 的线程。
++ Source0 只包含了一个回调（函数指针），它并不能主动触发事件。使用时，你需要先调用 CFRunLoopSourceSignal(source)，将这个 Source 标记为待处理，然后手动调用 CFRunLoopWakeUp(runloop) 来唤醒 run loop，让其处理这个事件。
++ Source1 包含了一个 mach_port 和一个回调（函数指针），被用于通过内核和其他线程相互发送消息（mach_msg），这种 Source 能主动唤醒 run loop 的线程。
 
 &emsp;下面看一下它们相关的数据结构，CFRunLoopSourceContext 和 CFRunLoopSourceContext1 具有一些相同的字段和不同字段。
 ```c++
 typedef struct {
     CFIndex version;
-    void * info; // source 的信息
+    void * info; // 作为 perform 函数的参数
     const void *(*retain)(const void *info); // retain 函数
     void (*release)(const void *info); // release 函数
     CFStringRef (*copyDescription)(const void *info); // 返回描述字符串的函数
     Boolean (*equal)(const void *info1, const void *info2); // 判断 source 对象是否相等的函数
     CFHashCode (*hash)(const void *info); // 哈希函数
+    ...
 } CFRunLoopSourceContext/1;
 ```
-&emsp;version、info、retain 函数、release 函数、描述字符串的函数、判断 source 对象是否相等的函数、哈希函数，是 CFRunLoopSourceContext 和 CFRunLoopSourceContext1 的基础内容双方完成等同，两者的区别主要在下面，它们表示了 source0 和 source1 的不同功能。
+&emsp;version、info、retain 函数、release 函数、描述字符串的函数、判断 source 对象是否相等的函数、哈希函数，是 CFRunLoopSourceContext 和 CFRunLoopSourceContext1 的基础内容双方完全等同，两者的区别主要在下面，它们表示了 source0 和 source1 的不同功能。
 ```c++
 typedef struct {
     ...
-    void (*schedule)(void *info, CFRunLoopRef rl, CFStringRef mode); // 当 source0 加入到 run loop 时触发的回调函数（在 CFRunLoopAddSource 函数中可看到其被调用）
+    // 当 source0 加入到 run loop 时触发的回调函数（在 CFRunLoopAddSource 函数内部可看到 schedule 被调用）
+    void (*schedule)(void *info, CFRunLoopRef rl, CFStringRef mode); 
+    
     void (*cancel)(void *info, CFRunLoopRef rl, CFStringRef mode); // 当 source0 从 run loop 中移除时触发的回调函数
-    void (*perform)(void *info); // source0 要执行的任务块，当 source0 事件被触发时的回调, 使用 CFRunLoopSourceSignal 函数触发
+    
+    // source0 要执行的任务块，当 source0 事件被触发时的回调, 调用 __CFRUNLOOP_IS_CALLING_OUT_TO_A_SOURCE0_PERFORM_FUNCTION__ 函数来执行 perform
+    void (*perform)(void *info); 
 } CFRunLoopSourceContext;
 ```
 ```c++
 typedef struct {
     ...
 #if (TARGET_OS_MAC && !(TARGET_OS_EMBEDDED || TARGET_OS_IPHONE)) || (TARGET_OS_EMBEDDED || TARGET_OS_IPHONE)
-    mach_port_t (*getPort)(void *info); // getPort 函数指针，用于当 source1 被添加到 run loop 中的时候，从该函数中获取具体的 mach_port_t 对象，用来唤醒 run loop。
-    void * (*perform)(void *msg, CFIndex size, CFAllocatorRef allocator, void *info); // perform 函数指针即指向 run loop 被唤醒后 source1 要执行的回调函数
+    // getPort 函数指针，用于当 source1 被添加到 run loop 中的时候，从该函数中获取具体的 mach_port_t 对象，用来唤醒 run loop。
+    mach_port_t (*getPort)(void *info); 
+    
+    // perform 函数指针即指向 run loop 被唤醒后 source1 要执行的回调函数，调用 __CFRUNLOOP_IS_CALLING_OUT_TO_A_SOURCE1_PERFORM_FUNCTION__ 函数来执行
+    void * (*perform)(void *msg, CFIndex size, CFAllocatorRef allocator, void *info);
 #else
     // 其它平台
     void * (*getPort)(void *info);
@@ -501,11 +509,44 @@ __CFArmNextTimerInMode
 
 &emsp;`modes`：一个字符串数组，用于标识与执行选择器的 timer 关联的模式。此数组必须至少包含一个字符串。如果为此参数指定 nil 或空数组，则此方法将返回而不执行指定的选择器。
 
-&emsp;此方法设置一个 timer，以便在当前线程的 run loop 上执行 aSelector 消息。timer 配置在 modes 参数指定的模式下运行。当 timer 触发时，线程尝试从 run loop 中取出消息并执行选择器。如果 run loop 正在运行并且处于指定的模式之一，则它成功；否则， timer 将等待直到 run loop 处于这些模式之一。
+&emsp;此方法设置一个 timer，以便在当前线程的 run loop 上执行 aSelector 消息。timer 配置在 modes 参数指定的模式下运行。当 timer 触发时，线程尝试从 run loop 中取出消息并执行选择器。如果 run loop 正在运行并且处于指定的模式之一，则它成功；否则， timer 将等待直到 run loop 处于这些模式之一。关于它会在当前 run loop 的 run loop mode 下添加一个 timer 可通过如下代码验证：
+```c++
+    NSThread *thread = [[NSThread alloc] initWithBlock:^{
+        NSLog(@"🧗‍♀️🧗‍♀️ ....");
+
+        [NSTimer scheduledTimerWithTimeInterval:1 repeats:YES block:^(NSTimer * _Nonnull timer) {
+            NSLog(@"⏰⏰⏰ timer 回调...");
+        }];
+
+        [self performSelector:@selector(caculate) withObject:nil afterDelay:2]; // ⬅️ 断点 1
+        
+        NSRunLoop *runloop = [NSRunLoop currentRunLoop]; // ⬅️ 断点 2
+        [runloop run];
+    }];
+    [thread start];
+```
+&emsp;分别在执行到以上两个断点时，在控制台通过 `po [NSRunLoop currentRunLoop]` 打印:
+```c++
+// 断点 1 处：po [NSRunLoop currentRunLoop]
+...
+    timers = <CFArray 0x28314e9a0 [0x20e729430]>{type = mutable-small, count = 1, values = (
+    0 : <CFRunLoopTimer 0x28204df80 [0x20e729430]>{valid = Yes, firing = No, interval = 1, tolerance = 0, next fire date = 631096717 (-14.273319 @ 16571855540445), callout = (NSTimer) [_NSTimerBlockTarget fire:] (0x1df20764c / 0x1df163018) (/System/Library/Frameworks/Foundation.framework/Foundation), context = <CFRunLoopTimer context 0x28154b900>}
+)
+...
+// 断点 2 处：po [NSRunLoop currentRunLoop]
+...
+    timers = <CFArray 0x28314e9a0 [0x20e729430]>{type = mutable-small, count = 2, values = (
+    0 : <CFRunLoopTimer 0x28204df80 [0x20e729430]>{valid = Yes, firing = No, interval = 1, tolerance = 0, next fire date = 631096717 (-32.979197 @ 16571855540445), callout = (NSTimer) [_NSTimerBlockTarget fire:] (0x1df20764c / 0x1df163018) (/System/Library/Frameworks/Foundation.framework/Foundation), context = <CFRunLoopTimer context 0x28154b900>}
+    1 : <CFRunLoopTimer 0x28204db00 [0x20e729430]>{valid = Yes, firing = No, interval = 0, tolerance = 0, next fire date = 631096747 (-2.84795797 @ 16572578697099), callout = (Delayed Perform) ViewController caculate (0x1df1f4094 / 0x10093ab88) (/var/containers/Bundle/Application/C2E33DEA-1FB0-48A0-AEDD-2D13AF564389/Simple_iOS.app/Simple_iOS), context = <CFRunLoopTimer context 0x28003d4c0>}
+)
+...
+```
+&emsp;可看到 performSelector:withObject:afterDelay: 添加了一个 timer。
 
 &emsp;如果希望在 run loop 处于默认模式以外的模式时使消息出列，请使用 `performSelector:withObject:afterDelay:inModes:` 方法。如果不确定当前线程是否为主线程，可以使用 `performSelectorOnMainThread:withObject:waitUntilDone:` 或 `performSelectorOnMainThread:withObject:waitUntilDone:modes:` 方法来确保选择器在主线程上执行。要取消排队的消息，请使用 `cancelPreviousPerformRequestsWithTarget:` 或 `cancelPreviousPerformRequestsWithTarget:selector:object:` 方法。
 
 &emsp;此方法向其当前上下文的 runloop 注册，并依赖于定期运行的 runloop 才能正确执行。一个常见的上下文是当调度队列调用时，你可能调用此方法并最终注册到一个不自动定期运行的 runloop。如果在调度队列上运行时需要此类功能，则应使用 dispatch_after 和相关方法来获得所需的行为。（类似的还有 NSTimer 不准时时，也可以使用 dispatch_source 来替代）
+
 ### NSRunLoop + NSOrderedPerform
 ```c++
 @interface NSRunLoop (NSOrderedPerform)
