@@ -46,15 +46,15 @@ typedef struct {
 #endif
 } CFRunLoopSourceContext1;
 ```
-+ source0 仅包含一个回调函数（perform），它并不能主动唤醒 run loop。使用时，你需要先调用 CFRunLoopSourceSignal(rls) 将这个 source 标记为待处理，然后手动调用 CFRunLoopWakeUp(rl) 来唤醒 run loop（ CFRunLoopWakeUp 函数内部是通过 run loop 的 \_wakeUpPort 端口来唤醒 run loop），唤醒后的 run loop 继续执行 \__CFRunLoopRun 函数内部的外层 do while 循环来处理 timer/source 事件，其中通过调用 \__CFRunLoopDoSources0 函数来执行 source0 事件，执行过后的 source0 会被 \__CFRunLoopSourceUnsetSignaled(rls) 标记为已处理，后续 run loop 循环中不会再执行标记为已处理的 source0。source0 不同于不重复执行的 timer 和 run loop 的 block 链表中的 block 节点，source0 执行过后不会自己主动移除，不重复执行的 timer 和 block 执行过后自己会主动移除。
+&emsp;source0 仅包含一个回调函数（perform），它并不能主动唤醒 run loop（进入休眠的 run loop 仅能通过 mach port 和 mach_msg 来唤醒）。使用时，你需要先调用 CFRunLoopSourceSignal(rls) 将这个 source 标记为待处理，然后手动调用 CFRunLoopWakeUp(rl) 来唤醒 run loop（CFRunLoopWakeUp 函数内部是通过 run loop 实例的 \_wakeUpPort 成员变量来唤醒 run loop 的），唤醒后的 run loop 继续执行 \__CFRunLoopRun 函数内部的外层 do while 循环来执行 timers（执行到达执行时间点的 timer 以及更新下次最近的时间点） 和 sources 以及 observer 回调 run loop 状态，其中通过调用 \__CFRunLoopDoSources0 函数来执行 source0 事件，执行过后的 source0 会被 \__CFRunLoopSourceUnsetSignaled(rls) 标记为已处理，后续 run loop 循环中不会再执行标记为已处理的 source0。source0 不同于不重复执行的 timer 和 run loop 的 block 链表中的 block 节点，source0 执行过后不会自己主动移除，不重复执行的 timer 和 block 执行过后会自己主动移除，执行过后的 source0 可手动调用 CFRunLoopRemoveSource(CFRunLoopGetCurrent(), rls, kCFRunLoopDefaultMode) 来移除。
 
-&emsp;source0 具体的执行函数如下，info 做参数执行 perform 函数。
+&emsp;source0 具体执行时的函数如下，info 做参数执行 perform 函数。
 ```c++
-__CFRUNLOOP_IS_CALLING_OUT_TO_A_SOURCE0_PERFORM_FUNCTION__(rls->_context.version0.perform, rls->_context.version0.info);
+__CFRUNLOOP_IS_CALLING_OUT_TO_A_SOURCE0_PERFORM_FUNCTION__(rls->_context.version0.perform, rls->_context.version0.info); // perform(info)
 ```
 &emsp;下面是我们手动创建 source0 的示例代码，创建好的 CFRunLoopSourceRef 必须调用 CFRunLoopSourceSignal 函数把其标记为待处理，否则即使 run loop 正常循环，这里的 rls 也得不到执行，由于 thread 线程中的计时器存在所以这里也可以不用手动调用 CFRunLoopWakeUp 唤醒 run loop，run loop 已是唤醒状态，rls 能在 run loop 的一个循环中正常得到执行，然后是其中的三个断点，当执行到断点时我们在控制台打印 po [NSRunLoop currentRunLoop] 可在 kCFRunLoopDefaultMode 的 sources0 哈希表中看到 rls，以及它的 signalled 标记的值，通过源码可知在 rls 的 perform 待执行之前就会先调用 \__CFRunLoopSourceUnsetSignaled(rls) 把其标记为已经处理，且处理过的 rls 并不会主动移除，它依然被保存在 kCFRunLoopDefaultMode 的 sources0 哈希表中，我们可以使用 CFRunLoopRemoveSource 函数手动移除。source0 不同于不重复执行的 timer 和 run loop 的 block 链表中的 block 节点，source0 执行过后不会自己主动移除，不重复执行的 timer 和 block 执行过后自己会主动移除。
 
-&emsp;话说是执行 source0 时需要手动调用 CFRunLoopWakeUp 来唤醒 run loop，实际觉得好像大部分场景下其它事件都会导致 run loop 正常进行着循环，只要 run loop 进行循环则都能执行 source0 事件，好像并不需要我们刻意的手动调用 CFRunLoopWakeUp 来唤醒 run loop。 
+&emsp;话说是执行 source0 时需要手动调用 CFRunLoopWakeUp 来唤醒 run loop，实际觉得好像大部分场景下其它事件都会导致 run loop 正常进行着循环，只要 run loop 进行循环则标记为待处理的 source0 就能得到执行，好像并不需要我们刻意的手动调用 CFRunLoopWakeUp 来唤醒当前的 run loop。 
 ```c++
 - (void)viewDidLoad {
     [super viewDidLoad];
@@ -62,7 +62,11 @@ __CFRUNLOOP_IS_CALLING_OUT_TO_A_SOURCE0_PERFORM_FUNCTION__(rls->_context.version
     NSThread *thread = [[NSThread alloc] initWithBlock:^{
         NSLog(@"🧗‍♀️🧗‍♀️ ....");
         
+        // 构建下下文，这里只有三个参数有值，0 是 version 值代表是 source0，info 则直接传的 self 即当前的 vc，schedule 和 cancel 偷懒了传的 NULL，它们分别是
+        // 执行 CFRunLoopAddSource 添加 rls 和 CFRunLoopRemoveSource 移除 rls 时调用的，大家可以自己试试，
+        // 然后最后是执行函数 perform 传了 runLoopSourcePerformRoutine。
         CFRunLoopSourceContext context = {0, (__bridge void *)(self), NULL, NULL, NULL, NULL, NULL, NULL, NULL, runLoopSourcePerformRoutine};
+        
         CFRunLoopSourceRef rls = CFRunLoopSourceCreate(kCFAllocatorDefault, 0, &context);
         CFRunLoopAddSource(CFRunLoopGetCurrent(), rls, kCFRunLoopDefaultMode);
 
@@ -127,8 +131,11 @@ entries =>
 }
 ...
 ```
+&emsp;针对 timers/sources 的执行流程（暂时忽略 run loop 休眠和 main run loop 执行，其实极极极大部分情况我们都是在使用主线程的 run loop，这里为了分析 timers/sources 暂时假装是在子线程的 run loop 中）我们这里再回顾一下 \__CFRunLoopRun 函数，从 \__CFRunLoopRun 函数的外层 do while 循环开始，首先进来会连续回调 kCFRunLoopBeforeTimers 和 kCFRunLoopBeforeSources 两个 run loop 的活动变化，然后接下来就是调用 \__CFRunLoopDoSources0(rl, rlm, stopAfterHandle) 来执行 source0，如果有 source0 被执行了，则 sourceHandledThisLoop 为 True，就不会回调 kCFRunLoopBeforeWaiting 和 kCFRunLoopAfterWaiting 两个活动变化，接着是根据当前 run loop 的本次循环被某个 mach port 唤醒的（\__CFRunLoopServiceMachPort(waitSet, &msg, sizeof(msg_buffer), &livePort, poll ? 0 : TIMEOUT_INFINITY, &voucherState, &voucherCopy) 唤醒本次 run loop 的 mach port 会被赋值到 livePort 中）来处理具体的内容，假如是 rlm->_timerPort（或 modeQueuePort） 唤醒的则调用 \__CFRunLoopDoTimers(rl, rlm, mach_absolute_time()) 来执行 timer 的回调，如果还有其他 timer 或者 timer 重复执行的话会调用 \__CFArmNextTimerInMode(rlm, rl) 来更新注册下次最近的 timer 的触发时间。  最后的话就是 source1 的端口了，首先通过 CFRunLoopSourceRef rls = __CFRunLoopModeFindSourceForMachPort(rl, rlm, livePort)（内部是 CFRunLoopSourceRef found = rlm->_portToV1SourceMap ? (CFRunLoopSourceRef)CFDictionaryGetValue(rlm->_portToV1SourceMap, (const void *)(uintptr_t)port) : NULL;，即从 rlm 的 _portToV1SourceMap 字典中以 livePort 为 Key 找到对应的 CFRunLoopSourceRef）来找到 livePort 所对应的具体的 rls（source1），然后是调用 \__CFRunLoopDoSource1(rl, rlm, rls, msg, msg->msgh_size, &reply) 来执行 rls 的回调，内部具体的执行是 \_\_CFRUNLOOP_IS_CALLING_OUT_TO_A_SOURCE1_PERFORM_FUNCTION\_\_(rls->_context.version1.perform, msg, size, reply, rls->_context.version1.info) 即同样是 info 做参数执行 perform 函数，且在执行前同样会调用 \__CFRunLoopSourceUnsetSignaled(rls) 把 source1 标记为已处理，且同 soure0 一样也不会主动从 run loop mode 的 source1 哈希表中主动移除。 
 
-+ Source1 包含了一个 mach_port 和一个回调（函数指针），被用于通过内核和其他线程相互发送消息（mach_msg），这种 Source 能主动唤醒 run loop 的线程。
+
+
+&emsp; Source1 包含了一个 mach_port 和一个回调（函数指针），被用于通过内核和其他线程相互发送消息（mach_msg），这种 Source 能主动唤醒 run loop 的线程。
 
 &emsp;可看到 source0 中仅有一些回调函数会在 run loop 的本次循环中执行，而 source1 中有 mach port 可用来主动唤醒 run loop。
 
