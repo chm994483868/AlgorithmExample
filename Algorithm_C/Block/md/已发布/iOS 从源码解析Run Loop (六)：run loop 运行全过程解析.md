@@ -898,7 +898,7 @@ static int32_t __CFRunLoopRun(CFRunLoopRef rl,
             // #define CFRUNLOOP_WAKEUP_FOR_TIMER() do { } while (0)
             CFRUNLOOP_WAKEUP_FOR_TIMER();
             
-            // 遍历执行 rlm 的 _timers 集合到达触发时间的 timer 的回调函数并更新其 `_fireTSR` 和 `_nextFireDate`
+            // 遍历执行 rlm 的 _timers 集合中到达触发时间的 timer 的回调函数并更新其 `_fireTSR` 和 `_nextFireDate`
             if (!__CFRunLoopDoTimers(rl, rlm, mach_absolute_time())) { // 7⃣️
                 // Re-arm the next timer, because we apparently fired early
         
@@ -927,10 +927,9 @@ static int32_t __CFRunLoopRun(CFRunLoopRef rl,
             // In this case, the timer port has been automatically reset (since it was returned from MsgWaitForMultipleObjectsEx), and if we do not re-arm it, then no timers will ever be serviced again unless something adjusts the timer list (e.g. adding or removing timers). The fix for the issue is to reset the timer here if CFRunLoopDoTimers did not handle a timer itself. 9308754
             // 在 Windows 上，我们发现了一个问题，即在我们要求设置定时器端口之前设置了定时器端口。例如，我们将开火时间设置为 TSR 167646765860，但实际上可以观察到以 TSR 167646764145开火，这是提早 1715 滴答。结果是，当 __CFRunLoopDoTimers 检查是否应触发任何运行循环计时器时，下一个计时器似乎为时过早，并且不处理任何计时器。
             
-            // run loop mode 中使用 MK_TIMER 构建计时器时，
-            // 触发到达执行时间的 run loop mode 中的 timer 回调。
+            // run loop mode 中使用 MK_TIMER 构建计时器时。触发到达执行时间的 run loop mode 中的 timer 回调。
             
-            // 遍历执行 rlm 的 _timers 集合中的 CFRunLoopTimerRef 的回调函数并更新其 `_fireTSR` 和 `_nextFireDate`
+            // 遍历执行 rlm 的 _timers 集合中到达触发时间的 timer 的回调函数并更新其 `_fireTSR` 和 `_nextFireDate`
             if (!__CFRunLoopDoTimers(rl, rlm, mach_absolute_time())) {
                 // Re-arm the next timer
                 // 重新布防下一个计时器
@@ -1025,23 +1024,23 @@ static int32_t __CFRunLoopRun(CFRunLoopRef rl,
         // 执行 rl 的 block 链表中的 block
         __CFRunLoopDoBlocks(rl, rlm);
         
-        // 根据当前 run loop 的状态来判断是否需要走下一个 loop。当被外部强制停止或 loop 超时时，就不继续下一个 loop 了，否则继续走下一个 loop，如下的情况：
+        // 根据当前 run loop 的状态来判断是否需要走下一个 loop。
         if (sourceHandledThisLoop && stopAfterHandle) {
-            // 已处理过一个源，继续处理
+            // stopAfterHandle 为真表示仅处理一个 sourc0，标记为 kCFRunLoopRunHandledSource。退出本次 run loop 循环。 
             retVal = kCFRunLoopRunHandledSource; // 4
         } else if (timeout_context->termTSR < mach_absolute_time()) {
-            // 超时
+            // run loop 运行超时。退出本次 run loop 循环。
             retVal = kCFRunLoopRunTimedOut; // 3
         } else if (__CFRunLoopIsStopped(rl)) {
-            // 停止
+            // 外部停止。退出本次 run loop 循环。
             __CFRunLoopUnsetStopped(rl);
             retVal = kCFRunLoopRunStopped; // 2
         } else if (rlm->_stopped) {
-            // rlm 停止（外部强制停止）
+            // rlm 停止（外部强制停止）。退出本次 run loop 循环。
             rlm->_stopped = false;
             retVal = kCFRunLoopRunStopped; // 2
         } else if (__CFRunLoopModeIsEmpty(rl, rlm, previousMode)) {
-            // rlm 为的  sources0/sources1/timers/block 为空
+            // rlm 的 sources0/sources1/timers/block 为空。退出本次 run loop 循环。
             retVal = kCFRunLoopRunFinished; // 1
         }
         

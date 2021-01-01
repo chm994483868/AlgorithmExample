@@ -221,13 +221,13 @@ entries =>
 &emsp;在 Core Foundation 中则必须手动创建端口及其 source1。在这两种情况下，都使用与端口不透明类型（CFMachPortRef、CFMessagePortRef 或 CFSocketRef）相关联的函数来创建适当的对象。
 
 ## 事件响应
-> &emsp;苹果注册了一个 Source1 (基于 mach port 的) 用来接收系统事件，其回调函数为 \__IOHIDEventSystemClientQueueCallback()，HID 是 Human Interface Devices “人机交互” 的首字母缩写。
+> &emsp;在 com.apple.uikit.eventfetch-thread 线程下苹果注册了一个 Source1 (基于 mach port 的) 用来接收系统事件，其回调函数为 \__IOHIDEventSystemClientQueueCallback()，HID 是 Human Interface Devices “人机交互” 的首字母缩写。
 > 
 > &emsp;当一个硬件事件(触摸/锁屏/摇晃等)发生后，首先由 IOKit.framework 生成一个 IOHIDEvent 事件并由 SpringBoard 接收。这个过程的详细情况可以参考[这里](http://iphonedevwiki.net/index.php/IOHIDFamily)。SpringBoard 只接收按键(锁屏/静音等)，触摸，加速，接近传感器等几种 Event，随后用 mach port 转发给需要的 App 进程。随后苹果注册的那个 Source1 就会触发回调，并调用 \_UIApplicationHandleEventQueue() 进行应用内部的分发。
 > 
 > &emsp;\_UIApplicationHandleEventQueue() 会把 IOHIDEvent 处理并包装成 UIEvent 进行处理或分发，其中包括识别 UIGesture/处理屏幕旋转/发送给 UIWindow 等。通常事件比如 UIButton 点击、touchesBegin/Move/End/Cancel 事件都是在这个回调中完成的。[深入理解RunLoop](https://blog.ibireme.com/2015/05/18/runloop/)
 
-&emsp;我们在程序中添加一个 \__IOHIDEventSystemClientQueueCallback 的符号断点，运行程序后触摸屏幕会进入该断点，然后 bt 打印当前的函数调用堆栈如下：
+&emsp;我们在程序中添加一个 \__IOHIDEventSystemClientQueueCallback 的符号断点，运行程序后触摸屏幕会进入该断点，然后 bt 打印当前的函数调用堆栈如下，可看到目前是在 com.apple.uikit.eventfetch-thread 线程，此时主线程是休眠状态，系统正是通过 com.apple.uikit.eventfetch-thread 来唤醒主线程。
 ```c++
 (lldb) bt
 * thread #6, name = 'com.apple.uikit.eventfetch-thread', stop reason = breakpoint 2.1
@@ -246,6 +246,61 @@ entries =>
     frame #12: 0x00000001de3a0cdc libsystem_pthread.dylib`thread_start + 4
 (lldb) 
 ```
+&emsp;在控制台打印 po [NSRunLoop currentRunLoop]，看一下当前线程的 run loop，此时应在模拟器中运行，可能由于真机的访问控制有关，如果使用真机的话无法看到 sources 的具体的回调函数名，用模拟器可以看到。由于内容太多，这里我们只摘录出只有一个 kCFRunLoopDefaultMode 模式的 sources1 中的一个 source1：
+```c++
+...
+sources1 = <CFBasicHash 0x600000cf0210 [0x7fff80617cb0]>{type = mutable set, count = 3,
+entries =>
+    ...
+    1 : <CFRunLoopSource 0x6000037a8780 [0x7fff80617cb0]>{signalled = No, valid = Yes, order = 0, context = <CFMachPort 0x6000035a0580 [0x7fff80617cb0]>{valid = Yes, port = 3307, source = 0x6000037a8780, callout = __IOHIDEventSystemClientQueueCallback (0x7fff25e91d1d), context = <CFMachPort context 0x7fbc69e007f0>}}
+    ...
+}
+...
+```
+&emsp;这里确实如大佬所说，包含一个回调函数是 \__IOHIDEventSystemClientQueueCallback 的 source1。
+
+&emsp;下面我们看一下另一位大佬关于事件响应更详细一点的分析：[iOS RunLoop完全指南](https://blog.csdn.net/u013378438/article/details/80239686)
+
+> &emsp;iOS 设备的事件响应，是有 RunLoop 参与的。提起 iOS 设备的事件响应，相信大家都会有一个大概的了解: (1) 用户触发事件 -> (2) 系统将事件转交到对应 APP 的事件队列 -> (3) APP 从消息队列头取出事件 -> (4) 交由 Main Window 进行消息分发 -> (5) 找到合适的 Responder 进行处理，如果没找到，则会沿着 Responder chain 返回到 APP 层，丢弃不响应该事件。
+> 
+> &emsp;这里涉及到两个问题，(3) 到 (5) 步是由进程内处理的，而 (1) 到 (2) 步则涉及到设备硬件，iOS 操作系统，以及目标 APP 之间的通信，通信的大致步骤是什么样的呢？当我们的 APP 在接收到任何事件请求之前，main RunLoop 都是处于 mach_msg_trap 休眠状态中的，那么，又是谁唤醒它的呢？（com.apple.uikit.eventfetch-thread）
+
+&emsp;首先我们在控制台用 po [NSRunLoop currentRunLoop] 打印出主线程的 run loop 的内容，这里内容超多，我们只摘录和我们分析相关的内容，可看到当前 main run loop 有 4 种 mode，这里我们只看 kCFRunLoopDefaultMode 和 UITrackingRunLoopMode 以及 kCFRunLoopCommonModes，它们三者下均有一个 source0 事件：
+```c++
+...
+current mode = kCFRunLoopDefaultMode,
+common modes = <CFBasicHash 0x60000014a400 [0x7fff80617cb0]>{type = mutable set, count = 2,
+entries =>
+    0 : <CFString 0x7fff867f6c40 [0x7fff80617cb0]>{contents = "UITrackingRunLoopMode"}
+    2 : <CFString 0x7fff8062b0a0 [0x7fff80617cb0]>{contents = "kCFRunLoopDefaultMode"}
+}
+
+// UITrackingRunLoopMode
+2 : <CFRunLoopMode 0x6000034500d0 [0x7fff80617cb0]>{name = UITrackingRunLoopMode, port set = 0x3003, queue = 0x60000215c500, source = 0x60000215c600 (not fired), timer port = 0x3203, 
+sources0 = <CFBasicHash 0x600000167cc0 [0x7fff80617cb0]>{type = mutable set, count = 4,
+entries =>
+    ...
+    4 : <CFRunLoopSource 0x600003a58780 [0x7fff80617cb0]>{signalled = No, valid = Yes, order = -1, context = <CFRunLoopSource context>{version = 0, info = 0x600003a5c180, callout = __handleEventQueue (0x7fff48126d97)}}
+    ...
+}
+
+// kCFRunLoopDefaultMode
+4 : <CFRunLoopMode 0x60000345c270 [0x7fff80617cb0]>{name = kCFRunLoopDefaultMode, port set = 0x2103, queue = 0x600002150c00, source = 0x600002150d00 (not fired), timer port = 0x2a03, 
+sources0 = <CFBasicHash 0x600000167d20 [0x7fff80617cb0]>{type = mutable set, count = 4,
+entries =>
+    ...
+    4 : <CFRunLoopSource 0x600003a58780 [0x7fff80617cb0]>{signalled = No, valid = Yes, order = -1, context = <CFRunLoopSource context>{version = 0, info = 0x600003a5c180, callout = __handleEventQueue (0x7fff48126d97)}}
+    ...
+}
+...
+```
+> &emsp;此 source0 的回调函数是 \__handleEventQueue，APP 就是通过这个回调函数来处理事件队列的。
+>
+> &emsp;但是，我们注意到了，\__handleEventQueue 所对应的 source 类型是 0，也就是说它本身不会唤醒休眠的 main RunLoop, main 线程自身在休眠状态中也不可能自己去唤醒自己，那么，系统肯定还有一个子线程，用来接收事件并唤醒 main thread，并将事件传递到 main thread上。
+&emsp;确实还一个子线程，我们将 APP 暂停，就会看到，除了主线程外，系统还为我们自动创建了几个子线程，通过 Xcode 左侧 Debug 导航可看到一个名字比较特殊的线程 com.apple.uikit.eventfetch-thread(7) 
+
+&emsp;看线程的名字就知道，它是 UIKit 所创建的用于接收 event 的线程(以下我们简称为 event fetch thread)。我们打印出 com.apple.uikit.eventfetch-thread 的 RunLoop。
+
 
 ## 卡顿监测
 &emsp;卡顿的呈现方式大概可以理解为我们触摸屏幕时系统回馈不及时或者连续滑动屏幕时肉眼可见的掉帧，回归到程序层面的话可知这些感知的来源都是主线程，而分析有没有卡顿发生则可以从主线程的 run loop 入手，可以通过监听 main run loop 的状态，就能够发现主线程调用方法是否执行时间过长而导致了 run loop 循环周期被拉长继而发生了卡顿。所以监测卡顿的方案是：**通过监控 main run loop 的状态变化周期来判断是否出现了卡顿。**
