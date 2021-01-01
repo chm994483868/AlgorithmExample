@@ -445,7 +445,7 @@ static int32_t __CFRunLoopRun(CFRunLoopRef rl,
     // 1. libdispatchQSafe 为真
     // 2. 入参 rl 是 main run loop
     // 3. 入参 rlm->_name 被 rl->_commonModes 包含
-    // 以上三个条件都是真的话，则把主线程主队列的端口号赋值给 dispatchPort 变量。
+    // 以上三个条件都是真的话，则把主线程主队列的端口号赋值给 dispatchPort 变量，用于当使用 dispatch_async 添加到主队列任务时唤醒 main run loop 执行。
     
     if (libdispatchQSafe && (CFRunLoopGetMain() == rl) && CFSetContainsValue(rl->_commonModes, rlm->_name)) 
         // _dispatch_get_main_queue_port_4CF 用于获取主线程主队列的端口号，然后赋值给 dispatchPort
@@ -547,7 +547,9 @@ static int32_t __CFRunLoopRun(CFRunLoopRef rl,
     }
     
     Boolean didDispatchPortLastTime = true;
-    // 返回值
+    
+    // run loop run 返回值，默认为 0，会在 do while 中根据情况被修改，
+    // 当不为 0 时，run loop 退出，如果 do while 结尾处 retVal 还是 0 则继续循环。
     int32_t retVal = 0;
     
     // 进入这个外层 do while 循环，这个 do while 循环超长几乎包含了剩下的所有函数内容，
@@ -564,7 +566,9 @@ static int32_t __CFRunLoopRun(CFRunLoopRef rl,
 #if DEPLOYMENT_TARGET_MACOSX || DEPLOYMENT_TARGET_EMBEDDED || DEPLOYMENT_TARGET_EMBEDDED_MINI
         // macOS 下，申请两个局部变量 msg 和 livePort
         mach_msg_header_t *msg = NULL;
-        mach_port_t livePort = MACH_PORT_NULL;
+        
+        // 用于记录唤醒休眠的 run loop 的 mach port，休眠前是 NULL
+        mach_port_t livePort = MACH_PORT_NULL; 
         
 #elif DEPLOYMENT_TARGET_WINDOWS
         HANDLE livePort = NULL;
@@ -573,7 +577,7 @@ static int32_t __CFRunLoopRun(CFRunLoopRef rl,
 
         // do while 循环进来，macOS 下连续申请了 5 个局部变量：voucherState、voucherCopy、msg_buffer、msg、livePort。 3⃣️
         
-        // 取得 rlm 的端口集合 _portSet
+        // 取当前 rlm 所需要监听的 mach port 集合，用于唤醒 run loop（__CFPortSet 实际上是 unsigned int 类型）
         __CFPortSet waitSet = rlm->_portSet;
         
         // 设置 rl->_perRunData->ignoreWakeUps = 0x0，表示未设置 IgnoreWakeUps 标记位。
@@ -582,7 +586,7 @@ static int32_t __CFRunLoopRun(CFRunLoopRef rl,
         // Unset 
         __CFRunLoopUnsetIgnoreWakeUps(rl);
         
-        // 下面 kCFRunLoopBeforeTimers（处理 timer 前） 和 kCFRunLoopBeforeSources（处理 source0 前） 两个状态回调 4⃣️
+        // kCFRunLoopBeforeTimers（处理 timer 前） 和 kCFRunLoopBeforeSources（处理 source0 前) 当前所有的 observer 进行 run loop 活动状态回调 4⃣️
         if (rlm->_observerMask & kCFRunLoopBeforeTimers) __CFRunLoopDoObservers(rl, rlm, kCFRunLoopBeforeTimers); // 通知即将处理 Timers
         if (rlm->_observerMask & kCFRunLoopBeforeSources) __CFRunLoopDoObservers(rl, rlm, kCFRunLoopBeforeSources); // 通知即将处理 Sources
         
@@ -636,7 +640,8 @@ static int32_t __CFRunLoopRun(CFRunLoopRef rl,
             // macOS 下执行
             msg = (mach_msg_header_t *)msg_buffer;
             
-            // 通过端口执行，如果有 Source1 是 ready 状态的话，就会跳转到 handle_msg 去处理消息
+            // 如果有 source1 被 signaled，则不休眠，直接跳到 handle_msg 去处理 source1
+            // （主队列由任务要执行）
             if (__CFRunLoopServiceMachPort(dispatchPort,
                                            &msg,
                                            sizeof(msg_buffer),
@@ -715,7 +720,8 @@ static int32_t __CFRunLoopRun(CFRunLoopRef rl,
             
             // MachPort
             // 端口消息（mach_msg），（正式进入休眠）
-            // 等待消息来唤醒当前线程
+            // 等待 waitSet 中的端口发送消息，等待接收消息唤醒当前 run loop
+            // run loop 的核心就是一个 mach_msg，run loop 调用这个函数去接收消息，如果没有别人发送 port 消息过来，内核会将线程置于等待状态
             __CFRunLoopServiceMachPort(waitSet,
                                        &msg,
                                        sizeof(msg_buffer),
@@ -769,7 +775,7 @@ static int32_t __CFRunLoopRun(CFRunLoopRef rl,
         }
         msg = (mach_msg_header_t *)msg_buffer;
         
-        // 大概是监听 waitSet 中的端口，等待接收消息
+        // 等待 waitSet 中的端口发送消息，等待接收消息
         __CFRunLoopServiceMachPort(waitSet,
                                    &msg,
                                    sizeof(msg_buffer),
@@ -804,10 +810,10 @@ static int32_t __CFRunLoopRun(CFRunLoopRef rl,
         // Also, we don't want them left in there if this function returns.
         // 必须在每次循环迭代中都删除本地激活端口，因为此模式可以重新进入，并且我们不希望为这些端口提供服务。另外，如果此函数返回，我们不希望它们留在那里。
         
-        // 从 waitSet 中移除 dispatchPort 
+        // 从 waitSet 中移除 dispatchPort
         __CFPortSetRemove(dispatchPort, waitSet);
         
-        // 设置 rl 忽略唤醒
+        // 设置 rl "忽略唤醒"，意指当前的 run loop 已经是唤醒状态了，此时再来唤醒的话直接 return
         // rl->_perRunData->ignoreWakeUps = 0x57414B45; // 'WAKE'
         __CFRunLoopSetIgnoreWakeUps(rl);
         
@@ -822,7 +828,8 @@ static int32_t __CFRunLoopRun(CFRunLoopRef rl,
         
     handle_msg:;
         // rl->_perRunData->ignoreWakeUps = 0x57414B45
-        // 设置 rl 忽略唤醒（表示已经进入唤醒状态，设置此值以组织其他的唤醒操作）
+        // 设置 rl 忽略唤醒（表示已经进入唤醒状态，设置此值以阻止其他的唤醒操作）
+        // 设置 rl "忽略唤醒"，意指当前的 run loop 已经是唤醒状态了，此时再来唤醒的话直接 return
         __CFRunLoopSetIgnoreWakeUps(rl);
         
         // 一大段 windows 平台下的代码，可忽略
@@ -861,14 +868,15 @@ static int32_t __CFRunLoopRun(CFRunLoopRef rl,
             // If we have a new live port then it will be handled below as normal
         }
 #endif
+        // 根据唤醒 run loop 的 livePort 值，来进行对应逻辑处理
         if (MACH_PORT_NULL == livePort) {
-            // #define CFRUNLOOP_WAKEUP_FOR_NOTHING() do { } while (0)
-            // 如果 livePort 为 NULL，什么也不做
-            CFRUNLOOP_WAKEUP_FOR_NOTHING();
+            // 如果 livePort 为 MACH_PORT_NULL，可能是 run loop 休眠超时，啥都不做
             
+            // #define CFRUNLOOP_WAKEUP_FOR_NOTHING() do { } while (0)
+            CFRUNLOOP_WAKEUP_FOR_NOTHING();
             // handle nothing
         } else if (livePort == rl->_wakeUpPort) {
-            // 如果 rl 的 _wakeUpPort 为 livePort，则在 macOS 下什么也不做
+            // 如果 livePort 是 rl->_wakeUpPort，是指被其他线程或进程唤醒，啥都不做
             
             // #define CFRUNLOOP_WAKEUP_FOR_WAKEUP() do { } while (0)
             CFRUNLOOP_WAKEUP_FOR_WAKEUP();
@@ -884,27 +892,23 @@ static int32_t __CFRunLoopRun(CFRunLoopRef rl,
         // 如果计时器是使用 dispatch_source 实现的
 #if USE_DISPATCH_SOURCE_FOR_TIMERS
         else if (modeQueuePort != MACH_PORT_NULL && livePort == modeQueuePort) {
-            // 如果 rlm 的 queue 的 modeQueuePort 不为 NULL，且 modeQueuePort 等于 livePort
+            // 如果 rlm 的 queue 的 modeQueuePort 不为 NULL，且此时 livePort 等于 modeQueuePort，
+            // 则表示此时需要处理 timer 回调。（这里表示是 timer 回调时间到了唤醒 run loop）
             
             // #define CFRUNLOOP_WAKEUP_FOR_TIMER() do { } while (0)
-            // 被 timer 唤醒
-            CFRUNLOOP_WAKEUP_FOR_TIMER();（这里表示是 timer 回调时间到了唤醒 run loop）
+            CFRUNLOOP_WAKEUP_FOR_TIMER();
             
-            // run loop mode 中使用 dispatch_source 构建计时器时：
-            // 触发 run loop mode 中的 timer 回调。
-            
-            // 遍历执行 rlm 的 _timers 集合中的 CFRunLoopTimerRef 的回调函数并更新其 `_fireTSR` 和 `_nextFireDate`
+            // 遍历执行 rlm 的 _timers 集合到达触发时间的 timer 的回调函数并更新其 `_fireTSR` 和 `_nextFireDate`
             if (!__CFRunLoopDoTimers(rl, rlm, mach_absolute_time())) { // 7⃣️
                 // Re-arm the next timer, because we apparently fired early
-                // 执行 rlm 的 _timers 中的 CFRunLoopTimerRef。
-                
+        
                 // 目前我们收集到四个：
                 // __CFRUNLOOP_IS_CALLING_OUT_TO_AN_OBSERVER_CALLBACK_FUNCTION__ // run loop 的状态发生变化前执行 run loop observer 的回调函数
                 // __CFRUNLOOP_IS_CALLING_OUT_TO_A_BLOCK__ // 执行 run loop 的 block 链表中的 block（block 执行完以后会被释放并移除）
                 // __CFRUNLOOP_IS_CALLING_OUT_TO_A_SOURCE0_PERFORM_FUNCTION__ // 执行 run loop mode 的 _source0 中的 CFRunLoopSourceRef 的 perfom 函数（以其 info 为参数）
                 // __CFRUNLOOP_IS_CALLING_OUT_TO_A_TIMER_CALLBACK_FUNCTION__ // 执行 run loop mode 的 _timers 中的 CFRunLoopTimerRef 的 _callout 函数（以其 _context.info 为参数）
                 
-                // 重新布防下一个计时器
+                // 重新布防下一个计时器（计算计时器中下次最近的触发时间，时间到时唤醒 run loop）
                 __CFArmNextTimerInMode(rlm, rl);
             }
         }
@@ -923,8 +927,8 @@ static int32_t __CFRunLoopRun(CFRunLoopRef rl,
             // In this case, the timer port has been automatically reset (since it was returned from MsgWaitForMultipleObjectsEx), and if we do not re-arm it, then no timers will ever be serviced again unless something adjusts the timer list (e.g. adding or removing timers). The fix for the issue is to reset the timer here if CFRunLoopDoTimers did not handle a timer itself. 9308754
             // 在 Windows 上，我们发现了一个问题，即在我们要求设置定时器端口之前设置了定时器端口。例如，我们将开火时间设置为 TSR 167646765860，但实际上可以观察到以 TSR 167646764145开火，这是提早 1715 滴答。结果是，当 __CFRunLoopDoTimers 检查是否应触发任何运行循环计时器时，下一个计时器似乎为时过早，并且不处理任何计时器。
             
-            // run loop mode 中使用 MK_TIMER 构建计时器时:
-            // 触发 run loop mode 中的 timer 回调。
+            // run loop mode 中使用 MK_TIMER 构建计时器时，
+            // 触发到达执行时间的 run loop mode 中的 timer 回调。
             
             // 遍历执行 rlm 的 _timers 集合中的 CFRunLoopTimerRef 的回调函数并更新其 `_fireTSR` 和 `_nextFireDate`
             if (!__CFRunLoopDoTimers(rl, rlm, mach_absolute_time())) {
@@ -935,18 +939,15 @@ static int32_t __CFRunLoopRun(CFRunLoopRef rl,
         }
 #endif
         else if (livePort == dispatchPort) {
-            // 如果 dispatchPort 等于 livePort
+            // dispatchPort: 处理分发到 main queue 上的事件（这里表示是 dispatch 触发 run loop 唤醒）
             
             // #define   CFRUNLOOP_WAKEUP_FOR_DISPATCH() do { } while (0)
-            // 被 GCD 换醒
-            CFRUNLOOP_WAKEUP_FOR_DISPATCH(); （这里表示是 dispatch 触发 run loop 唤醒，上面是 timer 回调时间到了唤醒 run loop）
+            CFRUNLOOP_WAKEUP_FOR_DISPATCH();
             
             // CFRunLoopMode 解锁
             __CFRunLoopModeUnlock(rlm);
             // CFRunLoop 解锁
             __CFRunLoopUnlock(rl);
-            
-            // 如果 dispatch 就执行 block，（这里是 dispatch 触发 run loop 唤醒，上面是 timer 回调时间到了唤醒 run loop）
             
             // 设置 TSD 中的 __CFTSDKeyIsInGCDMainQ 为 6（与下面的 0 成对，大概理解为构成锁）
             _CFSetTSD(__CFTSDKeyIsInGCDMainQ, (void *)6, NULL);
@@ -962,7 +963,6 @@ static int32_t __CFRunLoopRun(CFRunLoopRef rl,
             // __CFRUNLOOP_IS_CALLING_OUT_TO_A_TIMER_CALLBACK_FUNCTION__
             // __CFRUNLOOP_IS_SERVICING_THE_MAIN_DISPATCH_QUEUE__
             
-            // 处理 GCD
             // 主队列回调事件
             __CFRUNLOOP_IS_SERVICING_THE_MAIN_DISPATCH_QUEUE__(msg);
             
@@ -976,6 +976,8 @@ static int32_t __CFRunLoopRun(CFRunLoopRef rl,
             sourceHandledThisLoop = true;
             didDispatchPortLastTime = true;
         } else {
+            // 其余的，肯定是各种 source1 事件
+            
             // #define   CFRUNLOOP_WAKEUP_FOR_SOURCE() do { } while (0)
             CFRUNLOOP_WAKEUP_FOR_SOURCE();（这里表示是 source1 触发 run loop 唤醒）
             
@@ -996,15 +998,13 @@ static int32_t __CFRunLoopRun(CFRunLoopRef rl,
             CFRunLoopSourceRef rls = __CFRunLoopModeFindSourceForMachPort(rl, rlm, livePort);
             if (rls) {
 #if DEPLOYMENT_TARGET_MACOSX || DEPLOYMENT_TARGET_EMBEDDED || DEPLOYMENT_TARGET_EMBEDDED_MINI
-                // macOS 下
                 mach_msg_header_t *reply = NULL;
                 
-                // 执行 source1 回调
-                // __CFRUNLOOP_IS_CALLING_OUT_TO_A_SOURCE1_PERFORM_FUNCTION__
+                // 执行 source1 回调 __CFRUNLOOP_IS_CALLING_OUT_TO_A_SOURCE1_PERFORM_FUNCTION__
                 sourceHandledThisLoop = __CFRunLoopDoSource1(rl, rlm, rls, msg, msg->msgh_size, &reply) || sourceHandledThisLoop;
                 
+                // 如果有需要回复soruce1的消息，则回复
                 if (NULL != reply) {
-                    // repley 端口
                     (void)mach_msg(reply, MACH_SEND_MSG, reply->msgh_size, 0, MACH_PORT_NULL, 0, MACH_PORT_NULL);
                     CFAllocatorDeallocate(kCFAllocatorSystemDefault, reply);
                 }
@@ -1023,12 +1023,9 @@ static int32_t __CFRunLoopRun(CFRunLoopRef rl,
 #endif
         
         // 执行 rl 的 block 链表中的 block
-        // 处理 Block
         __CFRunLoopDoBlocks(rl, rlm);
         
-        // 根据当前 run loop 的状态来判断是否需要走下一个 loop。
-        // 当被外部强制停止或 loop 超时时，就不继续下一个 loop 了，否则继续走下一个 loop，如下的情况：
-        // 设置返回值
+        // 根据当前 run loop 的状态来判断是否需要走下一个 loop。当被外部强制停止或 loop 超时时，就不继续下一个 loop 了，否则继续走下一个 loop，如下的情况：
         if (sourceHandledThisLoop && stopAfterHandle) {
             // 已处理过一个源，继续处理
             retVal = kCFRunLoopRunHandledSource; // 4
@@ -1049,7 +1046,6 @@ static int32_t __CFRunLoopRun(CFRunLoopRef rl,
         }
         
 #if DEPLOYMENT_TARGET_MACOSX || DEPLOYMENT_TARGET_EMBEDDED || DEPLOYMENT_TARGET_EMBEDDED_MINI
-        // 在 macOS 下
         voucher_mach_msg_revert(voucherState);
         // 释放 voucherCopy
         os_release(voucherCopy);

@@ -2,8 +2,8 @@
 
 > &emsp;上一篇我们主要分析了 CFRunLoopTimerRef 相关的内容和部分 CFRunLoopObserverRef 相关的内容，本篇我们详细分析 CFRunLoopSourceRef 相关的内容。
 
-&emsp;在开始之前我们再详细区分一下 CFRunLoopSourceRef 中的 source0/source1。
-## source0/source1
+&emsp;在开始之前我们再详细区分一下 CFRunLoopSourceRef 的 source0 和 source1 两个版本。
+## source0 和 source1 的区别
 &emsp;首先我们从代码层面对 source0 和 source1 版本的 CFRunLoopSourceRef 进行区分，struct \__CFRunLoopSource 通过其内部的 \_context 来进行区分 source0 和 source1。
 ```c++
 struct __CFRunLoopSource {
@@ -27,6 +27,7 @@ typedef struct {
     void (*perform)(void *info);
 } CFRunLoopSourceContext;
 ```
+
 ```c++
 typedef struct {
     ...
@@ -131,18 +132,119 @@ entries =>
 }
 ...
 ```
-&emsp;针对 timers/sources 的执行流程（暂时忽略 run loop 休眠和 main run loop 执行，其实极极极大部分情况我们都是在使用主线程的 run loop，这里为了分析 timers/sources 暂时假装是在子线程的 run loop 中）我们这里再回顾一下 \__CFRunLoopRun 函数，从 \__CFRunLoopRun 函数的外层 do while 循环开始，首先进来会连续回调 kCFRunLoopBeforeTimers 和 kCFRunLoopBeforeSources 两个 run loop 的活动变化，然后接下来就是调用 \__CFRunLoopDoSources0(rl, rlm, stopAfterHandle) 来执行 source0，如果有 source0 被执行了，则 sourceHandledThisLoop 为 True，就不会回调 kCFRunLoopBeforeWaiting 和 kCFRunLoopAfterWaiting 两个活动变化，接着是根据当前 run loop 的本次循环被某个 mach port 唤醒的（\__CFRunLoopServiceMachPort(waitSet, &msg, sizeof(msg_buffer), &livePort, poll ? 0 : TIMEOUT_INFINITY, &voucherState, &voucherCopy) 唤醒本次 run loop 的 mach port 会被赋值到 livePort 中）来处理具体的内容，假如是 rlm->_timerPort（或 modeQueuePort） 唤醒的则调用 \__CFRunLoopDoTimers(rl, rlm, mach_absolute_time()) 来执行 timer 的回调，如果还有其他 timer 或者 timer 重复执行的话会调用 \__CFArmNextTimerInMode(rlm, rl) 来更新注册下次最近的 timer 的触发时间。  最后的话就是 source1 的端口了，首先通过 CFRunLoopSourceRef rls = __CFRunLoopModeFindSourceForMachPort(rl, rlm, livePort)（内部是 CFRunLoopSourceRef found = rlm->_portToV1SourceMap ? (CFRunLoopSourceRef)CFDictionaryGetValue(rlm->_portToV1SourceMap, (const void *)(uintptr_t)port) : NULL;，即从 rlm 的 _portToV1SourceMap 字典中以 livePort 为 Key 找到对应的 CFRunLoopSourceRef）来找到 livePort 所对应的具体的 rls（source1），然后是调用 \__CFRunLoopDoSource1(rl, rlm, rls, msg, msg->msgh_size, &reply) 来执行 rls 的回调，内部具体的执行是 \_\_CFRUNLOOP_IS_CALLING_OUT_TO_A_SOURCE1_PERFORM_FUNCTION\_\_(rls->_context.version1.perform, msg, size, reply, rls->_context.version1.info) 即同样是 info 做参数执行 perform 函数，且在执行前同样会调用 \__CFRunLoopSourceUnsetSignaled(rls) 把 source1 标记为已处理，且同 soure0 一样也不会主动从 run loop mode 的 source1 哈希表中主动移除。timers/sources 的流程大概如此。 
+&emsp;针对 timers/sources（0/1） 的执行流程（暂时忽略 run loop 休眠和 main run loop 执行，其实极极极大部分情况我们都是在使用主线程的 run loop，这里为了分析 timers/sources 暂时假装是在子线程的 run loop 中）我们这里再回顾一下 \__CFRunLoopRun 函数，从 \__CFRunLoopRun 函数的外层 do while 循环开始，首先进来会连着回调 kCFRunLoopBeforeTimers 和 kCFRunLoopBeforeSources 两个 run loop 的活动变化，然后接下来就是调用 \__CFRunLoopDoSources0(rl, rlm, stopAfterHandle) 来执行 source0，如果有 source0 被执行了，则 sourceHandledThisLoop 为 True，就不会回调 kCFRunLoopBeforeWaiting 和 kCFRunLoopAfterWaiting 两个活动变化。接着是根据当前 run loop 的本次循环被某个 mach port 唤醒的（\__CFRunLoopServiceMachPort(waitSet, &msg, sizeof(msg_buffer), &livePort, poll ? 0 : TIMEOUT_INFINITY, &voucherState, &voucherCopy) 唤醒本次 run loop 的 mach port 会被赋值到 livePort 中）来处理具体的内容，假如是 rlm->_timerPort（或 modeQueuePort 它两等同只是针对不同的平台不同的 timer 使用方式）唤醒的则调用 \__CFRunLoopDoTimers(rl, rlm, mach_absolute_time()) 来执行 timer 的回调，如果还有其它 timer 或者 timer 重复执行的话会调用 \__CFArmNextTimerInMode(rlm, rl) 来更新注册下次最近的 timer 的触发时间。  最后的话就是 source1 的端口了，首先通过 CFRunLoopSourceRef rls = __CFRunLoopModeFindSourceForMachPort(rl, rlm, livePort)（内部是 CFRunLoopSourceRef found = rlm->_portToV1SourceMap ? (CFRunLoopSourceRef)CFDictionaryGetValue(rlm->_portToV1SourceMap, (const void *)(uintptr_t)port) : NULL;，即从 rlm 的 \_portToV1SourceMap 字典中以 livePort 为 Key 找到对应的 CFRunLoopSourceRef）来找到 livePort 所对应的具体的 rls（source1），然后是调用 \__CFRunLoopDoSource1(rl, rlm, rls, msg, msg->msgh_size, &reply) 来执行 rls 的回调，内部具体的执行是 \_\_CFRUNLOOP_IS_CALLING_OUT_TO_A_SOURCE1_PERFORM_FUNCTION\_\_(rls->_context.version1.perform, msg, size, reply, rls->_context.version1.info) 即同样是 info 做参数执行 perform 函数，且在临近执行前同样会调用 \__CFRunLoopSourceUnsetSignaled(rls) 把 source1 标记为已处理，且同 soure0 一样也不会主动从 rlm 的 sources1 哈希表中主动移除。（source1 系统会自动 signaled）
 
-&emsp; Source1 包含了一个 mach_port 和一个回调（函数指针），被用于通过内核和其他线程相互发送消息（mach_msg），这种 Source 能主动唤醒 run loop 的线程。
+&emsp; Source1 包含了一个 mach port（由 CFRunLoopSourceRef 创建时的 CFRunLoopSourceContext1 传入） 和一个回调（CFRunLoopSourceContext1 的 perform 函数指针），被用于通过内核和其它线程相互发送消息（mach_msg），这种 Source 能主动唤醒 run loop 的线程。
 
-&emsp;可看到 source0 中仅有一些回调函数会在 run loop 的本次循环中执行，而 source1 中有 mach port 可用来主动唤醒 run loop。
-
-
-## 屏幕点击回调事件
-&emsp;
-
+&emsp;Source1 包含的 mach port 来自于创建 source1 时 CFRunLoopSourceContext1 的 info 成员变量，CFRunLoopSourceRef 通过 \_context  的 info 持有 mach port，同时以 CFRunLoopSourceRef 为 Key，以 mach port 为 Value 保存在 rlm 的 \_portToV1SourceMap 中，并且会把该 mach port 插入到 rlm 的 \_portSet 中。如下代码摘录自 CFRunLoopAddSource 函数中：
 ```c++
+...
+} else if (1 == rls->_context.version0.version) {
+    // 把 rls 添加到 rlm 的 _sources1 集合中
+    CFSetAddValue(rlm->_sources1, rls);
+    
+    // 以 info 为参，调用 rls->_context.version1.getPort 函数读出 mach port
+    // 基于 CFMachPort 创建的 CFRunLoopSourceRef 其 context 的 getPort 指针被赋值为 __CFMachPortGetPort 函数（iOS 下仅能使用 CFMachPort，不能使用 CFMessagePort）
+    // 基于 CFMessagePort 创建的 CFRunLoopSourceRef 其 context 的 getPort 指针被赋值为 __CFMessagePortGetPort 函数（macOS 下可用 CFMessagePort）
+    __CFPort src_port = rls->_context.version1.getPort(rls->_context.version1.info);
+    
+    if (CFPORT_NULL != src_port) {
+        // 把 rls 和 src_port 保存在 rlm 的 _portToV1SourceMap 字典中
+        CFDictionarySetValue(rlm->_portToV1SourceMap, (const void *)(uintptr_t)src_port, rls);
+        // 把 src_port 插入到 rlm 的 _portSet 中
+        __CFPortSetInsert(src_port, rlm->_portSet);
+    }
+}
+...
+```
+&emsp;可看到 source0 中仅有一些回调函数（perform 函数指针）会在 run loop 的本次循环中执行，而 source1 中有 mach port 可用来主动唤醒 run loop 后执行 source1 中的回调函数（perform 函数指针），即 source1 创建时会有 mach port 传入，然后当通过 mach_msg 函数向这个 mach port 发消息时，当前的 run loop 就会被唤醒来执行这个 source1 事件，但是 source0 则是依赖于由 “别人” 来唤醒 run loop，例如由开发者手动调用 CFRunLoopWakeUp 函数来唤醒 run loop，或者由 source1 唤醒 run loop 后，在当前 run loop 的本次循环中被标记为待处理的 source0 也趁机得到执行。 
 
+&emsp;source1 由 run loop 和内核管理，mach port 驱动。 source0 则偏向应用层一些，如 Cocoa 里面的 UIEvent 处理，会以 source0 的形式发送给 main run loop。
+
+&emsp;翻看了几篇博客后发现手动唤醒 run loop 适用的场景可以是在主线程中唤醒休眠中的子线程。只要能拿到子线程的 run loop 对象就能通过调用 CFRunLoopWakeUp 函数来唤醒指定的子线程，唤醒的方式是调用 mach_msg 函数向子线程的 run loop 对象的 \_weakUpPort 发送消息即可。下面我们看一下挺简短的源码。
+
+&emsp;CFRunLoopWakeUp 函数定义如下，只需要一个我们想要唤醒的线程的 run loop 对象。
+```c++
+void CFRunLoopWakeUp(CFRunLoopRef rl) {
+    CHECK_FOR_FORK();
+    // This lock is crucial to ignorable wakeups, do not remove it.
+    
+    // CFRunLoopRef 加锁
+    __CFRunLoopLock(rl);
+    
+    // 如果 rl 已经被标记为 "忽略唤醒"，则直接解锁 return，
+    // 其实当 rl 有这个 "忽略唤醒" 的标记时代表的是 rl 此时已经是唤醒状态了，所以本次唤醒操作可以忽略。
+    // 全局搜索 __CFRunLoopSetIgnoreWakeUps 设置 "忽略唤醒" 标记的函数，
+    // 可发现其调用都是在 __CFRunLoopRun 函数中 run loop 唤醒之前，用来标记 run loop 此时是唤醒状态。 
+    if (__CFRunLoopIsIgnoringWakeUps(rl)) {
+        __CFRunLoopUnlock(rl);
+        return;
+    }
+    
+#if DEPLOYMENT_TARGET_MACOSX || DEPLOYMENT_TARGET_EMBEDDED || DEPLOYMENT_TARGET_EMBEDDED_MINI
+    kern_return_t ret;
+    
+    /* We unconditionally try to send the message, since we don't want to lose a wakeup,
+    but the send may fail if there is already a wakeup pending, since the queue length is 1. */
+    
+    // __CFSendTrivialMachMessage 函数内部正是调用 mach_msg 向 rl->_wakeUpPort 端口发送消息
+    ret = __CFSendTrivialMachMessage(rl->_wakeUpPort, 0, MACH_SEND_TIMEOUT, 0);
+    // 发送不成功且不是超时，则 crash
+    if (ret != MACH_MSG_SUCCESS && ret != MACH_SEND_TIMED_OUT) CRASH("*** Unable to send message to wake up port. (%d) ***", ret);
+    
+#elif DEPLOYMENT_TARGET_WINDOWS
+    SetEvent(rl->_wakeUpPort);
+#endif
+    // CFRunLoopRef 解锁
+    __CFRunLoopUnlock(rl);
+}
+```
+&emsp;如此，主线程通过调用 CFRunLoopWakeUp(rl) 来唤醒子线程的 run loop，那么添加到子线程中的标记为待处理的 source0 就能得到执行了。
+
+&emsp;Cocoa Foundation 和 Core Foundation 为使用与端口相关的对象和函数创建基于端口的输入源（source1）提供内置支持。例如，在 Cocoa Foundation 中，我们根本不需要直接创建 source1，只需创建一个端口对象，并使用 NSRunLoop  的实例方法将该端口添加到 run loop 中。port 对象会处理所需 source1 的创建和配置。如下代码在子线程中:
+```c++
+NSPort *port = [NSPort port];
+[[NSRunLoop currentRunLoop] addPort:port forMode:NSDefaultRunLoopMode];
+```
+&emsp;即可在当前 run loop 的 NSDefaultRunLoopMode 模式的 sources1 集合中添加一个 source1，此时只要在主线程中能拿到 port 我们就可以实现主线和子线的通信（唤醒子线程）。
+
+&emsp;在上面示例代码中打一个断点，然后在控制台执行 po [NSRunLoop currentRunLoop]，可看到 kCFRunLoopDefaultMode 模式的 sources1 哈希表中多了一个 source1: 
+```c++
+...
+sources1 = <CFBasicHash 0x28148ebe0 [0x20e729430]>{type = mutable set, count = 1,
+entries =>
+    2 : <CFRunLoopSource 0x282fd9980 [0x20e729430]>{signalled = No, valid = Yes, order = 200, context = <CFMachPort 0x282ddca50 [0x20e729430]>{valid = Yes, port = a20b, source = 0x282fd9980, callout = __NSFireMachPort (0x1df1ee1f0), context = <CFMachPort context 0x28148ec70>}}
+}
+...
+```
+
+&emsp;在 Core Foundation 中则必须手动创建端口及其 source1。在这两种情况下，都使用与端口不透明类型（CFMachPortRef、CFMessagePortRef 或 CFSocketRef）相关联的函数来创建适当的对象。
+
+## 事件响应
+> &emsp;苹果注册了一个 Source1 (基于 mach port 的) 用来接收系统事件，其回调函数为 \__IOHIDEventSystemClientQueueCallback()，HID 是 Human Interface Devices “人机交互” 的首字母缩写。
+> 
+> &emsp;当一个硬件事件(触摸/锁屏/摇晃等)发生后，首先由 IOKit.framework 生成一个 IOHIDEvent 事件并由 SpringBoard 接收。这个过程的详细情况可以参考[这里](http://iphonedevwiki.net/index.php/IOHIDFamily)。SpringBoard 只接收按键(锁屏/静音等)，触摸，加速，接近传感器等几种 Event，随后用 mach port 转发给需要的 App 进程。随后苹果注册的那个 Source1 就会触发回调，并调用 \_UIApplicationHandleEventQueue() 进行应用内部的分发。
+> 
+> &emsp;\_UIApplicationHandleEventQueue() 会把 IOHIDEvent 处理并包装成 UIEvent 进行处理或分发，其中包括识别 UIGesture/处理屏幕旋转/发送给 UIWindow 等。通常事件比如 UIButton 点击、touchesBegin/Move/End/Cancel 事件都是在这个回调中完成的。[深入理解RunLoop](https://blog.ibireme.com/2015/05/18/runloop/)
+
+&emsp;我们在程序中添加一个 \__IOHIDEventSystemClientQueueCallback 的符号断点，运行程序后触摸屏幕会进入该断点，然后 bt 打印当前的函数调用堆栈如下：
+```c++
+(lldb) bt
+* thread #6, name = 'com.apple.uikit.eventfetch-thread', stop reason = breakpoint 2.1
+  * frame #0: 0x00000001dea0745c IOKit`__IOHIDEventSystemClientQueueCallback // ⬅️ （mp 是 CFMachPortRef）mp->_callout(mp, msg, size, context_info);
+    frame #1: 0x00000001de6ea990 CoreFoundation`__CFMachPortPerform + 188 // ⬅️ CFMachPort 端口的回调函数
+    frame #2: 0x00000001de711594 CoreFoundation`__CFRUNLOOP_IS_CALLING_OUT_TO_A_SOURCE1_PERFORM_FUNCTION__ + 56 // ⬅️ 
+    frame #3: 0x00000001de710ce0 CoreFoundation`__CFRunLoopDoSource1 + 440 // ⬅️ 可看到触摸事件确实是 source1 事件
+    frame #4: 0x00000001de70bb04 CoreFoundation`__CFRunLoopRun + 2096
+    frame #5: 0x00000001de70afb4 CoreFoundation`CFRunLoopRunSpecific + 436
+    frame #6: 0x00000001df0d995c Foundation`-[NSRunLoop(NSRunLoop) runMode:beforeDate:] + 300
+    frame #7: 0x00000001df0d97ec Foundation`-[NSRunLoop(NSRunLoop) runUntilDate:] + 96
+    frame #8: 0x000000020b052754 UIKitCore`-[UIEventFetcher threadMain] + 136
+    frame #9: 0x00000001df2064a0 Foundation`__NSThread__start__ + 984
+    frame #10: 0x00000001de39d2c0 libsystem_pthread.dylib`_pthread_body + 128
+    frame #11: 0x00000001de39d220 libsystem_pthread.dylib`_pthread_start + 44
+    frame #12: 0x00000001de3a0cdc libsystem_pthread.dylib`thread_start + 4
+(lldb) 
 ```
 
 ## 卡顿监测
@@ -323,4 +425,4 @@ static void runLoopObserverCallBack(CFRunLoopObserverRef observer, CFRunLoopActi
 + [内存管理：autoreleasepool与runloop](https://www.jianshu.com/p/d769c1653347)
 + [Objective-C的AutoreleasePool与Runloop的关联](https://blog.csdn.net/zyx196/article/details/50824564)
 + [iOS开发-Runloop中自定义输入源Source](https://blog.csdn.net/shengpeng3344/article/details/104518051)
-+ [source0/source1](https://www.jianshu.com/p/30b1bb071e83)
++ [IOHIDFamily](http://iphonedevwiki.net/index.php/IOHIDFamily)
