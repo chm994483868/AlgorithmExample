@@ -1,4 +1,4 @@
-# iOS 从源码解析Run Loop (九)：Run Loop 与 卡顿检测、屏幕刷新、点击事件
+# iOS 从源码解析Run Loop (九)：Run Loop 与事件响应、手势识别、屏幕刷新、卡顿监测
 
 > &emsp;上一篇我们主要分析了 CFRunLoopTimerRef 相关的内容和部分 CFRunLoopObserverRef 相关的内容，本篇我们详细分析 CFRunLoopSourceRef 相关的内容。
 
@@ -217,7 +217,6 @@ entries =>
 }
 ...
 ```
-
 &emsp;在 Core Foundation 中则必须手动创建端口及其 source1。在这两种情况下，都使用与端口不透明类型（CFMachPortRef、CFMessagePortRef 或 CFSocketRef）相关联的函数来创建适当的对象。
 ## 事件响应
 > &emsp;在 com.apple.uikit.eventfetch-thread 线程下苹果注册了一个 Source1 (基于 mach port 的) 用来接收系统事件，其回调函数为 \__IOHIDEventSystemClientQueueCallback()，HID 是 Human Interface Devices “人机交互” 的首字母缩写。
@@ -372,18 +371,123 @@ entries =>
 ```
 &emsp;上面第一段函数堆栈打印是进入 \__IOHIDEventSystemClientQueueCallback 断点时的打印，可看到在 com.apple.uikit.eventfetch-thread 线程的 run loop 中执行 \__CFRunLoopDoSource1，其中回调函数是 \__IOHIDEventSystemClientQueueCallback。
 
-&emsp;接着切换到主线程 com.apple.main-thread 执行 \__CFRunLoopDoSources0。
+&emsp;接着切换到主线程 com.apple.main-thread 执行 \__CFRunLoopDoSources0，并从 \__processEventQueue 开始处理直到  VC 的 touchesBegan:withEvent: 函数。（Xcode 11 和 Xcode 12 有所区别，大家可以自己手动测试下）
 
 > &emsp;测试可得如下结论：用户触发事件， IOKit.framework 生成一个 IOHIDEvent 事件并由 SpringBoard 接收，SpringBoard 会利用 mach port，产生 source1，来唤醒目标 APP 的 com.apple.uikit.eventfetch-thread 的 RunLoop。Eventfetch thread 会将 main runloop 中 \__handleEventQueue 所对应的 source0 设置为 signalled == Yes 状态，同时唤醒 main RunLoop。mainRunLoop 则调用 \__handleEventQueue 进行事件队列处理。
 
+&emsp;接下来我们顺着刚刚的事件响应的过程再细化一个分支。我们当前的 App 进程接收到事件以后（SpringBoard 只接收按键(锁屏/静音等)、触摸、加速、接近传感器等几种 Event，随后用 mach port 转发给需要的 App 进程），会调用 \__eventFetcherSourceCallback 和 \__eventQueueSourceCallback 进行应用内部分发，此时会对事件做一个细化，会把 IOHIDEvent 处理并包装成 UIEvent 进行处理或分发，其中包括识别 UIGesture/处理屏幕旋转/发送给 UIWindow 等。通常事件比如 UIButton 点击、touchesBegin/Move/End/Cancel 事件都是在这个回调中完成的，那如果是手势的话呢，那么我们的 App 进程如何处理呢？下面我们来一起看一下。
+## 手势识别
+&emso;我们继续先看一下 [ibireme](https://blog.ibireme.com/2015/05/18/runloop/) 大佬的结论，然后进行证明。（目前自己也不知道怎么学习这一部分内容，不同于前面的只要分析源码就好了，这里就沿着大佬的结论一步一步分析好了。）
+
+> &emsp;当上面的 _UIApplicationHandleEventQueue() 识别了一个手势时，其首先会调用 Cancel 将当前的 touchesBegin/Move/End 系列回调打断。随后系统将对应的 UIGestureRecognizer 标记为待处理。
+> 
+> &emsp;苹果注册了一个 Observer 监测 BeforeWaiting (Loop 即将进入休眠) 事件，这个Observer的回调函数是 \_UIGestureRecognizerUpdateObserver()，其内部会获取所有刚被标记为待处理的 GestureRecognizer，并执行 GestureRecognizer 的回调。
+>
+> &emsp;当有 UIGestureRecognizer 的变化(创建/销毁/状态改变)时，这个回调都会进行相应处理。
+
+&emsp;首先我们从 main run loop 中去找一下这个 回调函数是 \_UIGestureRecognizerUpdateObserver 的 CFRunLoopObserverRef。我们继续添加一个 \__IOHIDEventSystemClientQueueCallback 的符号断点和一个 \_UIGestureRecognizerUpdateObserver 的符号断点，然后尝试在屏幕上滑一下（这里我们依然使用模拟器，用真机的话是看不到具体的回调函数名的），当进入断点以后，我们首先在控制台打印 po [NSRunLoop mainRunLoop]。然后在 main run loop 的 kCFRunLoopDefaultMode、UITrackingRunLoopMode、kCFRunLoopCommonModes 模式下都有同一个回调函数是 \_UIGestureRecognizerUpdateObserver 的 CFRunLoopObserver，其 activities 值为 0x20（十进制 32），表示只监听 main run loop 的 kCFRunLoopBeforeWaiting = (1UL << 5) 状态。
+```c++
+...
+observers = (
+...
+"<CFRunLoopObserver 0x600001bd8320 [0x7fff80617cb0]>{valid = Yes, activities = 0x20, repeats = Yes, order = 0, callout = _UIGestureRecognizerUpdateObserver (0x7fff47c2f06a), context = <CFRunLoopObserver context 0x6000001dc7e0>}",
+...
+)
+...
+```
+&emsp;可知该 CFRunLoopObserver 监听 main run loop 的 kCFRunLoopBeforeWaiting 事件。每当 main run loop 即将休眠时，该 CFRunLoopObserver 被触发，同时调用回调函数 \_UIGestureRecognizerUpdateObserver。\_UIGestureRecognizerUpdateObserver 会检测当前需要被更新状态的 UIGestureRecognizer（创建，触发，销毁）。
+
+> &emsp;如果有手势被触发，在 \_UIGestureRecognizerUpdateObserver 回调中会借助 UIKit 一个内部类 UIGestureEnvironment 来进行一系列处理。
+&emsp;其中会向 APP 的 event queue 中投递一个 gesture event，这个 gesture event 的处理流程应该和上面的事件处理类似的，内部会调用 \__handleEventQueueInternal 处理该 gesture event，并通过 UIKit 内部类 UIGestureEnvironment 来处理这个 gesture event，并最终回调到我们自己所写的 gesture 回调中。[iOS RunLoop完全指南](https://blog.csdn.net/u013378438/article/details/80239686)
+
+&emsp;看一下函数调用栈，验证上面大佬的结论。
+```c++
+(lldb) bt
+* thread #1, queue = 'com.apple.main-thread', stop reason = breakpoint 2.1
+  * frame #0: 0x00007fff47c2f06a UIKitCore`_UIGestureRecognizerUpdateObserver // ⬅️ main run loop 的 CFRunLoopObserver 执行其 _UIGestureRecognizerUpdateObserver 回调
+    frame #1: 0x00007fff23bd3867 CoreFoundation`__CFRUNLOOP_IS_CALLING_OUT_TO_AN_OBSERVER_CALLBACK_FUNCTION__ + 23 // ⬅️ CFRunLoopObserver 执行
+    frame #2: 0x00007fff23bce2fe CoreFoundation`__CFRunLoopDoObservers + 430
+    frame #3: 0x00007fff23bce97a CoreFoundation`__CFRunLoopRun + 1514
+    frame #4: 0x00007fff23bce066 CoreFoundation`CFRunLoopRunSpecific + 438
+    frame #5: 0x00007fff384c0bb0 GraphicsServices`GSEventRunModal + 65
+    frame #6: 0x00007fff48092d4d UIKitCore`UIApplicationMain + 1621
+    frame #7: 0x000000010201a8fd Simple_iOS`main(argc=1, argv=0x00007ffeedbe5d60) at main.m:76:12
+    frame #8: 0x00007fff5227ec25 libdyld.dylib`start + 1
+(lldb) bt
+* thread #1, queue = 'com.apple.main-thread', stop reason = breakpoint 1.1
+  * frame #0: 0x0000000102019dd0 Simple_iOS`-[ViewController tapSelector](self=0x00007ff95af0fdb0, _cmd="tapSelector") at ViewController.m:415:27 // ⬅️ 执行我们的手势回调 tapSelector 
+    frame #1: 0x00007fff47c3a347 UIKitCore`-[UIGestureRecognizerTarget _sendActionWithGestureRecognizer:] + 44
+    frame #2: 0x00007fff47c4333d UIKitCore`_UIGestureRecognizerSendTargetActions + 109
+    frame #3: 0x00007fff47c409ea UIKitCore`_UIGestureRecognizerSendActions + 298
+    frame #4: 0x00007fff47c3fd17 UIKitCore`-[UIGestureRecognizer _updateGestureForActiveEvents] + 757
+    frame #5: 0x00007fff47c31eda UIKitCore`_UIGestureEnvironmentUpdate + 2706
+    frame #6: 0x00007fff47c3140a UIKitCore`-[UIGestureEnvironment _deliverEvent:toGestureRecognizers:usingBlock:] + 467
+    frame #7: 0x00007fff47c3117f UIKitCore`-[UIGestureEnvironment _updateForEvent:window:] + 200
+    frame #8: 0x00007fff480d04b0 UIKitCore`-[UIWindow sendEvent:] + 4574 // ⬅️ UIWindow
+    frame #9: 0x00007fff480ab53b UIKitCore`-[UIApplication sendEvent:] + 356 // ⬅️ UIApplication
+    frame #10: 0x0000000102578bd4 UIKit`-[UIApplicationAccessibility sendEvent:] + 85
+    frame #11: 0x00007fff4812c71a UIKitCore`__dispatchPreprocessedEventFromEventQueue + 6847
+    frame #12: 0x00007fff4812f1e0 UIKitCore`__handleEventQueueInternal + 5980 // ⬅️ 处理该 gesture event
+    frame #13: 0x00007fff23bd4471 CoreFoundation`__CFRUNLOOP_IS_CALLING_OUT_TO_A_SOURCE0_PERFORM_FUNCTION__ + 17 // ⬅️ source0 回调
+    frame #14: 0x00007fff23bd439c CoreFoundation`__CFRunLoopDoSource0 + 76
+    frame #15: 0x00007fff23bd3bcc CoreFoundation`__CFRunLoopDoSources0 + 268
+    frame #16: 0x00007fff23bce87f CoreFoundation`__CFRunLoopRun + 1263
+    frame #17: 0x00007fff23bce066 CoreFoundation`CFRunLoopRunSpecific + 438
+    frame #18: 0x00007fff384c0bb0 GraphicsServices`GSEventRunModal + 65
+    frame #19: 0x00007fff48092d4d UIKitCore`UIApplicationMain + 1621
+    frame #20: 0x000000010201a8fd Simple_iOS`main(argc=1, argv=0x00007ffeedbe5d60) at main.m:76:12
+    frame #21: 0x00007fff5227ec25 libdyld.dylib`start + 1
+(lldb)
+```
+## 界面刷新
+> &emsp;当在操作 UI 时，比如改变了 Frame、更新了 UIView/CALayer 的层次时，或者手动调用了 UIView/CALayer 的 setNeedsLayout/setNeedsDisplay 方法后，这个 UIView/CALayer 就被标记为待处理，并被提交到一个全局的容器去。
+> 
+> &emsp;苹果注册了一个 Observer 监听 BeforeWaiting(即将进入休眠) 和 Exit (即将退出 Loop) 事件，回调去执行一个很长的函数：\_ZN2CA11Transaction17observer_callbackEP19__CFRunLoopObservermPv()。这个函数里会遍历所有待处理的 UIView/CAlayer 以执行实际的绘制和调整，并更新 UI 界面。
+> 
+> &emsp;这个函数内部的调用栈大概是这样的：
+```c++
+_ZN2CA11Transaction17observer_callbackEP19__CFRunLoopObservermPv()
+QuartzCore:CA::Transaction::observer_callback:
+    CA::Transaction::commit();
+        CA::Context::commit_transaction();
+            CA::Layer::layout_and_display_if_needed();
+                CA::Layer::layout_if_needed();
+                    [CALayer layoutSublayers];
+                        [UIView layoutSubviews];
+                CA::Layer::display_if_needed();
+                    [CALayer display];
+                        [UIView drawRect];
+```
+&emsp;在控制台打印 main run loop，在其 kCFRunLoopDefaultMode、UITrackingRunLoopMode、kCFRunLoopCommonModes 模式下都有同一个回调函数是 \_ZN2CA11Transaction17observer_callbackEP19__CFRunLoopObservermPv 的 CFRunLoopObserver，其 activities 值为 0xa0（kCFRunLoopBeforeWaiting | kCFRunLoopExit），表示只监听 main run loop 的休眠前和退出状态。其 order = 2000000 比上面的手势识别的 order = 0 的 CFRunLoopObserver 的优先级要低。
+```c++
+    "<CFRunLoopObserver 0x600001bd88c0 [0x7fff80617cb0]>{valid = Yes, activities = 0xa0, repeats = Yes, order = 2000000, callout = _ZN2CA11Transaction17observer_callbackEP19__CFRunLoopObservermPv (0x7fff2b0c046e), context = <CFRunLoopObserver context 0x0>}"
+```
+> &emsp;当我们需要界面刷新，如 UIView/CALayer 调用了 setNeedsLayout/setNeedsDisplay，或更新了 UIView 的 frame，或 UI 层次。 
+其实，系统并不会立刻就开始刷新界面，而是先提交 UI 刷新请求，再等到下一次 main run loop 循环时，集中处理（集中处理的好处在于可以合并一些重复或矛盾的 UI 刷新）。而这个实现方式，则是通过监听 main run loop 的 before waitting 和 Exit 通知实现的。
+
+&emsp;\_ZN2CA11Transaction17observer_callbackEP19__CFRunLoopObservermPv 内部会调用 CA::Transaction::observer_callback(__CFRunLoopObserver*, unsigned long, void*) 在该函数中，会将所有的界面刷新请求提交，刷新界面，以及调用相关回调。
+```c++
+(lldb) bt
+* thread #1, queue = 'com.apple.main-thread', stop reason = breakpoint 1.1
+  * frame #0: 0x00007fff2b0c046e QuartzCore`CA::Transaction::observer_callback(__CFRunLoopObserver*, unsigned long, void*)
+    frame #1: 0x00007fff23bd3867 CoreFoundation`__CFRUNLOOP_IS_CALLING_OUT_TO_AN_OBSERVER_CALLBACK_FUNCTION__ + 23
+    frame #2: 0x00007fff23bce2fe CoreFoundation`__CFRunLoopDoObservers + 430
+    frame #3: 0x00007fff23bce97a CoreFoundation`__CFRunLoopRun + 1514
+    frame #4: 0x00007fff23bce066 CoreFoundation`CFRunLoopRunSpecific + 438
+    frame #5: 0x00007fff384c0bb0 GraphicsServices`GSEventRunModal + 65
+    frame #6: 0x00007fff48092d4d UIKitCore`UIApplicationMain + 1621
+    frame #7: 0x00000001019348fd Simple_iOS`main(argc=1, argv=0x00007ffeee2cbd60) at main.m:76:12
+    frame #8: 0x00007fff5227ec25 libdyld.dylib`start + 1
+(lldb) 
+```
 ## 卡顿监测
 &emsp;卡顿的呈现方式大概可以理解为我们触摸屏幕时系统回馈不及时或者连续滑动屏幕时肉眼可见的掉帧，回归到程序层面的话可知这些感知的来源都是主线程，而分析有没有卡顿发生则可以从主线程的 run loop 入手，可以通过监听 main run loop 的活动变化，从而发现主线程的调用方法堆栈中是否某些方法执行时间过长而导致了 run loop 循环周期被拉长继而发生了卡顿，所以监测卡顿的方案是：**通过监控 main run loop 从 kCFRunLoopBeforeSources（或者 kCFRunLoopBeforeTimers） 到 kCFRunLoopAfterWaiting  的活动变化所用时间是否超过了我们预定的阈值进而判断是否出现了卡顿，当出现卡顿时可以读出当前函数调用堆栈帮助我们来分析代码问题。**
-
 ```c++
 #import "HCCMonitor.h"
 #include <mach/mach_time.h>
 
 @interface HCCMonitor () {
+    // 往主线程添加一个 CFRunLoopObserverRef
     CFRunLoopObserverRef runLoopObserver;
 }
 
@@ -395,6 +499,7 @@ entries =>
 
 @implementation HCCMonitor
 
+// 单例
 + (instancetype)shareInstance {
     static HCCMonitor *instance = nil;
     static dispatch_once_t onceToken;
@@ -405,6 +510,7 @@ entries =>
     return instance;
 }
 
+// 开始监听
 - (void)beginMonitor {
     if (runLoopObserver) {
         return;
@@ -421,7 +527,8 @@ entries =>
     dispatch_async(dispatch_get_global_queue(0, 0), ^{
         while (YES) {
             long semaphoreWait = dispatch_semaphore_wait(self.dispatchSemaphore, dispatch_time(DISPATCH_TIME_NOW, 20 * NSEC_PER_MSEC));
-            // semaphoreWait 值不为 0，表示 semaphoreWait 等待超时了
+            
+            // 当 semaphoreWait 值不为 0 时，表示 semaphoreWait 等待时间超过了 dispatch_time(DISPATCH_TIME_NOW, 20 * NSEC_PER_MSEC)
             if (semaphoreWait != 0) {
                 if (!self->runLoopObserver) {
                     self.timeoutCount = 0;
@@ -430,20 +537,30 @@ entries =>
                     return ;
                 }
                 
+                // 监测 kCFRunLoopBeforeSources 或者 kCFRunLoopAfterWaiting 两个活动状态变化，即一旦发现进入睡眠前的 kCFRunLoopBeforeSources 状态，
+                // 或者唤醒后的状态 kCFRunLoopAfterWaiting，在设置的时间阈值内一直没有变化，即可判定为卡顿。
+    
+                // 在 run loop 的本次循环中，从 kCFRunLoopBeforeSources 到 kCFRunLoopBeforeWaiting 处理了 source/timer/block 的事情，如果时间花的太长必然导致主线程卡顿。
+                // 从 kCFRunLoopBeforeWaiting 到 kCFRunLoopAfterWaiting 状态，如果本次唤醒花了太多时间也会必然造成卡顿。
+                
                 if (self.runLoopActivity == kCFRunLoopBeforeSources || self.runLoopActivity == kCFRunLoopAfterWaiting) {
                     if (++self.timeoutCount < 3) {
                         continue;
                     }
                     
-                    NSLog(@"🔠🔠🔠 卡顿发生...");
+                    // 如果连续超过了 3 次则表示监测到卡顿 
+                    NSLog(@"🔠🔠🔠 卡顿发生了...");
+                    // 打印当前的函数堆栈，（也可直接上传到服务器，方便我们统计分析原因）
+                    NSLog(@"🗂🗂 %@", [NSThread callStackSymbols]);
                 }
             }
-            
+
             self.timeoutCount = 0;
         } // end while
     });
 }
 
+// 结束监听
 - (void)endMonitor {
     if (!runLoopObserver) {
         return;
@@ -455,20 +572,24 @@ entries =>
 }
 
 int count = 0;
+// runLoopObserver 的回调事件
 static void runLoopObserverCallBack(CFRunLoopObserverRef observer, CFRunLoopActivity activity, void *info) {
     HCCMonitor *lagMonitor = (__bridge HCCMonitor *)info;
+    
+    // 记录 main run loop 本次活动状态变化
     lagMonitor.runLoopActivity = activity;
-    
+    // 向子线程 while 循环中的 self.dispatchSemaphore 发送信号，结束等待继续向下执行
+    dispatch_semaphore_signal(lagMonitor.dispatchSemaphore);
+
+    // 下面是一些不同状态变化之间的时间跨度打印，可以帮助我们观察。
     ++count;
-    
     static uint64_t beforeTimersTSR = 0;
     static uint64_t beforeSourcesTSR = 0;
     static uint64_t beforeWaitingTSR = 0;
     static uint64_t afterWaitingTSR = 0;
     
-    //    uint64_t ns_at = (uint64_t)((__CFTSRToTimeInterval(beforeTimersTSR)) * 1000000000ULL);
-    
-    //    NSLog(@"✳️✳️✳️ beforeTimersTSR %llu", beforeTimersTSR);
+    // uint64_t ns_at = (uint64_t)((__CFTSRToTimeInterval(beforeTimersTSR)) * 1000000000ULL);
+    // NSLog(@"✳️✳️✳️ beforeTimersTSR %llu", beforeTimersTSR);
     
     switch (activity) {
         case kCFRunLoopEntry:
@@ -478,31 +599,23 @@ static void runLoopObserverCallBack(CFRunLoopObserverRef observer, CFRunLoopActi
         case kCFRunLoopBeforeTimers:
             NSLog(@"⏳ - %d kCFRunLoopBeforeTimers 即将处理 timers", count);
             beforeTimersTSR = mach_absolute_time();
-            
-//            NSLog(@"🔂 AfterWaiting~Timer: %llu", beforeTimersTSR - afterWaitingTSR);
-            
+            // NSLog(@"🔂 AfterWaiting~Timer: %llu", beforeTimersTSR - afterWaitingTSR);
             break;
         case kCFRunLoopBeforeSources:
             NSLog(@"💦 - %d kCFRunLoopBeforeSources 即将处理 sources", count);
             beforeSourcesTSR = mach_absolute_time();
-            
-//            NSLog(@"🔂 Timer~Source: %llu", beforeSourcesTSR - beforeTimersTSR);
-            
+            // NSLog(@"🔂 Timer~Source: %llu", beforeSourcesTSR - beforeTimersTSR);
             break;
         case kCFRunLoopBeforeWaiting:
             count = 0; // 每次 run loop 即将进入休眠时，count 置为 0，可表示一轮 run loop 循环结束
             NSLog(@"🛏 - %d kCFRunLoopBeforeWaiting 即将进入休眠", count);
             beforeWaitingTSR = mach_absolute_time();
-            
-//            NSLog(@"🔂 Source~BeforeWaiting %llu", beforeWaitingTSR - beforeSourcesTSR);
-            
+            // NSLog(@"🔂 Source~BeforeWaiting %llu", beforeWaitingTSR - beforeSourcesTSR);
             break;
         case kCFRunLoopAfterWaiting:
             NSLog(@"🦍 - %d kCFRunLoopAfterWaiting 即将从休眠中醒来", count);
             afterWaitingTSR = mach_absolute_time();
-            
-//            NSLog(@"🔂 BeforeWaiting~AfterWaiting: %llu", afterWaitingTSR - beforeWaitingTSR);
-            
+            // NSLog(@"🔂 BeforeWaiting~AfterWaiting: %llu", afterWaitingTSR - beforeWaitingTSR);
             break;
         case kCFRunLoopExit:
             count = 0;
@@ -512,18 +625,15 @@ static void runLoopObserverCallBack(CFRunLoopObserverRef observer, CFRunLoopActi
             NSLog(@"🤫 kCFRunLoopAllActivities");
             break;
     }
-    
-    dispatch_semaphore_t semaphore = lagMonitor.dispatchSemaphore;
-    dispatch_semaphore_signal(semaphore);
 }
 
 @end
 ```
+&emsp;首先给 main run loop 添加一个 CFRunLoopObserverRef runLoopObserver 来帮助我们监听主线程的活动状态变化，然后创建一条子线程在子线程里面用一个死循环 while(YES) 来等待着主线程的状态变化，等待的方式是在子线程的 while 循环内部用 `long dispatch_semaphore_wait(dispatch_semaphore_t dsema, dispatch_time_t timeout)` 函数，它的 timeout 参数刚好可以设置一个我们想要观察的 main run loop 的不同的活动状态变化之间的时间长度，当 dispatch_semaphore_wait 函数返回非 0 值时表示等待的时间超过了 timeout，所以我们只需要关注 dispatch_semaphore_wait 函数返回非 0 值的情况。我们使用 HCCMonitor 的单例对象在 runLoopObserver 的回调函数和子线程之间进行 "传值"，当 runLoopObserver 的回调函数执行时我们调用 dispatch_semaphore_signal 函数结束子线程 while 循环中的 dispatch_semaphore_wait 等待，同时使用单例对象的 runLoopActivity 成员变量记录 main run loop 本次变化的活动状态值，然后如果子线程的 while 循环中连续三次出现 kCFRunLoopBeforeSources 或者  kCFRunLoopAfterWaiting 状态变化等待超时了，那么就可认为是主线程卡顿了。
 
+&emsp;监测 kCFRunLoopBeforeSources 或者 kCFRunLoopAfterWaiting 两个活动状态变化，即一旦发现进入睡眠前的 kCFRunLoopBeforeSources 状态，或者唤醒后的状态 kCFRunLoopAfterWaiting，在设置的时间阈值内一直没有变化，即可判定为卡顿。
 
-
-
-
+&emsp;在 run loop 的本次循环中，从 kCFRunLoopBeforeSources 到 kCFRunLoopBeforeWaiting 处理了 source/timer/block 的事情，如果时间花的太长必然导致主线程卡顿。从 kCFRunLoopBeforeWaiting 到 kCFRunLoopAfterWaiting 状态，如果本次唤醒花了太多时间也会必然造成卡顿。
 ## 参考链接
 **参考链接:🔗**
 + [runloop 源码](https://opensource.apple.com/tarballs/CF/)
@@ -555,3 +665,4 @@ static void runLoopObserverCallBack(CFRunLoopObserverRef observer, CFRunLoopActi
 + [Objective-C的AutoreleasePool与Runloop的关联](https://blog.csdn.net/zyx196/article/details/50824564)
 + [iOS开发-Runloop中自定义输入源Source](https://blog.csdn.net/shengpeng3344/article/details/104518051)
 + [IOHIDFamily](http://iphonedevwiki.net/index.php/IOHIDFamily)
++ [iOS卡顿监测方案总结](https://juejin.cn/post/6844903944867545096)
