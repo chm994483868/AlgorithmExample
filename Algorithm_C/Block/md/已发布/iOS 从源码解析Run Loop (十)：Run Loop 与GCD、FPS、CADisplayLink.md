@@ -31,7 +31,9 @@
 
 &emsp;下面我们看一下 GCD 中使用到 Run Loop 的地方。
 
-&emsp;当调用 dispatch_async(dispatch_get_main_queue(), block) 时，libDispatch 会向主线程的 run loop 发送消息，run loop 会被唤醒，并从消息中取得这个 block，并在回调 \_\_CFRUNLOOP_IS_SERVICING_THE_MAIN_DISPATCH_QUEUE\_\_ 里执行这个 block。但这个逻辑仅限于 dispatch 到主线程，dispatch 到其他线程仍然是由 libDispatch 处理的。
+&emsp;当调用 dispatch_async(dispatch_get_main_queue(), block) 时，libDispatch 会向主线程的 run loop 发送消息，run loop 会被唤醒，并从消息中取得这个 block，并在回调 \_\_CFRUNLOOP_IS_SERVICING_THE_MAIN_DISPATCH_QUEUE\_\_ 里执行这个 block。但这个逻辑仅限于 dispatch 到主线程，dispatch 到其他线程仍然是由 libDispatch 处理的。为什么子线程没有这个和 GCD 交互的逻辑？原因有二：
+1. 主线程 run loop 是主线程的事件管理者。run loop 负责何时让 run loop 处理何种事件。所有分发给主线程的任务必须统一交给主线程 run loop 排队处理。举例：UI 操作只能在主线程，不在主线程操作 UI 会带来很多 UI 错乱问题以及 UI 更新延迟问题。
+2. 子线程不接受 GCD 的交互。因为子线程不一定开启了 run loop。
 
 &emsp;上面一段结论我们在梳理 \__CFRunLoopRun 函数流程时已经看的一清二楚了。如函数开始时判断当前是否是主线程来获取主队列的 port 并赋值给 dispatchPort，然后在 run loop 本次循环中判断唤醒来源是 dispatchPort 时，执行添加到主队列中的任务（_dispatch_main_queue_drain）。
 ```c++
