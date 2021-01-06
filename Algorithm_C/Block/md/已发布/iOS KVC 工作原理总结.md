@@ -167,14 +167,14 @@ NSLog(@"📢📢 %@", [self.student valueForKeyPath:@"array"]);
 
 &emsp;好了 NSKeyValueCoding 的内容我们差不多看完了，下面我们接着看 Key-Value Coding Programming Guide 文档。
 ### Using Key-Value Coding Compliant Objects（使用键值编码兼容对象）
-&emsp;对象通常在继承 `NSObject`（直接或间接）时也会拥有 key-value coding 能力，因为 NSObject 采用 `NSKeyValueCoding` 协议并为基本方法提供默认实现（实际是 NSObject + NSKeyValueCoding 分类默认实现了 Key-Value Coding 使用的基本方法）。此类对象允许其他对象通过紧凑的消息传递接口执行以下操作：
-+ **访问对象属性。** 该协议指定方法，例如泛型 getter 函数：`valueForKey:` 和泛型 setter 函数：`setValue:forKey:`，用于通过名称或键（参数化为字符串）访问对象属性。这些方法和相关方法的默认实现使用键来定位基础数据并与之交互，如 **Accessing Object Properties** 中所述。
-+ **操作集合属性。** 访问方法的默认实现与对象的集合属性（例如 `NSArray` 对象）一起使用，就像其他任何属性一样。此外，如果对象为属性定义了集合访问器方法，则它将启用对集合内容的键值访问。这通常比直接访问更有效，并允许您通过标准化的接口处理自定义集合对象，如 **Accessing Collection Properties** 中所述。
-+ **在集合对象上调用集合运算符。** 访问 key-value coding 兼容对象中的集合属性时，可以将集合运算符插入键字符串，如 **Using Collection Operators** 中所述。集合运算符指示默认的 `NSKeyValueCoding` getter 实现对集合执行操作，然后返回新的、经过筛选的集合版本，或者返回表示集合某些特征的单个值（平均值、总和等）。
-+ **访问非对象属性。** 协议的默认实现检测非对象属性，包括标量（scalars，int/float 等）和结构（structures），并自动将它们包装和展开为对象，以便在协议接口上使用，如 **Representing Non-Object Values** 中所述。此外，该协议声明了一种方法（setNilValueForKey:），允许兼容对象在通过键值编码接口对非对象属性设置 `nil` 值时提供适当的操作。 
+&emsp;对象通常在继承 NSObject（直接或间接）时也会拥有 key-value coding 能力，因为 NSObject 采用 NSKeyValueCoding 协议并为基本方法提供默认实现（实际是 NSObject + NSKeyValueCoding 分类默认实现了 Key-Value Coding 使用的基本方法）。此类对象允许其他对象通过紧凑的消息传递接口执行以下操作：
++ **访问对象属性。** 该协议指定方法，例如泛型 getter 函数：valueForKey: 和泛型 setter 函数：setValue:forKey:，用于通过名称或键（参数化为字符串）访问对象属性。这些方法和相关方法的默认实现使用键来定位基础数据并与之交互，如 **Accessing Object Properties** 中所述。
++ **操作集合属性。** 访问方法的默认实现与对象的集合属性（例如 NSArray` 对象）一起使用，就像其他任何属性一样。此外，如果对象为属性定义了集合访问器方法，则它将启用对集合内容的键值访问。这通常比直接访问更有效，并允许您通过标准化的接口处理自定义集合对象，如 **Accessing Collection Properties** 中所述。
++ **在集合对象上调用集合运算符。** 访问 key-value coding 兼容对象中的集合属性时，可以将集合运算符插入键字符串，如 **Using Collection Operators** 中所述。集合运算符指示默认的 NSKeyValueCoding getter 实现对集合执行操作，然后返回新的、经过筛选的集合版本，或者返回表示集合某些特征的单个值（平均值、总和等）。
++ **访问非对象属性。** 协议的默认实现检测非对象属性，包括标量（scalars，int/float 等）和结构（structures），并自动将它们包装和展开为对象，以便在协议接口上使用，如 **Representing Non-Object Values** 中所述。此外，该协议声明了一种方法（setNilValueForKey:），允许兼容对象在通过键值编码接口对非对象属性设置 nil 值时提供适当的操作。 
 + **通过键路径访问属性。** 当你具有与 key-value coding 兼容的对象的层次结构时，可以使用基于键路径的方法调用来通过单个调用在层次结构内深入（直到最终目标），获取或设置值。（即沿着 @"xxx.xx.x" 一路向下）
 ### Adopting Key-Value Coding for an Object（为对象采用键值编码）
-&emsp;为了使你自己的对象符合键值编码的要求，请确保它们采用 `NSKeyValueCoding` 非正式协议并实现相应的方法，例如 `valueForKey:` 作为通用 getter 和 `setValue:forKey:` 作为通用 setter。幸运的是，如上所述，NSObject 采用了此协议，并为这些和其他必要方法提供了默认实现。因此，如果你从 NSObject（或者其许多子类中的任何一个）派生对象，则许多工作已经为你完成。（实现接口都在 NSObject + NSKeyValueCoding 分类中）
+&emsp;为了使你自己的对象符合键值编码的要求，请确保它们采用 NSKeyValueCoding 非正式协议并实现相应的方法，例如 valueForKey: 作为通用 getter 和 setValue:forKey: 作为通用 setter。幸运的是，如上所述，NSObject 采用了此协议，并为这些和其他必要方法提供了默认实现。因此，如果你从 NSObject（或者其许多子类中的任何一个）派生对象，则许多工作已经为你完成。（实现接口都在 NSObject + NSKeyValueCoding 分类中）
 
 &emsp;为了使默认方法完成它们的工作，需要确保对象的访问器方法和实例变量遵循某些定义良好的（明确的）模式。这允许默认实现根据键值编码的消息查找对象的属性。然后，你可以选择通过提供验证方法和处理某些特殊情况的方法来扩展和自定义键值编码
 ### Key-Value Coding with Swift
@@ -223,7 +223,27 @@ NSLog(@"📢📢 %@", [self.student valueForKeyPath:@"array"]);
 
 &emsp;例如，假定 Person 和 Address 类也符合键值编码，则应用于银行帐户实例的键路径 owner.address.street 指的是存储在银行帐户所有者地址中的街道字符串的值。
 
-> &emsp;NOTE: 在 Swift 中，可以使用 #keyPath 表达式，而不是使用字符串来指示键或键路径。这提供了编译时检查的优势，如使用 Swift 与 Cocoa 和 Objective-C（swift3）指南的键和键路径部分所述。
+> &emsp;NOTE: 在 Swift 中，你可以使用 #keyPath 表达式，而不是使用字符串来指示键或键路径。正如 Using Swift with Cocoa and Objective-C (Swift 3) guide 中的 “键和键路径” 部分所述，这提供了编译时检查的优势。
+### Getting Attribute Values Using Keys（使用键获取属性值）
+&emsp;当一个对象采用 NSKeyValueCoding 协议时，它符合键值编码要求。从 NSObject 继承的对象提供了协议基本方法的默认实现，它自动采用具有某些默认行为的协议。此类对象至少实现以下基本的基于键的 getters：
++ `valueForKey:` - 返回由键参数命名的属性的值。如果根据 Accessor Search Patterns 中描述的规则找不到由键命名的属性，则对象会向自己发送一个 `valueForUndefinedKey:` 消息。`valueForUndefinedKey:` 的默认实现引发了 NSUndefinedKeyException，但是子类可以重写此行为并更优雅地处理这种情况。 
++ `valueForKeyPath:` - 返回相对于 receiver 的指定键路径的值。键路径序列中的任何对象，如果对特定键不兼容键值编码，即 `valueForKey:` 的默认实现找不到访问器方法，都会收到 `valueForUndefinedKey:` 消息。
++ `dictionaryWithValuesForKeys:` - 返回相对于 receiver 的键数组的值。该方法为数组中的每个键调用 `valueForKey:`。返回的 NSDictionary 包含数组中所有键的值。
+> &emsp;NOTE: 集合对象（如 NSArray、NSSet 和 NSDictionary）不能包含 nil 作为值。相反，可以使用 NSNull 对象表示 nil 值。NSNull 提供表示对象属性的 nil 值的单个实例。`dictionaryWithValuesForKeys:` 和相关 `setValuesForKeysWithDictionary:` 的默认实现会自动在 NSNull（在 dictionary 参数中）和 nil（在存储的属性中）之间进行转换。
+
+&emsp;使用键路径寻址属性时，如果键路径中除最后一个键以外的任何键是一个一对多关系（即它引用了一个集合），则返回的值是一个集合，其中包含一对多键右侧键的所有值。例如，请求键路径的 transactions.payee 返回一个数组，其中包含所有 transactions 的所有 payee 对象。这也适用于键路径中的多个数组。键路径 accounts.transactions.payee 返回一个数组，其中包含所有 accounts 中所有 transactions 的所有 payee 对象。
+### Setting Attribute Values Using Keys（使用键设置属性值）
+&emsp;
+
+
+
+
+
+
+
+
+
+
 
 
 
