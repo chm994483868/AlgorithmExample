@@ -413,7 +413,7 @@
 		D21287CC25983A89005A744C /* iOS 从源码解析Run Loop (八)：Run Loop 与 AutoreleasePool、NSTimer、PerformSelector 系列函数.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 从源码解析Run Loop (八)：Run Loop 与 AutoreleasePool、NSTimer、PerformSelector 系列函数.md"; sourceTree = "<group>"; };
 		D21287D6259C5CC5005A744C /* iOS 从源码解析Run Loop (九)：Run Loop 与事件响应、手势识别、屏幕刷新、卡顿监测.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 从源码解析Run Loop (九)：Run Loop 与事件响应、手势识别、屏幕刷新、卡顿监测.md"; sourceTree = "<group>"; };
 		D21287E225A2AAC4005A744C /* iOS 从源码解析Run Loop (十)：Run Loop 与GCD、FPS、CADisplayLink.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 从源码解析Run Loop (十)：Run Loop 与GCD、FPS、CADisplayLink.md"; sourceTree = "<group>"; };
-		D21287E325A459A3005A744C /* iOS KVC 工作原理总结.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS KVC 工作原理总结.md"; sourceTree = "<group>"; };
+		D21287E325A459A3005A744C /* iOS KVC 官方文档《Key-Value Coding Programming Guide》中文翻译.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS KVC 官方文档《Key-Value Coding Programming Guide》中文翻译.md"; sourceTree = "<group>"; };
 		D21287E425A45A05005A744C /* iOS KVO 工作原理总结.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS KVO 工作原理总结.md"; sourceTree = "<group>"; };
 		D21287E525A45A3E005A744C /* iOS 响应者链工作原理总结.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 响应者链工作原理总结.md"; sourceTree = "<group>"; };
 		D21287E625A45A95005A744C /* iOS 消息转发工作原理总结.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 消息转发工作原理总结.md"; sourceTree = "<group>"; };
@@ -1423,7 +1423,7 @@
 				D21287CC25983A89005A744C /* iOS 从源码解析Run Loop (八)：Run Loop 与 AutoreleasePool、NSTimer、PerformSelector 系列函数.md */,
 				D21287D6259C5CC5005A744C /* iOS 从源码解析Run Loop (九)：Run Loop 与事件响应、手势识别、屏幕刷新、卡顿监测.md */,
 				D21287E225A2AAC4005A744C /* iOS 从源码解析Run Loop (十)：Run Loop 与GCD、FPS、CADisplayLink.md */,
-				D21287E325A459A3005A744C /* iOS KVC 工作原理总结.md */,
+				D21287E325A459A3005A744C /* iOS KVC 官方文档《Key-Value Coding Programming Guide》中文翻译.md */,
 				D21287E425A45A05005A744C /* iOS KVO 工作原理总结.md */,
 				D21287E525A45A3E005A744C /* iOS 响应者链工作原理总结.md */,
 				D21287E625A45A95005A744C /* iOS 消息转发工作原理总结.md */,
