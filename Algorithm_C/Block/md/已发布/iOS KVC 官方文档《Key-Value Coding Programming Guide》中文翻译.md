@@ -783,11 +783,27 @@ if (![person validateValue:&name forKey:@"name" error:&error]) {
     return YES;
 }
 ```
+### Validation of Scalar Values
+&emsp;验证方法期望 value 参数是一个对象，因此，非对象属性的值被包装在 NSValue 或 NSNumber 对象中，如 Representing Non-Object Values 中所述。Listing 11-2 中的示例演示了标量属性 age 的验证方法。在这种情况下，通过创建设置为零的有效值并返回 YES 来处理一个潜在的无效条件，即 nil age 值。你还可以在 setNilValueForKey: 重载中处理这个特定条件，因为类的用户可能不会调用验证方法。
 
-
-
-
-
+&emsp;Listing 11-2 Validation method for a scalar property
+```c++
+- (BOOL)validateAge:(id *)ioValue error:(NSError * __autoreleasing *)outError {
+    if (*ioValue == nil) {
+        // Value is nil: Might also handle in setNilValueForKey
+        *ioValue = @(0);
+    } else if ([*ioValue floatValue] < 0.0) {
+        if (outError != NULL) {
+            *outError = [NSError errorWithDomain:PersonErrorDomain
+                                            code:PersonInvalidAgeCode
+                                        userInfo:@{ NSLocalizedDescriptionKey
+                                                    : @"Age cannot be negative" }];
+        }
+        return NO;
+    }
+    return YES;
+}
+```
 ## Describing Property Relationships（描述属性关系）
 &emsp;类描述提供了一种方法来描述类中的一个或多个属性。通过定义类属性之间的这些关系，可以使用键值编码对这些属性进行更智能、更灵活的操作。
 ### Class Descriptions
@@ -802,7 +818,11 @@ if (![person validateValue:&name forKey:@"name" error:&error]) {
 &emsp;通常，通过确保对象继承自 NSObject，然后提供本文档中描述的特定于属性的访问器和相关方法，可以使对象符合键值编码。很少需要重写键值编码访问器的默认实现，例如 valueForKey: 和 setValue:forKey:，或基于键的验证方法，如 validateValue:forKey:。因为这些实现会缓存有关运行时环境的信息以提高效率，所以如果你重写它们以引入自定义逻辑，请确保在返回前调用超类中的默认实现。
 ### Optimizing To-Many Relationships（优化一对多关系）
 &emsp;当实现一对多关系时，在许多情况下，尤其是对于可变集合，访问器的索引形式可显着提高性能。有关更多信息，请参见 Accessing Collection Properties 和 Defining Collection Methods。
-
+## Compliance Checklist
+&emsp;请执行本节中概述的步骤，以确保你的对象符合键值编码。有关详细信息，请参见前面的部分。
+### Attribute and To-One Relationship Compliance（属性和一对一关系合规性）
+&emsp;对于作为属性或一对一关系的每个属性：
+&emsp;实现名为<key>或is<key>的方法，或创建实例变量<key>或<key>。编译器通常在自动合成属性时为您执行此操作。
 
 
 
