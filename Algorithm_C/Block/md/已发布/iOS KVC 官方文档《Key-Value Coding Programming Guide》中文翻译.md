@@ -383,7 +383,6 @@ Table 4-1 Example data for the Transactions objects（Transactions 对象的示�
 | Mortgage | $1,250.00 | Feb 15, 2016 |
 | Mortgage | $1,250.00 | Mar 15, 2016 |
 | Animal Hospital | $600.00 | Jul 15, 2016 |
-
 ### Aggregation Operators
 &emsp;聚合运算符处理一个数组或一组属性，生成反映集合某些方面的单个值。
 #### @avg（求平均值）
@@ -707,17 +706,102 @@ if (![person validateValue:&name forKey:@"name" error:&error]) {
 ### Instance Variables
 &emsp;当某个键值编码访问器方法的默认实现找不到属性的访问器时，它会直接查询其类的 accessInstanceVariablesDirectly 方法，查看该类是否允许直接使用实例变量。默认情况下，该类方法返回 YES，但你可以重写该方法以返回 NO。
 
-&emsp;如果你确实允许使用 ivars，请确保以常规方式命名，并使用带下划线（_）前缀的属性名称。通常，编译器会在自动合成属性时为您执行此操作，但是如果您使用显式的@synthesize指令，则可以自己强制执行此命名：
-
-
-
+&emsp;如果你确实允许使用 ivars，请确保以常规方式命名，并使用带下划线（_）前缀的属性名称。通常，编译器会在自动合成属性时为你执行此操作，但是如果你使用显式的 @synthesize 指令，则可以自己强制执行此命名：
+```c++
+@synthesize title = _title;
+```
+&emsp;在某些情况下，不使用 @synthesis 指令或允许编译器自动合成属性，而是使用 @dynamic 指令通知编译器将在运行时提供 getter 和 setter。这样做可以避免自动合成 getter，这样就可以提供集合访问器，如 Defining Collection Methods 中所述。在这种情况下，你自己声明 ivar 作为接口声明的一部分：
+```c++
+@interface MyObject : NSObject {
+    NSString* _title;
+}
  
+@property (nonatomic) NSString* title;
  
+@end
+```
+
+
+😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻
+## Defining Collection Methods（定义集合方法）
+&emsp;当你使用标准命名约定创建访问器和 ivar 时（如 Achieving Basic Key-Value Coding Compliance 中所述），键值编码协议的默认实现可以根据键值编码消息定位它们。对于表示多个关系的集合对象，这一点与对于其他属性一样正确。但是，如果实现集合访问器方法而不是集合属性的基本访问器，或者除了这些方法之外，还可以：
++ **与 NSArray 或 NSSet 以外的类建立多模型关系。** 在对象中实现集合方法时，键值 getter 的默认实现返回一个代理对象，该代理对象调用这些方法以响应它接收到的后续 NSArray 或 NSSet 消息。底层属性对象不必是 NSArray 或 NSSet 本身，因为代理对象使用你的集合方法提供预期的行为。
++ ****
+😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻
+
+
+## Handling Non-Object Values（处理非对象值）
+&emsp;通常，与键值编码兼容的对象依赖键值编码的默认实现来自动包装和解包非对象属性，如 Representing Non-Object Values 中所述。但是，可以重写默认行为。这样做的最常见原因是处理在非对象属性上存储 nil 值的尝试。
+
+> &emsp;NOTE: 由于 Swift 中的所有属性都是对象，因此本节仅适用于 Objective-C 属性。
+
+&emsp;如果键值编码兼容对象收到 setValue:forKey: 将 nil 作为非对象属性的 value 传递的消息，默认实现没有适当的通用操作过程。因此，它会向自己发送一条 setNilValueForKey: 消息，你可以重写它。setNilValueForKey: 的默认实现引发 NSInvalidArgumentException 异常，但你可以提供适当的、特定于实现的行为。
+
+&emsp;例如，Listing 10-1 中的代码响应了将一个人的年龄设置为 nil 值的尝试，而是将年龄设置为 0，这对于浮点值更合适。请注意，重写方法为它没有显式处理的任何键调用其超类的 setNilValueForKey: 函数。
+ 
+&emsp;Listing 10-1 Example implementation of setNilValueForKey:（setNilValueForKey: 的示例实现）
+```c++
+- (void)setNilValueForKey:(NSString *)key {
+    if ([key isEqualToString:@"age"]) {
+        [self setValue:@(0) forKey:@"age"];
+    } else {
+        [super setNilValueForKey:key];
+    }
+}
+```
+> &emsp;NOTE: 为了向后兼容，当对象重写了不推荐使用的 unableToSetNilForKey: 方法时，setValue:forKey: 调用该方法而不是 setNilValueForKey:。
+
+## Adding Validation
+&emsp;键值编码协议定义了按键或键路径验证属性的方法。这些方法的默认实现反过来依赖于你按照与访问器方法类似的命名模式定义方法。具体来说，你可以为具有要验证的名称键的任何属性提供 validate<Key>:error: 方法。默认实现会搜索这个值，以响应键编码的 validateValue:forKey:error: 消息。
+
+&emsp;如果不为属性提供验证方法，则协议的默认实现假定该属性的验证成功，而不管值是多少。这意味着你选择逐个属性进行验证。
+
+> &emsp;NOTE: 你通常只使用 Objective-C 中描述的验证。在 Swift 中，属性验证更习惯于依赖编译器对选项和强类型检查的支持来处理，同时使用内置的 willSet 和 didSet 属性观察者来测试任何运行时 API contracts，如 The Swift Programming Language (Swift 3) 的 property Observators 部分所述 。
+### Implementing a Validation Method
+&emsp;当你为属性提供验证方法时，该方法通过引用接收两个参数：要验证的值对象和用于返回错误信息的 NSError。因此，你的验证方法可以采取以下三种操作之一：
++ 当值 value 有效时，返回 YES 而不更改 value 或 error。
++ 如果 value 无效，并且你不能或不想提供有效的替代方法，请将 error 参数设置为指示失败原因的 NSError 对象，并返回 NO。
+
+> &emsp;IMPORTANT: 在尝试设置错误引用之前，请始终测试它是否不为 NULL。（判断入参的 NSError 指针不是 nil）
+
++ 如果 value 无效，但知道有效的替代方法，请创建有效对象，将 value 指定给新对象，然后返回 YES 而不修改 error。如果提供另一个值，则始终返回新对象，而不是修改正在验证的对象，即使原始对象是可变的。 
+
+&emsp;Listing 11-1 演示了一个 name string 属性的验证方法，该方法确保 value 对象不是 nil，并且名称是最小长度。如果验证失败，此方法不会替换其他值。
+
+&emsp;Listing 11-1 Validation method for the name property（name 属性的验证方法）
+```c++
+- (BOOL)validateName:(id *)ioValue error:(NSError * __autoreleasing *)outError{
+    if ((*ioValue == nil) || ([(NSString *)*ioValue length] < 2)) {
+        if (outError != NULL) {
+            *outError = [NSError errorWithDomain:PersonErrorDomain
+                                            code:PersonInvalidNameCode
+                                        userInfo:@{ NSLocalizedDescriptionKey
+                                                    : @"Name too short" }];
+        }
+        return NO;
+    }
+    return YES;
+}
+```
 
 
 
 
 
+## Describing Property Relationships（描述属性关系）
+&emsp;类描述提供了一种方法来描述类中的一个或多个属性。通过定义类属性之间的这些关系，可以使用键值编码对这些属性进行更智能、更灵活的操作。
+### Class Descriptions
+&emsp;NSClassDescription 是一个基类，提供获取类元数据的接口。类描述对象记录特定类的对象的可用属性以及该类的对象与其他对象之间的关系（一对一、一对多和反向）。例如，attributeKeys 方法返回为类定义的所有属性的列表；ToAnyRelationshipKeys 和 ToOnRelationshipKeys 方法返回定义多对一关系的键数组；inverseRelationshipKey: 返回从所提供键的关系的目标指向 receiver  的关系的名称。
+
+&emsp;NSClassDescription 不定义用于定义关系的方法。具体的子类必须定义这些方法。一旦创建，你可以使用 NSClassDescription 的 registerClassDescription:forClass: 类方法注册一个类描述。
+
+&emsp;NSScriptClassDescription 是 Cocoa 中提供的 NSClassDescription 的唯一具体子类。它封装了应用程序的脚本信息。
+## Designing for Performance
+&emsp;键值编码是高效的，尤其是当你依靠默认实现来完成大部分工作时，但是它确实添加了一个间接级别，该级别比直接的方法调用稍慢。只有当你可以从它提供的灵活性中获益，或者允许你的对象参与依赖于它的 Cocoa 技术时，才使用键值编码。
+### Overriding Key-Value Coding Methods（覆盖键值编码方法）
+&emsp;通常，通过确保对象继承自 NSObject，然后提供本文档中描述的特定于属性的访问器和相关方法，可以使对象符合键值编码。很少需要重写键值编码访问器的默认实现，例如 valueForKey: 和 setValue:forKey:，或基于键的验证方法，如 validateValue:forKey:。因为这些实现会缓存有关运行时环境的信息以提高效率，所以如果你重写它们以引入自定义逻辑，请确保在返回前调用超类中的默认实现。
+### Optimizing To-Many Relationships（优化一对多关系）
+&emsp;当实现一对多关系时，在许多情况下，尤其是对于可变集合，访问器的索引形式可显着提高性能。有关更多信息，请参见 Accessing Collection Properties 和 Defining Collection Methods。
 
 
 
