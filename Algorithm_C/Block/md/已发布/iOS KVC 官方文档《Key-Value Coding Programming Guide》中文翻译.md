@@ -376,7 +376,14 @@ Table 4-1 Example data for the Transactions objects（Transactions 对象的示�
 | Car Loan | $250.00 | Jan 15, 2016 |
 | Car Loan | $250.00 | Feb 15, 2016 |
 | Car Loan | $250.00 | Mar 15, 2016 |
-| ... | ... | ... |
+| General Cable | $120.00 | Dec 1, 2015 |
+| General Cable | $155.00 | Jan 1, 2016 |
+| General Cable | $120.00 | Feb 1, 2016 |
+| Mortgage | $1,250.00 | Jan 15, 2016 |
+| Mortgage | $1,250.00 | Feb 15, 2016 |
+| Mortgage | $1,250.00 | Mar 15, 2016 |
+| Animal Hospital | $600.00 | Jul 15, 2016 |
+
 ### Aggregation Operators
 &emsp;聚合运算符处理一个数组或一组属性，生成反映集合某些方面的单个值。
 #### @avg（求平均值）
@@ -447,7 +454,277 @@ NSArray *payees = [self.transactions valueForKeyPath:@"@unionOfObjects.payee"];
 
 > &emsp;NOTE: 与 @distinctUnionOfArrays 运算符提供类似的行为，但是删除重复的对象。
 ### Nesting Operators
+&emsp;嵌套运算符对嵌套集合进行操作，其中集合本身的每个条目都包含一个集合。
+
+> &emsp;IMPORTANT: 使用嵌套运算符时，如果任何叶子对象（leaf objects）为 nil，则 valueForKeyPath: 方法将引发异常。
+
+&emsp;对于以下描述，考虑第二个数据数组，称为 moreTransactions，填充 Table 4-2 中的数据，并与原始事务数组（来自 Sample Data 部分）一起收集到一个嵌套数组中：
+```c++
+NSArray* moreTransactions = @[<# transaction data #>]; // Table 4-2 中的数据
+NSArray* arrayOfArrays = @[self.transactions, moreTransactions];
+```
 &emsp;
+Table 4-2 Hypothetical Transaction data in the moreTransactions array（moreTransactions 数组中的假设交易数据）
+| payee values | amount values formatted as currency | date values formatted as month day, year |
+| -- | -- | -- |
+| General Cable - Cottage | $120.00 | Dec 18, 2015 |
+| General Cable - Cottage | $150.00 | Jan 9, 2016 |
+| General Cable - Cottage | $120.00 | Dec 1, 2016 |
+| Second Mortgage | $1,250.00 | Nov 15, 2016 |
+| Second Mortgage | $1,250.00 | Sep 20, 2016 |
+| Second Mortgage | $1,250.00 | Jun 14, 2016 |
+| Hobby Shop | $600.00 | Jun 14, 2016 |
+#### @distinctUnionOfArrays
+&emsp;当指定 @distinctUnionOfArrays 运算符时，valueForKeyPath: 创建并返回一个数组，该数组包含与右键路径指定的属性相对应的所有集合的组合的不同对象。
+
+&emsp;要在 arrayOfArrays 中的所有数组之间获取 payee 属性的不同值：
+```c++
+NSArray *collectedDistinctPayees = [arrayOfArrays valueForKeyPath:@"@distinctUnionOfArrays.payee"];
+```
+&emsp;所得的 collectedDistinctPayees 数组包含以下值：Hobby Shop、Mortgage、Animal Hospital、Second Mortgage、Car Loan、General Cable - Cottage、General Cable、Green Power。
+
+> &emsp;NOTE: 与 @unionOfArrays 运算符提供类似的行为，但不会删除重复的对象。
+#### @unionOfArrays
+&emsp;当指定 @unionOfArrays 运算符时，valueForKeyPath: 创建并返回一个数组，该数组包含与由右键路径指定的属性相对应的所有集合的组合的所有对象，而不会删除重复项。
+
+&emsp;要获取 arrayOfArrays 内所有数组中的 payee 属性值：
+```c++
+NSArray *collectedPayees = [arrayOfArrays valueForKeyPath:@"@unionOfArrays.payee"];
+```
+&emsp;所得的 collectedPayees 数组包含以下值：Green Power、Green Power、Green Power、Car Loan、Car Loan、Car Loan、General Cable、General Cable、General Cable、Mortgage、Mortgage、Mortgage、Animal Hospital、General Cable - Cottage、General Cable - Cottage、General Cable - Cottage、Second Mortgage、Second Mortgage、Second Mortgage、Hobby Shop。
+
+> &emsp;NOTE: 与 @distinctUnionOfArrays 运算符提供类似的行为，但是删除重复的对象。
+#### @distinctUnionOfSets
+&emsp;当你指定 @distinctUnionOfSets 运算符时，valueForKeyPath: 创建并返回一个 NSSet 对象，该对象包含与右键路径指定的属性相对应的所有集合的组合的不同对象。
+
+&emsp;此操作符的行为与 @distinctUnionOfArrays 类似，只是它需要一个包含对象的 NSSet 实例的 NSSet 实例，而不是 NSArray 实例的 NSArray 实例。此外，它还返回一个 NSSet 实例。假设示例数据存储在集合而不是数组中，那么示例调用和结果与 @distinctUnionOfArrays 的结果相同。
+## Representing Non-Object Values（表示非对象值）
+&emsp;NSObject 提供的键值编码协议方法的默认实现同时处理对象和非对象属性。默认实现会自动在对象参数或返回值与非对象属性之间进行转换。这允许基于键的 getter 和 setter 的签名保持一致，即使存储的属性是标量或结构。
+
+> &emsp;NOTE: 由于 Swift 中的所有属性都是对象，因此本节仅介绍 Objective-C 属性。
+
+&emsp;当你调用协议的一个 getter（如 valueForKey:）时，默认实现将根据 Accessor Search Patterns 中描述的规则确定为指定键提供值的特定访问器方法或实例变量。如果返回值不是对象，getter 将使用该值初始化 NSNumber 对象（对于标量 int/float 等）或 NSValue对象（对于结构 struct），并返回该值。
+
+&emsp;类似地，默认情况下，setter setValue:forKey: 在给定特定键的情况下，确定属性的访问器或实例变量所需的数据类型。如果数据类型不是对象，那么 setter 首先向传入的 Value 对象发送一个适当的 <type>Value 消息来提取底层数据，并将其存储。
+
+> &emsp;NOTE: 当你使用非对象属性的 nil 值调用其中一个键值编码协议 setter 时，setter 没有明显的常规操作过程可采取。因此，它向接收 setter 调用的对象发送 setNilValueForKey: 消息。此方法的默认实现会引发 NSInvalidArgumentException 异常，但子类可能会重写此行为，如处理非对象值中所述，例如设置标记值或提供有意义的默认值。
+### Wrapping and Unwrapping Scalar Types（包装和解包标量类型 int/float 等）
+&emsp;Table 5-1 列出了默认键值编码实现使用 NSNumber 实例包装的标量类型。对于每种数据类型，该表显示了用于从基础属性值初始化 NSNumber 以提供 getter 返回值的创建方法。然后，它显示了在 set 操作期间用于从 setter 输入参数中提取值的访问器方法。
+
+&emsp;Table 5-1 Scalar types as wrapped in NSNumber objects（包装在 NSNumber 对象中的标量类型）
+| Data type | Creation method | Accessor method |
+| -- | -- | -- |
+| BOOL | numberWithBool: | boolValue (in iOS) charValue (in macOS)* |
+| char | numberWithChar: | charValue |
+| double | numberWithDouble: | doubleValue |
+| float | numberWithFloat: | floatValue |
+| int | numberWithInt: | intValue |
+| long | numberWithLong: | longValue |
+| long long | numberWithLongLong: | longLongValue |
+| short | numberWithShort: | shortValue |
+| unsigned char | numberWithUnsignedChar: | unsignedChar |
+| unsigned int | numberWithUnsignedInt: | unsignedInt |
+| unsigned long | numberWithUnsignedLong: | unsignedLong |
+| unsigned long long | numberWithUnsignedLongLong: | unsignedLongLong |
+| unsigned short | numberWithUnsignedShort: | unsignedShort |
+
+> &emsp;NOTE: *在 macOS 中，由于历史原因，BOOL 被定义为 signed char 类型，而 KVC 不区分这两种类型。因此，不应将 @"true" 或 @"YES" 等字符串值传递给 setValue:forKey: 当键是布尔类型时。KVC 将尝试调用 charValue（因为 BOOL 本身就是 char），但是 NSString 没有实现这个方法，这将导致运行时错误。相反，只传递一个 NSNumber 对象，例如 @(1) 或 @(YES)，作为参数值 setValue:forKey: 当键是布尔类型时。此限制不适用于 iOS，其中 BOOL 的类型定义为本机布尔类型 BOOL，而 KVC 调用 boolValue，它适用于 NSNumber 对象或格式正确的 NSString 对象。
+### Wrapping and Unwrapping Structures（包装和展开结构 Struct）
+&emsp;Table 5-2 显示了创建和访问器方法，默认访问器使用它们来包装和解包常见的 NSPoint、NSRange、NSRect、NSSize 结构。
+```c++
+struct CGPoint {
+    CGFloat x;
+    CGFloat y;
+};
+
+typedef struct _NSRange {
+    NSUInteger location;
+    NSUInteger length;
+} NSRange;
+
+struct CGRect {
+    CGPoint origin;
+    CGSize size;
+};
+
+struct CGSize {
+    CGFloat width;
+    CGFloat height;
+};
+```
+&emsp;Table 5-2 Common struct types as wrapped using NSValue（使用 NSValue 包装的常见结构类型）
+| Data type | Creation method | Accessor method |
+| -- | -- | -- |
+| NSPoint | valueWithPoint: | pointValue |
+| NSRange | valueWithRange: | rangeValue |
+| NSRect | valueWithRect:(macOS only) | rectValue |
+| NSSize | valueWithSize: | sizeValue |
+
+&emsp;自动包装和展开不限于 NSPoint、NSRange、NSRect 和 NSSize。结构类型（即 Objective-C 类型编码字符串以 { 开头的类型）可以包装在 NSValue 对象中。例如，考虑 Listing 5-1 中声明的结构和类接口。
+
+&emsp;Listing 5-1 A sample class using a custom structure（使用自定义结构的示例类）
+```c++
+typedef struct {
+    float x, y, z;
+} ThreeFloats;
+ 
+@interface MyClass
+@property (nonatomic) ThreeFloats threeFloats;
+@end
+```
+&emsp;使用名为 myClass 的类的实例，可以通过键值编码获得 threeFloats 值：
+```c++
+NSValue* result = [myClass valueForKey:@"threeFloats"];
+```
+&emsp;valueForKey: 的默认实现会调用 threeFloats getter，然后返回包装在 NSValue 对象中的结果。
+
+&emsp;同样，你可以使用键值编码设置 threeFloats 值：
+```c++
+ThreeFloats floats = {1., 2., 3.};
+NSValue* value = [NSValue valueWithBytes:&floats objCType:@encode(ThreeFloats)];
+
+[myClass setValue:value forKey:@"threeFloats"];
+```
+&emsp;默认实现使用 getValue: 消息解包该值，然后使用结果结构调用 setThreeFloats:。
+## Validating Properties（验证属性）
+&emsp;键值编码协议定义了支持属性验证的方法。就像使用基于键的访问器来读写键值编码兼容对象的属性一样，还可以按键（或键路径）验证属性。当你调用  validateValue:forKey:error:（或 validateValue:forKeyPath:error:）方法时，协议的默认实现会在接收验证消息的对象（或密钥路径末尾的对象）中搜索一种方法，其名称与模式 validate<Key>:error: 匹配。如果对象没有这样的方法，则默认情况下验证成功，默认实现返回 YES。当存在特定于属性的验证方法时，默认实现将返回调用该方法的结果。
+
+> &emsp;NOTE: 你通常只使用 Objective-C 中描述的验证。在 Swift中，属性验证更习惯于依赖编译器对选项和强类型检查（optionals and strong type checking）的支持来处理，同时使用内置的 willSet 和 didSet 属性观察者来测试任何运行时 API contracts，如 The Swift Programming Language (Swift 3) 中 Property Observers 的部分的所述。
+
+&emsp;由于特定于属性的验证方法通过引用接收值和错误参数，因此验证具有三种可能的结果：
+1. 验证方法认为 value 对象有效，并返回 YES 而不更改值或 error。
+2. 验证方法认为 value 对象无效，但选择不更改它。在这种情况下，该方法返回 NO 并将错误引用（如果有，则调用方提供）设置为指示失败原因的 NSError 对象。
+3. 验证方法认为 value 对象无效，但创建一个新的有效对象作为替换。在本例中，该方法返回 YES，同时保持 error 对象不变。在返回之前，该方法修改值引用以指向新的值对象。当方法进行修改时，它总是创建一个新对象，而不是修改旧对象，即使值对象是可变的。
+
+&emsp;Listing 6-1 显示了如何调用 name 字符串验证的示例。
+
+&emsp;Listing 6-1 Validation of the name property（验证 name 属性）
+```c++
+Person* person = [[Person alloc] init];
+
+NSError* error;
+NSString* name = @"John";
+
+if (![person validateValue:&name forKey:@"name" error:&error]) {
+    NSLog(@"%@",error);
+}
+```
+### Automatic Validation
+&emsp;一般来说，键值编码协议及其默认实现都没有定义任何机制来自动执行验证。相反，你可以在适合你的应用程序时使用验证方法。
+
+&emsp;某些其他 Cocoa 技术在某些情况下会自动执行验证。例如，保存托管对象上下文时，Core Data 会自动执行验证（请参阅 Core Data Programming Guide）。另外，在 macOS 中，Cocoa bindings 允许你指定自动进行验证（有关更多信息，请参阅  Cocoa Bindings Programming Topics）。
+
+🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼
+## Accessor Search Patterns（访问者搜索模式）
+&emsp;NSObject 提供的 NSKeyValueCoding 协议的默认实现使用一组明确定义的规则将基于键的访问器调用映射到对象的底层属性。这些协议方法使用一个键参数来搜索它们自己的对象实例，以查找访问器、实例变量和遵循某些命名约定的相关方法。尽管很少修改此默认搜索，但了解它的工作方式会很有帮助，既可以跟踪键值编码对象的行为，也可以使你自己的对象兼容。
+
+> &emsp;NOTE: 本节中的描述使用 <key> 或 <Key> 作为键的占位符，当该键在键值编码协议方法之一中作为参数出现时。然后由该方法用作辅助方法调用的一部分或变量名查找。映射的属性名称遵循占位符的大小写。例如对于 getters <key> 和 is<Key>，名为 hidden 的属性将映射为 hidden 和 isHidden。
+
+### Search Pattern for the Basic Getter（基本 Getter 的搜索模式）
+&emsp;在给定键参数作为输入的情况下，valueForKey: 的默认实现执行以下过程。（在接收 valueForKey: 调用的类实例内部进行操作）
+
+1. 在实例中搜索第一个名为 get<Key>、<key>、is<Key> 或 _<key> 的访问器方法。如果找到了，则调用它并继续执行步骤 5 并返回结果。否则继续下一步。
+
+2. 如果找不到简单的访问器方法，在实例中搜索名称与模式匹配的方法 countOf<Key> 和 objectIn<Key>AtIndex:（对应于 NSArray 类定义的原始方法） 和 <key>AtIndexes:（对应于 NSArray 的 objectsAtIndexes: 方法）。
+  如果找到其中的第一个以及其他两个中的至少一个，请创建一个响应所有 NSArray 方法的集合代理对象（collection proxy object），并返回该对象。否则，请继续执行步骤 3。
+  代理对象随后将接收到的任何 NSArray 消息转换为 countOf<Key>、objectIn<Key>AtIndex: 和 <Key>AtIndexes: 消息的组合，并将其转换为创建它的键值编码兼容对象。如果原始对象还实现了一个名为 get<Key>:range: 之类的可选方法，则代理对象也将在适当时使用该方法。实际上，代理对象与键值编码兼容的对象一起工作，允许底层属性的行为就像 NSArray 一样，即使它不是。
+  
+3. 如果找不到简单的访问器方法或数组访问方法组，请查找名为 countOf<Key>、enumeratorOf<Key> 和 memberOf<Key>：的三重方法。（对应于 NSSet 类定义的原始方法）
+  如果找到所有三个方法，请创建一个响应所有 NSSet 方法的集合代理对象，并返回该对象。否则，请继续执行步骤 4。
+  代理对象随后将接收到的任何 NSSet 消息转换为 countOf<Key>、enumeratorOf<Key> 和 memberOf<Key>: 消息的某种组合，以创建它的对象。实际上，代理对象与键值编码兼容对象一起工作，使得基础属性的行为就像 NSSet 一样，即使它不是 NSSet。
+  
+4. 如果找不到简单的访问器方法或集合访问方法组，并且如果 receiver 的类方法 accessInstanceVariablesDirectly 返回YES，则按该顺序搜索名为 _<key>、_is<Key>、<key> 或 is<Key> 的实例变量。如果找到，则直接获取实例变量的值并继续执行步骤 5。否则，继续进行步骤 6。
+
+5. 如果检索到的属性值是对象指针，则只需返回结果。
+  如果该值是 NSNumber 支持的标量类型，则将其存储在 NSNumber 实例中并返回它。
+  如果结果是 NSNumber 不支持的标量类型，请转换为 NSValue 对象并返回该对象。
+  
+6. 如果所有方法均失败，则调用 valueForUndefinedKey:。默认情况下，这会引发一个异常，但是 NSObject 的子类可以提供特定于键的行为（子类重写 valueForUndefinedKey: 函数）。
+### Search Pattern for the Basic Setter（基本 Setter 的搜索模式）
+&emsp;setValue:forKey: 的默认实现，给定 key 和 value 参数作为输入，尝试将名为 key 的属性设置为 value，使用以下过程在接收调用的对象内部：（对于非对象的属性，则为 value 的展开版本，如 Representing Non-Object Values 中所述）
+1. 按此顺序查找名为 set<Key>: 或 _set<Key> 的第一个访问器。如果找到了，则使用输入值（或根据需要取消包装的值）调用它并完成。
+2. 如果未找到简单的访问器，并且类方法 accessInstanceVariablesDirectly 返回 YES，按该顺序查找名称类似于 _<key>、_is<Key>、<key> 或 is<Key> 的实例变量。如果找到，则直接使用输入值（或展开值）设置变量并完成操作。
+3. 在找不到访问器或实例变量时，调用 setValue:forUndefinedKey:。这在默认情况下会引发异常，但 NSObject 的子类可能会提供键特定的行为。（子类重写 setValue:forUndefinedKey:）
+### Search Pattern for Mutable Arrays（可变数组的搜索模式）
+&emsp;mutableArrayValueForKey: 的默认实现，给定一个 key 参数作为输入，为接收访问器调用的对象内的名为 key 的属性返回一个可变的代理数组，使用以下过程：
+
+
+🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼
+
+
+
+## Achieving Basic Key-Value Coding Compliance（实现基本键值编码合规性）
+&emsp;当对对象采用键值编码时，你依赖于 NSKeyValueCoding 协议的默认实现，方法是让你的对象继承自 NSObject 或其许多子类之一。反过来，默认实现依赖于你按照某些良好定义的模式定义对象的实例变量（或 ivar）和访问器方法，以便在接收键值编码的消息时可以将键字符串与属性相关联。例如 valueForKey: 和 setValue:forKey:。
+
+&emsp;你通常通过简单地使用 @property 语句声明属性，并允许编译器自动合成 ivar 和访问器，来遵守 Objective-C 中的标准模式。默认情况下，编译器遵循预期的模式。
+
+> &emsp;NOTE: 在 Swift 中，只需以通常的方式声明属性即可自动生成适当的访问器，而你永远不会直接与 ivars 进行交互。有关 Swift 中的属性的更多信息，请阅读 The Swift Programming Language（Swift 3）中的 Properties。有关与 Swift 中的 Objective-C 属性进行交互的特定信息，请阅读 Using Swift with Cocoa and Objective-C (Swift 3) 中的 Accessing Properties。
+
+&emsp;如果确实需要在 Objective-C 中手动实现访问器或 ivar，请遵循本节中的指导原则以保持基本的遵从性。要提供增强与任何语言的对象集合属性交互的附加功能，请实现定义集合方法中描述的方法。要通过键值验证进一步增强对象，请实现添加验证中描述的方法。
+
+> &emsp;NOTE: 键值编码的默认实现比此处描述的更广泛的 ivars 和访问器可以使用。如果你有使用其他变量或访问器约定的旧版代码，请检查访问器搜索模式中的搜索模式，以确定默认实现是否可以找到你的对象的属性。
+
+### Basic Getters
+&emsp;要实现返回属性值的 getter，同时可能还要执行其他自定义工作，请使用名为属性的方法，例如 title 字符串属性：
+```c++
+- (NSString*)title {
+   // Extra getter logic…
+   
+   return _title;
+}
+```
+&emsp;对于具有布尔类型的属性，你也可以使用以 is 前缀的方法，例如名为 hidden 的 Boolean 类型属性：
+```c++
+- (BOOL)isHidden {
+   // Extra getter logic…
+ 
+   return _hidden;
+}
+```
+&emsp;当属性是标量或结构时，键值编码的默认实现将值包装到对象中，以便在协议方法的接口上使用，如 Representing Non-Object Values 中所述。你不需要做任何特殊的事情来支持这种行为。
+### Basic Setters
+&emsp;要实现用于存储属性值的 setter，请使用带有以单词 set 开头的属性大写名称的方法。对于 hidden 属性：
+```c++
+- (void)setHidden:(BOOL)hidden {
+    // Extra setter logic…
+ 
+   _hidden = hidden;
+}
+```
+> &emsp;WARNING: 切勿从 set<Key>: 方法内部调用 Validating Properties 中描述的 validation 方法。
+
+&emsp;当属性是非对象类型（如 Boolean 类型的 hidden 属性）时，协议的默认实现将检测基础数据类型，并解开来自 setValue:forKey: 的对象值（在这种情况下为 NSNumber 实例），然后再将其应用于 setter，如  Representing Non-Object Values 中所述。你不需要在 setter 本身中处理这个问题。但是，如果可能会将 nil 值写入非对象属性，则可以重写 setNilValueForKey: 以处理这种情况，如 Handling Non-Object Values 中所述。hidden 属性的适当行为可能只是将 nil 解释为 NO：
+```c++
+- (void)setNilValueForKey:(NSString *)key {
+    if ([key isEqualToString:@"hidden"]) {
+        [self setValue:@(NO) forKey:@"hidden"];
+    } else {
+        [super setNilValueForKey:key];
+    }
+}
+```
+&emsp;即使在允许编译器合成 setter 的情况下，也可以提供上述方法重写（如果适用）。
+### Instance Variables
+&emsp;当某个键值编码访问器方法的默认实现找不到属性的访问器时，它会直接查询其类的 accessInstanceVariablesDirectly 方法，查看该类是否允许直接使用实例变量。默认情况下，该类方法返回 YES，但你可以重写该方法以返回 NO。
+
+&emsp;如果你确实允许使用 ivars，请确保以常规方式命名，并使用带下划线（_）前缀的属性名称。通常，编译器会在自动合成属性时为您执行此操作，但是如果您使用显式的@synthesize指令，则可以自己强制执行此命名：
+
+
+
+ 
+ 
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
