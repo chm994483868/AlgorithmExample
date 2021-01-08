@@ -3,7 +3,7 @@
 > &emsp;日常开发中我们可能已经非常习惯于使用 valueForKey: 和 setValue:forKey:，不过可能有一些细节我们未深入过，那么下面一起通过官方文档来全面的学习一下 KVC 吧！⛽️⛽️ 
 
 ## About Key-Value Coding
-&emsp;Key-value coding（键值编码）是由 NSKeyValueCoding 非正式协议启用的一种机制，对象采用这种机制来提供对其属性/成员变量的间接访问。当一个对象符合键值编码时，它的属性/成员变量可以通过一个简洁、统一的消息传递接口（setValue:forKey:）通过字符串参数寻址。这种间接访问机制补充了实例变量（自动生成的 _属性名 ）及其相关访问器方法（getter 方法）提供的直接访问。
+&emsp;Key-value coding（键值编码）是由 NSKeyValueCoding 非正式协议启用的一种机制，对象采用这种机制来提供对其属性/成员变量的间接访问。当一个对象符合键值编码时，它的属性/成员变量可以通过一个简洁、统一的消息传递接口（setValue:forKey:）通过字符串参数寻址。这种间接访问机制补充了实例变量（自动生成的 \_属性名 ）及其相关访问器方法（getter 方法）提供的直接访问。
 
 &emsp;通常使用访问器方法来访问对象的属性。get 访问器（或 getter）返回属性的值。set 访问器（或 setter）设置属性的值。在 Objective-C 中，还可以直接访问属性的底层实例变量（由编译器生成的对应于属性的由 下划线和属性名拼接构成的实例变量）。以上述任何一种方式访问对象属性都是简单的，但需要调用特定于属性的方法或变量名。随着属性列表的增长或更改，访问这些属性的代码也必须随之增长或更改。相反，键值编码兼容对象提供了一个简单的消息传递接口，该接口在其所有属性中都是一致的。
 
@@ -21,7 +21,7 @@
 
 &emsp;因此，可以以一致的方式读取和设置对象的所有属性/成员变量。
 
-&emsp;访问属性值的默认实现方式依赖于通常由对象实现的访问器（getter）方法（或在需要时直接访问实例变量（_属性名））。
+&emsp;访问属性值的默认实现方式依赖于通常由对象实现的访问器（getter）方法（或在需要时直接访问实例变量（\_属性名））。
 #### valueForKey:
 &emsp;返回由给定键标识的属性的值。
 ```c++
@@ -335,7 +335,7 @@ NSLog(@"🛂🛂🛂🛂🛂 valueForKey 新增后 %@", self.student.personArray
 
 &emsp;Figure 4-1 Operator key path format
 
-![]()
+![Operator key path format](https://p1-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/786d1febd5b543dc92799f76a4fd652c~tplv-k3u1fbpfcp-watermark.image)
 
 &emsp;集合运算符表现出三种基本的行为类型：
 + Aggregation Operators（集合运算符）以某种方式合并集合的对象，并返回通常与在正确的键路径中命名的属性的数据类型匹配的单个对象。 @count 运算符是一个例外，它不使用任何右键路径，并且始终返回 NSNumber 实例。
@@ -383,6 +383,7 @@ Table 4-1 Example data for the Transactions objects（Transactions 对象的示�
 | Mortgage | $1,250.00 | Feb 15, 2016 |
 | Mortgage | $1,250.00 | Mar 15, 2016 |
 | Animal Hospital | $600.00 | Jul 15, 2016 |
+
 ### Aggregation Operators
 &emsp;聚合运算符处理一个数组或一组属性，生成反映集合某些方面的单个值。
 #### @avg（求平均值）
@@ -473,6 +474,7 @@ Table 4-2 Hypothetical Transaction data in the moreTransactions array（moreTran
 | Second Mortgage | $1,250.00 | Sep 20, 2016 |
 | Second Mortgage | $1,250.00 | Jun 14, 2016 |
 | Hobby Shop | $600.00 | Jun 14, 2016 |
+
 #### @distinctUnionOfArrays
 &emsp;当指定 @distinctUnionOfArrays 运算符时，valueForKeyPath: 创建并返回一个数组，该数组包含与右键路径指定的属性相对应的所有集合的组合的不同对象。
 
@@ -588,7 +590,7 @@ NSValue* value = [NSValue valueWithBytes:&floats objCType:@encode(ThreeFloats)];
 ## Validating Properties（验证属性）
 &emsp;键值编码协议定义了支持属性验证的方法。就像使用基于键的访问器来读写键值编码兼容对象的属性一样，还可以按键（或键路径）验证属性。当你调用  validateValue:forKey:error:（或 validateValue:forKeyPath:error:）方法时，协议的默认实现会在接收验证消息的对象（或密钥路径末尾的对象）中搜索一种方法，其名称与模式 validate<Key>:error: 匹配。如果对象没有这样的方法，则默认情况下验证成功，默认实现返回 YES。当存在特定于属性的验证方法时，默认实现将返回调用该方法的结果。
 
-> &emsp;NOTE: 你通常只使用 Objective-C 中描述的验证。在 Swift中，属性验证更习惯于依赖编译器对选项和强类型检查（optionals and strong type checking）的支持来处理，同时使用内置的 willSet 和 didSet 属性观察者来测试任何运行时 API contracts，如 The Swift Programming Language (Swift 3) 中 Property Observers 的部分的所述。
+> &emsp;NOTE: 通常只使用 Objective-C 中描述的验证。在 Swift中，属性验证更习惯于依赖编译器对选项和强类型检查（optionals and strong type checking）的支持来处理，同时使用内置的 willSet 和 didSet 属性观察者来测试任何运行时 API contracts，如 The Swift Programming Language (Swift 3) 中 Property Observers 的部分的所述。
 
 &emsp;由于特定于属性的验证方法通过引用接收值和错误参数，因此验证具有三种可能的结果：
 1. 验证方法认为 value 对象有效，并返回 YES 而不更改值或 error。
@@ -612,56 +614,66 @@ if (![person validateValue:&name forKey:@"name" error:&error]) {
 &emsp;一般来说，键值编码协议及其默认实现都没有定义任何机制来自动执行验证。相反，你可以在适合你的应用程序时使用验证方法。
 
 &emsp;某些其他 Cocoa 技术在某些情况下会自动执行验证。例如，保存托管对象上下文时，Core Data 会自动执行验证（请参阅 Core Data Programming Guide）。另外，在 macOS 中，Cocoa bindings 允许你指定自动进行验证（有关更多信息，请参阅  Cocoa Bindings Programming Topics）。
-
-🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼
 ## Accessor Search Patterns（访问者搜索模式）
 &emsp;NSObject 提供的 NSKeyValueCoding 协议的默认实现使用一组明确定义的规则将基于键的访问器调用映射到对象的底层属性。这些协议方法使用一个键参数来搜索它们自己的对象实例，以查找访问器、实例变量和遵循某些命名约定的相关方法。尽管很少修改此默认搜索，但了解它的工作方式会很有帮助，既可以跟踪键值编码对象的行为，也可以使你自己的对象兼容。
 
-> &emsp;NOTE: 本节中的描述使用 <key> 或 <Key> 作为键的占位符，当该键在键值编码协议方法之一中作为参数出现时。然后由该方法用作辅助方法调用的一部分或变量名查找。映射的属性名称遵循占位符的大小写。例如对于 getters <key> 和 is<Key>，名为 hidden 的属性将映射为 hidden 和 isHidden。
+> &emsp;NOTE: 本节中的描述使用 <key> 或 <Key> 作为键的占位符，当该键在键值编码协议方法之一中作为参数出现时。然后由该方法用作辅助方法调用的一部分或变量名查找。映射的属性名称遵循占位符的大小写。例如对于 getters<key> 和 is<Key>，名为 hidden 的属性将映射为 hidden 和 isHidden。
 
 ### Search Pattern for the Basic Getter（基本 Getter 的搜索模式）
 &emsp;在给定键参数作为输入的情况下，valueForKey: 的默认实现执行以下过程。（在接收 valueForKey: 调用的类实例内部进行操作）
 
-1. 在实例中搜索第一个名为 get<Key>、<key>、is<Key> 或 _<key> 的访问器方法。如果找到了，则调用它并继续执行步骤 5 并返回结果。否则继续下一步。
+1. 在实例中搜索第一个名为 get<Key>、<key>、is<Key> 或 \_<key> 的访问器方法。如果找到了，则调用它并继续执行步骤 5 并返回结果。否则继续下一步。（**get<Key>、<key>、is<Key>或 \_<key>**）
 
-2. 如果找不到简单的访问器方法，在实例中搜索名称与模式匹配的方法 countOf<Key> 和 objectIn<Key>AtIndex:（对应于 NSArray 类定义的原始方法） 和 <key>AtIndexes:（对应于 NSArray 的 objectsAtIndexes: 方法）。
-  如果找到其中的第一个以及其他两个中的至少一个，请创建一个响应所有 NSArray 方法的集合代理对象（collection proxy object），并返回该对象。否则，请继续执行步骤 3。
+2. 如果找不到简单的访问器方法，在实例中搜索名称与 countOf<Key>、objectIn<Key>AtIndex:（对应于 NSArray 类定义的原始方法） 和 <key>AtIndexes:（对应于 NSArray 的 objectsAtIndexes: 方法）模式匹配的方法。
+  如果找到其中的第一个以及其他两个中的至少一个，则创建一个响应所有 NSArray 方法的集合代理对象（collection proxy object），并返回该对象。否则，请继续执行步骤 3。
   代理对象随后将接收到的任何 NSArray 消息转换为 countOf<Key>、objectIn<Key>AtIndex: 和 <Key>AtIndexes: 消息的组合，并将其转换为创建它的键值编码兼容对象。如果原始对象还实现了一个名为 get<Key>:range: 之类的可选方法，则代理对象也将在适当时使用该方法。实际上，代理对象与键值编码兼容的对象一起工作，允许底层属性的行为就像 NSArray 一样，即使它不是。
   
 3. 如果找不到简单的访问器方法或数组访问方法组，请查找名为 countOf<Key>、enumeratorOf<Key> 和 memberOf<Key>：的三重方法。（对应于 NSSet 类定义的原始方法）
-  如果找到所有三个方法，请创建一个响应所有 NSSet 方法的集合代理对象，并返回该对象。否则，请继续执行步骤 4。
+  如果找到所有三个方法，请创建一个响应所有 NSSet 方法的集合代理对象，并返回该对象。否则，继续执行步骤 4。
   代理对象随后将接收到的任何 NSSet 消息转换为 countOf<Key>、enumeratorOf<Key> 和 memberOf<Key>: 消息的某种组合，以创建它的对象。实际上，代理对象与键值编码兼容对象一起工作，使得基础属性的行为就像 NSSet 一样，即使它不是 NSSet。
   
-4. 如果找不到简单的访问器方法或集合访问方法组，并且如果 receiver 的类方法 accessInstanceVariablesDirectly 返回YES，则按该顺序搜索名为 _<key>、_is<Key>、<key> 或 is<Key> 的实例变量。如果找到，则直接获取实例变量的值并继续执行步骤 5。否则，继续进行步骤 6。
+4. 如果找不到简单的访问器方法或集合访问方法组，并且如果 receiver 的类方法 accessInstanceVariablesDirectly 返回YES，则按该顺序搜索名为 \_<key>、\_is<Key>、<key> 或 is<Key> 的实例变量。如果找到，则直接获取实例变量的值并继续执行步骤 5。否则，继续进行步骤 6。（**\_<key>、\_is<Key>、<key> 或 is<Key>**）
 
 5. 如果检索到的属性值是对象指针，则只需返回结果。
   如果该值是 NSNumber 支持的标量类型，则将其存储在 NSNumber 实例中并返回它。
-  如果结果是 NSNumber 不支持的标量类型，请转换为 NSValue 对象并返回该对象。
+  如果结果是 NSNumber 不支持的标量类型，则转换为 NSValue 对象并返回该对象。
   
 6. 如果所有方法均失败，则调用 valueForUndefinedKey:。默认情况下，这会引发一个异常，但是 NSObject 的子类可以提供特定于键的行为（子类重写 valueForUndefinedKey: 函数）。
 ### Search Pattern for the Basic Setter（基本 Setter 的搜索模式）
-&emsp;setValue:forKey: 的默认实现，给定 key 和 value 参数作为输入，尝试将名为 key 的属性设置为 value，使用以下过程在接收调用的对象内部：（对于非对象的属性，则为 value 的展开版本，如 Representing Non-Object Values 中所述）
-1. 按此顺序查找名为 set<Key>: 或 _set<Key> 的第一个访问器。如果找到了，则使用输入值（或根据需要取消包装的值）调用它并完成。
-2. 如果未找到简单的访问器，并且类方法 accessInstanceVariablesDirectly 返回 YES，按该顺序查找名称类似于 _<key>、_is<Key>、<key> 或 is<Key> 的实例变量。如果找到，则直接使用输入值（或展开值）设置变量并完成操作。
-3. 在找不到访问器或实例变量时，调用 setValue:forUndefinedKey:。这在默认情况下会引发异常，但 NSObject 的子类可能会提供键特定的行为。（子类重写 setValue:forUndefinedKey:）
+&emsp;setValue:forKey: 的默认实现，给定 key 和 value 参数作为输入，尝试将名为 key 的属性设置为 value，使用以下过程在接收到调用的对象内部：（对于非对象的属性，则为 value 的展开版本，如 Representing Non-Object Values 中所述）
+
+1. 按此顺序查找名为 set<Key>: 或 \_set<Key> 的第一个访问器。如果找到了，则使用 value（或根据需要解包 value 的值）调用它并完成。（**set<Key>:、\_set<Key>**）
+
+2. 如果未找到简单的访问器，并且类方法 accessInstanceVariablesDirectly 返回 YES，按该顺序查找名称类似于 \_<key>、\_is<Key>、<key> 或 is<Key> 的实例变量。如果找到，则直接使用 value（或根据需要解包 value 的值）设置实例变量并完成操作。（**\_<key>、\_is<Key>、<key> 或 is<Key>**）
+
+3. 在找不到访问器或实例变量时，调用 setValue:forUndefinedKey:。这在默认情况下会引发异常，但 NSObject 的子类可能会提供键特定的行为。（由子类重写 setValue:forUndefinedKey:）
 ### Search Pattern for Mutable Arrays（可变数组的搜索模式）
 &emsp;mutableArrayValueForKey: 的默认实现，给定一个 key 参数作为输入，为接收访问器调用的对象内的名为 key 的属性返回一个可变的代理数组，使用以下过程：
 
+1. 搜索一对名字如 insertObject:in<Key>AtIndex: 和 removeObjectFrom<Key>AtIndex:（分别对应于 NSMutableArray 的原始方法 insertObject:atIndex: 和 removeObjectAtIndex:）的方法，或者名字如 insert<Key>:atIndexes: 和 remove<Key>AtIndexes: （对应于 NSMutableArray 的 insertObjects:atIndexes: 和 removeObjectsAtIndexes: 方法）的方法。
+  如果对象具有至少一种 insertion 方法和至少一种 removal 方法，通过发送 insertObject:in<Key>AtIndex:、removeObjectFrom<Key>AtIndex:、insert<Key>:atIndexes: 消息的某种组合，返回一个响应 NSMutableArray 消息的代理对象，并将 remove<Key>AtIndexes: 消息发送给 mutableArrayValueForKey: 的原始接收者。
+  当接收到 mutableArrayValueForKey: 消息的对象还实现了一个可选的 replace 对象方法，其名称类似于 replaceObjectIn<Key>AtIndex:withObject: 或 replace<Key>AtIndexes:with<Key>: 时，代理对象也会在适当的时候也利用这些对象以获得最佳性能。
+  
+2. 如果对象没有可变数组方法，查找名称与 set<Key>: 匹配的访问器方法。 在这种情况下，通过向 mutableArrayValueForKey: 的原始接收者发出 set<Key>: 消息，返回响应 NSMutableArray 消息的代理对象。
 
-🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼🚼
+> &emsp;NOTE: 该步骤中描述的机制比上一步的机制效率低得多，因为它可能涉及重复创建新的集合对象而不是修改现有集合对象。因此，在设计自己的键值编码兼容对象时，通常应避免使用它。
 
-
+3. 如果既没有找到可变数组方法，也没有找到访问器，并且如果 receiver 的类方法 accessInstanceVariablesDirectly 返回 YES，则按该顺序搜索名为 \_<key> 或 <key> 的实例变量。
+  如果找到了这样的实例变量，则返回一个代理对象，该代理对象将接收到的每个 NSMutableArray 消息转发到该实例变量的值，该值通常是 NSMutableArray 或其子类之一的实例。
+  
+4. 如果所有其他操作都失败，则发送给 mutableArrayValueForKey: 消息的原始接收方只要接收到 NSMutableArray 消息时则发出 setValue:forUndefinedKey: 消息。
+  setValue:forUndefinedKey: 引发 NSUndefinedKeyException，但子类可以重写此方法。
 
 ## Achieving Basic Key-Value Coding Compliance（实现基本键值编码合规性）
-&emsp;当对对象采用键值编码时，你依赖于 NSKeyValueCoding 协议的默认实现，方法是让你的对象继承自 NSObject 或其许多子类之一。反过来，默认实现依赖于你按照某些良好定义的模式定义对象的实例变量（或 ivar）和访问器方法，以便在接收键值编码的消息时可以将键字符串与属性相关联。例如 valueForKey: 和 setValue:forKey:。
+&emsp;当对对象采用键值编码时，你依赖于 NSKeyValueCoding 协议的默认实现，方法是让你的对象继承自 NSObject 或其许多子类之一。反过来，默认实现依赖于你按照某些良好定义的模式，所定义对象的实例变量（或 ivar）和访问器方法，以便在接收键值编码的消息时可以将键字符串与属性相关联。例如 valueForKey: 和 setValue:forKey:。
 
 &emsp;你通常通过简单地使用 @property 语句声明属性，并允许编译器自动合成 ivar 和访问器，来遵守 Objective-C 中的标准模式。默认情况下，编译器遵循预期的模式。
 
 > &emsp;NOTE: 在 Swift 中，只需以通常的方式声明属性即可自动生成适当的访问器，而你永远不会直接与 ivars 进行交互。有关 Swift 中的属性的更多信息，请阅读 The Swift Programming Language（Swift 3）中的 Properties。有关与 Swift 中的 Objective-C 属性进行交互的特定信息，请阅读 Using Swift with Cocoa and Objective-C (Swift 3) 中的 Accessing Properties。
 
-&emsp;如果确实需要在 Objective-C 中手动实现访问器或 ivar，请遵循本节中的指导原则以保持基本的遵从性。要提供增强与任何语言的对象集合属性交互的附加功能，请实现定义集合方法中描述的方法。要通过键值验证进一步增强对象，请实现添加验证中描述的方法。
+&emsp;如果确实需要在 Objective-C 中手动实现访问器或 ivar，请遵循本节中的指导原则以保持基本的遵从性。要提供增强与任何语言的对象集合属性交互的附加功能，请实现 Defining Collection Methods 中描述的方法。要通过键值验证进一步增强对象，请实现 Adding Validation 中描述的方法。
 
-> &emsp;NOTE: 键值编码的默认实现比此处描述的更广泛的 ivars 和访问器可以使用。如果你有使用其他变量或访问器约定的旧版代码，请检查访问器搜索模式中的搜索模式，以确定默认实现是否可以找到你的对象的属性。
+> &emsp;NOTE: 键值编码的默认实现比此处描述的更广泛的 ivars 和访问器可以使用。如果你有使用其他变量或访问器约定的旧版代码，请检查 Accessor Search Patterns 中的搜索模式，以确定默认实现是否可以找到你的对象的属性。
 
 ### Basic Getters
 &emsp;要实现返回属性值的 getter，同时可能还要执行其他自定义工作，请使用名为属性的方法，例如 title 字符串属性：
@@ -682,7 +694,7 @@ if (![person validateValue:&name forKey:@"name" error:&error]) {
 ```
 &emsp;当属性是标量或结构时，键值编码的默认实现将值包装到对象中，以便在协议方法的接口上使用，如 Representing Non-Object Values 中所述。你不需要做任何特殊的事情来支持这种行为。
 ### Basic Setters
-&emsp;要实现用于存储属性值的 setter，请使用带有以单词 set 开头的属性大写名称的方法。对于 hidden 属性：
+&emsp;要实现用于存储属性值的 setter，请使用带有以单词 set 开头的属性大写名称首字母的方法。对于 hidden 属性：
 ```c++
 - (void)setHidden:(BOOL)hidden {
     // Extra setter logic…
@@ -706,7 +718,7 @@ if (![person validateValue:&name forKey:@"name" error:&error]) {
 ### Instance Variables
 &emsp;当某个键值编码访问器方法的默认实现找不到属性的访问器时，它会直接查询其类的 accessInstanceVariablesDirectly 方法，查看该类是否允许直接使用实例变量。默认情况下，该类方法返回 YES，但你可以重写该方法以返回 NO。
 
-&emsp;如果你确实允许使用 ivars，请确保以常规方式命名，并使用带下划线（_）前缀的属性名称。通常，编译器会在自动合成属性时为你执行此操作，但是如果你使用显式的 @synthesize 指令，则可以自己强制执行此命名：
+&emsp;如果你确实允许使用 ivars，请确保以常规方式命名，并使用带下划线（\_）前缀的属性名称。通常，编译器会在自动合成属性时为你执行此操作，但是如果你使用显式的 @synthesize 指令，则可以自己强制执行此命名：
 ```c++
 @synthesize title = _title;
 ```
@@ -720,24 +732,165 @@ if (![person validateValue:&name forKey:@"name" error:&error]) {
  
 @end
 ```
-
-
-😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻
 ## Defining Collection Methods（定义集合方法）
-&emsp;当你使用标准命名约定创建访问器和 ivar 时（如 Achieving Basic Key-Value Coding Compliance 中所述），键值编码协议的默认实现可以根据键值编码消息定位它们。对于表示多个关系的集合对象，这一点与对于其他属性一样正确。但是，如果实现集合访问器方法而不是集合属性的基本访问器，或者除了这些方法之外，还可以：
-+ **与 NSArray 或 NSSet 以外的类建立多模型关系。** 在对象中实现集合方法时，键值 getter 的默认实现返回一个代理对象，该代理对象调用这些方法以响应它接收到的后续 NSArray 或 NSSet 消息。底层属性对象不必是 NSArray 或 NSSet 本身，因为代理对象使用你的集合方法提供预期的行为。
-+ ****
-😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻😻
+&emsp;当你使用标准命名约定创建访问器（getter）和 ivar 时（如 Achieving Basic Key-Value Coding Compliance 中所述），键值编码协议的默认实现可以根据键值编码消息找到它们。这一点对于表示一对多关系的集合类型的属性和其他一对一关系的属性一样正确。但是，如果代替集合属性的基本访问器或在集合属性的基础上实现集合访问器方法，则可以：
 
++ **Model to-many relationships with classes other than NSArray or NSSet（使用 NSArray 或 NSSet 以外的类建立一对多关系模型）.** 在对象中实现集合方法时，键值 getter 的默认实现返回一个代理对象，该代理对象调用这些方法以响应它接收到的后续 NSArray 或 NSSet 消息。底层属性对象不必是 NSArray 或 NSSet 本身，因为代理对象使用你的集合方法提供预期的行为。
++ **Achieve increased performance when mutating the contents of a to-many relationship（更改一对多关系的内容时实现更高的性能）.**
+  协议的默认实现使用你的集合方法来改变基础属性，而不是使用 basic setter 重复创建新的集合对象来响应每一个更改。（即我们上面提到的使用 mutableArrayValueForKey: 函数来直接修改 personArray 属性数组）
++ **Provide key-value observing compliant access to the contents of your object’s collection properties（提供对 key-value observing 的合规访问权限，以访问对象的集合属性的内容）.** 有关键值观察的更多信息，请阅读 Key-Value Observing Programming Guide。
 
+&emsp;你可以实现两类集合访问器中的一种，具体取决于你希望关系的行为类似于索引的有序集合（如 NSArray）还是无序的唯一集合（如 NSSet）。在这两种情况下，你至少要实现一组方法来支持对属性的读取访问，然后再添加一组方法来启用集合内容的可变性。
+
+> &emsp;NOTE: 键值编码协议不声明本节中描述的方法。相反，NSObject 提供的协议的默认实现会在符合键值编码的对象中查找这些方法，如 Accessor Search Patterns 中所述，并使用它们处理作为协议一部分的键值编码消息。
+
+&emsp;**对应我们上面的定义的 Student 类，当我们在 @implementation Student 内输入以下函数的前面的几个字母 Xcode 都会提示我们生成对应的函数。**
+&emsp;**对应我们上面的定义的 Student 类，当我们在 @implementation Student 内输入以下函数的前面的几个字母 Xcode 都会提示我们生成对应的函数。**
+
+### Accessing Indexed Collections（访问索引集合）
+&emsp;你可以添加索引访问器方法（indexed accessor methods），以提供一种用于对有序关系中的对象进行计数（counting）、检索（retrieving）、添加（adding）和替换（replacing ）的机制。底层对象通常是 NSArray 或 NSMutableArray 的实例，但是如果你提供集合访问器（collection accessors），则可以将实现这些方法的任何对象属性当作数组来操作。
+#### Indexed Collection Getters（索引集合获取器）
+&emsp;对于没有默认 getter 的集合类型属性，如果提供以下索引集合 getter 方法，则该协议的默认实现将响应 valueForKey: 消息，返回一个行为类似于 NSArray 的代理对象，但调用以下集合方法来完成其工作。
+
+> &emsp;NOTE: 在现代 Objective-C 中，编译器默认为每个属性合成一个 getter，因此默认实现不会创建使用本节中方法的只读代理（请注意基本 getter 的访问器搜索顺序）。你可以通过不声明属性（仅依赖于 ivar）或将属性声明为 @dynamic（表示你计划在运行时提供访问器行为）来绕过此问题。无论哪种方式，编译器都不会提供默认 getter，默认实现使用以下方法。 
+
++ countOf<Key>
+  该方法以 NSUInteger 的形式返回一对多关系中的对象数，就像 NSArray 基本方法 count 一样。实际上，当基础属性是 NSArray 时，可以使用该方法来提供结果。
+  例如，对于表示银行交易列表并由 NSArray 支持的一对多关系（称为 transactions）：
+```c++
+- (NSUInteger)countOfTransactions {
+    return [self.transactions count];
+}
+```
++ objectIn<Key>AtIndex: 或 <key>AtIndexes:
+  第一个返回对象在一对多关系中指定索引处的对象，而第二个返回在 NSIndexSet 参数指定的索引处的对象数组。它们分别对应于 NSArray 方法 objectAtIndex: 和 objectsAtIndexes:。你只需要实现其中一个。transactions 数组的相应方法是：
+```c++
+- (id)objectInTransactionsAtIndex:(NSUInteger)index {
+    return [self.transactions objectAtIndex:index];
+}
+ 
+- (NSArray *)transactionsAtIndexes:(NSIndexSet *)indexes {
+    return [self.transactions objectsAtIndexes:indexes];
+}
+```
++ get<Key>:range:
+  此方法是可选的，但可以提高性能。它从集合中返回属于指定范围内的对象，并与 NSArray 的 getObjects:range: 方法相对应。 transactions 数组的实现是
+```c++
+- (void)getTransactions:(Transaction * __unsafe_unretained *)buffer range:(NSRange)inRange {
+    [self.transactions getObjects:buffer range:inRange];
+}
+```
+#### Indexed Collection Mutators
+&emsp;支持与索引访问器的可变一对多关系需要实现一组不同的方法。当你提供这些 setter 方法时，响应 mutableArrayValueForKey: 消息的默认实现将返回一个代理对象，其行为类似于 NSMutableArray 对象，但使用对象的方法来执行其工作。这通常比直接返回 NSMutableArray 对象更有效。它还使一对多关系的内容符合键值观察（请参阅 Key-Value Observing Programming Guide）。
+
+&emsp;为了使你的对象键值编码符合可变的有序一对多关系，请实现以下方法：
+
++ insertObject:in<Key>AtIndex: 或 insert<Key>:atIndexes: 
+  第一个接收要插入的对象和一个整数，该整数指定要插入该对象的索引。第二种方法在传递的 NSIndexSet 指定的索引处向集合中插入一个对象数组。这些方法类似于 NSMutableArray 的 insertObject:atIndex: 和 insertObjects:atIndexes:。 只需要这些方法中的一种。
+  对于声明为 NSMutableArray 的 transactions 对象：
+```c++
+- (void)insertObject:(Transaction *)transaction inTransactionsAtIndex:(NSUInteger)index {
+    [self.transactions insertObject:transaction atIndex:index];
+}
+ 
+- (void)insertTransactions:(NSArray *)transactionArray atIndexes:(NSIndexSet *)indexes {
+    [self.transactions insertObjects:transactionArray atIndexes:indexes];
+}
+```
++ removeObjectFrom<Key>AtIndex: 或 remove<Key>AtIndexes:
+  第一个接收一个 NSUInteger 值，该值指定要从 relationship 中删除的对象的索引。第二个接收一个 NSIndexSet 对象，该对象指定要从 relationship 中删除的对象的索引。这些方法分别对应于 NSMutableArray 的 removeObjectAtIndex: 和removeObjectsAtIndexes:。这些方法只需要一种。
+  对于 transactions 对象：
+```c++
+- (void)removeObjectFromTransactionsAtIndex:(NSUInteger)index {
+    [self.transactions removeObjectAtIndex:index];
+}
+ 
+- (void)removeTransactionsAtIndexes:(NSIndexSet *)indexes {
+    [self.transactions removeObjectsAtIndexes:indexes];
+}
+```
++ replaceObjectIn<Key>AtIndex:withObject: 或 replace<Key>AtIndexes:with<Key>:
+  这些替换访问器为代理对象提供了一种直接替换集合中对象的方法，而不必依次删除一个对象并插入另一个对象。它们对应于 NSMutableArray 的 replaceObjectAtIndex:withObject：和 replaceObjectsAtIndexes:withObjects:。当对应用程序进行分析发现性能问题时，可以选择提供这些方法。
+  对于 transactions 对象：
+```c++
+- (void)replaceObjectInTransactionsAtIndex:(NSUInteger)index withObject:(id)anObject {
+    [self.transactions replaceObjectAtIndex:index withObject:anObject];
+}
+ 
+- (void)replaceTransactionsAtIndexes:(NSIndexSet *)indexes withTransactions:(NSArray *)transactionArray {
+    [self.transactions replaceObjectsAtIndexes:indexes withObjects:transactionArray];
+}
+```
+### Accessing Unordered Collections
+&emsp;你可以添加无序集合访问器方法，以提供一种机制来访问和改变无序关系中的对象。通常，此关系是 NSSet 或 NSMutableSet 对象的实例。但是，在实现这些访问器时，可以启用任何类来建模关系，并使用键值编码进行操作，就像它是 NSSet 的实例一样。
+#### Unordered Collection Getters
+&emsp;当你提供以下集合 getter 方法来返回集合中的对象数、迭代集合对象并测试集合中是否已存在对象时，协议的默认实现将响应 valueForKey: 消息，返回一个行为类似 NSSet 的代理对象，但调用以下集合方法来完成其工作。
+
+> &emsp;NOTE: 在现代的 Objective-C 中，编译器默认情况下会为每个属性合成一个 getter，因此默认实现不会创建使用此部分中方法的只读代理（请注意 Search Pattern for the Basic Getter）。你可以通过不声明属性（仅依靠 ivar）或将属性声明为 @dynamic 来解决此问题，这表明你计划在运行时提供访问器行为。无论哪种方式，编译器都不会提供默认的 getter，并且默认的实现使用以下方法。
+
++ countOf<Key>
+  此必需方法返回 relationship 中与 NSSet 方法 count 相对应的项目数。当基础对象是 NSSet 时，可以直接调用此方法。例如，对于一个名为 employee 的 NSSet 对象，其中包含 Employee 对象：
+```c++
+- (NSUInteger)countOfEmployees {
+    return [self.employees count];
+}
+```
++ enumeratorOf<Key> 
+  此必需方法返回一个 NSEnumerator 实例，该实例用于遍历 relationship 中的 items。有关枚举器的更多信息，请参见 Collections Programming Topics 中的 Enumeration: Traversing a Collection’s Elements。该方法对应于 NSSet 类中的 objectEnumerator。For the employees set:
+```c++
+- (NSEnumerator *)enumeratorOfEmployees {
+    return [self.employees objectEnumerator];
+}
+```
++ memberOf<Key>: 
+  此方法将作为参数传递的对象与集合中的对象进行比较，并返回匹配的对象作为结果，如果找不到匹配的对象，则返回 nil。如果手动实现比较方法，则通常使用 isEqual: 来比较对象。当基础对象是 NSSet 对象时，可以使用等效的 member: 方法：
+```c++
+- (Employee *)memberOfEmployees:(Employee *)anObject {
+    return [self.employees member:anObject];
+}
+```
+#### Unordered Collection Mutators
+&emsp;要支持与无序访问器的可变的一对多关系，需要实现额外的方法。实现可变无序访问器，以允许你的对象提供无序集合代理对象，以响应 mutableSetValueForKey: 方法。实现这些访问器比依赖访问器直接返回可变对象以对 relationship 中的数据进行更改要高效得多。这也使你的类的集合中的对象符合 key-value observing 兼容性（请参阅  Key-Value Observing Programming Guide）。
+
+&emsp;为了对可变的无序一对多 relationship 进行键值编码，请实施以下方法：
+
++ add<Key>Object: 或 add<Key>: 
+  这些方法将单个项或一组项添加到 relationship 中。向 relationship 中添加一组项时，请确保 relationship 中尚未存在等效对象。这些方法类似于 NSMutableSet 的 addObject: 和 unionSet:。只需要这些方法中的一种。对于 employees 集合如下：
+```c++
+- (void)addEmployeesObject:(Employee *)anObject {
+    [self.employees addObject:anObject];
+}
+ 
+- (void)addEmployees:(NSSet *)manyObjects {
+    [self.employees unionSet:manyObjects];
+}
+```
++ remove<Key>Object: 或 remove<Key>: 
+  这些方法从 relationship 中删除单个项或一组项。它们类似于 NSMutableSet 的 removeObject: 和 minusSet:。这些方法只需要一种。例如：
+```c++
+- (void)removeEmployeesObject:(Employee *)anObject {
+    [self.employees removeObject:anObject];
+}
+ 
+- (void)removeEmployees:(NSSet *)manyObjects {
+    [self.employees minusSet:manyObjects];
+}
+```
++ intersect<Key>: 
+  接收到 NSSet 参数的此方法将从 relationship 中删除输入集和集合集都不通用的所有对象。这等效于 NSMutableSet 的 intersectSet:。当分析表明出现与集合内容更新有关的性能问题时，可以选择实现此方法。例如：
+```c++
+- (void)intersectEmployees:(NSSet *)otherObjects {
+    return [self.employees intersectSet:otherObjects];
+}
+```
 ## Handling Non-Object Values（处理非对象值）
 &emsp;通常，与键值编码兼容的对象依赖键值编码的默认实现来自动包装和解包非对象属性，如 Representing Non-Object Values 中所述。但是，可以重写默认行为。这样做的最常见原因是处理在非对象属性上存储 nil 值的尝试。
 
 > &emsp;NOTE: 由于 Swift 中的所有属性都是对象，因此本节仅适用于 Objective-C 属性。
 
-&emsp;如果键值编码兼容对象收到 setValue:forKey: 将 nil 作为非对象属性的 value 传递的消息，默认实现没有适当的通用操作过程。因此，它会向自己发送一条 setNilValueForKey: 消息，你可以重写它。setNilValueForKey: 的默认实现引发 NSInvalidArgumentException 异常，但你可以提供适当的、特定于实现的行为。
+&emsp;如果键值编码兼容对象收到了 setValue:forKey: 将 nil 作为非对象属性的 value 的消息，默认实现没有适当的通用操作过程。因此，它会向自己发送一条 setNilValueForKey: 消息，你可以重写它。setNilValueForKey: 的默认实现引发 NSInvalidArgumentException 异常，但你可以提供适当的、特定于实现的行为。
 
-&emsp;例如，Listing 10-1 中的代码响应了将一个人的年龄设置为 nil 值的尝试，而是将年龄设置为 0，这对于浮点值更合适。请注意，重写方法为它没有显式处理的任何键调用其超类的 setNilValueForKey: 函数。
+&emsp;例如，Listing 10-1 中的代码响应了将一个人的年龄设置为 nil 值的尝试，其内部把年龄设置为 0，这对于浮点值更合适。请注意，重写方法为它没有显式处理的任何键调用其超类的 setNilValueForKey: 函数。（`[super setNilValueForKey:key]`）
  
 &emsp;Listing 10-1 Example implementation of setNilValueForKey:（setNilValueForKey: 的示例实现）
 ```c++
@@ -749,22 +902,22 @@ if (![person validateValue:&name forKey:@"name" error:&error]) {
     }
 }
 ```
-> &emsp;NOTE: 为了向后兼容，当对象重写了不推荐使用的 unableToSetNilForKey: 方法时，setValue:forKey: 调用该方法而不是 setNilValueForKey:。
+> &emsp;NOTE: 为了向后兼容，当对象重写了不推荐使用的 unableToSetNilForKey: 方法时，setValue:forKey: 会调用该方法而不是 setNilValueForKey:。
 
 ## Adding Validation
-&emsp;键值编码协议定义了按键或键路径验证属性的方法。这些方法的默认实现反过来依赖于你按照与访问器方法类似的命名模式定义方法。具体来说，你可以为具有要验证的名称键的任何属性提供 validate<Key>:error: 方法。默认实现会搜索这个值，以响应键编码的 validateValue:forKey:error: 消息。
+&emsp;键值编码协议定义了按键或键路径验证属性的方法。这些方法的默认实现反过来依赖于你按照与访问器方法类似的命名模式定义的方法。具体来说，你可以为你想要验证的名称为 key 的任何属性提供 validate<Key>:error: 方法。默认实现会搜索这个值，以响应键编码的 validateValue:forKey:error: 消息。
 
 &emsp;如果不为属性提供验证方法，则协议的默认实现假定该属性的验证成功，而不管值是多少。这意味着你选择逐个属性进行验证。
 
 > &emsp;NOTE: 你通常只使用 Objective-C 中描述的验证。在 Swift 中，属性验证更习惯于依赖编译器对选项和强类型检查的支持来处理，同时使用内置的 willSet 和 didSet 属性观察者来测试任何运行时 API contracts，如 The Swift Programming Language (Swift 3) 的 property Observators 部分所述 。
 ### Implementing a Validation Method
-&emsp;当你为属性提供验证方法时，该方法通过引用接收两个参数：要验证的值对象和用于返回错误信息的 NSError。因此，你的验证方法可以采取以下三种操作之一：
+&emsp;当你为属性提供验证方法时，该方法通过引用（指针的地址（id *，NSError **）为了在函数内部修改原始指针的指向）接收两个参数：要验证的 value 对象的指针地址和用于返回错误信息的 NSError 对象指针的地址。因此，你的验证方法可以采取以下三种操作之一：
 + 当值 value 有效时，返回 YES 而不更改 value 或 error。
-+ 如果 value 无效，并且你不能或不想提供有效的替代方法，请将 error 参数设置为指示失败原因的 NSError 对象，并返回 NO。
++ 如果 value 无效，并且你不能或不想提供有效的替代方法，将 error 参数设置为指示失败原因的 NSError 对象，并返回 NO。
 
-> &emsp;IMPORTANT: 在尝试设置错误引用之前，请始终测试它是否不为 NULL。（判断入参的 NSError 指针不是 nil）
+> &emsp;IMPORTANT: 在尝试设置 error 引用之前，先判断该 NSError ** error 参数是否不为 nil。
 
-+ 如果 value 无效，但知道有效的替代方法，请创建有效对象，将 value 指定给新对象，然后返回 YES 而不修改 error。如果提供另一个值，则始终返回新对象，而不是修改正在验证的对象，即使原始对象是可变的。 
++ 如果 value 无效，但知道有效的替代方法，请创建有效对象，将 value 指向这个创建的有效对象，然后返回 YES 而不修改 error。如果提供另一个 value，则始终返回新对象，而不是修改正在验证的对象，即使原始对象是可变的。（这里大概是指 value 入参是一个自己的临时变量什么的吗？而不是要验证的对象的属性）
 
 &emsp;Listing 11-1 演示了一个 name string 属性的验证方法，该方法确保 value 对象不是 nil，并且名称是最小长度。如果验证失败，此方法不会替换其他值。
 
@@ -784,13 +937,14 @@ if (![person validateValue:&name forKey:@"name" error:&error]) {
 }
 ```
 ### Validation of Scalar Values
-&emsp;验证方法期望 value 参数是一个对象，因此，非对象属性的值被包装在 NSValue 或 NSNumber 对象中，如 Representing Non-Object Values 中所述。Listing 11-2 中的示例演示了标量属性 age 的验证方法。在这种情况下，通过创建设置为零的有效值并返回 YES 来处理一个潜在的无效条件，即 nil age 值。你还可以在 setNilValueForKey: 重载中处理这个特定条件，因为类的用户可能不会调用验证方法。
+&emsp;验证方法期望 value 参数是一个对象类型，因此，非对象属性的值会被包装在 NSValue 或 NSNumber 对象中，如 Representing Non-Object Values 中所述。Listing 11-2 中的示例演示了标量属性 age 的验证方法。在这种情况下，通过创建设置为零的有效值并返回 YES 来处理一个潜在的无效条件，即 nil age 值。还可以在 setNilValueForKey: 重载中处理这个特定条件，因为类的用户可能不会调用验证方法而去直接给 age 设置 nil 值。
 
 &emsp;Listing 11-2 Validation method for a scalar property
 ```c++
 - (BOOL)validateAge:(id *)ioValue error:(NSError * __autoreleasing *)outError {
     if (*ioValue == nil) {
         // Value is nil: Might also handle in setNilValueForKey
+        // Value 是 nil，可能还会在 setNilValueForKey 函数中处理
         *ioValue = @(0);
     } else if ([*ioValue floatValue] < 0.0) {
         if (outError != NULL) {
@@ -805,7 +959,7 @@ if (![person validateValue:&name forKey:@"name" error:&error]) {
 }
 ```
 ## Describing Property Relationships（描述属性关系）
-&emsp;类描述提供了一种方法来描述类中的一个或多个属性。通过定义类属性之间的这些关系，可以使用键值编码对这些属性进行更智能、更灵活的操作。
+&emsp;类描述（Class descriptions）提供了一种方法来描述类中的一对一和 一对多属性。通过定义类属性之间的这些关系，可以使用键值编码对这些属性进行更智能、更灵活的操作。
 ### Class Descriptions
 &emsp;NSClassDescription 是一个基类，提供获取类元数据的接口。类描述对象记录特定类的对象的可用属性以及该类的对象与其他对象之间的关系（一对一、一对多和反向）。例如，attributeKeys 方法返回为类定义的所有属性的列表；ToAnyRelationshipKeys 和 ToOnRelationshipKeys 方法返回定义多对一关系的键数组；inverseRelationshipKey: 返回从所提供键的关系的目标指向 receiver  的关系的名称。
 
@@ -813,38 +967,59 @@ if (![person validateValue:&name forKey:@"name" error:&error]) {
 
 &emsp;NSScriptClassDescription 是 Cocoa 中提供的 NSClassDescription 的唯一具体子类。它封装了应用程序的脚本信息。
 ## Designing for Performance
-&emsp;键值编码是高效的，尤其是当你依靠默认实现来完成大部分工作时，但是它确实添加了一个间接级别，该级别比直接的方法调用稍慢。只有当你可以从它提供的灵活性中获益，或者允许你的对象参与依赖于它的 Cocoa 技术时，才使用键值编码。
+&emsp;键值编码是高效的，尤其是当你依靠默认实现来完成大部分工作时，但是它确实添加了一个间接级别，该级别比直接的方法调用稍慢。只有当你可以从它提供的灵活性中获益或者允许你的对象参与依赖于它的 Cocoa 技术时，才使用键值编码。
 ### Overriding Key-Value Coding Methods（覆盖键值编码方法）
-&emsp;通常，通过确保对象继承自 NSObject，然后提供本文档中描述的特定于属性的访问器和相关方法，可以使对象符合键值编码。很少需要重写键值编码访问器的默认实现，例如 valueForKey: 和 setValue:forKey:，或基于键的验证方法，如 validateValue:forKey:。因为这些实现会缓存有关运行时环境的信息以提高效率，所以如果你重写它们以引入自定义逻辑，请确保在返回前调用超类中的默认实现。
+&emsp;通常，通过确保对象继承自 NSObject，然后提供本文档中描述的特定于属性的访问器和相关方法，即可以使得对象符合键值编码的要求。很少需要重写键值编码访问器的默认实现，例如 valueForKey: 和 setValue:forKey:，或基于键的验证方法，如 validateValue:forKey:。因为这些实现会缓存有关运行时环境的信息以提高效率，所以如果你重写它们以引入自定义逻辑，请确保在返回前调用超类中的默认实现。
 ### Optimizing To-Many Relationships（优化一对多关系）
 &emsp;当实现一对多关系时，在许多情况下，尤其是对于可变集合，访问器的索引形式可显着提高性能。有关更多信息，请参见 Accessing Collection Properties 和 Defining Collection Methods。
-## Compliance Checklist
+## Compliance Checklist（符合 KVC 编码要求的检查表）
 &emsp;请执行本节中概述的步骤，以确保你的对象符合键值编码。有关详细信息，请参见前面的部分。
-### Attribute and To-One Relationship Compliance（属性和一对一关系合规性）
+### Attribute and To-One Relationship Compliance（属性和一对一关系的合规性）
 &emsp;对于作为属性或一对一关系的每个属性：
-&emsp;实现名为<key>或is<key>的方法，或创建实例变量<key>或<key>。编译器通常在自动合成属性时为您执行此操作。
 
+&emsp;☑️ 实现名为 <key> 或 is<Key> 的方法，或创建实例变量 <key> 或  \_<key>。编译器通常在自动合成属性时为你执行此操作。（即当我们在类定义中添加一个属性时，编译器通常会自动把我们生成该属性的 setter getter 和一个名字是 \_属性名 的成员变量。）
 
+> &emsp;NOTE: 尽管属性名称通常以小写字母开头，但是协议的默认实现也可以使用以大写字母开头的名称，例如 URL。
 
+&emsp;☑️ 如果该属性是可变的，则实现 set<Key>: 方法。允许编译器自动合成（automatically synthesize）属性时，编译器通常会为你执行此操作。
 
+> &emsp;IMPORTANT: 如果你重写默认的 setter，请确保不要调用协议的任何验证方法（validation methods）。
 
+&emsp;☑️ 如果该属性是标量，请重写 setNilValueForKey: 方法，以优雅地处理将 nil 值赋给标量属性的情况。
+### Indexed To-Many Relationship Compliance（一对多关系的合规性）
+&emsp;对于是一对多关系的每个属性（例如 NSArray 属性）：
 
+&emsp;☑️ 实现一个名为 <key> 的方法，该方法返回一个数组，或者具有一个名为 <key> 或 \_<key> 的数组实例变量。编译器通常会在自动合成属性时为你执行此操作。
 
+&emsp;☑️ 或者，实现方法 countOf<Key> 以及 objectIn<Key>AtIndex: 和 <key>AtIndexes: 中的一个或两个。
 
+&emsp;☑️ （可选）实现 get<Key>:range: 以提高性能。
 
+&emsp;此外，如果属性是可变的：
 
+&emsp;☑️ 实现 insertObject:in<Key>AtIndex: 和 insert<Key>:atIndexes: 中的一个或两个方法。
 
+&emsp;☑️ 实现 removeObjectFrom<Key>AtIndex: 和 remove<Key>AtIndexes: 中的一个或两个方法。
 
+&emsp;☑️ （可选）实现 replaceObjectIn<Key>AtIndex:withObject: 或 replace<Key>AtIndexes:with<Key>: 以提高性能。
+### Unordered To-Many Relationship Compliance（无序一对多关系的合规性）
+&emsp;对于是无序一对多关系的每个属性（例如 NSSet 属性）：
 
+&emsp;☑️ 实现一个名为 <key> 的方法，该方法返回一个集合，或者具有一个名为 <key> 或 \_<key> 的 NSSet 类型的实例变量。编译器通常会在自动合成属性时为你执行此操作。
 
+&emsp;☑️ 或者，实现方法 countOf<Key>、enumeratorOf<Key> 和 memberOf<Key>:。
 
+&emsp;此外，如果属性是可变的：
 
+&emsp;☑️ 实现方法 add<Key>Object: 和 add<Key>: 中的一个或两个。
 
+&emsp;☑️ 实现方法 remove<Key>Object: 和 remove<Key>: 中的一个或两个。
 
+&emsp;☑️ （可选）实现 intersect<Key>: 以提高性能。
+### Validation
+&emsp;选择验证是否需要它：
 
-
-
+&emsp;实现 validate<Key>:error: 方法，返回指示 value 的有效性的布尔值，并在适当时返回一个描述错误原因的 NSError 对象的引用。
 ## 参考链接
 **参考链接:🔗**
 + [Key-Value Coding Programming Guide](https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/KeyValueCoding/index.html#//apple_ref/doc/uid/10000107i)
-+ []()
