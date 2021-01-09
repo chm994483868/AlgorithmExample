@@ -58,15 +58,65 @@
 
 > &emsp;Important: 并非所有类的所有属性都符合 KVO。你可以按照 KVO Compliance 中所述的步骤，确保自己的类符合 KVO。通常，Apple 提供的框架中的属性只有在有文档记录的情况下才符合 KVO。
 ### Registering as an Observer
-&emsp;观察对象（observing object）首先通过发送 addObserver:forKeyPath:options:context: 消息向（被）观察对象（observed object）注册自己，将其自身作为观察者（observer）和要观察的属性的关键路径传递。观察者（observer）还指定了一个 options 参数和一个 context 指针来管理通知的各个方面。
+&emsp;观察对象（observing object）首先通过发送 addObserver:forKeyPath:options:context: 消息向（被观察对象）观察对象（observed object）注册自己，将其自身作为观察者（observer）和要观察的属性的关键路径传递。观察者（observer）还指定了一个 options 参数和一个 context 指针来管理通知的各个方面。
 #### Options
-&emsp;options 参数，指定为选项常量的按位 OR，既会影响通知中提供的更改字典的内容，又会影响生成通知的方式。
+```c++
+// - (void)addObserver:(NSObject *)observer forKeyPath:(NSString *)keyPath options:(NSKeyValueObservingOptions)options context:(nullable void *)context;
+// - (void)observeValueForKeyPath:(nullable NSString *)keyPath ofObject:(nullable id)object change:(nullable NSDictionary<NSKeyValueChangeKey, id> *)change context:(nullable void *)context;
+
+// 用于 -addObserver:forKeyPath:options:context: 和 -addObserver:toObjectsAtIndexes:forKeyPath:options:context: 函数的选项
+typedef NS_OPTIONS(NSUInteger, NSKeyValueObservingOptions) {
+    // 通知中发送的更改字典（(NSDictionary<NSKeyValueChangeKey,id> *)change）是否应分别包含 NSKeyValueChangeNewKey 和 NSKeyValueChangeOldKey 条目。
+    NSKeyValueObservingOptionNew = 0x01,
+    NSKeyValueObservingOptionOld = 0x02,
+    
+    // 在观察者注册方法返回之前，是否应立即将通知发送给观察者。
+    // 如果还指定了 NSKeyValueObservingOptionNew，则通知中的更改字典将始终包含 NSKeyValueChangeNewKey 条目，但绝不包含 NSKeyValueChangeOldKey 条目。
+    //（在初始通知中，观察到的属性的当前值可能是旧的，但对于观察者却是新的。）
+    // 你可以使用此选项，而不是同时显式调用观察者的 -observeValueForKeyPath:ofObject:change:context: 方法。
+    // 当此选项与 -addObserver:toObjectsAtIndexes:forKeyPath:options:context: 一起使用时，将向要添加观察者的每个索引对象发送一个通知。
+    
+    // 当调用 -addObserver:forKeyPath:options:context: 函数注册观察者并在 options 参数中包含 NSKeyValueObservingOptionInitial 选项时，
+    // 此时会立即调用一次观察者的 -observeValueForKeyPath:ofObject:change:context: 函数，如果 options 参数是 NSKeyValueObservingOptionInitial | NSKeyValueObservingOptionNew，
+    // 则在 change 字典中将始终包含 NSKeyValueChangeNewKey 值。（如果被观察者的 keyPath 对应的属性的值为 nil 则change 字典中 NSKeyValueChangeNewKey 的值为 NULL）
+    
+    // 当 options 参数是 NSKeyValueObservingOptionInitial | NSKeyValueObservingOptionNew 时，change 字典打印结果：（keyPath 对应属性值是 nil/有值 时）
+    // {kind = 1; new = "<null>";} {kind = 1; new = CHM;}
+    // 当 options 参数是 NSKeyValueObservingOptionInitial 时，打印 change 字典，仅包含 kind: {kind = 1;}
+    
+    // 即 NSKeyValueObservingOptionInitial 选项的作用仅是为了在注册观察者时收到一次通知。
+    //（连带着可以包含 new 值或者不包含 new 值，看开发者意愿，如果选项是 NSKeyValueObservingOptionInitial | NSKeyValueObservingOptionOld 时，change 字典也只包含 kind）
+    
+    NSKeyValueObservingOptionInitial API_AVAILABLE(macos(10.5), ios(2.0), watchos(2.0), tvos(9.0)) = 0x04,
+    
+    
+    
+    
+    
+    
+    
+
+    /* Whether separate notifications should be sent to the observer before and after each change, instead of a single notification after the change. The change dictionary in a notification sent before a change always contains an NSKeyValueChangeNotificationIsPriorKey entry whose value is [NSNumber numberWithBool:YES], but never contains an NSKeyValueChangeNewKey entry. You can use this option when the observer's own KVO-compliance requires it to invoke one of the -willChange... methods for one of its own properties, and the value of that property depends on the value of the observed object's property. (In that situation it's too late to easily invoke -willChange... properly in response to receiving an -observeValueForKeyPath:ofObject:change:context: message after the change.)
+
+When this option is specified, the change dictionary in a notification sent after a change contains the same entries that it would contain if this option were not specified, except for ordered unique to-many relationships represented by NSOrderedSets.  For those, for NSKeyValueChangeInsertion and NSKeyValueChangeReplacement changes, the change dictionary for a will-change notification contains an NSKeyValueChangeIndexesKey (and NSKeyValueChangeOldKey in the case of Replacement where the NSKeyValueObservingOptionOld option was specified at registration time) which give the indexes (and objects) which *may* be changed by the operation.  The second notification, after the change, contains entries reporting what did actually change.  For NSKeyValueChangeRemoval changes, removals by index are precise.
+    */
+    NSKeyValueObservingOptionPrior API_AVAILABLE(macos(10.5), ios(2.0), watchos(2.0), tvos(9.0)) = 0x08
+
+};
+```
+&emsp;options 参数，指定为（多个）选项常量的按位 OR（或者单个的选项常量），既会影响通知中提供的更改字典的内容，又会影响生成通知的方式。
 
 &emsp;你可以通过指定选项 NSKeyValueObservingOptionOld 选择从更改之前接收观察到的属性的值。你可以使用选项 NSKeyValueObservingOptionNew 来请求属性的新值。你可以通过这些选项的按位 OR 来接收新旧值。
 
 &emsp;指示观察对象发送带有选项 NSKeyValueObservingOptionInitial 的立即更改通知（在 addObserver:forKeyPath:options:context: 返回之前）。你可以使用此附加的一次性通知在 observer 中建立属性的初始值。
 
-&emsp;通过包含选项 NSKeyValueObservingOptionPrior，可以指示观察对象在属性更改之前发送通知（除了更改之后的常规通知之外）。change dictionary通过包含值为NSNumber wrapping YES的键NSKeyValueChangeNotificationIsPriorKey来表示预更改通知。那把钥匙不在别的地方。当观察者自己的KVO遵从性要求它为依赖于观察到的属性的属性调用-willChange…方法时，可以使用prechange通知。通常的变更后通知来得太晚，无法及时调用willChange。
+
+
+
+
+
+
+&emsp;通过包含选项 NSKeyValueObservingOptionPrior，可以指示观察对象在属性更改之前发送通知（除了更改之后的常规通知之外）。change dictionary通过包含值为 NSNumber wrapping YES 的键 NSKeyValueChangeNotificationIsPriorKey 来表示预更改通知。那把钥匙不在别的地方。当观察者自己的KVO遵从性要求它为依赖于观察到的属性的属性调用-willChange…方法时，可以使用prechange通知。通常的变更后通知来得太晚，无法及时调用willChange。
 
 &emsp;通过包括选项 NSKeyValueObservingOptionPrior，可以指示观察对象在属性更改之前（除了更改之后的常规通知）发送通知。更改字典通过将键 NSKeyValueChangeNotificationIsPriorKey 包括 NSNumber 值包装为 YES 来表示预更改通知。该 key 不存在。当观察者自己的 KVO 合规性要求其根据依赖于观察到的属性的其属性之一调用-willChange…方法之一时，可以使用更改前通知。
 
