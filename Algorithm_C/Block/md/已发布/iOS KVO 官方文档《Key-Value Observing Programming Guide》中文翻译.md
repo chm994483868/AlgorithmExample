@@ -210,23 +210,189 @@ static void *PersonAccountInterestRateContext = &PersonAccountInterestRateContex
 + 如果尚未注册为观察者，则请求以观察者身份移除会导致 NSRangeException。 你可以对 removeObserver:forKeyPath:context: 进行一次调用，以对应对 addObserver:forKeyPath:options:context: 的调用，或者，如果在你的应用中不可行，则将 removeObserver:forKeyPath:context: 调用在 try/catch 块内以处理潜在的异常。
 + 观察者释放后，观察者不会自动将其自身移除。被观察者对象继续发送通知，而忽略了观察者的状态。但是，与发送到已释放对象的任何其他消息一样，更改通知会触发内存访问异常。因此，你必须确保观察者在从内存中消失之前将自己移除。
 + 该协议无法询问对象是观察者还是被观察者。构建你的代码时以避免 release 相关的错误。一种典型的模式是在观察者初始化期间（例如，在 init 或 viewDidLoad 中）注册为观察者，并在释放过程中（通常在 dealloc 中）注销，以确保成对和有序地添加和删除消息，并且在从内存中释放观察者之前，未对其进行注册。
+## KVO Compliance（KVO 合规性）
+&emsp;为了被视为与特定属性的 KVO 兼容，类必须确保：
++ 该类必须与属性的键值编码兼容，如 key-value coding compliant 中所述。
+  KVO 支持与 KVC 相同的数据类型，包括 Objective-C 对象以及 Scalar and Structure Support 中列出的标量和结构。
++ 该类为属性发出 KVO 更改通知。
++ 相关键已正确注册（请参阅 Registering Dependent Keys）。
 
+&emsp;有两种技术可以确保发出更改通知（change notifications）。自动支持由 NSObject 提供，默认情况下可用于符合键值编码的类的所有属性。通常，如果遵循标准的 Cocoa 编码和命名约定，就可以使用自动更改通知，而无需编写任何其他代码。
 
+&emsp;手动更改通知提供了对何时发出通知的附加控制，并且需要附加编码。通过实现类方法 automaticallyNotifiesObserversForKey:，可以控制子类属性的自动通知。
+### Automatic Change Notification（自动更改通知）
+&emsp;NSObject 提供了自动键值更改通知（automatic key-value change notification）的基本实现。自动键值更改通知通知观察者使用键值兼容的访问器以及键值编码方法所做的更改。例如：mutableArrayValueForKey: 返回的集合代理对象也支持自动通知。
 
+&emsp;Listing 1 所示的示例导致属性名的任何观察者都会收到更改通知。
 
+&emsp;Listing 1  Examples of method calls that cause KVO change notifications to be emitted（导致发出 KVO 更改通知的方法调用示例）
+```c++
+// Call the accessor method. 调用访问器方法
+[account setName:@"Savings"];
+ 
+// Use setValue:forKey:.
+[account setValue:@"Savings" forKey:@"name"];
+ 
+// Use a key path, where 'account' is a kvc-compliant property of 'document'.
+[document setValue:@"Savings" forKeyPath:@"account.name"];
+ 
+// Use mutableArrayValueForKey: to retrieve a relationship proxy object.
+Transaction *newTransaction = <#Create a new transaction for the account#>;
+NSMutableArray *transactions = [account mutableArrayValueForKey:@"transactions"];
+[transactions addObject:newTransaction];
+```
+### Manual Change Notification（手动更改通知）
+&emsp;在某些情况下，你可能希望控制通知过程，例如，将由于特定于应用程序的原因而不必要的触发通知最小化，或者将多个更改分组到单个通知中。手动更改通知提供了执行此操作的方法。
 
+&emsp;手动和自动通知并不相互排斥。你可以自由地发出手动通知，除了自动通知已经执行。更典型的是，你可能希望完全控制特定属性的通知。在本例中，你将重写 automaticallyNotifiesObserversForKey: 的 NSObject 实现。对于要排除其自动通知的属性，automaticallyNotifiesObserversForKey: 的子类实现应返回 NO。子类实现应为任何无法识别的键调用 super。Listing 2 中的示例启用了 balance 属性的手动通知，允许超类确定所有其他键的通知。
 
+&emsp;Listing 2  Example implementation of automaticallyNotifiesObserversForKey:（automaticallyNotifiesObserversForKey: 函数到实现示例）
+```c++
++ (BOOL)automaticallyNotifiesObserversForKey:(NSString *)theKey {
+    BOOL automatic = NO;
+    if ([theKey isEqualToString:@"balance"]) {
+        // 当是 balance 时返回 NO
+        automatic = NO;
+    } else {
+        // 其他属性的情况下则是调用其父类实现
+        automatic = [super automaticallyNotifiesObserversForKey:theKey];
+    }
+    
+    return automatic;
+}
+```
+&emsp;要实现手动观察者通知，请在更改值之前调用 willChangeValueForKey:，在更改值之后调用 didChangeValueForKey:。Listing 3 中的示例实现了 balance 属性的手动通知。
 
+&emsp;Listing 3  Example accessor method implementing manual notification（实现手动通知的访问器方法示例）
+```c++
+- (void)setBalance:(double)theBalance {
+    [self willChangeValueForKey:@"balance"];
+    _balance = theBalance;
+    [self didChangeValueForKey:@"balance"];
+}
+```
+&emsp;你可以通过首先检查值是否已更改来最小化发送不必要的通知。Listing 4 中的示例测试 balance 的值，并仅在其发生更改时提供通知。
 
+&emsp;Listing 4  Testing the value for change before providing notification（在提供通知之前测试更改值）
+```c++
+- (void)setBalance:(double)theBalance {
+    // 判断 _balance 的当前值和 theBalance 不相等时才发出更改通知
+    if (theBalance != _balance) {
+        [self willChangeValueForKey:@"balance"];
+        _balance = theBalance;
+        [self didChangeValueForKey:@"balance"];
+    }
+}
+```
+&emsp;如果单个操作导致多个键发生更改，则必须嵌套更改通知，如 Listing 5 所示。
 
+&emsp;Listing 5  Nesting change notifications for multiple keys（嵌套多个键的更改通知）
+```c++
+- (void)setBalance:(double)theBalance {
+    // balance 和 itemChanged 两个属性都发生改变
+    [self willChangeValueForKey:@"balance"];
+    [self willChangeValueForKey:@"itemChanged"];
+    
+    _balance = theBalance;
+    _itemChanged = _itemChanged+1;
+    
+    [self didChangeValueForKey:@"itemChanged"];
+    [self didChangeValueForKey:@"balance"];
+}
+```
+&emsp;在有序一对多关系的情况下，不仅必须指定更改的键，还必须指定更改的类型和所涉及对象的索引。更改类型是指定 NSKeyValueChangeInsertion、NSKeyValueChangeRemoval 或 NSKeyValueChangeReplacement 的 NSKeyValueChange。受影响对象的索引作为 NSIndexSet 对象传递。
 
+&emsp;Listing 6 中的代码片段演示了如何在 transactions 所示的一对多关系中包装对象的删除。
 
+&emsp;Listing 6  Implementation of manual observer notification in a to-many relationship（在一对多关系中实现手动观察者通知）
+```c++
+- (void)removeTransactionsAtIndexes:(NSIndexSet *)indexes {
+    [self willChange:NSKeyValueChangeRemoval valuesAtIndexes:indexes forKey:@"transactions"];
+ 
+    // Remove the transaction objects at the specified indexes.
+ 
+    [self didChange:NSKeyValueChangeRemoval valuesAtIndexes:indexes forKey:@"transactions"];
+}
+```
+## Registering Dependent Keys（注册依赖的 Keys）
+&emsp;在许多情况下，一个属性的值取决于另一个对象中一个或多个其他属性的值。如果某个属性的值发生更改，则派生属性（derived property）的值也应标记为更改。如何确保为这些依赖属性发布键值观察通知取决于关系的基数（cardinality of the relationship）。
+### To-One Relationships（一对一）
+&emsp;要为一对一关系自动触发通知，你应该重写 keyPathsForValuesAffectingValueForKey: 或实现一个合适的方法，该方法遵循它为注册依赖键定义的模式。
 
+&emsp;例如，一个人的全名取决于名字和姓氏。返回全名的方法可以编写如下：
+```c++
+- (NSString *)fullName {
+    return [NSString stringWithFormat:@"%@ %@",firstName, lastName];
+}
+```
+&emsp;当 firstName 或 lastName 属性更改时，必须通知观察 fullName 属性的应用程序，因为它们会影响属性的值。
 
+&emsp;一种解决方案是重写 keyPathsForValuesAffectingValueForKey: 指定 person 的 fullName 属性依赖于 lastName 和 firstName 属性。Listing 1 展示了这种依赖关系的一个示例实现：
 
+&emsp;Listing 1  Example implementation of keyPathsForValuesAffectingValueForKey:
+```c++
++ (NSSet *)keyPathsForValuesAffectingValueForKey:(NSString *)key {
+    NSSet *keyPaths = [super keyPathsForValuesAffectingValueForKey:key];
+ 
+    if ([key isEqualToString:@"fullName"]) {
+        NSArray *affectingKeys = @[@"lastName", @"firstName"];
+        keyPaths = [keyPaths setByAddingObjectsFromArray:affectingKeys];
+    }
+    
+    return keyPaths;
+}
+```
+&emsp;重写通常应该调用 super 并返回一个集合，该集合包含执行该操作所产生的集合中的任何成员（以免干扰超类中此方法的重写）。
 
+&emsp;也可以通过实现一个遵循命名约定 keyPathsForValuesAffecting<Key> 的类方法来实现相同的结果，其中 <Key> 是依赖于这些值的属性（首字母大写）的名称。使用此模式，可以将 Listing 1 中的代码重写为名为 keyPathsForValuesAffectingFullName 的类方法，如 Listing 2 所示。
 
+&emsp;Listing 2  Example implementation of the keyPathsForValuesAffecting<Key> naming convention
+```c++
++ (NSSet *)keyPathsForValuesAffectingFullName {
+    return [NSSet setWithObjects:@"lastName", @"firstName", nil];
+}
+```
+&emsp;在使用 category 向现有类添加计算属性时，不能重写 keyPathsForValuesAffectingValueForKey: 方法，因为不应重写 category 中的方法。在这种情况下，实现一个匹配的 keyPathsForValuesAffecting<Key> 类方法来利用这种机制。
 
+> &emsp;Note: 不能通过实现 keyPathsForValuesAffectingValueForKey: 来设置一对多个关系的依赖关系。相反，你必须观察 to-many 集合中每个对象的适当属性，并通过自己更新依赖键来响应其值的更改。下一节展示了处理这种情况的策略。
+### To-Many Relationships（一对多）
+&emsp;keyPathsForValuesAffectingValueForKey: 方法不支持包含一对多关系的键路径。例如，假设你有一个 Department 对象，它与一个 Employee 具有一对多关系（employees），Employee 具有 salary 属性。你可能希望 Department 对象具有 totalSalary 属性，该属性依赖于 relationship 中所有 Employees 的 salaries。例如，不能使用 keyPathsForValuesAffectingTotalSalary 函数返回 employees.salary 作为一个 key。
+
+&emsp;两种情况下都有两种可能的解决方案：
+1. 可以使用键值观察将父级（在本例中为 Department）注册为所有子级（在本例中为 Employees）的相关属性的观察者。当子对象添加到关系中或从关系中移除时，必须将父对象作为观察者添加和移除（请参见  Registering for Key-Value Observing）。在 observeValueForKeyPath:ofObject:change:context: 方法更新依赖值以响应更改，如以下代码片段所示：
+```c++
+- (void)observeValueForKeyPath:(NSString *)keyPath ofObject:(id)object change:(NSDictionary *)change context:(void *)context {
+    if (context == totalSalaryContext) {
+        [self updateTotalSalary];
+    } else
+    // deal with other observations and/or invoke super...
+}
+ 
+- (void)updateTotalSalary {
+    [self setTotalSalary:[self valueForKeyPath:@"employees.@sum.salary"]];
+}
+ 
+- (void)setTotalSalary:(NSNumber *)newTotalSalary {
+    if (totalSalary != newTotalSalary) {
+        [self willChangeValueForKey:@"totalSalary"];
+        _totalSalary = newTotalSalary;
+        [self didChangeValueForKey:@"totalSalary"];
+    }
+}
+ 
+- (NSNumber *)totalSalary {
+    return _totalSalary;
+}
+```
+2. 如果你使用的是 Core Data，那么可以在应用程序的通知中心注册父级，作为其 managed object context 的观察者。父类应以类似于键值观察的方式回应子类发布的相关变更通知。
+## Key-Value Observing Implementation Details（Key-Value Observing 实现详情）
+&emsp;自动键值观察是使用 isa swizzling 技术实现的。
+
+&emsp;顾名思义，isa 指针指向维护调度表的对象类。这个分派表本质上包含指向类实现的方法的指针以及其他数据。
+
+&emsp;当一个观察者为一个对象的属性注册时，被观察者对象的 isa 指针被修改，指向一个中间类而不是真类。因此，isa 指针的值不一定反映实例的实际类。
+
+&emsp;决不能依赖 isa 指针来确定类成员身份。相反，应该使用 class 方法来确定对象实例的类。
 ## 参考链接
 **参考链接:🔗**
 + [Key-Value Observing Programming Guide](https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/KeyValueObserving/KeyValueObserving.html#//apple_ref/doc/uid/10000177-BCICJDHA)
