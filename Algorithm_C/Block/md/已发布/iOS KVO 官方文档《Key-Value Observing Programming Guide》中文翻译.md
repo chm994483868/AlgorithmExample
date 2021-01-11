@@ -262,6 +262,14 @@
 &emsp;此方法的默认实现从内存地址为键的被观察者对象的全局字典中检索信息。
 
 &emsp;为了提高性能，可以覆盖此属性和 observationInfo，以将不透明数据指针存储在实例变量中。覆盖此属性不得尝试将消息发送到存储的数据。
+
+&emsp;`observationInfo` 打印示例：
+```c++
+🟠🟠🟠 <NSKeyValueObservationInfo 0x60000059a5a0> (
+<NSKeyValueObservance 0x600000b7b420: Observer: 0x7f9a7070fa40, Key path: name, Options: <New: YES, Old: YES, Prior: YES> Context: 0x0, Property: 0x600000b67a50>
+<NSKeyValueObservance 0x600000b7af10: Observer: 0x6000007fd300, Key path: name, Options: <New: YES, Old: YES, Prior: YES> Context: 0x0, Property: 0x600000b67a50>
+)
+```
 #### NSKeyValueChange
 &emsp;可以观察到的变化类型。（change 字典中 NSKeyValueChangeKindKey 为 key 时对应的 value 值）
 ```c++
@@ -678,11 +686,25 @@ NSMutableArray *transactions = [account mutableArrayValueForKey:@"transactions"]
 ## Key-Value Observing Implementation Details（Key-Value Observing 实现详情）
 &emsp;自动键值观察是使用 isa swizzling 技术实现的。
 
-&emsp;顾名思义，isa 指针指向维护调度表的对象类。这个分派表本质上包含指向类实现的方法的指针以及其他数据。
+&emsp;顾名思义，isa 指针指向维护调度表的对象类。这个调度表本质上包含指向类实现的方法的指针以及其他数据。
 
-&emsp;当一个观察者为一个对象的属性注册时，被观察者对象的 isa 指针被修改，指向一个中间类而不是真类。因此，isa 指针的值不一定反映实例的实际类。
+&emsp;当一个观察者为一个对象的属性注册时，被观察者对象的 isa 指针被修改，指向一个中间类而不是真类（NSKVONotifying_XXX）。因此，isa 指针的值不一定反映实例的实际类。
 
 &emsp;决不能依赖 isa 指针来确定类成员身份。相反，应该使用 class 方法来确定对象实例的类。
+
+> &emsp;KVO 是通过 isa-swizzling 实现的。基本的流程就是编译器自动为被观察者对象创造一个派生类（此派生类的父类是被观察者对象所属类），并将被观察者对象的 isa  指向这个派生类。如果用户注册了对此目标对象的某一个属性的观察，那么此派生类会重写这个属性的 setter 方法，并在其中添加进行通知的代码。Objective-C 在发送消息的时候，会通过 isa 指针找到当前对象所属的类对象。而类对象中保存着当前对象的实例方法，因此在向此对象发送消息时候，实际上是发送到了派生类对象的方法。由于编译器对派生类的方法进行了 override，并添加了通知代码，因此会向注册的观察者对象发送通知。注意派生类只重写注册了观察者的属性方法。
+
+&emsp;如我们上面的示例代码中定义的 Student 类，当对其 name 属性注册了观察者后，打印其 class 和 isa 如下：
+```c++
+NSLog(@"🤍🤍 %@", [self.student class]);
+// object_getClass方法返回 isa 指向
+NSLog(@"🤍🤍 %@", object_getClass(self.student));
+// 控制台打印:
+ 🤍🤍 Student
+ 🤍🤍 NSKVONotifying_Student
+```
 ## 参考链接
 **参考链接:🔗**
 + [Key-Value Observing Programming Guide](https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/KeyValueObserving/KeyValueObserving.html#//apple_ref/doc/uid/10000177-BCICJDHA)
++ [iOS KVC和KVO详解](https://juejin.cn/post/6844903602545229831#heading-22)
++ [用代码探讨 KVC/KVO 的实现原理](https://juejin.cn/post/6844903587898753037)
