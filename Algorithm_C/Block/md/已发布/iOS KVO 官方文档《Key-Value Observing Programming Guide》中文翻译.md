@@ -67,6 +67,25 @@
 &emsp;`keyPath`: 相对于对象的已更改值的键路径。`object`: 键路径 `keyPath` 的源对象。`change`: 一个字典，描述相对于对象的键路径 `keyPath` 上的属性值所做的更改。条目在 Change Dictionary Keys 中描述。`context`: 注册观察者以接收键值观察通知时提供的值。
 
 &emsp;为了使对象开始在 keyPath 处发送该值的更改通知消息，可以向其发送 addObserver:forKeyPath:options:context:  消息，并命名应接收该消息的观察者对象。当你完成观察时，尤其是在释放观察者对象之前，你会向被观察者对象发送一个 removeObserver:forKeyPath: 或 removeObserver:forKeyPath:context: 取消注册观察者并停止发送更改通知消息的消息。
+
+&emsp;假设接收者已经在相对于对象的关键路径上注册为该值的观察者，则应通知该值更改。
+
+&emsp;更改字典始终包含一个 NSKeyValueChangeKindKey 条目，其值是包装 NSKeyValueChange 的 NSNumber（使用 -[NSNumber unsignedIntegerValue]）。NSKeyValueChange 的含义取决于键路径标识的属性类型：
+
++ 对于任何类型的属性（属性，一对一关系，有序或无序一对多关系），NSKeyValueChangeSetting 指示观察到的对象已收到 -setValue:forKey: 消息，或者表示与键值编码兼容的 set 方法用于键已被调用，或者 -willChangeValueForKey:/-didChangeValueForKey: 对已被调用。
++ 对于一对多关系，NSKeyValueChangeInsertion、NSKeyValueChangeRemoval 和 NSKeyValueChangeReplacement 表示已将变异消息发送到由 -mutableArrayValueForKey: 消息发送给对象返回的数组，或发送到由 -mutableOrderedSetValueForKey: 消息返回的有序集合。发送到对象，或者已经调用了符合键值编码的数组或键的有序集合突变方法之一，或者 -willChange:valuesAtIndexes:forKey:/-didChange:valuesAtIndexes:forKey: 对具有否则被调用。
++ 对于一对多关系（在 Mac OS 10.4中引入），NSKeyValueChangeInsertion、NSKeyValueChangeRemoval 和 NSKeyValueChangeReplacement 表示已将变异消息发送到由 -mutableSetValueForKey: 消息已发送至对象返回的集合，或该键之一已调用了符合键值的 -value 编码的设置突变方法，或者已另外调用了-willChangeValueForKey:withSetMutation:usingObjects:/-ddChangeValueForKey:withSetMutation:usingObjects:对。
+
+&emsp;对于任何类型的属性，如果在观察者注册时指定了 NSKeyValueObservingOptionNew，则更改字典将包含一个 NSKeyValueChangeNewKey 条目，这是正确的更改，并且这不是事先通知。如果指定了 NSKeyValueObservingOptionOld，则更改字典包含一个 NSKeyValueChangeOldKey，这是正确的更改。有关这些条目的值，请参见 NSKeyValueObserverNotification 非正式协议方法的注释。
+
+&emsp;对于一对多关系，更改字典始终包含一个 NSKeyValueChangeIndexesKey 条目，其值是一个 NSIndexSet，其中包含插入、移除或替换的对象的索引，除非更改是 NSKeyValueChangeSetting。
+
+&emsp;如果在观察者注册时指定了 NSKeyValueObservingOptionPrior（在Mac OS 10.5中引入），并且此通知是在更改之前发送的通知，因此更改字典包含一个 NSKeyValueChangeNotificationIsPriorKey 条目，其值是 NSNumber 包装为 YES（使用 -[NSNumber boolValue]）。
+
+&emsp;context 始终与在观察者注册时传递的指针相同。
+
+&emsp;NSObject + NSKeyValueObserverRegistration 分类：在相对于接收者的关键路径上，以值的观察者身份注册或注销。这些选项确定观察者通知中包括的内容以及何时发送它们，如上所述，并且如上所述，上下文在观察者通知中传递上下文。你应该尽可能使用 -removeObserver:forKeyPath:context: 而不是 -removeObserver:forKeyPath:，因为它可以让你更精确地指定意图。当同一观察者多次注册相同的键路径，但每次都使用不同的上下文指针时，-removeObserver:forKeyPath: 在确定要删除的对象时必须猜测上下文指针，并且可能会猜错。
+
 #### addObserver:forKeyPath:options:context:
 &emsp;注册观察者对象以接收相对于接收此消息的对象的键路径的 KVO 通知。
 ```c++
@@ -88,10 +107,235 @@
 ```c++
 - (void)removeObserver:(NSObject *)observer forKeyPath:(NSString *)keyPath context:(nullable void *)context API_AVAILABLE(macos(10.7), ios(5.0), watchos(2.0), tvos(9.0));
 ```
+&emsp;`observer`: 要作为观察者移除的对象。`keyPath`: 相对于被观察者对象的键路径，已为其注册观察者以接收 KVO 更改通知。`context`: 更具体地标识要删除的观察者的任意数据。（任意数据是指 context 注册时可以是一个指向任意地址的指针）
 
+&emsp;通过检查上下文中的值，你可以精确确定使用哪个 addObserver:forKeyPath:options:context: 调用创建观察关系。当同一观察者多次为同一键路径注册但使用不同的上下文指针时，应用程序可以专门确定停止哪个观察者对象。如果对象尚未注册为观察者却去调用 removeObserver:forKeyPath:context: 函数则是一个错误。
 
+&emsp;在释放在 addObserver:forKeyPath:options:context: 中指定的任何对象之前，请确保调用此方法（或 removeObserver:forKeyPath:）。
 
+&emsp;NSObject + NSKeyValueObserverNotification 分类：给定一个标识属性的键（属性，一对一关系或有序或无序一对多关系），向每个为该键注册的观察者发送 -observeValueForKeyPath:ofObject:change:context: 类型为 NSKeyValueChangeSetting 的通知消息使用其他在对象中找到键值的键路径向其他对象注册的对象。这些方法的调用必须始终配对。
 
+&emsp;如果在观察者注册时要求使用这些方法，则通知中的更改字典将包含可选条目：
++ NSKeyValueChangeOldKey 条目（如果存在）包含调用 -willChangeValueForKey: 时由 -valueForKey: 返回的值（如果 -valueForKey: 返回 nil，则为 NSNull）。
++ NSKeyValueChangeNewKey 条目（如果存在）包含在调用 -didChangeValueForKey: 的瞬间由 -valueForKey: 返回的值（如果 -valueForKey: 返回 nil，则为 NSNull）。
+
+#### willChangeValueForKey:
+&emsp;通知被观察者对象给定属性的值即将更改。
+```c++
+- (void)willChangeValueForKey:(NSString *)key;
+```
+&emsp;`key`: 值将更改的属性的名称。
+
+&emsp;手动实现键值观察者遵从性时，请使用此方法来通知被观察者对象 `key` 对应的属性的值即将更改。
+
+&emsp;此方法的更改类型为 NSKeyValueChangeSetting。（NSKeyValueChangeSetting 下面会详细分析）
+
+> &emsp;Important: 更改值后，必须使用相同的参数（key）调用相应的 didChangeValueForKey:。
+
+&emsp;**你很少需要在子类中重写此方法，但是如果这样做，请务必调用 super。**
+
+#### didChangeValueForKey:
+&emsp;通知被观察者对象给定属性的值已更改。
+```c++
+- (void)didChangeValueForKey:(NSString *)key;
+```
+&emsp;`key`: 值已发生更改的属性的名称。
+
+&emsp;手动实现键值观察者遵从性时，请使用此方法来通知被观察者对象 `key` 对应的属性的值刚刚更改。始终将此方法的调用与对 willChangeValueForKey: 的调用配对。
+
+&emsp;**你很少需要在子类中重写此方法，但是如果这样做，请确保调用 super。**
+
+&emsp;给定一个标识一对多关系的键，将 -observeValueForKeyPath:ofObject:change:context: 传入的更改类型的通知消息发送给每个为该键注册的观察者，包括那些使用键路径向其他对象注册的观察者在此对象中找到键值。传入的类型必须为 NSKeyValueChangeInsertion、NSKeyValueChangeRemoval 或 NSKeyValueChangeReplacement。传入的索引集必须是要插入、删除或替换的对象的索引。这些方法的调用必须始终与相同的参数配对。
+
+&emsp;如果在观察者注册时要求使用这些方法，则通知中的更改字典将包含可选条目：
++ 如果存在 NSKeyValueChangeOldKey 条目（仅适用于 NSKeyValueChangeRemoval 和 NSKeyValueChangeReplacement），则在调用 -willChangeValueForKey:valuesAtIndexes:forKey: 的那一刻，包含由 -valueForKey: 返回的数组中的索引对象数组。
++ 如果存在 NSKeyValueChangeNewKey 条目（仅适用于 NSKeyValueChangeInsertion 和 NSKeyValueChangeReplacement），则在调用 -didChangeValueForKey:valuesAtIndexes:forKey: 的瞬间，该数组将包含由 -valueForKey: 返回的数组中的索引对象。
+
+#### willChange:valuesAtIndexes:forKey:
+&emsp;通知被观察者对象，对于指定的有序一多对关系，将在给定的索引处执行指定的更改。
+```c++
+- (void)willChange:(NSKeyValueChange)changeKind valuesAtIndexes:(NSIndexSet *)indexes forKey:(NSString *)key;
+```
+&emsp;`change`: 即将进行的更改的类型。`indexes`: 更改将影响的一对多关系的索引。`key`: 有序一对多关系的属性的名称。
+
+&emsp;手动实现键值观察合规性时，请使用此方法。
+
+> &emsp;Important: 更改值后，必须使用相同的参数调用相应的 didChange:valuesAtIndexes:forKey:。
+
+&emsp;**你很少需要在子类中重写此方法，但是如果这样做，请确保调用 super。**
+#### didChange:valuesAtIndexes:forKey:
+&emsp;通知被观察者对象，指定的一对多关系在索引上发生了指定的更改。
+```c++
+- (void)didChange:(NSKeyValueChange)changeKind valuesAtIndexes:(NSIndexSet *)indexes forKey:(NSString *)key;
+```
+&emsp;`change`: 所做更改的类型。`indexes`: 受更改影响的一对多关系的索引。`key`: 有序一对多关系的属性的名称。
+
+&emsp;手动实现键值观察合规性时，请使用此方法。
+
+&emsp;**你很少需要在子类中重写此方法，但是如果这样做，请确保调用 super。始终将此方法的调用与对 willChange:valuesAtIndexes:forKey: 的调用配对。**
+
+&emsp;给定一个标识无序一对多关系的键，向每个为该键注册的观察者发送 -observeValueForKeyPath:ofObject:change:context:通知消息，包括那些使用其他在此对象中查找键值的键路径向其他对象注册的通知消息。目的。传入的突变类型对应于 NSMutableSet 方法。传入的集合必须包含将传递给相应的 NSMutableSet 方法的集合。这些方法的调用必须始终与相同的参数配对。
+
+&emsp;使用这些方法导致的通知中更改字典中 NSKeyValueChangeKindKey 条目的值取决于传入的 mutationKind 值：
+
++ NSKeyValueUnionSetMutation -> NSKeyValueChangeInsertion
++ NSKeyValueMinusSetMutation -> NSKeyValueChangeRemoval
++ NSKeyValueIntersectSetMutation -> NSKeyValueChangeRemoval
++ NSKeyValueSetSetMutation -> NSKeyValueChangeReplacement
+
+&emsp;更改字典可能还包含可选条目:
++ NSKeyValueChangeOldKey 条目（如果存在）（仅适用于 NSKeyValueChangeRemoval 和 NSKeyValueChangeReplacement）包含已删除的对象集。
++ NSKeyValueChangeNewKey 条目（如果存在）（仅用于 NSKeyValueChangeInsertion 和 NSKeyValueChangeReplacement）包含所添加的对象集。
+
+#### willChangeValueForKey:withSetMutation:usingObjects:
+&emsp;通知被观察者对象即将对指定的无序一对多关系进行指定的更改。
+```c++
+- (void)willChangeValueForKey:(NSString *)key withSetMutation:(NSKeyValueSetMutationKind)mutationKind usingObjects:(NSSet *)objects;
+```
+&emsp;`key`: 无序一对多关系的属性名称。`mutationKind`: 将要进行的更改的类型。`objects`: 更改中涉及的对象（请参阅 NSKeyValueSetMutationKind）。
+
+&emsp;手动实现键值观察合规性时，请使用此方法。
+
+> &emsp;Important: 更改值后，必须使用相同的参数调用相应的 didChangeValueForKey:withSetMutation:usingObjects:。
+
+&emsp;**你很少需要在子类中重写此方法，但是如果这样做，请确保调用 super。**
+#### didChangeValueForKey:withSetMutation:usingObjects:
+&emsp;通知被观察者对象对指定的无序对一对多关系进行了指定的更改。
+```c++
+- (void)didChangeValueForKey:(NSString *)key withSetMutation:(NSKeyValueSetMutationKind)mutationKind usingObjects:(NSSet *)objects;
+```
+&emsp;`key`: 无序一对多关系的属性名称。`mutationKind`: 所做更改的类型。`objects`: 更改中涉及的对象（请参阅 NSKeyValueSetMutationKind）。
+
+&emsp;手动实现键值观察合规性时，请使用此方法。对该方法的调用始终与对  willChangeValueForKey:withSetMutation:usingObjects: 的调用配对。
+
+&emsp;**你很少需要在子类中重写此方法，但是如果这样做，请务必调用 super。**
+#### automaticallyNotifiesObserversForKey:
+&emsp;返回一个布尔值，该值指示被观察者对象是否支持给定键的自动键值观察。
+```c++
++ (BOOL)automaticallyNotifiesObserversForKey:(NSString *)key;
+```
+&emsp;如果键值观察机制应自动调用 willChangeValueForKey:/didChangeValueForKey: 和  willChange:valuesAtIndexes:forKey:/didChange:valuesAtIndexes:forKey: 只要该类的实例收到该键的键值编码消息，或为该键调用改变键值编码合规性方法时返回 YES；其他情况返回 NO。
+
+&emsp;默认实现返回 YES。从 OS X 10.5 开始，此方法的默认实现从接收类中搜索名称与模式  +automaticallyNotifiesObserversOf<Key> 匹配的方法，并返回调用该方法的结果（如果找到）。找到的任何方法都必须返回 BOOL。如果找不到这样的方法，则返回 YES。
+
+#### keyPathsForValuesAffectingValueForKey:
+&emsp;为属性的值返回一组键路径，这些属性的值会影响指定键的值。
+```c++
++ (NSSet<NSString *> *)keyPathsForValuesAffectingValueForKey:(NSString *)key;
+```
+&emsp;`key`: 其值受键值路径影响的键。
+
+&emsp;当键的观察者向接收类的实例注册时，键值观察本身会自动观察同一实例的所有键路径，并在观察者的值发生变化时将键的更改通知发送给观察者关键路径发生了变化。
+
+&emsp;当键的观察者向接收类的实例注册时，键值观察自身会自动观察同一实例的所有键路径，并在任何键路径的值发生更改时向观察者发送键的更改通知。
+
+&emsp;此方法的默认实现在接收类中搜索名称与 +keyPathsForValuesAffecting<Key> 匹配的方法，如果找到该方法，则返回调用该方法的结果。任何这样的方法都必须返回 NSSet。如果没有找到这样的方法，则返回一个NSSet，该 NSSet 是根据先前不赞成使用的 setKeys:triggerChangeNotificationsForDependentKey: 方法的先前调用提供的信息计算得出的，以实现向后二进制兼容性。
+
+&emsp;当某个属性的 getter 方法使用其他属性的值（包括按键路径定位的属性）计算要返回的值时，可以重写此方法。重写通常应该调用 super 并返回一个集合，该集合包含执行该操作所产生的集合中的任何成员（以免干扰超类中此方法的重写）。
+
+> &emsp;Note: 使用 category 将计算的属性添加到现有类时，请勿覆盖此方法，不支持覆盖 category 中的方法。在这种情况下，请实现匹配的 +keyPathsForValuesAffecting<Key> 以利用此机制。
+#### setKeys:triggerChangeNotificationsForDependentKey:
+&emsp;如果给定数组中指定的任何属性发生更改，则将被观察者对象配置为发布给定属性的更改通知。
+
+> &emsp;Deprecated: 请改用 keyPathsForValuesAffectingValueForKey: 方法代替。
+
+```c++
++ (void)setKeys:(NSArray *)keys triggerChangeNotificationsForDependentKey:(NSString *)dependentKey;
+```
+&emsp;`keys`: 由 `dependentKey` 标识的属性值所依赖的属性的名称。`dependentKey`: 属性的名称，其值取决于 `keys` 指定的属性。
+
+&emsp;对键中的任何键进行 will- 和 did-change KVO 通知方法的调用会自动为 dependentKey 调用相应的更改通知方法。被观察的对象没有接收 willChange 或 didChange 消息来生成通知。
+
+&emsp;在创建接收类的任何实例之前，应先注册依赖项，因此通常可以在类的 initialize 方法中调用此方法，如以下示例所示。
+```c++
++ (void)initialize {
+    [self setKeys:@[@"firstName", @"lastName"] triggerChangeNotificationsForDependentKey:@"fullName"];
+}
+```
+#### observationInfo
+&emsp;返回一个指针，该指针标识有关向被观察者对象注册的所有观察者的信息。
+```c++
+@property void *observationInfo;
+```
+&emsp;该指针标识有关已向被观察者对象注册的所有观察者的信息，在注册时使用的选项等。
+
+&emsp;此方法的默认实现从内存地址为键的被观察者对象的全局字典中检索信息。
+
+&emsp;为了提高性能，可以覆盖此属性和 observationInfo，以将不透明数据指针存储在实例变量中。覆盖此属性不得尝试将消息发送到存储的数据。
+#### NSKeyValueChange
+&emsp;可以观察到的变化类型。（change 字典中 NSKeyValueChangeKindKey 为 key 时对应的 value 值）
+```c++
+typedef NS_ENUM(NSUInteger, NSKeyValueChange) {
+    NSKeyValueChangeSetting = 1,
+    NSKeyValueChangeInsertion = 2,
+    NSKeyValueChangeRemoval = 3,
+    NSKeyValueChangeReplacement = 4,
+};
+```
+&emsp;这些常量作为传递给 observeValueForKeyPath:ofObject:change:context: 函数中的更改字典中，NSKeyValueChangeKindKey 为 key 时的 value 值，指示所做更改的类型。
+
++ NSKeyValueChangeSetting: 指示被观察者的键路径的值已设置为新值。当观察对象的 keyPath 对应是：属性、一对一 和一对多关系的属性时，可能会发生这种更改。
++ NSKeyValueChangeInsertion: 指示已将对象插入到正在观察的一对多关系中。
++ NSKeyValueChangeRemoval: 指示已从观察的一对多关系中删除了一个对象。
++ NSKeyValueChangeReplacement: 指示已从观察的一对多关系中替换了一个对象。
+
+#### NSKeyValueChangeKey
+&emsp;可以显示在更改字典中的键。
+```c++
+typedef NSString * NSKeyValueChangeKey NS_STRING_ENUM;
+```
+&emsp;这些常量在传递给 observeValueForKeyPath:ofObject:change:context: 函数的 change 字典中用作键。
+
++ NSKeyValueChangeKindKey: 一个包含与 NSKeyValueChange 枚举之一相对应的值的 NSNumber 对象，指示发生了哪种更改。
+```c++
+FOUNDATION_EXPORT NSKeyValueChangeKey const NSKeyValueChangeKindKey;
+```
+&emsp;NSKeyValueChangeSetting 的值指示观察到的对象已收到 setValue:forKey: 消息，或者已调用该键的与键值编码兼容的 set 方法，或者 willChangeValueForKey: 或 didChangeValueForKey: 方法之一已被调用。
+
+&emsp;NSKeyValueChangeInsertion、NSKeyValueChangeRemoval 或 NSKeyValueChangeReplacement 的值表示已向遵循键值的集合代理发送了变异消息，或者已调用了该键的其中一个符合键值编码的集合变异方法，或者某个集合将更改，或者某个方法已更改以其他方式调用。
+
+&emsp;你可以在 NSNumber 对象上使用 unsignedIntegerValue 方法来检索更改种类的值。
+
++ NSKeyValueChangeIndexesKey: 如果 NSKeyValueChangeKindKey 条目的值是 NSKeyValueChangeInsertion、NSKeyValueChangeRemoval 或 NSKeyValueChangeReplacement，则此键的值是 NSIndexSet 对象，其中包含已插入、已删除或已替换对象的索引。
+```c++
+FOUNDATION_EXPORT NSKeyValueChangeKey const NSKeyValueChangeIndexesKey;
+```
++ NSKeyValueChangeNewKey: 如果 NSKeyValueChangeKindKey 条目的值是 NSKeyValueChangeSetting，并且在注册观察者时指定了 NSKeyValueObservingOptionNew，则此键的值是该属性的新值。
+```c++
+FOUNDATION_EXPORT NSKeyValueChangeKey const NSKeyValueChangeNewKey;
+```
+&emsp;对于 NSKeyValueChangeInsertion 或 NSKeyValueChangeReplacement，如果在注册观察者时指定了 NSKeyValueObservingOptionNew，则此键的值是一个 NSArray 实例，该实例分别包含已插入或替换其他对象的对象。
+
++ NSKeyValueChangeNotificationIsPriorKey: 如果在注册观察者时指定了 NSKeyValueObservingOptionPrior 选项，则会在更改之前发送此通知。
+```c++
+FOUNDATION_EXPORT NSKeyValueChangeKey const NSKeyValueChangeNotificationIsPriorKey API_AVAILABLE(macos(10.5), ios(2.0), watchos(2.0), tvos(9.0));
+```
+&emsp;更改字典包含一个 NSKeyValueChangeNotificationIsPriorKey 条目，其值是一个包含布尔值 YES 的 NSNumber 对象。
+
++ NSKeyValueChangeOldKey: 如果 NSKeyValueChangeKindKey 条目的值是 NSKeyValueChangeSetting，并且在注册观察者时指定了 NSKeyValueObservingOptionOld，则此键的值是更改属性之前的值。
+```c++
+FOUNDATION_EXPORT NSKeyValueChangeKey const NSKeyValueChangeOldKey;
+```
+&emsp;对于 NSKeyValueChangeRemoval 或 NSKeyValueChangeReplacement，如果在注册观察者时指定了 NSKeyValueObservingOptionOld，则该值是一个 NSArray 实例，其中分别包含已删除或已被其他对象替换的对象。
+
+#### NSKeyValueSetMutationKind
+&emsp;你可以对无序集合进行的突变类型。
+```c++
+typedef NS_ENUM(NSUInteger, NSKeyValueSetMutationKind) {
+    NSKeyValueUnionSetMutation = 1,
+    NSKeyValueMinusSetMutation = 2,
+    NSKeyValueIntersectSetMutation = 3,
+    NSKeyValueSetSetMutation = 4
+};
+```
+&emsp;这些常量被指定为方法 willChangeValueForKey:withSetMutation:usingObjects: 和 didChangeValueForKey:withSetMutation:usingObjects: 的 mutationKind 参数。它们的语义分别与 NSMutableSet 的 -unionSet:、-minusSet:、-intersectSet: 和 -setSet: 方法完全对应。
+
++ NSKeyValueUnionSetMutation: 指示已将指定集中的观察者添加到被观察者对象。这种突变会导致 NSKeyValueChangeInsertion 的 NSKeyValueChangeKindKey 值。
++ NSKeyValueMinusSetMutation: 指示正在从被观察者对象中移除指定集合中的观察者。这种突变会导致 NSKeyValueChangeRemoval 的 NSKeyValueChangeKindKey 值。
++ NSKeyValueIntersectSetMutation: 指示正在从被观察者对象中移除不在指定集合中的观察者。这种突变会导致 NSKeyValueChangeRemoval 的 NSKeyValueChangeKindKey 值。
++ NSKeyValueSetSetMutation: 指示一组观察者正在替换被观察者对象中的现有对象。这种突变会导致 NSKeyValueChangeReplacement 的 NSKeyValueChangeKindKey 值。
+
+&emsp;以上就是 NSKeyValueObserving 在 Developer Documentation 文档中的所有内容，可能对一些内容会有一些迷糊，不要紧，在下面的 Key-Value Observing Programming Guide 中会有详细的解释以及示例代码，那么继续学习吧！
 
 ## Registering for Key-Value Observing（注册键值观察）
 &emsp;你必须执行以下步骤才能使对象接收到符合 KVO 的属性的键值观察通知：
