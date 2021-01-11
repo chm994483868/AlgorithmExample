@@ -1,6 +1,6 @@
 # iOS KVO 官方文档《Key-Value Observing Programming Guide》中文翻译
 
-> &emsp;那么下面一起通过官方文档来全面的学习一下 KVO 吧！⛽️⛽️ 
+> &emsp;日常开发中我们可能已经非常习惯于使用 KVO 来监听对象的某个属性，不过可能有一些细节我们未深入过，那么下面一起通过官方文档来全面的学习一下 KVO 吧！⛽️⛽️
 
 ## Introduction to Key-Value Observing Programming Guide（键值观察编程指南简介）
 &emsp;键值观察是一种机制，它允许将其他对象的指定属性的更改通知给对象。
@@ -11,6 +11,8 @@
 &emsp;键值观察提供了一种机制，该机制允许将其他对象的特定属性的更改通知给对象。对于应用程序中模型层和控制器层（model and controller layers）之间的通信特别有用。 （在 OS X 中，控制器层（controller layer）绑定技术在很大程度上依赖于键值观察。）控制器对象通常观察模型对象的属性，而视图对象通过控制器观察模型对象的属性。但是，此外，模型对象可能会观察其他模型对象（通常是确定从属值何时更改）甚至是自身观察自己（再次确定从属值何时更改）。
 
 &emsp;你可以观察到包括简单属性（attributes）、一对一关系（ to-one relationships）和一对多关系（to-many relationships）的属性。一对多关系的观察者被告知所做更改的类型，以及更改涉及哪些对象。
+
+&emsp;以下示例代码摘自上篇 KVC 中的，分别表示了不同类型的属性。
 ```c++
 @interface BankAccount : NSObject
  
@@ -47,6 +49,50 @@
 &emsp;与使用 NSNotificationCenter 的通知不同，没有 central object 为所有观察者（observers）提供更改通知。而是在进行更改时将通知直接发送到观察对象。 NSObject 提供了键值观察的基本实现，因此你几乎不需要重写这些方法。
 
 &emsp;Key-Value Observing Implementation Details  描述了键值观察的实现方式。
+
+&emsp;同上篇的 KVC 一样，KVO 相关的代码都声明在 NSKeyValueObserving.h 文件中，在 NSKeyValueObserving.h 文件内部同样是采用 Category 机制，把不同的函数定义在不同的 NSObject Category 中，如 NSObject + NSKeyValueObserving 中声明了所有观察者都必须实现的 -observeValueForKeyPath:ofObject:change:context: 通知函数，NSObject + NSKeyValueObserverRegistration 中声明了注册观察者和移除观察者的函数，然后 NSArray<ObjectType> + NSKeyValueObserverRegistration、NSOrderedSet<ObjectType> + NSKeyValueObserverRegistration、NSSet<ObjectType> + NSKeyValueObserverRegistration 则是分别针对 NSArray、NSOrderedSet、NSSet 类重写 KVO 相关的函数，以及新增一些 KVO 相关函数。
+
+&emsp;那么这里我们先看一下 NSKeyValueObserving.h 的内容，然后再接着看 Key-Value Observing Programming Guide 文档。
+### NSKeyValueObserving
+&emsp;对象采用的一种非正式协议，用于将其他对象的指定属性的更改通知给对象。
+
+&emsp;你可以观察到任何对象属性，包括简单属性，一对一关系和一对多关系。一对多关系的观察者被告知所做更改的类型，以及更改涉及哪些对象。
+
+&emsp;NSObject 提供了 NSKeyValueObserving 协议的实现，该协议为所有对象提供了自动观察功能。你可以通过禁用自动观察者通知并使用此协议中的方法实现手动通知来进一步优化通知。
+#### observeValueForKeyPath:ofObject:change:context:
+&emsp;当相对于被观察者对象的指定键路径上的值已更改（注意这里是发生更改以后）时，通知观察者对象。
+```c++
+- (void)observeValueForKeyPath:(NSString *)keyPath ofObject:(id)object change:(NSDictionary<NSKeyValueChangeKey, id> *)change context:(void *)context;
+```
+&emsp;`keyPath`: 相对于对象的已更改值的键路径。`object`: 键路径 `keyPath` 的源对象。`change`: 一个字典，描述相对于对象的键路径 `keyPath` 上的属性值所做的更改。条目在 Change Dictionary Keys 中描述。`context`: 注册观察者以接收键值观察通知时提供的值。
+
+&emsp;为了使对象开始在 keyPath 处发送该值的更改通知消息，可以向其发送 addObserver:forKeyPath:options:context:  消息，并命名应接收该消息的观察者对象。当你完成观察时，尤其是在释放观察者对象之前，你会向被观察者对象发送一个 removeObserver:forKeyPath: 或 removeObserver:forKeyPath:context: 取消注册观察者并停止发送更改通知消息的消息。
+#### addObserver:forKeyPath:options:context:
+&emsp;注册观察者对象以接收相对于接收此消息的对象的键路径的 KVO 通知。
+```c++
+- (void)addObserver:(NSObject *)observer forKeyPath:(NSString *)keyPath options:(NSKeyValueObservingOptions)options context:(nullable void *)context;
+```
+&emsp;`observer`: 注册 KVO 通知的对象。观察者（`observer`）必须实现键值观察方法 observeValueForKeyPath:ofObject:change:context:。`keyPath`: 要观察的属性相对于接收此消息的对象的键路径。此值不能为 nil。`options`: NSKeyValueObservingOptions 值的组合，用于指定观察通知中包括的内容。有关可能的值，请参见 NSKeyValueObservingOptions。`context`: 在 observeValueForKeyPath:ofObject:change:context: 中传递给观察者的任意数据。
+
+&emsp;既不保留接收此消息的对象，也不保留观察者。调用此方法的对象最终还必须调用 removeObserver:forKeyPath: 或 removeObserver:forKeyPath:context: 方法，以在参与 KVO（participating in KVO）时注销观察者。
+#### removeObserver:forKeyPath:
+&emsp;停止观察者对象接收由相对于接收此消息的对象的键路径指定的属性的更改通知。
+```c++
+- (void)removeObserver:(NSObject *)observer forKeyPath:(NSString *)keyPath;
+```
+&emsp;`observer`: 要作为观察者移除的对象。`keyPath`: 相对于接收此消息的对象的键路径，已为其注册观察者以接收 KVO 更改通知。
+
+&emsp;为先前尚未注册为观察者的对象调用 removeObserver:forKeyPath: 是错误的。在释放在 addObserver:forKeyPath:options:context: 中指定的任何对象之前，请确保调用此方法（或 removeObserver:forKeyPath:context:）。
+#### removeObserver:forKeyPath:context:
+&emsp;在给定上下文的情况下，停止观察者对象接收由键路径相对于接收此消息的对象相对于键路径指定的属性的更改通知。
+```c++
+- (void)removeObserver:(NSObject *)observer forKeyPath:(NSString *)keyPath context:(nullable void *)context API_AVAILABLE(macos(10.7), ios(5.0), watchos(2.0), tvos(9.0));
+```
+
+
+
+
+
 ## Registering for Key-Value Observing（注册键值观察）
 &emsp;你必须执行以下步骤才能使对象接收到符合 KVO 的属性的键值观察通知：
 
