@@ -24,6 +24,7 @@ void BubbleSort::bubbleSort(int nums[], int count) {
                 n = j;
             }
         }
+        
         if (noExchange) {
             break;
         }

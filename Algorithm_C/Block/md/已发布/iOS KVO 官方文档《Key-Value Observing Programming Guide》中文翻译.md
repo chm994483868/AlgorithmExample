@@ -703,6 +703,9 @@ NSLog(@"🤍🤍 %@", object_getClass(self.student));
  🤍🤍 Student
  🤍🤍 NSKVONotifying_Student
 ```
+
+> &emsp;简而言之，苹果使用了一种 isa 交换的技术，当 student 被观察后，student 对象的 isa 指针被指向了一个新建的 Student 的子类 NSKVONotifying_Student，且这个子类重写了被观察值的 setter 方法和 class 方法，dealloc 和 \_isKVO 方法，然后使 student 对象的 isa 指针指向这个新建的类，然后事实上 student 变为了NSKVONotifying_Student 的实例对象，执行方法要从这个类的方法列表里找。dealloc 方法：观察移除后使 class 变回去 Student（通过 isa 指向）, \_isKVO 方法判断被观察者自己是否同时也观察了其他对象。（同时苹果警告我们，通过 isa 获取类的类型是不可靠的，通过 class 方法才能得到正确的类）[用代码探讨 KVC/KVO 的实现原理](https://juejin.cn/post/6844903587898753037)
+
 ## 参考链接
 **参考链接:🔗**
 + [Key-Value Observing Programming Guide](https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/KeyValueObserving/KeyValueObserving.html#//apple_ref/doc/uid/10000177-BCICJDHA)

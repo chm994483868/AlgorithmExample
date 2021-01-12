@@ -415,12 +415,12 @@
 		D21287E225A2AAC4005A744C /* iOS 从源码解析Run Loop (十)：Run Loop 与GCD、FPS、CADisplayLink.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 从源码解析Run Loop (十)：Run Loop 与GCD、FPS、CADisplayLink.md"; sourceTree = "<group>"; };
 		D21287E325A459A3005A744C /* iOS KVC 官方文档《Key-Value Coding Programming Guide》中文翻译.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS KVC 官方文档《Key-Value Coding Programming Guide》中文翻译.md"; sourceTree = "<group>"; };
 		D21287E425A45A05005A744C /* iOS KVO 官方文档《Key-Value Observing Programming Guide》中文翻译.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS KVO 官方文档《Key-Value Observing Programming Guide》中文翻译.md"; sourceTree = "<group>"; };
-		D21287E525A45A3E005A744C /* iOS 响应者链工作原理总结.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 响应者链工作原理总结.md"; sourceTree = "<group>"; };
+		D21287E525A45A3E005A744C /* iOS 响应者链与事件传递.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 响应者链与事件传递.md"; sourceTree = "<group>"; };
 		D21287E625A45A95005A744C /* iOS 消息转发工作原理总结.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 消息转发工作原理总结.md"; sourceTree = "<group>"; };
 		D21333F224E63B6C00A6175C /* 深入理解Objective-C中的alloc和init.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "深入理解Objective-C中的alloc和init.md"; sourceTree = "<group>"; };
 		D21333F324E6610E00A6175C /* 内存对齐原则.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "内存对齐原则.md"; sourceTree = "<group>"; };
 		D2164F0524EE10650000A6AA /* volatile关键字使用.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "volatile关键字使用.md"; sourceTree = "<group>"; };
-		D2164F0624EE113B0000A6AA /* 学习统计.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "学习统计.md"; sourceTree = "<group>"; };
+		D2164F0624EE113B0000A6AA /* 面试准备.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "面试准备.md"; sourceTree = "<group>"; };
 		D2164F0724EE28500000A6AA /* noexcept关键字学习.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "noexcept关键字学习.md"; sourceTree = "<group>"; };
 		D2164F1724F3B9A20000A6AA /* iOS weak 底层实现原理(一)：SideTable|s、weak_table_t、weak_entry_t 等数据结构.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS weak 底层实现原理(一)：SideTable|s、weak_table_t、weak_entry_t 等数据结构.md"; sourceTree = "<group>"; };
 		D2164F1B24F505330000A6AA /* C++强制类型转换符reinterpret_cast.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "C++强制类型转换符reinterpret_cast.md"; sourceTree = "<group>"; };
@@ -1425,7 +1425,7 @@
 				D21287E225A2AAC4005A744C /* iOS 从源码解析Run Loop (十)：Run Loop 与GCD、FPS、CADisplayLink.md */,
 				D21287E325A459A3005A744C /* iOS KVC 官方文档《Key-Value Coding Programming Guide》中文翻译.md */,
 				D21287E425A45A05005A744C /* iOS KVO 官方文档《Key-Value Observing Programming Guide》中文翻译.md */,
-				D21287E525A45A3E005A744C /* iOS 响应者链工作原理总结.md */,
+				D21287E525A45A3E005A744C /* iOS 响应者链与事件传递.md */,
 				D21287E625A45A95005A744C /* iOS 消息转发工作原理总结.md */,
 			);
 			path = "已发布";
@@ -2089,7 +2089,7 @@
 			isa = PBXGroup;
 			children = (
 				D2164F1C24F7AF070000A6AA /* 已发布 */,
-				D2164F0624EE113B0000A6AA /* 学习统计.md */,
+				D2164F0624EE113B0000A6AA /* 面试准备.md */,
 				D2164F2E2500F32A0000A6AA /* iOS Tagged Pointer.md */,
 				D21333F324E6610E00A6175C /* 内存对齐原则.md */,
 				D2164F1D24F8856E0000A6AA /* 野指针.md */,

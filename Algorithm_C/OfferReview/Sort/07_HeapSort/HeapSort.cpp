@@ -14,11 +14,11 @@ void HeapSort::heapSort(int nums[], int count) {
     }
     
     int i = (count - 1 - 1) / 2;
-    for (; i >= 0 ; --i) {
+    for (; i >= 0; --i) {
         maxHeapFixdown(nums, i, count);
     }
     
-    for (i = count - 1; i >= 1; --i) {
+    for (i = (count - 1); i >= 1; --i) {
         swap(&nums[0], &nums[i]);
         maxHeapFixdown(nums, 0, i);
     }
