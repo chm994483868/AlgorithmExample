@@ -85,13 +85,245 @@ UIKIT_EXTERN API_AVAILABLE(ios(2.0)) @interface UITouch : NSObject
 
 &emsp;要了解如何使用 swipes，请阅读 Event Handling Guide for UIKit Apps 中的 Handling Swipe and Drag Gestures。
 
-&emsp;touch 对象在多点触摸序列（multi-touch sequence）中始终存在。
+&emsp;touch 对象在多点触摸序列（multi-touch sequence）中始终存在。你可以在处理多点触控序列时存储对 touch 的引用，只要在序列结束时释放该引用即可。如果需要在多点触控序列之外存储有关 touch 的信息，请从 touch 中复制该信息。
 
+&emsp;touch 的 gestureRecognizers 属性包含当前正在处理 touch 的 gesture recognizers。每个 gesture recognizer 都是 UIGestureRecognizer 的具体子类的实例。
+### locationInView:
+&emsp;返回给定 `view` 坐标系中 receiver 的当前位置。（即返回一个 UITouch 对象在 view 的坐标系中的位置（CGPoint））
+```c++
+- (CGPoint)locationInView:(nullable UIView *)view;
+```
+&emsp;`view`: 要在其坐标系中定位 touch 的视图对象。处理 touch 的自定义视图可以指定 self 以在其自己的坐标系中获取 touch 位置。传递 nil 以获取 window 坐标系中的 touch 位置。
 
+&emsp;Return Value: 一个指定 receiver 在 view 中位置的 point。
 
-你可以在处理多点触摸序列时存储对触摸的引用，只要在序列结束时释放该引用即可。如果你需要在多点触摸序列之外存储有关触摸的信息，请从触摸中复制该信息。
+&emsp;此方法返回 UITouch 对象在指定 view 的坐标系中的当前位置。因为 touch 对象可能已从另一个视图转发到一个视图，所以此方法将 touch 位置执行任何必要的转换到指定 view 的坐标系。
+### previousLocationInView:
+&emsp;返回 receiver 在给定 view 坐标系中的先前位置。
+```c++
+- (CGPoint)previousLocationInView:(nullable UIView *)view;
+```
+&emsp;`view`: 要在其坐标系中定位 touch 的视图对象。处理 touch 的自定义视图可以指定 self 以在其自己的坐标系中获取 touch 位置。传递 nil 以获取 window 坐标系中的 touch 位置。
 
-&emsp;touch 的 gestureRecognizers 属性包含当前正在处理 touch 的 gesture recognizers。每个 gesture recognizers 都是 UIGestureRecognizer 的具体子类的实例。
+&emsp;Return Value: 此方法返回 UITouch 对象在指定 view 的坐标系中的上一个位置。因为 touch 对象可能已从另一个视图转发到一个视图，所以此方法将 touch 位置执行任何必要的转换到指定 view 的坐标系。
+### view
+&emsp;触摸要传递到的视图（如果有的话）。
+```c++
+@property(nullable,nonatomic,readonly,strong) UIView *view;
+```
+&emsp;此属性的值是将 touches 传递到的 view 对象，不一定是 touch 当前所在的 view。例如，当 gesture recognizer 识别到 touch 时，此属性为 nil，因为没有 view 在接收 touch。
+### window
+&emsp;最初发生 touch 的 window。
+```c++
+@property(nullable,nonatomic,readonly,strong) UIWindow *window;
+```
+&emsp;该属性的值是最初发生 touch 的 window。该 window 可能与当前包含 touch 的 window 不同。
+### majorRadius
+&emsp;touch 的半径（以点（points）表示）。
+```c++
+@property(nonatomic,readonly) CGFloat majorRadius API_AVAILABLE(ios(8.0));
+```
+&emsp;使用此属性中的值确定硬件报告的 touch 大小。此值是大小的近似值，可以根据 majorRadiusTolerance 属性中指定的量而变化。
+### majorRadiusTolerance
+&emsp;touch 的半径的容差（以点表示）。
+```c++
+@property(nonatomic,readonly) CGFloat majorRadiusTolerance API_AVAILABLE(ios(8.0));
+```
+&emsp;此值确定 majorRadius 属性中值的准确性。将此值添加到半径以获得最大触摸半径。减去该值以获得最小触摸半径。
+### preciseLocationInView:
+&emsp;返回 touch 的精确位置（如果可用）。
+```c++
+- (CGPoint)preciseLocationInView:(nullable UIView *)view API_AVAILABLE(ios(9.1));
+```
+&emsp;`view`: 包含 touch 的视图。
+
+&emsp;Return Value: touch 的精确位置。
+
+&emsp;使用此方法可获取 touch 的额外精度（如果可用）。不要使用返回点进行命中测试（hit testing）。在某些情况下，命中测试可能表示 touch 位于视图中，但针对更精确位置的命中测试可能表示 touch 在视图之外。
+### precisePreviousLocationInView:
+&emsp;返回 touch 的精确先前位置（如果可用）。
+```c++
+- (CGPoint)precisePreviousLocationInView:(nullable UIView *)view API_AVAILABLE(ios(9.1));
+```
+&emsp;使用此方法可以获得 touch 先前位置的额外精度（如果可用）。不要使用返回点进行命中测试。在某些情况下，命中测试可能表示 touch 位于视图中，但针对更精确位置的命中测试可能表示 touch 在视图之外。
+### tapCount
+&emsp;给定 touch 的 tap 次数。
+```c++
+@property(nonatomic,readonly) NSUInteger tapCount; // 在一定时间内在某个点内触摸
+```
+&emsp;此属性的值是一个整数，包含在预定义的时间段内此 touch 发生的点击数。使用此属性可评估用户是单点、双点、还是甚至三击特定 view 或 window。
+### timestamp
+&emsp;touch 发生的时间或上次发生 mutated 的时间。
+```c++
+@property(nonatomic,readonly) NSTimeInterval timestamp;
+```
+&emsp;此属性的值是自系统启动以来触发 touch 或上次更改 touch 的时间（以秒为单位）。你可以存储此属性的值，并将其与后续 UITouch 对象中的时间戳进行比较，以确定触摸的持续时间，如果 touch 正在轻扫，则确定移动速度。有关系统启动后的时间定义，请参阅 NSProcessInfo 类的 systemUptime 方法的说明。
+### UITouchType
+&emsp;touch 类型。
+```c++
+typedef NS_ENUM(NSInteger, UITouchType) {
+    UITouchTypeDirect, // A direct touch from a finger (on a screen) 手指直接触摸（在屏幕上）
+    UITouchTypeIndirect, // An indirect touch (not a screen) 间接触摸（不是屏幕）
+    UITouchTypePencil API_AVAILABLE(ios(9.1)), // Add pencil name variant 添加 pencil 名称变体 
+    UITouchTypeStylus API_AVAILABLE(ios(9.1)) = UITouchTypePencil, // A touch from a stylus (deprecated name, use pencil) 手写笔的触摸（已弃用，UITouchTypePencil）
+    
+    // A touch representing a button-based, indirect input device describing the input sequence from button press to button release
+    // 表示基于按钮的间接输入设备的触摸，描述从按钮按下到按钮释放的输入序列
+    UITouchTypeIndirectPointer API_AVAILABLE(ios(13.4), tvos(13.4)) API_UNAVAILABLE(watchos),
+    
+} API_AVAILABLE(ios(9.0));
+```
++ UITouchTypeDirect: 与屏幕直接接触产生的触摸。当用户的手指接触屏幕时，会发生直接接触。
++ UITouchTypeIndirect: 不是接触屏幕造成的触摸。间接触摸是由与屏幕分离的触摸输入设备产生的。例如，Apple TV 遥控器的触控板会产生间接触摸。
++ UITouchTypePencil: Apple Pencil 的 touch。当 Apple Pencil 与设备的屏幕交互时，会发生 Pencil Touch。
++ UITouchTypeStylus: 已废弃，使用 UITouchTypePencil 代替。
+### type
+&emsp;表示 touch 类型的属性。
+```c++
+@property(nonatomic,readonly) UITouchType type API_AVAILABLE(ios(9.0));
+```
+&emsp;有关触摸类型的完整列表，请参阅 maximumPossibleForce。
+### UITouchPhase
+&emsp;touch 事件的阶段。
+```c++
+typedef NS_ENUM(NSInteger, UITouchPhase) {
+    UITouchPhaseBegan, // whenever a finger touches the surface. 只要手指碰到表面。
+    UITouchPhaseMoved, // whenever a finger moves on the surface. 当手指在表面上移动时。
+    UITouchPhaseStationary, // whenever a finger is touching the surface but hasn't moved since the previous event. 当手指接触到表面，但自上次事件后没有移动时。
+    UITouchPhaseEnded, // whenever a finger leaves the surface. 当手指离开表面。
+    UITouchPhaseCancelled, // whenever a touch doesn't end but we need to stop tracking (e.g. putting device to face) 当触摸未结束但我们需要停止跟踪时（例如，接听电话时将设备放在脸上移动）
+    
+    UITouchPhaseRegionEntered   API_AVAILABLE(ios(13.4), tvos(13.4)) API_UNAVAILABLE(watchos),  // whenever a touch is entering the region of a user interface 每当触摸进入用户界面区域时
+    
+    // when a touch is inside the region of a user interface, but hasn’t yet made contact or left the region
+    // 当触摸位于用户界面区域内，但尚未联系或离开该区域时
+    UITouchPhaseRegionMoved     API_AVAILABLE(ios(13.4), tvos(13.4)) API_UNAVAILABLE(watchos),
+    
+    UITouchPhaseRegionExited    API_AVAILABLE(ios(13.4), tvos(13.4)) API_UNAVAILABLE(watchos),  // when a touch is exiting the region of a user interface 当触摸退出用户界面区域时
+};
+```
+&emsp;UITouch 实例的阶段随着系统在事件过程中接收更新而改变。通过 phase 属性访问此值。
++ UITouchPhaseBegan: 屏幕上按下了对给定事件的 touch。
++ UITouchPhaseMoved: 给定事件的 touch 已在屏幕上移动。
++ UITouchPhaseStationary: 在屏幕上按下给定事件的 touch，但自上一个事件后就再也没有移动过。
++ UITouchPhaseEnded: 给定事件的 touch 已从屏幕上抬起。
++ UITouchPhaseCancelled: 例如，当用户将设备靠在脸上移动时，系统取消了对触摸的跟踪。
++ UITouchPhaseRegionEntered: 给定事件的触摸已进入屏幕上的 window。UITouchPhaseRegionEntered、UITouchPhaseRegionMoved 和 UITouchPhaseRegionSited 阶段并不总是与 UIHoverGestureRecognizer 的状态属性对齐。hover gesture recognizer 的状态仅适用于 gesture’s 视图的上下文，而 touch states 适用于 window。
++ UITouchPhaseRegionMoved: 给定事件的触摸在屏幕上的窗口内，但尚未按下。
++ UITouchPhaseRegionExited: 对给定事件的触摸在屏幕上留下了一个窗口。
+
+### phase
+&emsp;touch 阶段。属性值是一个常量，指示触摸是开始、移动、结束还是取消。有关此属性可能值的描述，请参见 UITouchPhase。
+```c++
+@property(nonatomic,readonly) UITouchPhase phase;
+```
+### gestureRecognizers
+&emsp;接收 touch 对象的 gesture recognizers。
+```c++
+@property(nullable,nonatomic,readonly,copy)   NSArray <UIGestureRecognizer *> *gestureRecognizers API_AVAILABLE(ios(3.2));
+```
+&emsp;数组中的对象是抽象基类 UIGestureRecognizer 的子类的实例。如果当前没有接收 touch 的 gesture recognizers，则此属性包含空数组。
+
+&emsp;下面大概是一些 3D Touch、Apple Pencil 相关的（触摸）内容，可直接忽略。
+### force
+&emsp;touch 的力，其中值 1.0 表示平均触摸力（由系统预先确定，而不是特定于用户）。
+```c++
+@property(nonatomic,readonly) CGFloat force API_AVAILABLE(ios(9.0));
+```
+&emsp;此属性在支持 3D Touch 或 Apple Pencil 的设备上可用。要在运行时检查设备是否支持 3D Touch，请读取应用程序中具有 trait 环境的任何对象的 trait 集合上 forceTouchCapability 属性的值。
+
+&emsp;Apple Pencil 所报告的力是沿着 Pencil 的轴线测量的。如果想要垂直于设备的力，需要使用 altitudeAngle 值计算该值。
+
+&emsp;Apple Pencil 报告的力最初是估计的，可能并不总是更新。要确定是否需要更新，请参阅 estimatedPropertiesExpectingUpdates 并查找 UITouchPropertyForce 标志。在这种情况下，estimationUpdateIndex 索引包含一个非 nil 值，你可以在更新发生时将该值与原始触摸相关联。当没有预期的力更新时，整个触摸序列通常不会有更新，因此可以对触摸序列应用自定义的、特定于工具的力曲线。
+### maximumPossibleForce
+&emsp;touch 的最大可能力。
+```c++
+@property(nonatomic,readonly) CGFloat maximumPossibleForce API_AVAILABLE(ios(9.0));
+```
+&emsp;该属性的值足够高，可以为 force 属性的值提供广泛的动态范围。
+
+&emsp;此属性在支持 3D Touch 或 Apple Pencil 的设备上可用。要在运行时检查设备是否支持 3D Touch，请读取应用程序中具有 trait 环境的任何对象的 trait 集合上 forceTouchCapability 属性的值。
+### altitudeAngle
+&emsp;Pencil 的高度（弧度）。仅适用于 UITouchTypePencil 类型。
+
+```c++
+@property(nonatomic,readonly) CGFloat altitudeAngle API_AVAILABLE(ios(9.1));
+```
+&emsp;值为 0 弧度表示 Apple Pencil 与曲面平行。当 Apple Pencil 垂直于曲面时，此属性的值为 Pi/2。
+
+&emsp;下面好像暂时用不到的两个方法。
+### azimuthAngleInView:
+&emsp;返回 Apple Pencil 的方位角（以弧度为单位）。
+```c++
+- (CGFloat)azimuthAngleInView:(nullable UIView *)view API_AVAILABLE(ios(9.1));
+```
+&emsp;在屏幕平面中，方位角是指手写笔指向的方向。当触针尖端接触屏幕时，当触针的帽端（即尖端对面的端部）指向设备屏幕的正x轴时，此属性的值为0弧度。当用户围绕笔尖顺时针方向摆动手写笔的笔帽端时，方位角会增加。
+> &emsp;Note: 获取方位角（相对于方位单位矢量）的成本更高，但也更方便。
+### azimuthUnitVectorInView:
+&emsp;返回指向 Apple Pencil 方位角方向的单位向量。
+```c++
+- (CGVector)azimuthUnitVectorInView:(nullable UIView *)view API_AVAILABLE(ios(9.1));
+```
+&emsp;得到方位单位矢量比得到方位角要便宜。如果要创建变换矩阵，单位向量也会更有用。
+### UITouchProperties
+&emsp;一些可能会更新的 touch 属性的位掩码。
+```c++
+typedef NS_OPTIONS(NSInteger, UITouchProperties) {
+    UITouchPropertyForce = (1UL << 0),
+    UITouchPropertyAzimuth = (1UL << 1),
+    UITouchPropertyAltitude = (1UL << 2),
+    UITouchPropertyLocation = (1UL << 3), // For predicted Touches 对于预测的触摸
+} API_AVAILABLE(ios(9.1));
+```
++ UITouchPropertyForce: 位掩码中表示 force 的 touch 属性。
++ UITouchPropertyAzimuth: 位掩码中表示 azimuth（方位角） 的 touch 属性。（用于 Apple Pencil）
++ UITouchPropertyAltitude: 位掩码中表示 altitude（高度/海拔） 的 touch 属性。（用于 Apple Pencil）
++ UITouchPropertyLocation: 位掩码中表示 location 的 touch 属性。
+
+### estimatedProperties
+&emsp;一组 touch 属性，其值仅包含估计值。
+```c++
+@property(nonatomic,readonly) UITouchProperties estimatedProperties API_AVAILABLE(ios(9.1));
+```
+&emsp;此属性包含一个常量位掩码，表示无法立即报告哪些触摸属性。例如，Apple Pencil 记录了触摸的力度，但必须通过空中传输信息到底层 iPad。传输数据所产生的延迟可能会导致在向应用程序报告触摸后接收信息。
+
+&emsp;不保证以后更新此属性中的值。有关希望更新其值的属性列表，请参阅 estimatedPropertiesExpectingUpdates。
+### estimatedPropertiesExpectingUpdates
+&emsp;一组 touch 属性，预计将来会更新这些属性的值。
+```c++
+@property(nonatomic,readonly) UITouchProperties estimatedPropertiesExpectingUpdates API_AVAILABLE(ios(9.1));
+```
+&emsp;此属性包含常量的位掩码，该位掩码指示哪些触摸属性无法立即报告，哪些触摸属性需要稍后更新。当此属性包含非空集时，可以期望 UIKit 稍后使用给定属性的更新值调用响应程序或手势识别器的 toucheEstimatedPropertiesUpdated: 方法。将 estimationUpdateIndex 属性中的值附加到应用程序的触摸数据副本。当 UIKit 稍后调用 toucheEstimatedPropertiesUpdated: 方法时，使用新 touch 的估计更新索引来定位和更新应用程序的 touch 数据副本。
+
+&emsp;当此属性包含空集时，不需要更多更新。在该场景中，估计值或更新值是最终值。
+### estimationUpdateIndex
+&emsp;一个索引编号，用于将更新的 touch 与原始 touch 关联起来。
+```c++
+@property(nonatomic,readonly) NSNumber * _Nullable estimationUpdateIndex API_AVAILABLE(ios(9.1));
+```
+&emsp;此属性包含当前触摸数据的唯一标记。当触摸包含估计属性时，将此索引与其余触摸数据一起保存到应用程序的数据结构中。当系统稍后报告实际触摸值时，使用此索引定位应用程序数据结构中的原始数据，并替换先前存储的估计值。例如，当触摸包含估计属性时，可以将此属性用作字典中的键，字典的值是用于存储触摸数据的对象。
+
+&emsp;对于包含估计属性的每个触摸，此属性的值都会单调增加。当触摸对象不包含估计或更新的属性时，此属性的值为零。
+## Handling Touches in Your View（处理视图中的触摸）
+&emsp;如果触摸处理（touch handling）与 view 的内容有复杂的链接（intricately linked），则直接在 view 子类上使用触摸事件（touch events）。
+
+&emsp;如果你不打算对自定义视图使用手势识别器，则可以直接从视图本身处理触摸事件。因为视图是响应者，所以它们可以处理多点触控事件和许多其他类型的事件。当 UIKit 确定某个视图中发生了触摸事件时，它将调用该视图的 `touchesBegan:withEvent:`、`touchesMoved:withEvent:` 或 `touchesEnded:withEvent:` 方法。你可以在自定义视图中重写这些方法，并使用它们提供对触摸事件的响应。（来自 UIResponder）
+
+&emsp;你在视图（或任何响应程序）中重写的处理触摸的方法对应于触摸事件处理过程的不同阶段。例如，图1 说明了触摸事件的不同阶段。当手指（或 Apple Pencil）接触屏幕时，UIKit 会创建 UITouch 对象，将触摸位置设置为适当的点，并将其 phase 属性设置为 UITouchPhaseBegan。当同一个手指在屏幕上移动时，UIKit 会更新触摸位置，并将触摸对象的 phase 属性更改为 UITouchPhaseMoved。当用户将手指从屏幕上提起时，UIKit 将 phase 属性更改为 UITouchPhaseEnded，触摸序列结束。
+
+&emsp;Figure 1 The phases of a touch event（触摸事件的各个阶段）
+![]()
+
+&emsp;类似地，系统可以随时取消正在进行的触摸序列；例如，当来电中断应用程序时。当它这样做时，UIKit 通过调用 touchs 来通知你的视图 touchesCancelled:withEvent: 方法。你可以使用该方法对视图的数据结构执行任何必要的清理。
+
+&emsp;UIKit 为触摸屏幕的每个新手指创建一个新的 UITouch 对象。触摸本身是通过当前 UIEvent 对象传递的。UIKit 区分了来自手指和 Apple Pencil 的触摸，你可以对它们进行不同的处理。
+
+> &emsp;Important: 在其默认配置中，视图仅接收与事件关联的第一个 UITouch 对象，即使有多个手指接触视图也是如此。要接收额外的触摸，必须将视图的 multipleTouchEnabled 属性设置为 true。也可以使用属性检查器在 Interface Builder 中配置此属性。
+
+## UIResponder
+&emsp;
+
+xxxxxx
 
 ## UIEvent
 &emsp;描述单个 user 与你的应用交互的对象。
@@ -111,7 +343,6 @@ UIKIT_EXTERN API_AVAILABLE(ios(2.0)) @interface UIEvent : NSObject
 &emsp;在多点触摸序列中，UIKit 在将更新的触摸数据传递到你的应用程序时会重用同一 UIEvent 对象。你永远不应 retain 事件对象或事件对象返回的任何对象。如果需要在用于处理该数据的响应程序方法之外保留数据，请将该数据从 UITouch 或 UIEvent 对象复制到本地数据结构。
 
 &emsp;有关如何在 UIKit 应用中处理事件的更多信息，请参见 Event Handling Guide for UIKit Apps。（UIKit 文档内容过多，这里我们只阅读 Handling Touches in Your View 文档）
-
 ### UIEventType
 &emsp;指定事件的常规类型。
 ```c++
@@ -247,11 +478,10 @@ typedef NS_ENUM(NSInteger, UIEventSubtype) {
 
 
 
-
-
 ## 参考链接
 **参考链接:🔗**
 + [Using Responders and the Responder Chain to Handle Events](https://developer.apple.com/documentation/uikit/touches_presses_and_gestures/using_responders_and_the_responder_chain_to_handle_events)
++ [Handling Touches in Your View](https://developer.apple.com/documentation/uikit/touches_presses_and_gestures/handling_touches_in_your_view)
 + [Responder object](https://developer.apple.com/library/archive/documentation/General/Conceptual/Devpedia-CocoaApp/Responder.html#//apple_ref/doc/uid/TP40009071-CH1-SW1)
 + [Events (iOS)](https://developer.apple.com/library/archive/documentation/General/Conceptual/Devpedia-CocoaApp/EventHandlingiPhone.html#//apple_ref/doc/uid/TP40009071-CH13-SW1)
 + [Target-Action](https://developer.apple.com/library/archive/documentation/General/Conceptual/CocoaEncyclopedia/Target-Action/Target-Action.html#//apple_ref/doc/uid/TP40010810-CH12)
