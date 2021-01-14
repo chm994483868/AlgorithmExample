@@ -589,7 +589,38 @@ UIKIT_EXTERN API_AVAILABLE(ios(2.0)) @interface UIResponder : NSObject <UIRespon
 ```
 &emsp;此属性通常用于将附件视图附加到为 UITextField 和 UITextView 对象显示的系统提供的键盘上。(位置是在键盘的顶部)
 
-&emsp;此只读属性的值为 nil。如果要将自定义控件附加到系统提供的输入视图（如系统键盘）或自定义输入视图（在 inputView 属性中提供的视图），请在 UIResponder 子类中将此属性重新声明为读写。然后可以使用此属性管理自定义附件视图。当接收器成为第一个响应者时，响应者基础结构会在显示附件视图之前将其附加到适当的输入视图。
+&emsp;此只读属性的值为 nil。如果要将自定义控件附加到系统提供的输入视图（如系统键盘）或自定义输入视图（在 inputView 属性中提供的视图），请在 UIResponder 子类中将此属性重新声明为读写。然后可以使用此属性管理自定义附件视图。当 receiver 成为第一个响应者时，响应者基础结构会在显示附件视图之前将其附加到适当的输入视图。
+#### inputAccessoryViewController
+&emsp;自定义输入附件视图控制器，以在 receiver 成为第一响应者时显示。
+```c++
+@property (nullable, nonatomic, readonly, strong) UIInputViewController *inputAccessoryViewController API_AVAILABLE(ios(8.0));
+```
+#### reloadInputViews
+&emsp;当对象是第一响应者时，更新自定义输入和附件视图（custom input and accessory views）。（如果在对象是第一响应者的情况下调用，则重新加载 inputView、inputAccessoryView 和 textInputMode。否则忽略。）
+```c++
+- (void)reloadInputViews API_AVAILABLE(ios(3.2));
+```
+&emsp;当它是第一响应者时，可以使用此方法刷新与当前对象关联的自定义输入视图（custom input view）或输入附件视图（ input accessory view）。视图将立即替换（即不会附加动画）。如果当前对象不是第一响应者，则此方法无效。
+### Getting the Undo Manager（）
+#### undoManager
+&emsp;返回响应者链中最近的共享撤消（shared undo）管理器。
+```c++
+@property(nullable, nonatomic,readonly) NSUndoManager *undoManager API_AVAILABLE(ios(3.0));
+```
+&emsp;默认情况下，应用程序的每个 window 都有一个撤消管理器：一个用于管理撤消和重做操作的共享对象。但是，响应程序链中任何对象的类都可以有自己的自定义撤消管理器。（例如，UITextField的实例有自己的 undoManager，当文本字段退出第一响应者状态时，该管理器将被清除。）当你请求 undoManager 时，请求将进入响应者链，UIWindow 对象将返回一个可用的实例。
+
+&emsp;你可以将撤消管理器添加到视图控制器，以执行托管视图本地的撤消和重做操作。
+### Building and Validating Commands（构建和验证命令）
+
+#### validateCommand:
+&emsp;要求接收响应者验证命令。
+```c++
+
+```
+
+
+
+
 
 ## Target-Action
 &emsp;尽管 delegation、bindings 和 notification 对于处理程序中对象之间的某些形式的通信很有用，但它们并不特别适合于最明显的通信类型。典型的应用程序的用户界面由许多图形对象组成，其中最常见的对象可能是控件（controls）。控件是真实世界或逻辑设备（按钮（button）、滑块（slider）、复选框（checkboxes）等）的图形模拟；与真实世界控件（如收音机调谐器）一样，你使用它将你的意图传达给某个系统，而该系统是应用程序的一部分。
