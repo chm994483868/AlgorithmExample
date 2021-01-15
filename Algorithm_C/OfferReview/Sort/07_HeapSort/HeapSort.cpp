@@ -18,7 +18,7 @@ void HeapSort::heapSort(int nums[], int count) {
         maxHeapFixdown(nums, i, count);
     }
     
-    for (i = (count - 1); i >= 1; --i) {
+    for (i = count - 1; i >= 1; --i) {
         swap(&nums[0], &nums[i]);
         maxHeapFixdown(nums, 0, i);
     }

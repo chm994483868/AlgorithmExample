@@ -1,81 +1,274 @@
-# iOS 从触摸屏幕到寻找第一响应者到响应者链处理事件的完整流程分析
+# iOS 响应者链处理事件全过程分析
 
-> &emsp;
+> &emsp;本文会对从手指触摸屏幕开始一直到这个触摸事件得到处理的完整过程进行分析。（侧重点放在当前应用程序处理触摸事件部分）
 
-// 1. 沿着 UIApplication -> UIWindow -> UIView -> subView 寻找第一响应者
-// 2. 第一响应者处理 UIEvent，如果第一响应者不能处理这个 UIEvent，则其顺着 Responder Chin 寻找能处理这个 UIEvent 的响应者（next Responder）
-// 3. Target-Action 设计模式
+## IOKit.framework/SpringBoard
+&emsp;IOKit.framework 是与硬件或内核服务通信的低级框架。尽管这是一个公共框架，但苹果不鼓励开发人员使用它，并且任何使用它的应用都将被App Store拒绝。[IOKit.framework](http://iphonedevwiki.net/index.php/IOKit.framework)
 
-### hitTest:withEvent:
-&emsp;返回包含指定点（`point`）的视图层次结构中 receiver 的最远后代（最远子视图，也可能是其自身）。
+&emsp;SpringBoard.app 是 iPhone 的应用程序启动器。它提供所有应用程序启动服务、图标管理、状态栏控件等等内容。有关管理 Springboard.app 的类，可参见 SpringBoard。 [SpringBoard.app](https://iphonedevwiki.net/index.php/SpringBoard.app)
+
+> &emsp;SpringBoard.app 是 iOS 和 iPadOS 负责管理主屏幕的基础程序，并在设备启动时启动 WindowServer、开启应用程序（实现该功能的程序称为应用启动器）和对设备进行某些设置。有时候主屏幕也被作为 SpringBoard 的代称。主要处理按键（锁屏/静音等）、触摸、加速、距离传感器（UIEventTypeMotion）等几种事件，随后通过 mac port 进程间通信转发至需要的 APP。
+> 
+> &emsp;Mac OSX 中使用的是 Launchpad，能让用户以从类似于 iOS 的 SpringBoard 的界面点击一下图示来启动应用程序。在 Launchpad 推出之前，用户能以 Dock、Finder、Spotlight 或终端来启动应用程序。不过 Launchpad 并不会占据整个主屏幕，而更像是一个 Space（类似于仪表板）。[细数iOS触摸事件流动](https://juejin.cn/post/6844904175415853064)
+
+> &emsp;当一个硬件事件（触摸/锁屏/摇晃等）发生后，首先由 IOKit.framework 生成一个 IOHIDEvent 事件并由 SpringBoard 接收。这个过程的详细情况可以参考 IOHIDFamily。SpringBoard 只接收按键（锁屏/静音等）、触摸、加速、距离传感器（UIEventTypeMotion）等几种 Event，SpringBoard 判断桌面是否存在前台应用，若无（如处于桌面翻页），则触发 SpringBoard 应用内部主线程 run loop 的 source0 事件回调，由桌面应用内部消耗；若有则通过 mach port 转发给需要的前台 App 进程。
+
+&emsp;下面我们接着看由前台 App 的哪个 mach port 来接收 SpringBoard 的消息并唤醒前台 App 的主线程。 
+## com.apple.uikit.eventfetch-thread
+&emsp;App 启动后会创建一条名为 com.apple.uikit.eventfetch-thread 的线程，并直接启动此线程的 run loop，且在其 kCFRunLoopDefaultMode 运行模式下添加了一个回调函数是 \_\_IOHIDEventSystemClientQueueCallback 的 source1，用于接收上面提到的 SpringBoard 通过 mach port 发来的消息。
+
+&emsp;前台 App 进程的 com.apple.uikit.eventfetch-thread 线程被 SpringBoard 根据指定的 mach port 唤醒后，执行其 source1 对应的回调函数 \_\_IOHIDEventSystemClientQueueCallback，并将 main run loop 中的回调函数是 \_\_handleEventQueue 的 source0 的 signalled 设置为 YES 标记其为待处理状态，同时唤醒 main run loop，主线程则调用 \_\_handleEventQueue 来进行事件（IOHIDEvent）的处理。
+
+&emsp;[ibireme](https://blog.ibireme.com/2015/11/12/smooth_user_interfaces_for_ios/) 大佬说在 \_UIApplicationHandleEventQueue 内会把 IOHIDEvent 处理并包装成 UIEvent 进行处理或分发，可是添加符号断点并不能找到此方法，猜测现在应该是在 \_\_handleEventQueue 函数内处理 IOHIDEvent。接着就是 进行 [UIApplication sendEvent:] 把 UIEvent 分发到我们的 App 了。
+
+&emsp;我们使用 Xcode 创建一个 Single View App 后并直接运行，然后点击 Xcode 底部的暂停程序执行的按钮，当前程序的 com.apple.main-thread 线程定位到 mach_msg_trap，然后在其下方有一条名为 com.apple.uikit.eventfetch-thread 的线程，我们直接选中它，然后在 Xcode 控制台输入: po [NSRunLoop currentRunLoop] 打印当前线程的 run loop，可看到它仅有一个被标记为 common 的 kCFRunLoopDefaultMode 模式，然后 Default Mode 中的内容也很简单，仅有一个 source0 和三个 source1，且它们的回调事件正与 IOHIDEvent 相关。这里我们只列出回调函数是 \_\_IOHIDEventSystemClientQueueCallback 的 source1。
 ```c++
-- (UIView *)hitTest:(CGPoint)point withEvent:(UIEvent *)event;
-```
-&emsp;`point`: receiver 的本地坐标系（bounds）中指定的点。`event`: 需要调用此方法的事件。如果要从事件处理代码外部调用此方法，则可以指定 nil。
-
-&emsp;Return Value: view 对象是当前 view 的最远子视图，并且包含 `point`。如果该 `point` 完全位于 receiver 的视图层次之外，则返回 nil。
-
-&emsp;此方法通过调用每个子视图的 pointInside:withEvent: 方法来遍历视图层次结构，以确定哪个子视图应接收 touch 事件。如果 pointInside:withEvent: 返回 YES，然后类似地遍历其子视图的层次结构，直到找到包含 `point` 的最前面的视图。如果视图不包含该 `point`，则将忽略其视图层次结构的分支。你很少需要自己调用此方法，但可以重写它以从子视图中隐藏 touch 事件。
-
-&emsp;此方法将忽略 hidden 设置为 YES 的、禁用用户交互（userInteractionEnabled 设置为 NO）或 alpha 小于 0.01 的视图对象。确定点击（determining a hit）时，此方法不会考虑视图的内容。因此，即使 `point` 位于该视图内容的透明部分中，该视图仍然可以返回。
-
-&emsp;超出 receiver’s bounds 的 `point` 永远不会被报告为命中，即使它们实际上位于 receiver 的一个子视图中。如果当前视图的 clipsToBounds 属性设置为 NO，并且受影响的子视图超出了视图的边界，则会发生这种情况。（例如一个 button 按钮超出了其父试图的 bounds，此时点击 button 未超出父视图的区域的话可以响应点击事件，如果点击 button 超出父视图的区域的话则不能响应点击事件）
-
-&emsp;hitTest:withEvent: 寻找一个包含 `point` 的视图的过程可以理解如下：
-```c++
-- (UIView *)hitTest:(CGPoint)point withEvent:(UIEvent *)event{
-    // 3 种状态无法响应事件
-    // 1): userInteractionEnabled 为 NO，禁止了用户交互。
-    // 2): hidden 为 YES，被隐藏了。
-    // 3): alpha 小于等于 0.01，透明度小于 0.01。
-    if (self.userInteractionEnabled == NO || self.hidden == YES ||  self.alpha <= 0.01) return nil;
-    
-    // 触摸点若不在当前视图上则无法响应事件
-    if ([self pointInside:point withEvent:event] == NO) return nil;
-    
-    // ⬇️⬇️⬇️ 从后往前遍历子视图数组
-    int count = (int)self.subviews.count;
-    for (int i = count - 1; i >= 0; i--) {
-        // 获取子视图
-        UIView *childView = self.subviews[i];
-        
-        // 坐标系的转换，把触摸点在当前视图上坐标转换为在子视图上的坐标
-        CGPoint childP = [self convertPoint:point toView:childView];
-        
-        // 询问子视图层级中的最佳响应视图
-        UIView *fitView = [childView hitTest:childP withEvent:event];
-        
-        if (fitView) {
-            // 如果子视图中有更合适的就返回
-            return fitView;
-        }
-    }
-    
-    // 没有在子视图中找到更合适的响应视图，那么自身就是最合适的
-    return self;
+...
+sources1 = <CFBasicHash 0x600001fff330 [0x7fff80617cb0]>{type = mutable set, count = 3,
+entries =>
+...
+1 : <CFRunLoopSource 0x6000024e4540 [0x7fff80617cb0]>{signalled = No, valid = Yes, order = 0, context = <CFMachPort 0x6000026ec210 [0x7fff80617cb0]>{valid = Yes, port = 440b, source = 0x6000024e4540, callout = __IOHIDEventSystemClientQueueCallback (0x7fff25e91d1d), context = <CFMachPort context 0x7fb555601c50>}}
+...
 }
+...
 ```
-### pointInside:withEvent:
-&emsp;返回一个布尔值，该值指示 receiver 是否包含 `point`。
+&emsp;然后我们使用 po [NSRunLoop mainRunLoop] 打印 main run loop，可看到在其 UITrackingRunLoopMode 和 kCFRunLoopDefaultMode 模式下有同一个回调函数是 \_\_handleEventQueue 的 source0，且 Tracking Mode 和 Default Mode 都被标记为 common。
 ```c++
-- (BOOL)pointInside:(CGPoint)point withEvent:(UIEvent *)event;
+...
+2 : <CFRunLoopMode 0x6000028101a0 [0x7fff80617cb0]>{name = UITrackingRunLoopMode, port set = 0x2a03, queue = 0x600003d1ca00, source = 0x600003d1cb00 (not fired), timer port = 0x2c03, 
+sources0 = <CFBasicHash 0x600001d319b0 [0x7fff80617cb0]>{type = mutable set, count = 4,
+entries =>
+...
+4 : <CFRunLoopSource 0x600002618240 [0x7fff80617cb0]>{signalled = No, valid = Yes, order = -1, context = <CFRunLoopSource context>{version = 0, info = 0x6000026103c0, callout = __handleEventQueue (0x7fff48126d97)}}
+},
+...
+...
+4 : <CFRunLoopMode 0x600002814410 [0x7fff80617cb0]>{name = kCFRunLoopDefaultMode, port set = 0x2503, queue = 0x600003d10e80, source = 0x600003d10f80 (not fired), timer port = 0x1e03, 
+sources0 = <CFBasicHash 0x600001d31a10 [0x7fff80617cb0]>{type = mutable set, count = 4,
+entries =>
+...
+4 : <CFRunLoopSource 0x600002618240 [0x7fff80617cb0]>{signalled = No, valid = Yes, order = -1, context = <CFRunLoopSource context>{version = 0, info = 0x6000026103c0, callout = __handleEventQueue (0x7fff48126d97)}}
+}
+...
 ```
-&emsp;`point`: receiver 的本地坐标系（bounds）中指定的点。`event`: 需要调用此方法的事件。如果要从事件处理代码外部调用此方法，则可以指定 nil。
+&emsp;我们在上面的 Single View App 中创建一个名字是 CustomView 的自定义 UIView，并重写该 view 的 touchesBegan:withEvent: 方法，然后在其中打一个断点。然后在当前 App 的 root view 上添加一个 CustomView 对象，运行程序并点击该 CustomView。然后在控制台输入 bt 并回车，可看到如下函数调用堆栈：
+```c++
+(lldb) bt
+* thread #1, queue = 'com.apple.main-thread', stop reason = breakpoint 5.1
+  * frame #0: 0x0000000101522cbd EmptySimpleApp`-[CustomView touchesBegan:withEvent:](self=0x00007ff88fc0b5e0, _cmd="touchesBegan:withEvent:", touches=1 element, event=0x000060000190c500) at CustomView.m:22:30
+    frame #1: 0x00007fff480ce8de UIKitCore`-[UIWindow _sendTouchesForEvent:] + 1867
+    frame #2: 0x00007fff480d04c6 UIKitCore`-[UIWindow sendEvent:] + 4596
+    frame #3: 0x00007fff480ab53b UIKitCore`-[UIApplication sendEvent:] + 356
+    frame #4: 0x0000000103724bd4 UIKit`-[UIApplicationAccessibility sendEvent:] + 85
+    frame #5: 0x00007fff4812c71a UIKitCore`__dispatchPreprocessedEventFromEventQueue + 6847
+    frame #6: 0x00007fff4812f1e0 UIKitCore`__handleEventQueueInternal + 5980
+    frame #7: 0x00007fff23bd4471 CoreFoundation`__CFRUNLOOP_IS_CALLING_OUT_TO_A_SOURCE0_PERFORM_FUNCTION__ + 17
+    frame #8: 0x00007fff23bd439c CoreFoundation`__CFRunLoopDoSource0 + 76
+    frame #9: 0x00007fff23bd3b74 CoreFoundation`__CFRunLoopDoSources0 + 180
+    frame #10: 0x00007fff23bce87f CoreFoundation`__CFRunLoopRun + 1263
+    frame #11: 0x00007fff23bce066 CoreFoundation`CFRunLoopRunSpecific + 438
+    frame #12: 0x00007fff384c0bb0 GraphicsServices`GSEventRunModal + 65
+    frame #13: 0x00007fff48092d4d UIKitCore`UIApplicationMain + 1621
+    frame #14: 0x0000000101523104 EmptySimpleApp`main(argc=1, argv=0x00007ffeee6dbd38) at main.m:18:12
+    frame #15: 0x00007fff5227ec25 libdyld.dylib`start + 1
+    frame #16: 0x00007fff5227ec25 libdyld.dylib`start + 1
+(lldb) 
+```
+&emsp;其中的 [UIApplication sendEvent:] 开始进行 UIEvent 事件在 App 中的分发，看到随后并分发到了 UIWindow 中。下面涉及到第一响应者的寻找以及响应者链执行事件，下面我们继续分章节进行学习。
+## [UIApplication sendEvent:]
+&emsp;将事件调度到应用程序中的相应响应者对象。
+```c++
+- (void)sendEvent:(UIEvent *)event;
+```
+&emsp;`event`: 一个 UIEvent 对象，封装有关事件的信息，包括涉及的触摸。
 
-&emsp;如果 `point` 包含在 receiver 的 bounds 中，则返回 YES，否则返回 NO。
-### convertPoint:toView:
-&emsp;将 `point` 从 receiver 的坐标系转换为指定视图（`view`）的点（CGPoint）。
+&emsp;如果需要，可以通过子类化 UIApplication 并重写此方法来拦截传入的事件。对于你拦截的每个事件，必须在实现中处理事件后通过调用 [super sendEvent:event] 进行调度。
+
+&emsp;根据上面的函数调用堆栈 UIApplication 会接着把 event 发送到 UIWindow 中。
+## [UIWindow sendEvent:]
+&emsp;将指定的事件调度到其 view。
 ```c++
-- (CGPoint)convertPoint:(CGPoint)point toView:(UIView *)view;
+- (void)sendEvent:(UIEvent *)event; // called by UIApplication to dispatch events to views inside the window 由 UIApplication 调用以将事件调度到 window 内的 view 
 ```
-&emsp;`point`: receiver 的本地坐标系（bounds）中指定的点。
+&emsp;`event`: 要调度的事件。
+
+&emsp;UIApplication 对象调用此方法将事件调度到 window。window 对象将触摸事件调度到发生触摸的 view，并将其他类型的事件分派到最合适的目标对象。你可以根据需要在应用程序中调用此方法以调度你创建的自定义事件。例如，你可以调用此方法将自定义事件调度到 window 的响应者链。
+
+&emsp;看到这里我们大概明白了 UIApplication 会把 UIEvent 发送到 UIWindow，那么 UIEvent 是什么呢？那么我们的思路切下分支来看一下 UIEvent 的文档，然后再回到我们的主分支。
+## UIEvent
+&emsp;描述单个用户与你的应用交互的对象。
+```c++
+UIKIT_EXTERN API_AVAILABLE(ios(2.0)) @interface UIEvent : NSObject
+```
+&emsp;应用程序可以接收许多不同类型的事件，包括触摸事件（touch events）、运动事件（motion events）、远程控制事件（remote-control events）和按键事件（press events）。
++ 触摸事件是最常见的，并且被传递到最初发生触摸的 view 中。
++ 运动事件是 UIKit 触发的，与 Core Motion 框架报告的运动事件是分开的。
++ 远程控制事件允许响应者对象从外部附件或耳机接收命令，以便它可以管理音频和视频的管理，例如，播放视频或跳至下一个音轨。
++ 按键事件表示与游戏控制器、AppleTV 遥控器或其他具有物理按钮的设备的交互。
+&emsp;可以使用类型（`type`）和子类型（`subtype`）属性确定事件的类型。
+
+&emsp;触摸事件对象包含与事件有某种关系的 touches（即屏幕上的手指）。触摸事件对象可以包含一个或多个 touch，并且每个触摸都由 UITouch 对象表示。
+当触摸事件发生时，系统将其路由到相应的响应者并调用相应的方法，如 touchesBegan:withEvent:。然后，响应者使用 touches 来确定适当的行动方案。
+
+&emsp;在多点触摸序列中，UIKit 在将更新的 touch 数据传递到你的应用程序时会重用同一 UIEvent 对象。你永远不应 retain UIEvent 对象或 UIEvent 对象返回的任何对象。如果需要在用于处理该数据的响应程序方法之外保留数据，请将该数据从 UITouch 或 UIEvent 对象复制到本地数据结构。
+
+&emsp;有关如何在 UIKit 应用中处理事件的更多信息，请参见 Event Handling Guide for UIKit Apps。（UIKit 文档内容过多，这里我们只阅读 Handling Touches in Your View 文档）
+### UIEventType
+&emsp;指定事件的常规类型。
+```c++
+typedef NS_ENUM(NSInteger, UIEventType) {
+    UIEventTypeTouches,
+    UIEventTypeMotion,
+    UIEventTypeRemoteControl,
+    UIEventTypePresses API_AVAILABLE(ios(9.0)),
+};
+```
+&emsp;你可以从 type 属性获取事件的类型。为了进一步识别事件，你可能还需要确定其子类型，该子类型是从 subtype 属性获得的。
++ UIEventTypeTouches: 该事件与屏幕上的触摸有关。
++ UIEventTypeMotion: 该事件与设备的运动有关，例如用户摇晃设备。
++ UIEventTypeRemoteControl: 该事件是一个远程控制事件。远程控制事件源于从耳机或外部附件接收的命令，用于控制设备上的多媒体。
++ UIEventTypePresses: 该事件与按下物理按钮有关。
+
+### UIEventSubtype
+&emsp;指定事件的子类型（相对于其常规类型）。
+```c++
+typedef NS_ENUM(NSInteger, UIEventSubtype) {
+    // available in iPhone OS 3.0
+    UIEventSubtypeNone                              = 0,
+    
+    // for UIEventTypeMotion, available in iPhone OS 3.0
+    UIEventSubtypeMotionShake                       = 1,
+    
+    // for UIEventTypeRemoteControl, available in iOS 4.0
+    UIEventSubtypeRemoteControlPlay                 = 100,
+    UIEventSubtypeRemoteControlPause                = 101,
+    UIEventSubtypeRemoteControlStop                 = 102,
+    UIEventSubtypeRemoteControlTogglePlayPause      = 103,
+    UIEventSubtypeRemoteControlNextTrack            = 104,
+    UIEventSubtypeRemoteControlPreviousTrack        = 105,
+    UIEventSubtypeRemoteControlBeginSeekingBackward = 106,
+    UIEventSubtypeRemoteControlEndSeekingBackward   = 107,
+    UIEventSubtypeRemoteControlBeginSeekingForward  = 108,
+    UIEventSubtypeRemoteControlEndSeekingForward    = 109,
+};
+```
+&emsp;你可以从 subtype 属性获取事件的子类型。
++ UIEventSubtypeNone: 该事件没有子类型。这是 UIEventTypeTouches 常规类型的事件的子类型。
++ UIEventSubtypeMotionShake: 该事件与用户摇晃设备有关。它是 UIEventTypeMotion 常规事件类型的子类型。
++ UIEventSubtypeRemoteControlPlay: 播放音频或视频的远程控制事件。它是 UIEventTypeRemoteControl 常规事件类型的子类型。
++ UIEventSubtypeRemoteControlPause: 暂停音频或视频的远程控制事件。它是 UIEventTypeRemoteControl 常规事件类型的子类型。
++ UIEventSubtypeRemoteControlStop: 用于停止播放音频或视频的远程控制事件。它是 UIEventTypeRemoteControl 常规事件类型的子类型。
++ UIEventSubtypeRemoteControlTogglePlayPause: 在播放和暂停之间切换音频或视频的远程控制事件。它是 UIEventTypeRemoteControl 常规事件类型的子类型。
++ UIEventSubtypeRemoteControlNextTrack: 跳至下一个音频或视频轨道的远程控制事件。它是 UIEventTypeRemoteControl 常规事件类型的子类型。
++ UIEventSubtypeRemoteControlPreviousTrack: 跳到上一个音频或视频轨道的远程控制事件。它是 UIEventTypeRemoteControl 常规事件类型的子类型。
++ UIEventSubtypeRemoteControlBeginSeekingBackward: 一个远程控制事件，开始通过音频或视频媒体向后搜索。它是 UIEventTypeRemoteControl 常规事件类型的子类型。
++ UIEventSubtypeRemoteControlEndSeekingBackward: 结束通过音频或视频媒体向后搜索的远程控制事件。它是 UIEventTypeRemoteControl 常规事件类型的子类型。 
++ UIEventSubtypeRemoteControlBeginSeekingForward: 一个开始通过音频或视频介质向前搜索的远程控制事件。它是 UIEventTypeRemoteControl 常规事件类型的子类型。
++ UIEventSubtypeRemoteControlEndSeekingForward: 结束通过音频或视频介质向前搜索的远程控制事件。它是 UIEventTypeRemoteControl 常规事件类型的子类型。
+
+### type
+&emsp;返回事件的类型。
+```c++
+@property(nonatomic,readonly) UIEventType type API_AVAILABLE(ios(3.0));
+```
+&emsp;此属性返回的 UIEventType 常量指示此事件的常规类型，例如，它是触摸事件还是运动事件。
+### subtype
+&emsp;返回事件的子类型。
+```c++
+@property(nonatomic,readonly) UIEventSubtype  subtype API_AVAILABLE(ios(3.0));
+```
+&emsp;此属性返回的 UIEventSubtype 常量指示与常规类型相关的事件的子类型，该子类型是从 type 属性返回的。
+### timestamp
+&emsp;事件发生的时间。
+```c++
+@property(nonatomic,readonly) NSTimeInterval  timestamp;
+```
+&emsp;此属性包含自系统启动以来经过的秒数。有关此时间值的描述，请参见 NSProcessInfo 类的 systemUptime 方法的描述。
+### allTouches
+&emsp;返回与事件关联的所有 touches。（alltouchs 属性只包含触摸序列中的最后一次触摸）
+```c++
+@property(nonatomic, readonly, nullable) NSSet <UITouch *> *allTouches; // 只读集合
+```
+&emsp;一组 UITouch 对象，表示与事件关联的所有 touches。
+
+&emsp;如果事件的 touches 源自不同的 views 和 windows，则从此方法获得的 UITouch 对象将与不同的响应者对象相关联。
+
+&emsp;（在 touchesBegan:withEvent: 函数中 touches 参数和 event.allTouches 是完全一样的，那这里可能会迷惑既然 event 中完全包含 touches 那为什么还要用两个参数呢？传递一个 event 对象不就够了吗，比如看 [UIApplication sendEvent:] 中就仅传了一个 event，其实这里是因为 touchesBegan:withEvent: 函数中可以仅传 touches 参数，把 event 参数传 nil 的。因为仅使用 touches 即可进行 hit-testing 来判断触摸点是否在某个 view 上，便可判断该 view 是否可以作为响应者。（如果要从事件处理代码外部调用此方法，则可以指定 nil。））
+
+### touchesForWindow:
+&emsp;从 UIEvent 中返回属于指定 window 的 UITouch 对象。
+```c++
+- (nullable NSSet <UITouch *> *)touchesForWindow:(UIWindow *)window;
+```
+&emsp;`window`: 最初发生 touches 的 UIWindow 对象。
+
+&emsp;一组 UITouch 对象，它们代表属于指定 window 的触摸。
+### touchesForView:
+&emsp;从 UIEvent 中返回属于指定 view 的 UITouch 对象。
+```c++
+- (nullable NSSet <UITouch *> *)touchesForView:(UIView *)view;
+```
+&emsp;`view`: 最初发生 touches 的 UIView 对象。
+
+&emsp;一组 UITouch 对象，它们代表属于指定 view 的触摸。
+### touchesForGestureRecognizer:
+&emsp;返回要传递到指定 gesture recognizer 的 UITouch 对象。
+```c++
+- (nullable NSSet <UITouch *> *)touchesForGestureRecognizer:(UIGestureRecognizer *)gesture API_AVAILABLE(ios(3.2));
+```
+&emsp;`gesture`: 抽象基类 UIGestureRecognizer 的子类的实例。必须将此 gesture-recognizer object  附加到视图，以接收对该视图及其子视图进行了 hit-tested。
+
+&emsp;一组表示触摸的 UITouch 对象，这些对象将传递给 receiver 表示的 UIEvent 的指定 gesture recognizer。
+
+&emsp;下面两个函数用于获取 UIEvent 对象的 main  touch objecct 关联的 UITouch 和预测的 UITouch 数组。主要用于 Apple Pencil 获取高精度的 touch 输入（在 iPad 上使用 Apple Pencil 时，iPad 屏幕刷新会提到 120 赫兹）以及预测 touch  走向，提高用户体验。（不想看的可以忽略）
+
+### coalescedTouchesForTouch:
+&emsp;返回与指定 main touch 关联的所有 touches。（一组针对给定 main touch 未传递的触摸事件的辅助 UITouch。这还包括 main touch 本身的辅助版本。）
+```c++
+- (nullable NSArray <UITouch *> *)coalescedTouchesForTouch:(UITouch *)touch API_AVAILABLE(ios(9.0));
+```
+&emsp;`touch`: 与 event 一起报告的 main touch 对象。你指定的触摸对象确定返回附加触摸的序列。
+
+&emsp;Return Value: UITouch 对象的数组，代表自上次传递事件以来针对指定 UITouch 报告的所有 UITouch。数组中对象的顺序与将触摸报告给系统的顺序匹配，最后一次触摸是你在 touch 参数中指定的同一 UITouch 的副本。如果 touch 参数中的对象与当前事件不关联，则返回值为 nil。
+
+&emsp;使用此方法可获取系统接收到但未在上一个 UIEvent 对象中传递的任何其他 UITouch。一些设备以高达 240 赫兹的频率收集 UITouch 数据，这通常高于将 UITouch 传送到应用程序的速率。尽管这些额外的 UITouch 数据提供了更高的精度，但许多应用程序并不需要这种精度，也不想招致与处理它们相关的开销。但是，想要提高精度的应用程序可以使用此方法来检索额外的 UITouch 对象。例如，绘图应用程序可以使用这些 UITouch 来获取用户绘图输入的更精确记录。然后，你可以将额外的 UITouch 数据应用于应用程序的内容。如果你想要合并的 UITouch 或使用传递给响应者方法的一组 UITouch，请使用此方法，但不要将两组 UITouch 混合在一起。此方法返回自上次事件以来报告的 UITouch 的完整序列，包括报告给响应者方法的 UITouch 的副本。传递给响应者方法的事件只包含序列中的最后一次触摸。类似地，alltouchs 属性只包含序列中的最后一次触摸。（想到了 Apple pencil 在 iPad 上使用时，iPad 屏幕刷新会提高到 120 赫兹）
+### predictedTouchesForTouch:
+&emsp;返回预计将针对指定 UITouch 发生的 UITouch 数组。（一组辅助 UITouch，用于预测在给定的 main touch 下会发生的触摸事件。这些预测可能与触摸的真实行为不完全匹配，因此应将其解释为一种估计。）
+```c++
+- (nullable NSArray <UITouch *> *)predictedTouchesForTouch:(UITouch *)touch API_AVAILABLE(ios(9.0));
+```
+&emsp;`touch`: 与事件一起报告的 main touch 对象。你指定的 UITouch 对象用于确定返回附加 UITouch 的序列。
+
+&emsp;Return Value: 一组 UITouch 对象，它们表示系统将预测的下一组 UITouch。数组中对象的顺序与预期将触摸传递到你的应用程序的顺序匹配。该数组不包括你在 touch 参数中指定的原始 UITouch。如果 touch 参数中的对象与当前事件没有关联，则返回值为 nil。
+
+&emsp;使用此方法可以最小化用户的触摸输入和屏幕内容呈现之间的明显延迟。处理来自用户的 UITouch 输入并将该信息转换为绘图命令需要时间，而将这些绘图命令转换为呈现的内容则需要额外的时间。如果用户的手指或 Apple Pencil 移动速度足够快，这些延迟可能会导致当前触摸位置和渲染内容之间出现明显的间隙。为了最大限度地减少感觉到的延迟，请使用此方法的预期效果作为对内容的附加临时输入。
+
+&emsp;此方法返回的 UITouch 表示系统根据用户过去的输入估计用户的触摸输入将在何处。仅将这些 UITouch 暂时附加到用于绘制或更新内容的结构中，并在收到带有新 UITouch 的新事件后立即丢弃它们。当与合并的 UITouch 和高效的绘图代码结合使用时，你可以创建一种感觉，即用户的输入被立即处理，几乎没有延迟。这种感觉改善了用户对绘图应用程序或任何让用户直接在屏幕上操作对象的应用程序的体验。
+
+&emsp;UIEvent 文档共有这么多内容，并不多，其实并不应该想当然的觉得 UIEvent 复杂，其实它很简单，我们更需要关注的是 UIEvent 中包含的手指触摸位置，只有这些位置或者说是触摸点信息才是最重要的，下面我们看一下 UITouch 的文档。
 
 ## UITouch
-&emsp;表示屏幕上发生的触摸的位置（location）、大小（size）、移动（movement）和力度（force）的对象。
+&emsp;表示屏幕上发生的触摸的位置（location）、大小（size）、移动（movement）和力度（force，针对 3D Touch 和 Apple Pencil）的对象。
 ```c++
 UIKIT_EXTERN API_AVAILABLE(ios(2.0)) @interface UITouch : NSObject
 ```
-&emsp;你可以通过传递给响应器对象（UIResponder 或其子类）的 UIEvent 对象访问 touch 对象，以进行事件处理。touch 对象包括用于以下对象的访问器：
+&emsp;打印一个 UITouch 对象的可看到如下内容:
+```c++
+<UITouch: 0x7f9089614b70> 
+phase: Moved 
+tap count: 1 
+force: 0.000 
+
+window: <UIWindow: 0x7f908950d170; frame = (0 0; 375 812); gestureRecognizers = <NSArray: 0x600003c5ff90>; layer = <UIWindowLayer: 0x60000321e4e0>> 
+view: <CustomView: 0x7f90897078d0; frame = (112.667 331; 150 150); autoresize = RM+BM; layer = <CALayer: 0x600003219a80>> 
+
+location in window: {219.33332824707031, 428.66665649414062} 
+previous location in window: {220, 429} 
+location in view: {106.66666158040363, 97.666656494140625} 
+previous location in view: {107.33333333333331, 98}
+```
+&emsp;你可以通过传递给响应者对象（UIResponder 或其子类）的 UIEvent 对象访问 touch 对象（allTouches 属性），以进行事件处理。touch 对象包括用于以下对象的访问：
+
 + 发生触摸的 view 或 window
 + 触摸在 view 或 window 中的位置
 + 触摸的近似半径（approximate radius）
@@ -83,23 +276,23 @@ UIKIT_EXTERN API_AVAILABLE(ios(2.0)) @interface UITouch : NSObject
 
 &emsp;touch 对象还包含一个时间戳，该时间戳指示何时发生触摸；一个整数，代表用户 tapped 屏幕的次数；以及触摸的阶段，其形式为常数，描述了触摸是开始，移动还是结束，或系统是否取消触摸。
 
-&emsp;要了解如何使用 swipes，请阅读 Event Handling Guide for UIKit Apps 中的 Handling Swipe and Drag Gestures。
+&emsp;要了解如何使用 swipes 手势，请阅读 Event Handling Guide for UIKit Apps 中的 Handling Swipe and Drag Gestures。
 
 &emsp;touch 对象在多点触摸序列（multi-touch sequence）中始终存在。你可以在处理多点触控序列时存储对 touch 的引用，只要在序列结束时释放该引用即可。如果需要在多点触控序列之外存储有关 touch 的信息，请从 touch 中复制该信息。
 
 &emsp;touch 的 gestureRecognizers 属性包含当前正在处理 touch 的 gesture recognizers。每个 gesture recognizer 都是 UIGestureRecognizer 的具体子类的实例。
 ### locationInView:
-&emsp;返回给定 `view` 坐标系中 receiver 的当前位置。（即返回一个 UITouch 对象在 view 的坐标系中的位置（CGPoint））
+&emsp;返回给定 view 坐标系中 UITouch 对象的当前位置。（即返回一个 UITouch 对象在 view 的坐标系中的位置（CGPoint））
 ```c++
 - (CGPoint)locationInView:(nullable UIView *)view;
 ```
 &emsp;`view`: 要在其坐标系中定位 touch 的视图对象。处理 touch 的自定义视图可以指定 self 以在其自己的坐标系中获取 touch 位置。传递 nil 以获取 window 坐标系中的 touch 位置。
 
-&emsp;Return Value: 一个指定 receiver 在 view 中位置的 point。
+&emsp;Return Value: 一个指定 UITouch 在 view 中位置的 point。
 
 &emsp;此方法返回 UITouch 对象在指定 view 的坐标系中的当前位置。因为 touch 对象可能已从另一个视图转发到一个视图，所以此方法将 touch 位置执行任何必要的转换到指定 view 的坐标系。
 ### previousLocationInView:
-&emsp;返回 receiver 在给定 view 坐标系中的先前位置。
+&emsp;返回 UITouch 在给定 view 坐标系中的先前位置。
 ```c++
 - (CGPoint)previousLocationInView:(nullable UIView *)view;
 ```
@@ -107,11 +300,11 @@ UIKIT_EXTERN API_AVAILABLE(ios(2.0)) @interface UITouch : NSObject
 
 &emsp;Return Value: 此方法返回 UITouch 对象在指定 view 的坐标系中的上一个位置。因为 touch 对象可能已从另一个视图转发到一个视图，所以此方法将 touch 位置执行任何必要的转换到指定 view 的坐标系。
 ### view
-&emsp;触摸要传递到的视图（如果有的话）。
+&emsp;UITouch 要传递到的视图（如果有的话）。
 ```c++
 @property(nullable,nonatomic,readonly,strong) UIView *view;
 ```
-&emsp;此属性的值是将 touches 传递到的 view 对象，不一定是 touch 当前所在的 view。例如，当 gesture recognizer 识别到 touch 时，此属性为 nil，因为没有 view 在接收 touch。
+&emsp;此属性的值是将 touche 传递到的 view 对象，不一定是 touch 当前所在的 view。例如，当 gesture recognizer 识别到 touch 时，此属性为 nil，因为没有 view 在接收 touch。
 ### window
 &emsp;最初发生 touch 的 window。
 ```c++
@@ -131,7 +324,7 @@ UIKIT_EXTERN API_AVAILABLE(ios(2.0)) @interface UITouch : NSObject
 ```
 &emsp;此值确定 majorRadius 属性中值的准确性。将此值添加到半径以获得最大触摸半径。减去该值以获得最小触摸半径。
 ### preciseLocationInView:
-&emsp;返回 touch 的精确位置（如果可用）。
+&emsp;返回 UITouch 的精确位置（如果可用）。
 ```c++
 - (CGPoint)preciseLocationInView:(nullable UIView *)view API_AVAILABLE(ios(9.1));
 ```
@@ -177,6 +370,7 @@ typedef NS_ENUM(NSInteger, UITouchType) {
 + UITouchTypeIndirect: 不是接触屏幕造成的触摸。间接触摸是由与屏幕分离的触摸输入设备产生的。例如，Apple TV 遥控器的触控板会产生间接触摸。
 + UITouchTypePencil: Apple Pencil 的 touch。当 Apple Pencil 与设备的屏幕交互时，会发生 Pencil Touch。
 + UITouchTypeStylus: 已废弃，使用 UITouchTypePencil 代替。
+
 ### type
 &emsp;表示 touch 类型的属性。
 ```c++
@@ -184,14 +378,14 @@ typedef NS_ENUM(NSInteger, UITouchType) {
 ```
 &emsp;有关触摸类型的完整列表，请参阅 maximumPossibleForce。
 ### UITouchPhase
-&emsp;touch 事件的阶段。
+&emsp;touch 的阶段。
 ```c++
 typedef NS_ENUM(NSInteger, UITouchPhase) {
     UITouchPhaseBegan, // whenever a finger touches the surface. 只要手指碰到表面。
     UITouchPhaseMoved, // whenever a finger moves on the surface. 当手指在表面上移动时。
     UITouchPhaseStationary, // whenever a finger is touching the surface but hasn't moved since the previous event. 当手指接触到表面，但自上次事件后没有移动时。
     UITouchPhaseEnded, // whenever a finger leaves the surface. 当手指离开表面。
-    UITouchPhaseCancelled, // whenever a touch doesn't end but we need to stop tracking (e.g. putting device to face) 当触摸未结束但我们需要停止跟踪时（例如，接听电话时将设备放在脸上移动）
+    UITouchPhaseCancelled, // whenever a touch doesn't end but we need to stop tracking (e.g. putting device to face) 当触摸未结束但我们需要停止跟踪时（例如，接听电话时将设备放在脸上移动、或者识别到触摸是手势后会强制把 touch 置为 cancel）
     
     UITouchPhaseRegionEntered   API_AVAILABLE(ios(13.4), tvos(13.4)) API_UNAVAILABLE(watchos),  // whenever a touch is entering the region of a user interface 每当触摸进入用户界面区域时
     
@@ -203,6 +397,7 @@ typedef NS_ENUM(NSInteger, UITouchPhase) {
 };
 ```
 &emsp;UITouch 实例的阶段随着系统在事件过程中接收更新而改变。通过 phase 属性访问此值。
+
 + UITouchPhaseBegan: 屏幕上按下了对给定事件的 touch。
 + UITouchPhaseMoved: 给定事件的 touch 已在屏幕上移动。
 + UITouchPhaseStationary: 在屏幕上按下给定事件的 touch，但自上一个事件后就再也没有移动过。
@@ -224,7 +419,8 @@ typedef NS_ENUM(NSInteger, UITouchPhase) {
 ```
 &emsp;数组中的对象是抽象基类 UIGestureRecognizer 的子类的实例。如果当前没有接收 touch 的 gesture recognizers，则此属性包含空数组。
 
-&emsp;下面大概是一些 3D Touch、Apple Pencil 相关的（触摸）内容，可直接忽略。
+&emsp;⬇️⬇️ 下面是一些与 3D Touch、Apple Pencil 相关的内容，不感兴趣的话可直接忽略。
+
 ### force
 &emsp;touch 的力，其中值 1.0 表示平均触摸力（由系统预先确定，而不是特定于用户）。
 ```c++
@@ -302,7 +498,103 @@ typedef NS_OPTIONS(NSInteger, UITouchProperties) {
 ```
 &emsp;此属性包含当前触摸数据的唯一标记。当触摸包含估计属性时，将此索引与其余触摸数据一起保存到应用程序的数据结构中。当系统稍后报告实际触摸值时，使用此索引定位应用程序数据结构中的原始数据，并替换先前存储的估计值。例如，当触摸包含估计属性时，可以将此属性用作字典中的键，字典的值是用于存储触摸数据的对象。
 
-&emsp;对于包含估计属性的每个触摸，此属性的值都会单调增加。当触摸对象不包含估计或更新的属性时，此属性的值为零。
+&emsp;对于包含估计属性的每个 touch，此属性的值都会单调增加。当 touch 对象不包含估计或更新的属性时，此属性的值为零。
+
+&emsp;UITouch 的内容就这么多，也比较简单，最重要的记录其在 view  和 window 中的坐标点以及 phase 等下在学习 UIResponder 是会用到，UITouch 在不同的阶段时响应者会调用不同的响应函数。（touchesBegan:withEvent:、touchesMoved:withEvent:、touchesEnded:withEvent:、touchesCancelled:withEvent:）
+
+&emsp;UIResponder 响应者相关的内容我们放在后面，现在 UIEvent 和 UITouch 看完了，我们继续顺着上面的 [UIApplication sendEvent:]、[UIWindow sendEvent:] 向下看，此时需要一层一层找到第一响应者。  那么我们如何找到第一响应者呢，我们继续向下看。  
+
+## Hit-Testing
+&emsp;判断一个 touch 的触摸点是否在一个 view 中涉及到下面 UIView 类中的几个函数。（UIWindow 继承自 UIView 大家应该都知道的）
+### hitTest:withEvent:
+&emsp;返回包含指定点（`point`）的视图层次结构中 UIView 的最远子视图（最远子视图，也可能是其自身）。
+```c++
+- (UIView *)hitTest:(CGPoint)point withEvent:(UIEvent *)event;
+```
+&emsp;`point`: UIView 的本地坐标系（bounds）中指定的点。`event`: 需要调用此方法的事件。如果要从事件处理代码外部调用此方法，则可以指定 nil。
+
+&emsp;Return Value: view 对象是当前 view 的最远子视图，并且包含 `point`。如果该 `point` 完全位于 UIView 的视图层次之外，则返回 nil。
+
+&emsp;此方法通过调用每个子视图的 `pointInside:withEvent:` 方法来遍历视图层次结构，以确定哪个子视图应接收 touch 事件。如果 `pointInside:withEvent:` 返回 YES，然后类似地遍历其子视图的层次结构，直到找到包含 `point` 的最前面的视图。如果视图不包含该 `point`，则将忽略其视图层次结构的分支。你很少需要自己调用此方法，但可以重写它以从子视图中隐藏 touch 事件，或者扩大 view 响应范围。
+
+&emsp;此方法将忽略 hidden 设置为 YES 的、禁用用户交互（userInteractionEnabled 设置为 NO）或 alpha 小于 0.01 的 view 对象。确定点击（determining a hit）时，此方法不会考虑 view 的内容。因此，即使 `point` 位于该 view 内容的透明部分中，该 view 仍然可以返回。
+
+&emsp;超出 view 的 bounds 的 `point` 永远不会被报告为命中，即使它们实际上位于 receiver 的一个子视图中。如果当前视图的 clipsToBounds 属性设置为 NO，并且受影响的子视图超出了视图的边界，则会发生这种情况。（例如一个 button 按钮超出了其父试图的 bounds，此时点击 button 未超出父视图的区域的话可以响应点击事件，如果点击 button 超出父视图的区域的话则不能响应点击事件）
+
+&emsp;hitTest:withEvent: 寻找一个包含 `point` 的 view 的过程可以理解为如下：
+```c++
+- (UIView *)hitTest:(CGPoint)point withEvent:(UIEvent *)event{
+    // 3 种状态无法响应事件
+    // 1): userInteractionEnabled 为 NO，禁止了用户交互。
+    // 2): hidden 为 YES，被隐藏了。
+    // 3): alpha 小于等于 0.01，透明度小于 0.01。
+    if (self.userInteractionEnabled == NO || self.hidden == YES ||  self.alpha <= 0.01) return nil;
+    
+    // 触摸点若不在当前视图上则无法响应事件
+    if ([self pointInside:point withEvent:event] == NO) return nil;
+    
+    // ⬇️⬇️⬇️ 从后往前遍历子视图数组（倒序）
+    int count = (int)self.subviews.count;
+    for (int i = count - 1; i >= 0; i--) {
+        // 获取子视图
+        UIView *childView = self.subviews[i];
+        
+        // 坐标系的转换，把触摸点在当前视图上坐标转换为在子视图上的坐标
+        CGPoint childP = [self convertPoint:point toView:childView];
+        
+        // 询问子视图层级中的最佳响应视图（递归）
+        UIView *fitView = [childView hitTest:childP withEvent:event];
+        
+        if (fitView) {
+            // 如果子视图中有更合适的就返回
+            return fitView;
+        }
+    }
+    
+    // 没有在子视图中找到更合适的响应视图，那么自身就是最合适的
+    return self;
+}
+```
+### pointInside:withEvent:
+&emsp;返回一个布尔值，该值指示 UIView 是否包含 `point`。
+```c++
+- (BOOL)pointInside:(CGPoint)point withEvent:(UIEvent *)event;
+```
+&emsp;`point`: UIView 的本地坐标系（bounds）中指定的点。`event`: 需要调用此方法的事件。如果要从事件处理代码外部调用此方法，则可以指定 nil。
+
+&emsp;如果 `point` 包含在 UIView 的 bounds 中，则返回 YES，否则返回 NO。
+### convertPoint:toView:
+&emsp;将 `point` 从 UIView 的坐标系转换为指定视图（`view`）的点（CGPoint）。
+```c++
+- (CGPoint)convertPoint:(CGPoint)point toView:(UIView *)view;
+```
+&emsp;`point`: UIView 的本地坐标系（bounds）中指定的点。
+
+&emsp;以上从一个指定 view 中找到最远的一个可以包含 touch 的 
+
+
+
+
+
+
+
+
+
+
+
+
+
+// 1. 沿着 UIApplication -> UIWindow -> UIView -> subView 寻找第一响应者
+// 2. 第一响应者处理 UIEvent，如果第一响应者不能处理这个 UIEvent，则其顺着 Responder Chin 寻找能处理这个 UIEvent 的响应者（next Responder）
+// 3. Target-Action 设计模式
+
+
+
+
+
+
+
+
 ## Handling Touches in Your View（处理视图中的触摸）
 &emsp;如果触摸处理（touch handling）与 view 的内容有复杂的链接（intricately linked），则直接在 view 子类上使用触摸事件（touch events）。
 
@@ -619,9 +911,6 @@ UIKIT_EXTERN API_AVAILABLE(ios(2.0)) @interface UIResponder : NSObject <UIRespon
 ```
 
 
-
-
-
 ## Target-Action
 &emsp;尽管 delegation、bindings 和 notification 对于处理程序中对象之间的某些形式的通信很有用，但它们并不特别适合于最明显的通信类型。典型的应用程序的用户界面由许多图形对象组成，其中最常见的对象可能是控件（controls）。控件是真实世界或逻辑设备（按钮（button）、滑块（slider）、复选框（checkboxes）等）的图形模拟；与真实世界控件（如收音机调谐器）一样，你使用它将你的意图传达给某个系统，而该系统是应用程序的一部分。
 
@@ -727,149 +1016,7 @@ UIKIT_EXTERN API_AVAILABLE(ios(2.0)) @interface UIResponder : NSObject <UIRespon
 + UIWindow 对象。window 的下一个响应者是 UIApplication 对象。
 + UIApplication 对象。下一个响应者是 app delegate，但仅当该 app delegate 是 UIResponder 的实例并且不是 view、view controller 或 app  对象本身时，才是下一个响应者。
 
-## UIEvent
-&emsp;描述单个 user 与你的应用交互的对象。
-```c++
-UIKIT_EXTERN API_AVAILABLE(ios(2.0)) @interface UIEvent : NSObject
-```
-&emsp;应用程序可以接收许多不同类型的事件，包括触摸事件（touch events）、运动事件（motion events）、远程控制事件（remote-control events）和按键事件（press events）。
-+ 触摸事件是最常见的，并且被传递到最初发生触摸的视图中。
-+ 运动事件是 UIKit 触发的，与 Core Motion 框架报告的运动事件是分开的。
-+ 远程控制事件允许响应者对象从外部附件或耳机接收命令，以便它可以管理音频和视频的管理，例如，播放视频或跳至下一个音轨。
-+ 按键事件表示与游戏控制器、AppleTV 遥控器或其他具有物理按钮的设备的交互。
-&emsp;可以使用类型（`type`）和子类型（`subtype`）属性确定事件的类型。
 
-&emsp;触摸事件对象包含与事件有某种关系的触摸（即屏幕上的手指）。触摸事件对象可以包含一个或多个触摸，并且每个触摸都由 UITouch 对象表示。
-当触摸事件发生时，系统将其路由到相应的响应程序并调用相应的方法，如 touchesBegan:withEvent:。然后，响应者使用 touches 来确定适当的行动方案。
-
-&emsp;在多点触摸序列中，UIKit 在将更新的触摸数据传递到你的应用程序时会重用同一 UIEvent 对象。你永远不应 retain 事件对象或事件对象返回的任何对象。如果需要在用于处理该数据的响应程序方法之外保留数据，请将该数据从 UITouch 或 UIEvent 对象复制到本地数据结构。
-
-&emsp;有关如何在 UIKit 应用中处理事件的更多信息，请参见 Event Handling Guide for UIKit Apps。（UIKit 文档内容过多，这里我们只阅读 Handling Touches in Your View 文档）
-### UIEventType
-&emsp;指定事件的常规类型。
-```c++
-typedef NS_ENUM(NSInteger, UIEventType) {
-    UIEventTypeTouches,
-    UIEventTypeMotion,
-    UIEventTypeRemoteControl,
-    UIEventTypePresses API_AVAILABLE(ios(9.0)),
-};
-```
-&emsp;你可以从 type 属性获取事件的类型。为了进一步识别事件，你可能还需要确定其子类型，该子类型是从 subtype 属性获得的。
-+ UIEventTypeTouches: 该事件与屏幕上的触摸有关。
-+ UIEventTypeMotion: 该事件与设备的运动有关，例如用户摇晃设备。
-+ UIEventTypeRemoteControl: 该事件是一个远程控制事件。远程控制事件源于从耳机或外部附件接收的命令，用于控制设备上的多媒体。
-+ UIEventTypePresses: 该事件与按下物理按钮有关。
-
-### UIEventSubtype
-&emsp;指定事件的子类型（相对于其常规类型）。
-```c++
-typedef NS_ENUM(NSInteger, UIEventSubtype) {
-    // available in iPhone OS 3.0
-    UIEventSubtypeNone                              = 0,
-    
-    // for UIEventTypeMotion, available in iPhone OS 3.0
-    UIEventSubtypeMotionShake                       = 1,
-    
-    // for UIEventTypeRemoteControl, available in iOS 4.0
-    UIEventSubtypeRemoteControlPlay                 = 100,
-    UIEventSubtypeRemoteControlPause                = 101,
-    UIEventSubtypeRemoteControlStop                 = 102,
-    UIEventSubtypeRemoteControlTogglePlayPause      = 103,
-    UIEventSubtypeRemoteControlNextTrack            = 104,
-    UIEventSubtypeRemoteControlPreviousTrack        = 105,
-    UIEventSubtypeRemoteControlBeginSeekingBackward = 106,
-    UIEventSubtypeRemoteControlEndSeekingBackward   = 107,
-    UIEventSubtypeRemoteControlBeginSeekingForward  = 108,
-    UIEventSubtypeRemoteControlEndSeekingForward    = 109,
-};
-```
-&emsp;你可以从 subtype 属性获取事件的子类型。
-+ UIEventSubtypeNone: 该事件没有子类型。这是 UIEventTypeTouches 常规类型的事件的子类型。
-+ UIEventSubtypeMotionShake: 该事件与用户摇晃设备有关。它是 UIEventTypeMotion 常规事件类型的子类型。
-+ UIEventSubtypeRemoteControlPlay: 播放音频或视频的远程控制事件。它是 UIEventTypeRemoteControl 常规事件类型的子类型。
-+ UIEventSubtypeRemoteControlPause: 暂停音频或视频的远程控制事件。它是 UIEventTypeRemoteControl 常规事件类型的子类型。
-+ UIEventSubtypeRemoteControlStop: 用于停止播放音频或视频的远程控制事件。它是 UIEventTypeRemoteControl 常规事件类型的子类型。
-+ UIEventSubtypeRemoteControlTogglePlayPause: 在播放和暂停之间切换音频或视频的远程控制事件。它是 UIEventTypeRemoteControl 常规事件类型的子类型。
-+ UIEventSubtypeRemoteControlNextTrack: 跳至下一个音频或视频轨道的远程控制事件。它是 UIEventTypeRemoteControl 常规事件类型的子类型。
-+ UIEventSubtypeRemoteControlPreviousTrack: 跳到上一个音频或视频轨道的远程控制事件。它是 UIEventTypeRemoteControl 常规事件类型的子类型。
-+ UIEventSubtypeRemoteControlBeginSeekingBackward: 一个远程控制事件，开始通过音频或视频媒体向后搜索。它是 UIEventTypeRemoteControl 常规事件类型的子类型。
-+ UIEventSubtypeRemoteControlEndSeekingBackward: 结束通过音频或视频媒体向后搜索的远程控制事件。它是 UIEventTypeRemoteControl 常规事件类型的子类型。 
-+ UIEventSubtypeRemoteControlBeginSeekingForward: 一个开始通过音频或视频介质向前搜索的远程控制事件。它是 UIEventTypeRemoteControl 常规事件类型的子类型。
-+ UIEventSubtypeRemoteControlEndSeekingForward: 结束通过音频或视频介质向前搜索的远程控制事件。它是 UIEventTypeRemoteControl 常规事件类型的子类型。
-
-### type
-&emsp;返回事件的类型。
-```c++
-@property(nonatomic,readonly) UIEventType     type API_AVAILABLE(ios(3.0));
-```
-&emsp;此属性返回的 UIEventType 常量指示此事件的常规类型，例如，它是触摸事件还是运动事件。
-### subtype
-&emsp;返回事件的子类型。
-```c++
-@property(nonatomic,readonly) UIEventSubtype  subtype API_AVAILABLE(ios(3.0));
-```
-&emsp;此属性返回的 UIEventSubtype 常量指示与常规类型相关的事件的子类型，该子类型是从 type 属性返回的。
-### timestamp
-&emsp;事件发生的时间。
-```c++
-@property(nonatomic,readonly) NSTimeInterval  timestamp;
-```
-&emsp;此属性包含自系统启动以来经过的秒数。有关此时间值的描述，请参见 NSProcessInfo 类的 systemUptime 方法的描述。
-### allTouches
-&emsp;返回与事件关联的所有 touches。
-```c++
-@property(nonatomic, readonly, nullable) NSSet <UITouch *> *allTouches; // 只读集合
-```
-&emsp;一组 UITouch 对象，表示与事件关联的所有 touches。
-
-&emsp;如果事件的 touches 源自不同的 views 和 windows，则从此方法获得的 UITouch 对象将与不同的响应者对象相关联。
-### touchesForWindow:
-&emsp;从事件中返回属于指定 window 的触摸对象。
-```c++
-- (nullable NSSet <UITouch *> *)touchesForWindow:(UIWindow *)window;
-```
-&emsp;`window`: 最初发生 touches 的 UIWindow 对象。
-
-&emsp;一组 UITouch 对象，它们代表属于指定 window 的触摸。
-### touchesForView:
-&emsp;从事件中返回属于指定 view 的触摸对象。
-```c++
-- (nullable NSSet <UITouch *> *)touchesForView:(UIView *)view;
-```
-&emsp;`view`: 最初发生 touches 的 UIView 对象。
-
-&emsp;一组 UITouch 对象，它们代表属于指定 view 的触摸。
-### touchesForGestureRecognizer:
-&emsp;返回要传递到指定 gesture recognizer 的触摸对象。
-```c++
-- (nullable NSSet <UITouch *> *)touchesForGestureRecognizer:(UIGestureRecognizer *)gesture API_AVAILABLE(ios(3.2));
-```
-&emsp;`gesture`: 抽象基类 UIGestureRecognizer 的子类的实例。必须将此 gesture-recognizer object  附加到视图，以接收对该视图及其子视图进行了经过 hit-tested 触摸。
-
-&emsp;一组表示触摸的 UITouch 对象，这些对象将传递给 receiver 表示的事件的指定 gesture recognizer。
-### coalescedTouchesForTouch:
-&emsp;返回与指定 main touch 关联的所有 touches。（一组针对给定 main touch 未传递的触摸事件的辅助 UITouch。这还包括 main touch 本身的辅助版本。）
-```c++
-- (nullable NSArray <UITouch *> *)coalescedTouchesForTouch:(UITouch *)touch API_AVAILABLE(ios(9.0));
-```
-&emsp;`touch`: 与 event 一起报告的 main touch 对象。你指定的触摸对象确定返回附加触摸的序列。
-
-&emsp;Return Value: UITouch 对象的数组，代表自上次传递事件以来针对指定触摸报告的所有触摸。数组中对象的顺序与将触摸报告给系统的顺序匹配，最后一次触摸是你在 touch 参数中指定的同一触摸的副本。如果 touch 参数中的对象与当前事件不关联，则返回值为 nil。
-
-&emsp;使用此方法可获取系统接收到但未在上一个 UIEvent 对象中传递的任何其他接触。一些设备以高达 240 赫兹的频率收集触摸数据，这通常高于将触摸传送到应用程序的速率。尽管这些额外的触摸数据提供了更高的精度，但许多应用程序并不需要这种精度，也不想招致与处理它们相关的开销。但是，想要提高精度的应用程序可以使用此方法来检索额外的触摸对象。例如，绘图应用程序可以使用这些触摸来获取用户绘图输入的更精确记录。然后，你可以将额外的触摸数据应用于应用程序的内容。如果你想要合并的触摸或使用传递给响应者方法的一组触摸，请使用此方法，但不要将两组触摸混合在一起。此方法返回自上次事件以来报告的触摸的完整序列，包括报告给响应者方法的触摸的副本。传递给响应程序方法的事件只包含序列中的最后一次触摸。类似地，alltouchs 属性只包含序列中的最后一次触摸。（想到了 Apple pencil 在 iPad 上使用时，iPad 屏幕刷新会提高到 120赫兹）
-### predictedTouchesForTouch:
-&emsp;返回预计将针对指定触摸发生的触摸数组。（一组辅助 UITouch，用于预测在给定的 main touch 下会发生的触摸事件。这些预测可能与触摸的真实行为不完全匹配，因此应将其解释为一种估计。）
-```c++
-- (nullable NSArray <UITouch *> *)predictedTouchesForTouch:(UITouch *)touch API_AVAILABLE(ios(9.0));
-```
-&emsp;`touch`: 与事件一起报告的 main touch 对象。你指定的触摸对象用于确定返回附加触摸的序列。
-
-&emsp;Return Value: 一组 UITouch 对象，它们表示系统将预测的下一组触摸。数组中对象的顺序与预期将触摸传递到你的应用程序的顺序匹配。该数组不包括你在 touch 参数中指定的原始触摸。如果 touch 参数中的对象与当前事件没有关联，则返回值为 nil。
-
-&emsp;使用此方法可以最小化用户的触摸输入和屏幕内容呈现之间的明显延迟。处理来自用户的触摸输入并将该信息转换为绘图命令需要时间，而将这些绘图命令转换为呈现的内容则需要额外的时间。如果用户的手指或 Apple Pencil 移动速度足够快，这些延迟可能会导致当前触摸位置和渲染内容之间出现明显的间隙。为了最大限度地减少感觉到的延迟，请使用此方法的预期效果作为对内容的附加临时输入。
-
-&emsp;此方法返回的触摸表示系统根据用户过去的输入估计用户的触摸输入将在何处。仅将这些触摸暂时附加到用于绘制或更新内容的结构中，并在收到带有新触摸的新事件后立即丢弃它们。当与合并的触摸和高效的绘图代码结合使用时，你可以创建一种感觉，即用户的输入被立即处理，几乎没有延迟。这种感觉改善了用户对绘图应用程序或任何让用户直接在屏幕上操作对象的应用程序的体验。
 
 
 
