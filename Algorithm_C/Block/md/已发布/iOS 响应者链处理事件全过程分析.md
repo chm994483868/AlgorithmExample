@@ -570,7 +570,7 @@ typedef NS_OPTIONS(NSInteger, UITouchProperties) {
 ```
 &emsp;`point`: UIView 的本地坐标系（bounds）中指定的点。
 
-&emsp;以上从一个指定 view 中找到最远的一个可以包含 touch 的 
+&emsp;以上从一个指定 view 中找到最远的一个可以包含 touch 的子 view。所以上面顺着 [UIApplication sendEvent:]、[UIWindow sendEvent:] 以后再往下走就是我们 App 的根 window 的根控制器的 View 了（假设只有一个 window），
 
 
 
