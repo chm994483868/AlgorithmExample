@@ -1,20 +1,48 @@
 # iOS 消息转发工作原理总结
 
 > &emsp;
-### Selector
-&emsp;选择器是用于选择要为对象执行的方法的名称，或者是在编译源代码时替换该名称的唯一标识符。选择器本身不起任何作用。它只是标识一个方法。唯一使选择器方法名不同于普通字符串的是编译器确保选择器是唯一的。选择器之所以有用，是因为（与运行时一起）它的作用就像一个动态函数指针，对于给定的名称，它会自动指向一个方法的实现，该方法适用于与它一起使用的任何类。假设您有一个方法运行的选择器，类Dog、Athlete和ComputerSimulation（每个类都实现了一个方法运行）。选择器可以与每个类的实例一起使用，以调用其run方法，即使每个类的实现可能不同。
+
+## Selector
+&emsp;选择器（Selector）是用于选择要为对象执行的方法的名称，或者是在编译源代码时替换该名称的唯一标识符。选择器本身不起任何作用。它只是标识一个方法。唯一使选择器方法名不同于普通字符串的是编译器确保选择器是唯一的。选择器之所以有用，是因为（与运行时一起）它的作用就像一个动态函数指针，对于给定的名称，它会自动指向一个方法的实现，该方法适用于与它一起使用的任何类。假设你有一个方法运行的选择器，类 Dog、Athlete 和 ComputerSimulation（每个类都实现了一个 run 方法）。选择器可以与每个类的实例一起使用，以调用其 run 方法，即使每个类的实现可能不同。
+### Getting a Selector
+&emsp;编译的选择器是 SEL 类型。获取选择器有两种常见方法：
++ 在编译时，使用编译器指令 @selector。
+```c++
+SEL aSelector = @selector(methodName);
+```
++ 在运行时，使用 NSSelectorFromString 函数，其中 string 是方法的名称：
+```c++
+SEL aSelector = NSSelectorFromString(@"methodName");
+```
+&emsp;当你想让你的代码发送一个直到执行阶段才知道其名称的消息时，你可以使用从字符串建立的选取器。
+### Using a Selector
+&emsp;可以以 selector 为参数调用 performSelector: 方法和其他类似方法来执行 selector 方法。
+```c++
+SEL aSelector = @selector(run);
+
+[aDog performSelector:aSelector];
+[anAthlete performSelector:aSelector];
+[aComputerSimulation performSelector:aSelector];
+```
+&emsp;（你可以在特殊情况下使用此技术，例如在实现使用 Target-Action 设计模式的对象时。通常情况下，你只需直接调用该方法。）
+## NSMethodSignature
+&emsp;方法的返回值和参数的类型信息记录。
+```c++
+NS_SWIFT_UNAVAILABLE("NSInvocation and related APIs not available")
+@interface NSMethodSignature : NSObject
+```
+&emsp;使用 NSMethodSignature 对象转发接收对象不响应的消息，尤其是在分布式对象的情况下。通常，你可以使用 NSObject methodSignatureForSelector: instance方法创建 NSMethodSignature 对象（在macOS 10.5 及更高版本中，你还可以使用 signatureWithobjType:）。然后使用它创建一个 NSInvocation 对象，该对象作为参数传递给 forwardInvocation: 消息，以将调用发送到任何其他可以处理该消息的对象。在默认情况下，NSObject 调用 doesNotRecognizeSelector:，这会引发异常。对于分布式对象，NSInvocation 对象使用 NSMethodSignature 对象中的信息进行编码，并发送到消息接收方表示的真实对象。
 
 
-### NSMethodSignature
+
+
+## NSInvocation
 &emsp;
 
-### NSInvocation
-&emsp;
 
 
 
-
-### resolveInstanceMethod:
+## resolveInstanceMethod:
 &emsp;动态地为实例方法的给定选择器（sel）提供实现。
 ```c++
 + (BOOL)resolveInstanceMethod:(SEL)sel OBJC_AVAILABLE(10.5, 2.0, 9.0, 1.0, 2.0);
@@ -46,13 +74,13 @@ void dynamicMethodIMP(id self, SEL _cmd) {
 &emsp;This method is called before the Objective-C forwarding mechanism is invoked. If respondsToSelector: or instancesRespondToSelector: is invoked, the dynamic method resolver is given the opportunity to provide an IMP for the given selector first.
 
 &emsp;在调用 Objective-C 转发机制之前调用此方法。如果调用 respondsToSelector: 或 instancesRespondToSelector:，则动态方法解析器（dynamic method resolver）将有机会首先为给定的选择器提供 IMP。
-### resolveClassMethod:
+## resolveClassMethod:
 &emsp;为类方法的给定选择器（sel）动态提供实现。
 ```c++
 + (BOOL)resolveClassMethod:(SEL)sel OBJC_AVAILABLE(10.5, 2.0, 9.0, 1.0, 2.0);
 ```
 &emsp;此方法允许你动态提供给定选择器的实现，同 resolveInstanceMethod: 函数。（为 sel 动态添加实现）
-### forwardingTargetForSelector:
+## forwardingTargetForSelector:
 &emsp;返回未识别消息应首先指向的对象。（Returns the object to which unrecognized messages should first be directed.）
 ```c++
 - (id)forwardingTargetForSelector:(SEL)aSelector OBJC_AVAILABLE(10.5, 2.0, 9.0, 1.0, 2.0);
@@ -66,7 +94,7 @@ void dynamicMethodIMP(id self, SEL _cmd) {
 &emsp;如果你在非根类（非 NSObject）中实现此方法，如果你的类对于给定的选择器没有要返回的内容，那么你应该返回调用 super 实现的结果（return [super forwardingTargetForSelector:aSelector];）。
 
 &emsp;这种方法使对象有机会在更昂贵的 forwardInvocation: 机制接管之前重定向发送给它的未知消息。当你只想将消息重定向到另一个对象时，这非常有用，并且可以比常规转发快一个数量级。如果转发的目标是捕获 NSInvocation，或者在转发过程中操纵参数或返回值，那么它就没有用了。
-### methodSignatureForSelector:
+## methodSignatureForSelector:
 &emsp;返回一个 NSMethodSignature 对象，该对象包含由给定选择器标识的方法的描述。
 ```c++
 - (NSMethodSignature *)methodSignatureForSelector:(SEL)aSelector OBJC_SWIFT_UNAVAILABLE("");
@@ -76,7 +104,7 @@ void dynamicMethodIMP(id self, SEL _cmd) {
 &emsp;Return Value: 一个 NSMethodSignature 对象，其中包含由 aSelector 标识的方法的描述，如果找不到该方法，则为 nil。
 
 &emsp;该方法用于 protocols 的实现。此方法还用于必须创建 NSInvocation 对象的情况，例如在消息转发期间。如果你的对象维护 delegate 或能够处理它不直接实现的消息，则应该重写此方法以返回适当的方法签名。
-### forwardInvocation:
+## forwardInvocation:
 &emsp;被子类重写以将消息转发到其他对象。
 ```c++
 - (void)forwardInvocation:(NSInvocation *)anInvocation OBJC_SWIFT_UNAVAILABLE("");
@@ -109,7 +137,7 @@ void dynamicMethodIMP(id self, SEL _cmd) {
 &emsp;forwardInvocation: 方法的实现可以做的不仅仅是转发消息。forwardInvocation: 例如，可以用于合并响应各种不同消息的代码，从而避免了为每个选择器编写单独方法的必要性。forwardInvocation: 方法可能还会在对给定消息的响应中包含其他几个对象，而不是只将其转发给一个对象。
 
 &emsp;NSObject 的 forwardInvocation: 实现只是调用 doesNotRecognizeSelector: 方法；它不转发任何消息。因此，如果选择不实现 forwardInvocation:，则向对象发送无法识别的消息将引发异常。
-### doesNotRecognizeSelector:
+## doesNotRecognizeSelector:
 &emsp;处理 receiver 无法识别的消息。
 ```c++
 - (void)doesNotRecognizeSelector:(SEL)aSelector;
