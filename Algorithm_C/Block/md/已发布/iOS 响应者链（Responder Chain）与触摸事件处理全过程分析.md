@@ -1,6 +1,8 @@
-# iOS 响应者链处理事件全过程分析
+# iOS 响应者链（Responder Chain）与触摸事件处理全过程分析
 
 > &emsp;本文会对从手指触摸屏幕开始一直到这个触摸事件得到处理的完整过程进行分析。（侧重点放在当前应用程序处理触摸事件部分）
+
+> &emsp;在开始之前觉得还是有必要先对一些继承关系有一个理解：NSObject 是我们日常接触最多的基类，然后大概在 iOS 中可以理解为表示数据层的 Foundation 框架下的以 NS 开头的类如 NSDictionary、NSArray 等几乎都是直接继承自 NSObject 或者是 NSObject 的间接子类，可以说是依靠 NSObject 基类完成了它们所有的内存管理等内容。那么 UI 层呢？如 UIView 它们则都是 UIResponder 的子类，UIResponder 则是 NSObject 的子类，UIButton 则是继承自 UIControl，而 UIControl 则是继承自 UIView，UIView 等一众子类正是因为继承自 UIResponder 所以才可以被作为响应者使用，而之所以能被称为响应者，就是因为它们可以重写 UIResponder 的 touches...（响应触摸事件）、presses...（响应按键事件）、motion...（响应运动事件） 系列函数而已。UIControl 系列则是依据 Target-Action 机制来响应用户事件。好了，继承关系就是这些吧，想必在我们日常开发中没事就按住 command 往下点的过程中就已经对它们的继承关系烂熟于心了，那么下面我们就对这些内容进行详细的展开吧！ 
 
 ## IOKit.framework/SpringBoard
 &emsp;IOKit.framework 是与硬件或内核服务通信的低级框架。尽管这是一个公共框架，但苹果不鼓励开发人员使用它，并且任何使用它的应用都将被App Store拒绝。[IOKit.framework](http://iphonedevwiki.net/index.php/IOKit.framework)
@@ -570,87 +572,11 @@ typedef NS_OPTIONS(NSInteger, UITouchProperties) {
 ```
 &emsp;`point`: UIView 的本地坐标系（bounds）中指定的点。
 
-&emsp;以上从一个指定 view 中找到最远的一个可以包含 touch 的子 view。所以上面顺着 [UIApplication sendEvent:]、[UIWindow sendEvent:] 以后再往下走就是我们 App 的根 window 的根控制器的 View 了（假设只有一个 window），
+&emsp;以上是从一个指定 view 中找到最远的一个可以包含 touch 的子 view 的方法。所以上面顺着 [UIApplication sendEvent:]、[UIWindow sendEvent:] 再往下走其实就是我们 App 的根 window（[UIApplication sharedApplication].keyWindow，iOS 13 推出 UISceneSession 后获取根窗口的方式已经改变，这里我们还是使用以前的方式来获取根 window） 的根控制器（[UIApplication sharedApplication].keyWindow.rootViewController）的 View 了，然后一路随着 view  的层级关系一路寻找第一响应者（对每一个 view 进行 Hit-Testing）。那么找到第一响应者以后呢，就是直接把 event 交给它处理，而它能不能处理就是看它有没有实现 touches... 系列函数，如果有的话，则是直接执行，如果自己不想执行的话可以调用 super 函数，如果自己完全没有实现  touches... 系列函数的话，则是沿者响应者链一路向上去找可以响应此次事件的响应者。如果最终都没有找到的话，则把此次事件丢弃。那么接下来就是看 Responser 以及 Responder Chian 了，那么它们到底是什么呢？接着向下看吧...
 
-
-
-
-
-
-
-
-
-
-
-
-
-// 1. 沿着 UIApplication -> UIWindow -> UIView -> subView 寻找第一响应者
-// 2. 第一响应者处理 UIEvent，如果第一响应者不能处理这个 UIEvent，则其顺着 Responder Chin 寻找能处理这个 UIEvent 的响应者（next Responder）
-// 3. Target-Action 设计模式
-
-
-
-
-
-
-
-
-## Handling Touches in Your View（处理视图中的触摸）
-&emsp;如果触摸处理（touch handling）与 view 的内容有复杂的链接（intricately linked），则直接在 view 子类上使用触摸事件（touch events）。
-
-&emsp;如果你不打算对自定义视图使用手势识别器，则可以直接从视图本身处理触摸事件。因为视图是响应者，所以它们可以处理多点触控事件和许多其他类型的事件。当 UIKit 确定某个视图中发生了触摸事件时，它将调用该视图的 `touchesBegan:withEvent:`、`touchesMoved:withEvent:` 或 `touchesEnded:withEvent:` 方法。你可以在自定义视图中重写这些方法，并使用它们提供对触摸事件的响应。（来自 UIResponder）
-
-&emsp;你在视图（或任何响应程序）中重写的处理触摸的方法对应于触摸事件处理过程的不同阶段。例如，图1 说明了触摸事件的不同阶段。当手指（或 Apple Pencil）接触屏幕时，UIKit 会创建 UITouch 对象，将触摸位置设置为适当的点，并将其 phase 属性设置为 UITouchPhaseBegan。当同一个手指在屏幕上移动时，UIKit 会更新触摸位置，并将触摸对象的 phase 属性更改为 UITouchPhaseMoved。当用户将手指从屏幕上提起时，UIKit 将 phase 属性更改为 UITouchPhaseEnded，触摸序列结束。
-
-&emsp;Figure 1 The phases of a touch event（触摸事件的各个阶段）
-![phases_of_a_touch_event](https://p9-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/e4b571cc659149239045a7bd9c8e0355~tplv-k3u1fbpfcp-watermark.image)
-
-&emsp;类似地，系统可以随时取消正在进行的触摸序列；例如，当来电中断应用程序时。当它这样做时，UIKit 通过调用 touchs 来通知你的视图 touchesCancelled:withEvent: 方法。你可以使用该方法对视图的数据结构执行任何必要的清理。
-
-&emsp;UIKit 为触摸屏幕的每个新手指创建一个新的 UITouch 对象。触摸本身是通过当前 UIEvent 对象传递的。UIKit 区分了来自手指和 Apple Pencil 的触摸，你可以对它们进行不同的处理。
-
-> &emsp;Important: 在其默认配置中，视图仅接收与事件关联的第一个 UITouch 对象，即使有多个手指接触视图也是如此。要接收额外的触摸，必须将视图的 multipleTouchEnabled 属性设置为 true。也可以使用属性检查器在 Interface Builder 中配置此属性。
-
-## Handling UIKit Gestures（处理 UIKit 手势）
-&emsp;使用 gesture recognizers 简化 touch handling 并创建一致的用户体验。
-
-&emsp;Gesture recognizers 是处理视图中的 touch（UIEventTypeTouches 屏幕上的触摸事件） 或 press （UIEventTypePresses 设备的物理按钮）事件的最简单方法。可以将一个或多个 gesture recognizers 附加到任何视图。Gesture recognizers 封装了为该视图处理和解释传入事件所需的所有逻辑，并将它们与已知模式（手势类型）相匹配。当检测到匹配时，gesture recognizer 会通知其指定的目标对象，该目标对象可以是 view controller、view 本身或应用程序中的任何其他对象。
-
-&emsp;Gesture recognizers 使用目标动作设计模式（target-action design pattern）发送通知。 当 UITapGestureRecognizer 对象在视图中检测到单个手指点击时，它将调用 view 的 view controller 的操作方法，你可以使用该方法提供响应。
-
-&emsp;Figure 1 Gesture recognizer notifying its target（手势识别器通知目标）
-![gesture_recognizer_notifying_its_target](https://p6-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/2be0b127274a4ae9850b843b1a3ee832~tplv-k3u1fbpfcp-watermark.image)
-
-&emsp;Gesture recognizers 有两种类型：离散（discrete）和连续（continuous）。一个离散的手势识别器（discrete gesture recognizer）会在手势被识别后准确地调用你的动作方法（action method）一次。满足初始识别条件后，连续手势识别器（continuous gesture recognizer）会多次执行对动作方法的调用，并在手势事件中的信息发生更改时通知你。例如，每次触摸位置更改时，UIPanGestureRecognizer 对象都会调用动作方法。
-
-&emsp;Interface Builder 包含每个标准 UIKit gesture recognizers 的对象。它还包括一个自定义手势识别器对象，你可以使用它来表示自定义 UIGestureRecognizer 子类。
-### Configuring a gesture recognizer（配置手势识别器）
-&emsp;要配置手势识别器：
-1. 在 storyboard 中，将手势识别器拖到视图中。
-2. 实现识别手势时要调用的动作方法；参见  Listing 1。
-3. 将你的动作方法连接到手势识别器。
-
-&emsp;通过右键单击手势识别器并将其 Sent Action selector 连接到界面中的相应对象，可以在 Interface Builder 中创建此连接。你还可以使用手势识别器的 addTarget(_:action:) 方法以编程方式配置 action 方法。
-
-&emsp;Listing 1 显示了手势识别器的 action 方法的通用格式。如果愿意，可以更改参数类型以匹配特定的手势识别器子类。
-
-&emsp;Listing 1 Gesture recognizer action methods（手势识别器 action 方法）
-```c++
-// Swift
-@IBAction func myActionMethod(_ sender: UIGestureRecognizer) { ... }
-// Objective-c
-- (IBAction)myActionMethod:(UITapGestureRecognizer *)sender { ... }
-```
-### Responding to Gestures（响应手势）
-&emsp;与 gesture recognizer 关联的 action method 提供应用程序对该手势的响应。对于离散手势，你的 action method 类似于 button 的 action method。一旦调用了 action method，就可以执行适合该手势的任何任务。对于连续的手势，action method 可以响应对手势的识别，但也可以在识别手势之前跟踪事件。跟踪事件可以让你创建更具交互性的体验。例如，你可以使用 UIPanGestureRecognizer 对象的更新来重新定位应用程序中的内容。（如让一个 imageView 跟着你的手指移动位置）
-
-&emsp;gesture recognizer 的 state 属性传递对象的当前识别状态。对于连续的手势，gesture recognizer 将从更新此属性的值 UIGestureRecognizer.State.began 至 UIGestureRecognizer.State.changed 至 UIGestureRecognizer.State.ended，或 UIGestureRecognizer.State.cancelled。action methods 使用此属性来确定适当的 action 过程。例如，可以使用 began 和 changed 状态对内容进行临时更改，使用 ended 状态使这些更改永久化，使用 cancelled 状态放弃更改。在执行操作之前，请始终检查 gesture recognizer 的 state 属性值。
-
-&emsp;手势的文档就看到这里吧，文档里面还有各种类型手势的处理以及实现自定义手势、离散手势、连续手势的实现、手势的状态机等等内容，大家可以根据需要进行学习。
-
-&emsp;下面学习最重要的 UIResponder 如何进行事件响应。
+&emsp;这里我们先阅读一下 UIResponder 的文档。
 ## UIResponder
-&emsp;响应和处理事件的 abstract interface。（UIResponder 是一个极重要的继承自 NSObject 的抽象接口，正是从它建立了 NSObject 和 UI 层之间的连接。）
+&emsp;响应和处理事件的 abstract interface。（UIResponder 是一个极重要的继承自 NSObject 的抽象接口，它几乎是 UIKit 框架下所有 UI 类的父类（也有特殊，如 UIImage 类则是直接继承自 NSObject），正是从它建立了 NSObject 和 UI 层之间的连接。）
 ```c++
 UIKIT_EXTERN API_AVAILABLE(ios(2.0)) @interface UIResponder : NSObject <UIResponderStandardEditActions>
 ```
@@ -660,7 +586,7 @@ UIKIT_EXTERN API_AVAILABLE(ios(2.0)) @interface UIResponder : NSObject <UIRespon
 
 &emsp;除了处理事件外，UIKit 响应者还管理将未处理的事件转发到应用程序的其他部分。如果给定的响应者不能处理事件，它会将该事件转发给响应者链中的下一个响应者（文档应该错了，文档写的是 "next event"）。UIKit 动态管理响应者链，使用预定义的规则来确定下一个接收事件的响应者对象。例如，view 将事件转发到其 superview，层次结构的 root view 将事件转发到其 view controller。
 
-&emsp;响应者处理 UIEvent 对象，但也可以通过 input view 接受 custom input。系统的键盘是 input view 最明显的例子。当用户在屏幕上点击 UITextField 和 UITextView 对象时，此 view 将成为第一个响应者，并显示其 input view，即系统键盘。类似地，你可以创建 custom input views，并在其他响应者激活时显示它们。要将 custom input view 与响应者关联，请将此 view 指定给响应者的 inputView 属性。
+&emsp;响应者处理 UIEvent 对象，但也可以通过 input view 接受 custom input view。系统的键盘是 input view 最明显的例子。当用户在屏幕上点击 UITextField 和 UITextView 对象时，此 view 将成为第一个响应者，并显示其 input view，即系统键盘。类似地，你可以创建 custom input views，并在其他响应者激活时显示它们。要将 custom input view 与响应者关联，请将此 view 指定给响应者的 inputView 属性。
 
 &emsp;有关响应者和响应者链的信息，请参见 Using Responders and the Responder Chain to Handle Events。（后面我们会详细学习该文档）
 ### Managing the Responder Chain（管理响应者链）
@@ -902,14 +828,140 @@ UIKIT_EXTERN API_AVAILABLE(ios(2.0)) @interface UIResponder : NSObject <UIRespon
 &emsp;默认情况下，应用程序的每个 window 都有一个撤消管理器：一个用于管理撤消和重做操作的共享对象。但是，响应程序链中任何对象的类都可以有自己的自定义撤消管理器。（例如，UITextField的实例有自己的 undoManager，当文本字段退出第一响应者状态时，该管理器将被清除。）当你请求 undoManager 时，请求将进入响应者链，UIWindow 对象将返回一个可用的实例。
 
 &emsp;你可以将撤消管理器添加到视图控制器，以执行托管视图本地的撤消和重做操作。
-### Building and Validating Commands（构建和验证命令）
+...
 
-#### validateCommand:
-&emsp;要求接收响应者验证命令。
+&emsp;UIResponder 的文档就看到这吧，我们最需要记住的就是当我们需要自己处理事件时需要重写 touches...（响应触摸事件）、presses...（响应按键事件）、motion...（响应运动事件） 系列函数，以及 nextResponder 属性，是它链接了响应者链。
+
+&emsp;下面我们阅读 Responder object 文档，虽然它被标记为过时，但是还是有一定的参考意义。
+## Responder object
+&emsp;响应者是可以响应事件并处理它们的对象。所有响应者对象都是最终从 UIResponder（iOS）或 NSResponder（OS X）继承的类的实例。这些类声明了一个用于事件处理的编程接口，并定义了响应者的默认行为。应用程序的可见对象几乎总是响应者（例如，windows、views 和 controls），而应用程序对象（AppDelegate）也是响应者。在 iOS 中，视图控制器（UIViewController 对象）也是响应者对象。
+
+![responder](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/118b9dd7a273495c9d21b66dbf8020e5~tplv-k3u1fbpfcp-watermark.image)
+
+&emsp;若要接收事件，响应者必须实现适当的事件处理方法，在某些情况下，告诉应用它可以成为第一响应者。
+### The First Responder Receives Some Events First（第一响应者首先接收一些事件）
+&emsp;在应用程序中，首先接收多种事件的响应者对象称为第一响应者。它接收关键事件、运动事件和 action 消息等。（鼠标事件和多点触控事件首先转到鼠标指针或手指下的视图；该视图可能是也可能不是第一响应者。）第一响应者通常是应用程序认为最适合处理事件的窗口中的视图。为了接收事件，响应者还必须表明其成为第一响应者的意愿；对于每个平台，响应者以不同的方式进行：
 ```c++
-
+// OS X
+- (BOOL)acceptsFirstResponder { 
+    return YES; 
+}
+ 
+// iOS
+- (BOOL)canBecomeFirstResponder {
+    return YES; 
+}
 ```
+&emsp;除了接收事件消息外，响应者还可以接收未指定 target 的 action 消息。（action 消息由 buttons 和 controls 等控件在用户操作时发送。）
+### The Responder Chain Enables Cooperative Event Handling（响应者链支持协作事件处理）
+&emsp;如果第一个响应者无法处理事件或 action 消息，它会将其转发给一个称为响应者链的链接系列中的 “下一个响应者” （next responder）。响应者链允许响应者对象将处理事件或 action 消息的责任转移到应用程序中的其他对象。如果响应者链中的对象无法处理事件或 action，它会将消息传递给链中的下一个响应者。消息沿着链向上传播，指向更高级别的对象，直到被处理为止。如果未处理，应用程序将丢弃它。
 
+&emsp;The responder chain for iOS (left) and OS X (right)
+
+![iOS_and_OSX_responder_chain](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/a21b84f206d14ebebd1e9cbd83ea57af~tplv-k3u1fbpfcp-watermark.image)
+
+&emsp;The path of an event。事件在响应者链上的一般路径从第一个响应者的视图或鼠标指针或手指下的视图开始。从那里开始，它向上进入视图层次结构，进入 window 对象，然后进入全局应用程序对象。但是，iOS 中事件的响应者链为该路径添加了一个变体：如果 view 由 view controller 管理，并且 view 无法处理事件，则 view controller 将成为下一个响应者。
+
+&emsp;The path of an action message。对于 action 消息，OS X 和 iOS 都将响应者链扩展到其他对象。在 OS X 中，对于基于文档体系结构的应用程序、使用窗口控制器的应用程序（NSWindowController）和不适合这两个类别的应用程序，action 消息的响应者链是不同的。此外，如果 OS X 上的应用程序同时具有一个 key window 和一个 main window，那么 action 消息所经过的响应者链可能涉及两个窗口的视图层次结构。
+
+&emsp;接着下面是 Handling Touches in Your View（处理视图中的触摸）文档。
+## Handling Touches in Your View（处理视图中的触摸）
+&emsp;如果触摸处理（touch handling）与 view 的内容有复杂的链接（intricately linked），则直接在 view 子类上使用触摸事件（touch events）。
+
+&emsp;如果你不打算对自定义视图使用手势识别器，则可以直接从视图本身处理触摸事件。因为 view 是响应者，所以它们可以处理多点触控事件和许多其他类型的事件。当 UIKit 确定某个 view 中发生了触摸事件时，它将调用该 view 的 `touchesBegan:withEvent:`、`touchesMoved:withEvent:` 或 `touchesEnded:withEvent:` 方法。你可以在自定义视图中重写这些方法，并使用它们提供对触摸事件的响应。（来自 UIResponder）
+
+&emsp;你在视图（或任何响应者）中重写的处理触摸的方法对应于触摸事件处理过程的不同阶段。例如，图1 说明了触摸事件的不同阶段。当手指（或 Apple Pencil）接触屏幕时，UIKit 会创建 UITouch 对象，将触摸位置设置为适当的点，并将其 phase 属性设置为 UITouchPhaseBegan。当同一个手指在屏幕上移动时，UIKit 会更新触摸位置，并将触摸对象的 phase 属性更改为 UITouchPhaseMoved。当用户将手指从屏幕上提起时，UIKit 将 phase 属性更改为 UITouchPhaseEnded，触摸序列结束。
+
+&emsp;Figure 1 The phases of a touch event（触摸事件的各个阶段）
+![phases_of_a_touch_event](https://p9-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/e4b571cc659149239045a7bd9c8e0355~tplv-k3u1fbpfcp-watermark.image)
+
+&emsp;类似地，系统可以随时取消正在进行的触摸序列；例如，当来电中断应用程序时。当它这样做时，UIKit 通过调用 touchs 来通知你的 view 的 `touchesCancelled:withEvent:` 方法。你可以使用该方法对 view 的数据结构执行任何必要的清理。
+
+&emsp;UIKit 为触摸屏幕的每个新手指创建一个新的 UITouch 对象。触摸本身是通过当前 UIEvent 对象传递的。UIKit 区分了来自手指和 Apple Pencil 的触摸，你可以对它们进行不同的处理。
+
+> &emsp;Important: 在其默认配置中，view 仅接收与事件关联的第一个 UITouch 对象，即使有多个手指接触 view 也是如此。要接收额外的触摸，必须将 view 的 multipleTouchEnabled 属性设置为 true。也可以使用属性检查器在 Interface Builder 中配置此属性。
+
+&emsp;接着下面是 Using Responders and the Responder Chain to Handle Events（使用响应者和响应者链来处理事件）文档。
+## Using Responders and the Responder Chain to Handle Events（使用响应者和响应者链来处理事件）
+&emsp;了解如何处理通过你的应用传播的事件。
+
+&emsp;应用程序使用响应者对象（responder objects）接收和处理事件。responder 对象是 UIResponder 类的任何实例，常见的子类包括 UIView、UIViewController 和 UIApplication。响应者接收原始事件数据，并且必须处理该事件或将其转发给另一个响应者对象。当应用程序接收到事件时，UIKit 会自动将该事件定向到最合适的响应者对象（称为第一响应者）。
+
+&emsp;未处理的事件在活动响应者链中从一个响应者传递到另一个响应者，这是应用程序响应者对象的动态配置。Figure 1 显示了应用程序中的响应者，其界面包含一个 label、一个 text field、一个 button 和两个背景 views。该图还显示了事件如何沿着响应者链从一个响应者移动到下一个响应者。
+
+&emsp;Figure 1 Responder chains in an app（应用中的响应者链）
+![responder_chains_in_an_app](https://p1-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/7ed8b25e72b84091936355631dfa39a4~tplv-k3u1fbpfcp-watermark.image)
+
+&emsp;如果 text field 不处理事件，UIKit 会将事件发送到 text field 的父 view 对象，后跟 window 的根视图。在将事件定向到 window 之前，响应者链从根视图转移到拥有的视图控制器。如果 window 无法处理事件，UIKit 会将事件传递给 UIApplication 对象，如果该对象是 UIResponder 的实例而不是响应程序链的一部分，则可能会传递给 app delegate。
+### Determining an Event's First Responder（确定事件的第一响应者）
+&emsp;UIKit 根据事件的类型将对象指定为事件的第一响应者。事件类型包括：
+| Event type | First responder |
+| --- | --- |
+| Touch events | The view in which the touch occurred.（发生触摸的视图） |
+| Press events | The object that has focus. |
+| Shake-motion events | The object that you (or UIKit) designate. |
+| Remote-control events | The object that you (or UIKit) designate. |
+| Editing menu messages | The object that you (or UIKit) designate. |
+
+> &emsp;Note: 与加速计（accelerometers）、陀螺仪（gyroscopes）和磁力计（magnetometer）相关的运动事件不遵循响应链。相反，Core Motion 将这些事件直接传递给指定的对象。有关详细信息，请参见 Core Motion Framework
+
+&emsp;Controls 使用 action 消息直接与其关联的 target 对象通信。当用户与 control 交互时，control 将向其 target 对象发送 action 消息。Action messages 不是事件，但它们仍然可以利用响应者链。当 control 的 target 对象为 nil 时，UIKit 从目标对象开始遍历响应者链，直到找到实现适当 action 方法的对象。例如，UIKit 编辑菜单（editing menu）使用此行为来搜索响应者对象，这些对象实现了名称为 cut:、copy: 或 paste: 的方法。
+
+&emsp;Gesture recognizers 在 view 之前接收 touch 和 press 事件。如果 view 的 gesture recognizers 无法识别一系列 touches，UIKit 会将 touches 发送到 view。如果 view 不能处理 touches，UIKit 会将它们向上传递到响应者链。有关使用 gesture recognizer 处理事件的详细信息，请参阅 Handling UIKit Gestures（下面有其翻译）。
+### Determining Which Responder Contained a Touch Event（确定哪个响应者包含触摸事件）
+&emsp;UIKit 使用基于 view 的 Hit-Testing（view-based hit-testing）来确定触摸事件发生的位置。具体来说，UIKit 将触摸位置与 view 层次结构中 view 对象的 bounds 进行比较。UIView 的 hitTest:withEvent: 方法遍历视图层次结构，查找包含指定触摸的最深子视图，该子视图将成为触摸事件的第一响应者。（会直接把 UIEvent 交给它处理）
+
+> &emsp;Note: 如果触摸位置在视图 bounds 之外，则 hitTest:withEvent: 方法忽略该视图及其所有子视图。因此，当视图的 clipsToBounds 属性为 NO 时，即使超出该视图 bounds 的子视图恰好包含触摸，也不会返回这些子视图。有关 Hit-Testing 行为的更多信息，请参阅 UIView 的 hitTest:withEvent: 方法（上面我们已经详细分析过了）。
+
+&emsp;当触摸发生时，UIKit 创建一个 UITouch 对象并将其与 view 相关联。当触摸位置或其他参数改变时，UIKit 用新信息更新同一 UITouch 对象。唯一不变的属性是 view。（即使触摸位置移动到原始 view 之外，触摸 view 属性中的值也不会更改。（如我们常见的页面上有一个小的滚动区域时，我们手指先摸到它并滑动该小区域开始滚动，当我们的手指超出此块滚动区域并不离开屏幕时，此小滚动区域也一直响应我们手指的滑动））当触摸结束时，UIKit 释放 UITouch 对象。
+### Altering the Responder Chain（改变响应者链）
+&emsp;你可以通过重写响应者对象的 nextResponder 属性来更改响应者链。当你这样做时，下一个响应者就是你返回的对象。
+
+&emsp;许多 UIKit 类已经重写此属性并返回特定的对象，包括：
++ UIView 对象。如果 view 是 view controller 的 root view，则下一个响应者是 view controller；否则，下一个响应者是 view 的 superview。
++ UIViewController 对象。
+  + 如果 view controller 的 view 是 window 的 root view，则它的下一个响应者是 window 对象。
+  + 如果 view controller 由另一个 view controller 呈现，则它的下一个响应者是呈现 view controller。（parent view controller）
++ UIWindow 对象。window 的下一个响应者是 UIApplication 对象。
++ UIApplication 对象。下一个响应者是 app delegate，但仅当该 app delegate 是 UIResponder 的实例并且不是 view、view controller 或 app  对象本身时，才是下一个响应者。
+
+&emsp;事件处理、响应者以及响应者链的相关内容到这里就可以结束了，下面我们再对 gesture recognizers（继承自 NSObject，响应事件的方式同 UIControl，也是 target-action 机制） 和 target-action 进行一个拓展学习，它们还挺重要的。（当一个 view 同时实现了 touches... 系列函数和添加了手势时，我们去触摸该 view 首先会调用 touchesBegan:withEvent: 函数，而当 gesture recognizers 识别出手势后会调用 view 的 touchesCancelled:withEvent: 打断 touches... 系列函数的执行，然后去执行手势的 action 函数。）
+## Handling UIKit Gestures（处理 UIKit 手势）
+&emsp;使用 gesture recognizers 简化 touch handling 并创建一致的用户体验。
+
+&emsp;Gesture recognizers 是处理视图中的 touch（UIEventTypeTouches 屏幕上的触摸事件） 或 press （UIEventTypePresses 设备的物理按钮）事件的最简单方法。可以将一个或多个 gesture recognizers 附加到任何视图。Gesture recognizers 封装了为该视图处理和解释传入事件所需的所有逻辑，并将它们与已知模式（手势类型）相匹配。当检测到匹配时，gesture recognizer 会通知其指定的目标对象，该目标对象可以是 view controller、view 本身或应用程序中的任何其他对象。
+
+&emsp;Gesture recognizers 使用目标动作设计模式（target-action design pattern）发送通知。 当 UITapGestureRecognizer 对象在视图中检测到单个手指点击时，它将调用 view 的 view controller 的操作方法，你可以使用该方法提供响应。
+
+&emsp;Figure 1 Gesture recognizer notifying its target（手势识别器通知目标）
+![gesture_recognizer_notifying_its_target](https://p6-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/2be0b127274a4ae9850b843b1a3ee832~tplv-k3u1fbpfcp-watermark.image)
+
+&emsp;Gesture recognizers 有两种类型：离散（discrete）和连续（continuous）。一个离散的手势识别器（discrete gesture recognizer）会在手势被识别后准确地调用你的动作方法（action method）一次。满足初始识别条件后，连续手势识别器（continuous gesture recognizer）会多次执行对动作方法的调用，并在手势事件中的信息发生更改时通知你。例如，每次触摸位置更改时，UIPanGestureRecognizer 对象都会调用动作方法。
+
+&emsp;Interface Builder 包含每个标准 UIKit gesture recognizers 的对象。它还包括一个自定义手势识别器对象，你可以使用它来表示自定义 UIGestureRecognizer 子类。
+### Configuring a gesture recognizer（配置手势识别器）
+&emsp;要配置手势识别器：
+1. 在 storyboard 中，将手势识别器拖到视图中。
+2. 实现识别手势时要调用的动作方法；参见  Listing 1。
+3. 将你的动作方法连接到手势识别器。
+
+&emsp;通过右键单击手势识别器并将其 Sent Action selector 连接到界面中的相应对象，可以在 Interface Builder 中创建此连接。你还可以使用手势识别器的 addTarget(_:action:) 方法以编程方式配置 action 方法。
+
+&emsp;Listing 1 显示了手势识别器的 action 方法的通用格式。如果愿意，可以更改参数类型以匹配特定的手势识别器子类。
+
+&emsp;Listing 1 Gesture recognizer action methods（手势识别器 action 方法）
+```c++
+// Swift
+@IBAction func myActionMethod(_ sender: UIGestureRecognizer) { ... }
+// Objective-c
+- (IBAction)myActionMethod:(UITapGestureRecognizer *)sender { ... }
+```
+### Responding to Gestures（响应手势）
+&emsp;与 gesture recognizer 关联的 action method 提供应用程序对该手势的响应。对于离散手势，你的 action method 类似于 button 的 action method。一旦调用了 action method，就可以执行适合该手势的任何任务。对于连续的手势，action method 可以响应对手势的识别，但也可以在识别手势之前跟踪事件。跟踪事件可以让你创建更具交互性的体验。例如，你可以使用 UIPanGestureRecognizer 对象的更新来重新定位应用程序中的内容。（如让一个 imageView 跟着你的手指移动位置）
+
+&emsp;gesture recognizer 的 state 属性传递对象的当前识别状态。对于连续的手势，gesture recognizer 将从更新此属性的值 UIGestureRecognizer.State.began 至 UIGestureRecognizer.State.changed 至 UIGestureRecognizer.State.ended，或 UIGestureRecognizer.State.cancelled。action methods 使用此属性来确定适当的 action 过程。例如，可以使用 began 和 changed 状态对内容进行临时更改，使用 ended 状态使这些更改永久化，使用 cancelled 状态放弃更改。在执行操作之前，请始终检查 gesture recognizer 的 state 属性值。
+
+&emsp;手势的文档就看到这里吧，文档里面还有各种类型手势的处理以及实现自定义手势、离散手势、连续手势的实现、手势的状态机等等内容，大家可以根据需要进行学习。
 
 ## Target-Action
 &emsp;尽管 delegation、bindings 和 notification 对于处理程序中对象之间的某些形式的通信很有用，但它们并不特别适合于最明显的通信类型。典型的应用程序的用户界面由许多图形对象组成，其中最常见的对象可能是控件（controls）。控件是真实世界或逻辑设备（按钮（button）、滑块（slider）、复选框（checkboxes）等）的图形模拟；与真实世界控件（如收音机调谐器）一样，你使用它将你的意图传达给某个系统，而该系统是应用程序的一部分。
@@ -972,60 +1024,6 @@ UIKIT_EXTERN API_AVAILABLE(ios(2.0)) @interface UIResponder : NSObject <UIRespon
 - (void)action:(id)sender forEvent:(UIEvent *)event
 ```
 &emsp;要了解有关 UIKit 中 target-action mechanism 的更多信息，请阅读 UIControl Class Reference。
-
-## Using Responders and the Responder Chain to Handle Events（使用响应者和响应者链来处理事件）
-&emsp;了解如何处理通过你的应用传播的事件。
-
-&emsp;应用程序使用响应者对象（responder objects）接收和处理事件。responder 对象是 UIResponder 类的任何实例，常见的子类包括 UIView、UIViewController 和 UIApplication。响应者接收原始事件数据，并且必须处理该事件或将其转发给另一个响应者对象。当应用程序接收到事件时，UIKit 会自动将该事件定向到最合适的响应者对象（称为第一响应者）。
-
-&emsp;未处理的事件在活动响应者链中从一个响应者传递到另一个响应者，这是应用程序响应者对象的动态配置。Figure 1 显示了应用程序中的响应者，其界面包含一个 label、一个 text field、一个 button 和两个背景 views。该图还显示了事件如何沿着响应器链从一个响应者移动到下一个响应者。
-
-&emsp;Figure 1 Responder chains in an app（应用中的响应者链）
-![responder_chains_in_an_app](https://p1-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/7ed8b25e72b84091936355631dfa39a4~tplv-k3u1fbpfcp-watermark.image)
-
-&emsp;如果 text field 不处理事件，UIKit 会将事件发送到 text field 的父 UIView 对象，后跟 window 的根视图。在将事件定向到 window 之前，响应者链从根视图转移到拥有的视图控制器。如果 window 无法处理事件，UIKit 会将事件传递给 UIApplication 对象，如果该对象是 UIResponder 的实例而不是响应程序链的一部分，则可能会传递给 app delegate。
-### Determining an Event's First Responder（确定事件的第一响应者）
-&emsp;UIKit 根据事件的类型将对象指定为事件的第一响应者。事件类型包括：
-| Event type | First responder |
-| --- | --- |
-| Touch events | The view in which the touch occurred.（发生触摸的视图） |
-| Press events | The object that has focus. |
-| Shake-motion events | The object that you (or UIKit) designate. |
-| Remote-control events | The object that you (or UIKit) designate. |
-| Editing menu messages | The object that you (or UIKit) designate. |
-
-> &emsp;Note: 与加速计（accelerometers）、陀螺仪（gyroscopes）和磁力计（magnetometer）相关的运动事件不遵循响应链。相反，Core Motion 将这些事件直接传递给指定的对象。有关详细信息，请参见 Core Motion Framework
-
-&emsp;Controls 使用 action messages 直接与其关联的目标对象通信。当用户与 control 交互时，control 将向其目标对象发送 action message。Action messages 不是事件，但它们仍然可以利用响应者链。当 control 的目标对象为 nil 时，UIKit 从目标对象开始遍历响应者链，直到找到实现适当 action method 的对象。例如，UIKit 编辑菜单（editing menu）使用此行为来搜索响应者对象，这些对象实现了名称为 cut:、copy: 或 paste: 的方法。
-
-&emsp;Gesture recognizers 在 view 之前接收 touch 和 press 事件。如果 view 的 gesture recognizers 无法识别一系列 touches，UIKit 会将 touches 发送到 view。如果 view 不能处理 touches，UIKit 会将它们向上传递到响应者链。有关使用 gesture recognizer 处理事件的详细信息，请参阅 Handling UIKit Gestures。
-### Determining Which Responder Contained a Touch Event（确定哪个响应者包含触摸事件）
-&emsp;UIKit 使用基于视图的点击测试（view-based hit-testing）来确定触摸事件发生的位置。具体来说，UIKit 将触摸位置与视图层次结构中视图对象的 bounds 进行比较。UIView 的 hitTest:withEvent: 方法遍历视图层次结构，查找包含指定触摸的最深子视图，该子视图将成为触摸事件的第一响应者。（会直接把 UIEvent 交给它处理）
-
-> &emsp;Note: 如果触摸位置在视图 bounds 之外，则 hitTest:withEvent: 方法忽略该视图及其所有子视图。因此，当视图的 clipsToBounds 属性为 NO 时，即使超出该视图 bounds 的子视图恰好包含触摸，也不会返回这些子视图。有关命中测试行为的更多信息，请参阅 UIView 的 hitTest:withEvent: 方法。
-
-&emsp;当触摸发生时，UIKit 创建一个 UITouch 对象并将其与 view 相关联。当触摸位置或其他参数改变时，UIKit 用新信息更新同一 UITouch 对象。唯一不变的属性是 view。（即使触摸位置移动到原始 view 之外，触摸 view 属性中的值也不会更改。）当触摸结束时，UIKit 释放 UITouch 对象。
-### Altering the Responder Chain（改变响应者链）
-&emsp;你可以通过重写响应者对象的 nextResponder 属性来更改响应者链。当你这样做时，下一个响应者就是你返回的对象。
-
-&emsp;许多 UIKit 类已经重写此属性并返回特定的对象，包括：
-+ UIView 对象。如果 view 是 view controller 的 root view，则下一个响应者是 view controller；否则，下一个响应者是 view 的 superview。
-+ UIViewController 对象。
-  + 如果 view controller 的 view 是 window 的 root view，则它的下一个响应者是 window 对象。
-  + 如果 view controller 由另一个 view controller 呈现，则它的下一个响应者是呈现 view controller。
-+ UIWindow 对象。window 的下一个响应者是 UIApplication 对象。
-+ UIApplication 对象。下一个响应者是 app delegate，但仅当该 app delegate 是 UIResponder 的实例并且不是 view、view controller 或 app  对象本身时，才是下一个响应者。
-
-
-
-
-
-
-
-
-
-
-
 
 ## 参考链接
 **参考链接:🔗**
