@@ -416,7 +416,7 @@
 		D21287E325A459A3005A744C /* iOS KVC 官方文档《Key-Value Coding Programming Guide》中文翻译.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS KVC 官方文档《Key-Value Coding Programming Guide》中文翻译.md"; sourceTree = "<group>"; };
 		D21287E425A45A05005A744C /* iOS KVO 官方文档《Key-Value Observing Programming Guide》中文翻译.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS KVO 官方文档《Key-Value Observing Programming Guide》中文翻译.md"; sourceTree = "<group>"; };
 		D21287E525A45A3E005A744C /* iOS 响应者链（Responder Chain）与触摸事件处理全过程分析.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 响应者链（Responder Chain）与触摸事件处理全过程分析.md"; sourceTree = "<group>"; };
-		D21287E625A45A95005A744C /* iOS 消息转发工作原理总结.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 消息转发工作原理总结.md"; sourceTree = "<group>"; };
+		D21287E625A45A95005A744C /* iOS Dynamic Method Resolution与Message Forwarding官方文档翻译.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS Dynamic Method Resolution与Message Forwarding官方文档翻译.md"; sourceTree = "<group>"; };
 		D21333F224E63B6C00A6175C /* 深入理解Objective-C中的alloc和init.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "深入理解Objective-C中的alloc和init.md"; sourceTree = "<group>"; };
 		D21333F324E6610E00A6175C /* 内存对齐原则.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "内存对齐原则.md"; sourceTree = "<group>"; };
 		D2164F0524EE10650000A6AA /* volatile关键字使用.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "volatile关键字使用.md"; sourceTree = "<group>"; };
@@ -1426,7 +1426,7 @@
 				D21287E325A459A3005A744C /* iOS KVC 官方文档《Key-Value Coding Programming Guide》中文翻译.md */,
 				D21287E425A45A05005A744C /* iOS KVO 官方文档《Key-Value Observing Programming Guide》中文翻译.md */,
 				D21287E525A45A3E005A744C /* iOS 响应者链（Responder Chain）与触摸事件处理全过程分析.md */,
-				D21287E625A45A95005A744C /* iOS 消息转发工作原理总结.md */,
+				D21287E625A45A95005A744C /* iOS Dynamic Method Resolution与Message Forwarding官方文档翻译.md */,
 			);
 			path = "已发布";
 			sourceTree = "<group>";
