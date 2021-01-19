@@ -12,15 +12,14 @@ void BubbleSort::bubbleSort(int nums[], int count) {
     if (nums == nullptr || count <= 0) {
         return;
     }
-    
     int k = count - 1;
     for (int i = 0; i < count - 1; ++i) {
         bool noExchange = true;
         int n = 0;
         for (int j = 0; j < k; ++j) {
             if (nums[j] > nums[j + 1]) {
-                swap(&nums[j], &nums[j + 1]);
                 noExchange = false;
+                swap(&nums[j], &nums[j + 1]);
                 n = j;
             }
         }
