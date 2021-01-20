@@ -243,7 +243,7 @@ API_AVAILABLE(macos(10.5), ios(2.0), watchos(2.0), tvos(9.0))
 #### Layers Can Be Manipulated in Three Dimensions（可以在三个维度上操纵 layers）
 &emsp;每个 layer 都有两个变换矩阵（transform matrices），可用于操纵该 layer 及其内容。 CALayer 的 transform 属性指定要同时应用于该 layer 及其嵌入式子 layer 的转换。通常，当你要修改 layer 本身时，可以使用此属性。例如，你可以使用该属性缩放或旋转 layer 或临时更改其位置。 sublayerTransform 属性定义仅适用于子 layer 的其他转换，并且最常用于向场景内容添加透视视觉效果。
 
-&emsp;transforms 的工作方式是将坐标值乘以一个数字矩阵，以获得表示原始点的变换版本的新坐标。因为可以在三个维度上指定 Core Animation 值，所以每个坐标点都有四个值，必须将这些值乘以四乘四矩阵，如图 1-7 所示。在 Core Animation 中，图中的变换由 CATransform3D 类型表示。幸运的是，你不必直接修改此结构的字段即可执行标准转换。 Core Animation 提供了一组全面的功能，用于创建比例尺，平移和旋转矩阵以及进行矩阵比较。除了使用函数来操纵变换之外，Core Animation 还扩展了键值编码支持，使你可以使用 key path 修改变换。有关可以修改的 key path 的列表，请参阅 CATransform3D Key Paths。
+&emsp;transforms 的工作方式是将坐标值乘以一个数字矩阵，以获得表示原始点的变换版本的新坐标。因为可以在三个维度上指定 Core Animation 值，所以每个坐标点都有四个值，必须将这些值乘以四乘四矩阵，如图 1-7 所示。在 Core Animation 中，图中的变换由 CATransform3D 类型表示。幸运的是，你不必直接修改此结构的字段即可执行标准转换。 Core Animation 提供了一组全面的功能，用于创建比例尺，平移和旋转矩阵以及进行矩阵比较。除了使用函数来操纵变换之外，Core Animation 还扩展了键值编码支持，使你可以使用 key path 修改变换。有关可以修改的 key path 的列表，请参见 CATransform3D Key Paths。
 
 &emsp;Figure 1-7  Converting a coordinate using matrix math（使用矩阵数学转换坐标）
 
@@ -290,7 +290,7 @@ API_AVAILABLE(macos(10.5), ios(2.0), watchos(2.0), tvos(9.0))
 
 &emsp;除了与 view 关联的 layer 之外，你还可以创建没有对应 view 的 layer 对象。你可以将这些独立的 layer 对象嵌入到应用程序中的任何其他 layer 对象中，包括与 view 关联的对象。通常，你将独立的 layer 对象用作特定优化路径的一部分。例如，如果要在多个位置使用同一图像，则可以加载一次图像并将其与多个独立的 layer 对象关联，然后将这些对象添加到 layer tree 中。然后，每个 layer 都引用源映像，而不是尝试在内存中创建该映像的自己的副本。
 
-&emsp;有关如何为应用程序 view 启用 layer 支持的信息，请参阅 Enabling Core Animation Support in Your App。有关如何创建 layer 对象层次结构的信息，以及有关何时进行创建的提示，请参阅 Building a Layer Hierarchy。
+&emsp;有关如何为应用程序 view 启用 layer 支持的信息，请参见 Enabling Core Animation Support in Your App。有关如何创建 layer 对象层次结构的信息，以及有关何时进行创建的提示，请参见 Building a Layer Hierarchy。
 
 ## Setting Up Layer Objects（设置图层对象）
 &emsp;layer 对象是你使用 Core Animation 所做的一切的核心。layer 管理你应用的视觉内容，并提供用于修改该内容的样式和视觉外观的选项。尽管 iOS 应用已自动启用了 layer 支持，但 OS X 应用的开发人员必须先显式启用它，然后才能利用性能优势。启用后，你需要了解如何配置和操作应用程序的 layer 以获得所需的效果。
@@ -368,7 +368,7 @@ CATiledLayer* hostedLayer = [CATiledLayer layer];
 #### Using an Image for the Layer’s Content（使用图像作为图层的内容）
 &emsp;由于 layer 只是用于管理位图图像的容器，因此你可以将图像直接分配给 layer 的 contents 属性。将图像分配给 layer 很容易，并且可以指定要在屏幕上显示的确切图像。layer 使用你直接提供的图像对象，并且不尝试创建该图像的自己的副本。如果你的应用在多个地方使用相同的图像，此行为可以节省内存。
 
-&emsp;你分配给 layer 的图像必须是 CGImageRef 类型。 （在 OS X v10.6 及更高版本中，你还可以分配一个 NSImage 对象。）分配图像时，请记住提供一个分辨率与本机设备的分辨率匹配的图像。对于具有 Retina 显示屏的设备，这可能还需要你调整图像的 contentsScale 属性。有关在图层上使用高分辨率内容的信息，请参阅 Working with High-Resolution Images。
+&emsp;你分配给 layer 的图像必须是 CGImageRef 类型。 （在 OS X v10.6 及更高版本中，你还可以分配一个 NSImage 对象。）分配图像时，请记住提供一个分辨率与本机设备的分辨率匹配的图像。对于具有 Retina 显示屏的设备，这可能还需要你调整图像的 contentsScale 属性。有关在图层上使用高分辨率内容的信息，请参见 Working with High-Resolution Images。
 #### Using a Delegate to Provide the Layer’s Content（使用委托提供图层内容）
 &emsp;如果 layer 的内容动态变化，则可以使用 delegate 对象在需要时提供和更新该内容。在显示时，该 layer 调用 delegate 的方法以提供所需的内容：
 + 如果 delegate 实现 `displayLayer:` 方法，则该实现负责创建位图并将其分配给 layer 的 contents 属性。
@@ -526,9 +526,35 @@ myLayer.filters = [NSArray arrayWithObject:aFilter];
 ```
 &emsp;有关可用 Core Image 过滤器的信息，请参见 [Core Image Filter Reference](https://developer.apple.com/library/archive/documentation/GraphicsImaging/Reference/CoreImageFilterReference/index.html#//apple_ref/doc/uid/TP40004346)。
 ### The Layer Redraw Policy for OS X Views Affects Performance（OS X 视图的层重绘策略影响性能）
-&emsp;在 OS X 中，layer 支持的 view 支持几种不同的策略来确定何时更新底层的内容。由于 native AppKit 绘图模型与 Core Animation 引入的模型之间存在差异，因此这些策略使将旧代码迁移到 Core Animation 变得更加容易。你可以逐个视图地配置这些策略，以确保每个视图的最佳性能。
+&emsp;在 OS X 中，layer 支持的 view 支持几种不同的策略来确定何时更新底层的内容。由于 native AppKit 绘图模型与 Core Animation 引入的模型之间存在差异，因此这些策略使将旧代码迁移到 Core Animation 变得更加容易。你可以逐个视图地配置这些策略，以确保每个 view 的最佳性能。
 
+&emsp;每个视图定义一个 `layerContentsRedrawPolicy` 方法，该方法返回 view 的 layer 的重绘策略。你可以使用 `setLayerContentsRedrawPolicy:` 方法设置策略。为了保持与传统绘图模型的兼容性，AppKit 将重绘策略默认设置为 `NSViewLayerContentsRedrawDuringViewResize`。但是，你可以将策略更改为表 2-2 中的任何值。请注意，建议的重绘策略不是默认策略。
 
+&emsp;Table 2-2  Layer redraw policies for OS X views（OS X 视图的图层重绘策略）
+
+| Policy | Usage |
+| --- | --- |
+| NSViewLayerContentsRedrawOnSetNeedsDisplay | 这是推荐的策略。使用此策略，view geometry 更改不会自动导致 view 更新其 layer 内容。相反，layer 的现有内容会被拉伸和操纵，以便于 geometry 更改。要强制 view 重新绘制自身并更新 layer 的内容，必须显式调用 view 的 `setNeedsDisplay:`方法。
+此策略最接近于表示 Core Animation layers 的标准行为。但是，它不是默认策略，必须显式设置。 |
+| NSViewLayerContentsRedrawDuringViewResize | 这是默认的重绘策略。此策略通过在 view 的 geometry 发生更改时重新生成 layer 的内容来保持与传统 AppKit 绘图的最大兼容性。此行为导致在调整大小操作期间在应用程序的主线程上多次调用 view 的 `drawRect:` 方法。 |
+| NSViewLayerContentsRedrawBeforeViewResize | 使用此策略，AppKit 在执行任何调整大小操作之前以最终大小绘制 layer，并缓存该位图。调整大小操作使用缓存的位图作为起始图像，缩放它以适应旧的 bounds 矩形。然后将位图设置为最终大小。此行为可能导致 view 的内容在动画开始时出现拉伸或扭曲，在初始外观不重要或不明显的情况下效果更好。 |
+| NSViewLayerContentsRedrawNever | 使用此策略，即使调用 `setNeedsDisplay:` 方法，AppKit 也不会更新 layer。此策略最适用于内容从不更改且 view 大小很少更改（如果有的话）的 view。例如，你可以将其用于显示固定大小内容或背景元素的 view。 |
+
+&emsp;view 重绘策略减轻了使用独立 sublayers 来提高绘图性能的需要。在引入 view 重绘策略之前，有一些 layer 支持的 view（layer-backed views）比需要的更频繁，从而导致了性能问题。解决这些性能问题的方法是使用 sublayers 来表示 view 内容中不需要定期重绘的部分。随着 OS X v10.6 中引入重绘策略，现在建议你将 layer 支持的 view（layer-backed views）的重绘策略设置为适当的值，而不是创建显式的 sublayer 层次结构。
+### Adding Custom Properties to a Layer（向图层添加自定义属性）
+&emsp;CAAnimation 和 CALayer 类扩展了键值编码约定（key-value coding conventions）以支持自定义属性。可以使用此行为向 layer 添加数据，并使用定义的自定义键检索数据。甚至可以将 actions 与自定义属性相关联，以便在更改属性时执行相应的动画。
+
+&emsp;有关如何设置和获取自定义属性的信息，请参见 Key-Value Coding Compliant Container Classes。有关向 layer 对象添加 actions 的信息，请参见 Changing a Layer’s Default Behavior。
+### Printing the Contents of a Layer-Backed View（打印 Layer-Backed View 的内容）
+&emsp;在打印过程中，layer 根据需要重新绘制其内容以适应打印环境。Core Animation 在渲染到屏幕时通常依赖于缓存的位图，而在打印时它会重新绘制该内容。特别是，如果 layer-backed view 使用 `drawRect:` 方法提供 layer 内容，则 Core Animation 在打印期间再次调用 `drawRect:` 以生成打印的 layer 内容。
+## Animating Layer Content（为图层内容动画化）
+&emsp;Core Animation 提供的 infrastructure 使你可以轻松创建应用程序 layer 的复杂动画，并扩展到拥有这些 layer 的任何 view。示例包括更改 layer frame 矩形的大小、更改其在屏幕上的位置、应用旋转变换或更改其不透明度。对于 Core Animation，启动动画通常与更改属性一样简单，但也可以创建动画并显式设置动画参数。
+
+&emsp;有关创建更高级动画的信息，请参见 Advanced Animation Tricks。
+### Animating Simple Changes to a Layer’s Properties（对图层属性的简单更改进行动画设置）
+&emsp;你可以根据需要隐式或显式地执行简单动画。隐式动画使用默认的计时和动画属性来执行动画，而显式动画则要求你使用动画对象自行配置这些属性。因此，隐式动画非常适合在不需要大量代码的情况下进行更改，并且默认计时对你非常合适。
+
+&emsp;简单的动画包括更改 layer 的属性，并让 Core Animation 随着时间的推移为这些更改设置动画。layer 定义了许多影响 layer 可见外观的属性。更改这些属性之一是设置外观更改动画的一种方法。例如，将 layer 的不透明度从 1.0 更改为 0.0 会导致 layer 淡出并变为透明。
 
 
 
