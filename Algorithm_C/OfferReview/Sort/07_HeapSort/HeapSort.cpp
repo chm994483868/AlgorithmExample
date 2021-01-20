@@ -14,6 +14,7 @@ void HeapSort::heapSort(int nums[], int count) {
     }
     
     int i = (count - 1 - 1) / 2;
+    
     for (; i >= 0; --i) {
         maxHeapFixdown(nums, i, count);
     }

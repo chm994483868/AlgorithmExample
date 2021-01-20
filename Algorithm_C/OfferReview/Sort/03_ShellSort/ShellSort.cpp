@@ -24,11 +24,34 @@ void ShellSort::shellSort(int nums[], int count) {
 //    }
     
     for (int gap = count / 2; gap > 0; gap /= 2) {
-        for (<#initialization#>; <#condition#>; <#increment#>) {
-            <#statements#>
+        for (int i = gap; i < count; ++i) {
+            for (int j = i - gap; j >= 0 && nums[j] > nums[j + gap]; j -= gap) {
+                swap(&nums[j], &nums[j + gap]);
+            }
         }
     }
     
+    //    if (nums == nullptr || count <= 0) {
+    //        return;
+    //    }
+    //
+    //    //    for (int gap = count / 2; gap > 0; gap /= 2) {
+    //    //        for (int i = 0; i < gap; ++i) {
+    //    //            for (int j = i + gap; j < count; j += gap) {
+    //    //                for (int k = j - gap; k >= 0 && nums[k] > nums[k + gap]; k -= gap) {
+    //    //                    swap(&nums[k], &nums[k + gap]);
+    //    //                }
+    //    //            }
+    //    //        }
+    //    //    }
+    //
+    //    for (int gap = count / 2; gap > 0; gap /= 2) {
+    //        for (int i = gap; i < count; ++i) {
+    //            for (int j = i - gap; j >= 0 && nums[j] > nums[j + gap]; j -= gap) { // j 是左边元素
+    //                swap(&nums[j], &nums[j + gap]);
+    //            }
+    //        }
+    //    }
 }
 
 // 测试代码
