@@ -137,6 +137,7 @@
 		D239E78024D4012500DA0BE5 /* TranslateNumbersToStrings.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D239E77E24D4012500DA0BE5 /* TranslateNumbersToStrings.cpp */; };
 		D239E78424D4161800DA0BE5 /* MaxValueOfGifts.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D239E78224D4161800DA0BE5 /* MaxValueOfGifts.cpp */; };
 		D239E78824D4290200DA0BE5 /* LongestSubstringWithoutDup.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D239E78624D4290200DA0BE5 /* LongestSubstringWithoutDup.cpp */; };
+		D2EA09C025B982210054B58A /* AssignmentOperator_2.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D2EA09BE25B982200054B58A /* AssignmentOperator_2.cpp */; };
 		D2EB010024D912C6009EAFD6 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2EB00FF24D912C6009EAFD6 /* main.swift */; };
 		D2EB010924D9136D009EAFD6 /* BubbleSort.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2EB010824D9136D009EAFD6 /* BubbleSort.swift */; };
 		D2EB010C24D91F91009EAFD6 /* BubbleSort.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D2EB010A24D91F91009EAFD6 /* BubbleSort.cpp */; };
@@ -535,6 +536,8 @@
 		D2EA09BB25B7B5000054B58A /* iOS《Core Animation Programming Guide》官方文档.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS《Core Animation Programming Guide》官方文档.md"; sourceTree = "<group>"; };
 		D2EA09BC25B972B90054B58A /* iOS NSCoding.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS NSCoding.md"; sourceTree = "<group>"; };
 		D2EA09BD25B97C1C0054B58A /* iOS CALayer 官方文档.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS CALayer 官方文档.md"; sourceTree = "<group>"; };
+		D2EA09BE25B982200054B58A /* AssignmentOperator_2.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = AssignmentOperator_2.cpp; sourceTree = "<group>"; };
+		D2EA09BF25B982200054B58A /* AssignmentOperator_2.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = AssignmentOperator_2.hpp; sourceTree = "<group>"; };
 		D2EB00FD24D912C6009EAFD6 /* Algorithm_Swift */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = Algorithm_Swift; sourceTree = BUILT_PRODUCTS_DIR; };
 		D2EB00FF24D912C6009EAFD6 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
 		D2EB010824D9136D009EAFD6 /* BubbleSort.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BubbleSort.swift; sourceTree = "<group>"; };
@@ -977,6 +980,8 @@
 				8EA593DF24CDBD0B002785EF /* AssignmentOperator.hpp */,
 				8E919554254D57DA0039A12E /* AssignmentOperator_1.cpp */,
 				8E919555254D57DA0039A12E /* AssignmentOperator_1.hpp */,
+				D2EA09BE25B982200054B58A /* AssignmentOperator_2.cpp */,
+				D2EA09BF25B982200054B58A /* AssignmentOperator_2.hpp */,
 			);
 			path = 01_AssignmentOperator;
 			sourceTree = "<group>";
@@ -2629,6 +2634,7 @@
 				D202B32D255B9B2C00D9BFBC /* MaximalProfit.cpp in Sources */,
 				D202B2F7255A6DD100D9BFBC /* MissingNumber.cpp in Sources */,
 				D202B30F255A95FF00D9BFBC /* ContinuousSquenceWithSum.cpp in Sources */,
+				D2EA09C025B982210054B58A /* AssignmentOperator_2.cpp in Sources */,
 				D2EB011E24D955D6009EAFD6 /* SelectSort.cpp in Sources */,
 				D237C66224D2BC31001E0B21 /* ConvertBinarySearchTree.cpp in Sources */,
 				D202B2762551044900D9BFBC /* CuttingRope_1.cpp in Sources */,

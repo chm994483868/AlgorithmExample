@@ -19,9 +19,9 @@ API_AVAILABLE(macos(10.5), ios(2.0), watchos(2.0), tvos(9.0))
 }
 ```
 ### Overview
-&emsp;Layers 通常用于为 view 提供备份存储，但也可以在没有 view 的情况下使用以显示内容。layer 的主要工作是管理你提供的视觉内容，但 layer 本身也具有可以设置的视觉属性，例如背景色、边框和阴影。除了管理视觉内容外，layer 还维护有关其内容的几何图形（例如其位置、大小和变换（transform））的信息，这些信息用于在屏幕上显示该内容。修改 layer 的属性是在 layer 的内容或几何体上启动动画的方式。layer 对象通过 CAMediaTiming 协议封装 layer 及其动画的持续时间和步调（pacing），该协议定义了 layer 的计时信息（timing information）。
+&emsp;Layers 通常用于为 view 提供 backing store，但也可以在没有 view 的情况下使用以显示内容。layer 的主要工作是管理你提供的视觉内容（visual content），但 layer 本身也具有可以设置的视觉属性（visual attributes），例如背景色（background color）、边框（border）和阴影（shadow）。除了管理视觉内容外，layer 还维护有关其内容的几何（geometry）（例如其位置（position）、大小（size）和变换（transform））的信息，这些信息用于在屏幕上显示该内容。修改 layer 的属性是在 layer 的内容或几何（geometry）上启动动画的方式。layer 对象通过 CAMediaTiming 协议封装 layer 及其动画的持续时间（duration）和步调（pacing），该协议定义了 layer 的时间信息（timing information）。
 
-&emsp;如果 layer 对象是由 view 创建的，则 view 通常会自动将自身指定为 layer 的代理，并且不应更改该关系。对于你自己创建的 layer，可以指定一个 delegate，并使用该对象动态提供 layer 的内容并执行其他任务。layer 还可以具有布局管理器（layout manager）对象（指定给 layoutManager 属性），以分别管理子视图（subviews）的布局。
+&emsp;如果 layer 对象是由 view 创建的，则 view 通常会自动将自身指定为 layer 的 delegate，并且不应更改该关系。对于你自己创建的 layers，可以为其指定一个 delegate 对象，并使用该对象动态提供 layer 的内容并执行其他任务。layer 可能还具有布局管理器（layout manager）对象（指定给 layoutManager 属性），以分别管理子图层（sublayers）的布局。
 ### Creating a Layer（创建 layer）
 #### + layer
 &emsp;创建并返回 layer 对象的实例。
@@ -36,11 +36,11 @@ API_AVAILABLE(macos(10.5), ios(2.0), watchos(2.0), tvos(9.0))
 ```c++
 - (instancetype)init;
 ```
-&emsp;这是不在 presentation layer 中的 layer 对象的指定初始化程序。
+&emsp;这是不在 presentation layer（表示层）中的 layer 对象的指定初始化程序。
 #### - initWithLayer:
 &emsp;重写以复制或初始化指定 layer 的自定义字段。
 
-&emsp;CoreAnimation 使用此初始值设定项来创建 layers 的 shadow 副本，例如用作 presentation layers。子类可以重写此方法，以将其实例变量复制到 presentation layer 中（子类随后应调用超类）。在任何其他情况下调用此方法都将导致未定义的行为。
+&emsp;Core Animation 使用此初始值设定项来创建 layers 的 shadow 副本，例如用作 presentation layers。子类可以重写此方法，以将其实例变量复制到 presentation layer 中（子类随后应调用超类）。在任何其他情况下调用此方法都将导致未定义的行为。
 ```c++
 - (instancetype)initWithLayer:(id)layer;
 ```
@@ -48,11 +48,11 @@ API_AVAILABLE(macos(10.5), ios(2.0), watchos(2.0), tvos(9.0))
 
 &emsp;Return Value:从 `layer` 复制的任何自定义实例变量的 layer 实例。
 
-&emsp;此初始化程序用于创建 layer 的 shadow 副本，例如，用于 presentationLayer 方法。在任何其他情况下使用此方法都会产生不确定的行为。例如，请勿使用此方法用现有 layer 的内容初始化新 layer。
+&emsp;此初始化程序用于创建 layer 的 shadow 副本，例如，用于 `presentationLayer` 方法。在任何其他情况下使用此方法都会产生不确定的行为。例如，请勿使用此方法用现有 layer 的内容初始化新 layer。
 
 &emsp;如果要实现自定义 layer 子类，则可以重写此方法并将其用于将实例变量的值复制到新对象中。子类应始终调用超类实现。
 
-&emsp;此方法是 presentation layer 中各 layer 对象的指定初始化器。
+&emsp;此方法是 presentation layer（表示层）中各 layer 对象的指定初始化器。
 ### Accessing Related Layer Objects（访问相关 layer 对象）
 #### - presentationLayer
 &emsp;返回 presentation layer 对象的副本，该对象表示当前在屏幕上显示的 layer 的状态。
