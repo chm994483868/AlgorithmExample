@@ -533,6 +533,8 @@
 		D2E526D124E4B2E200ACD06F /* 深入理解Objective-C中的Class.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "深入理解Objective-C中的Class.md"; sourceTree = "<group>"; };
 		D2E526D824E4DAFD00ACD06F /* Objective-C类型编码.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "Objective-C类型编码.md"; sourceTree = "<group>"; };
 		D2EA09BB25B7B5000054B58A /* iOS《Core Animation Programming Guide》官方文档.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS《Core Animation Programming Guide》官方文档.md"; sourceTree = "<group>"; };
+		D2EA09BC25B972B90054B58A /* iOS NSCoding.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS NSCoding.md"; sourceTree = "<group>"; };
+		D2EA09BD25B97C1C0054B58A /* iOS CALayer 官方文档.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS CALayer 官方文档.md"; sourceTree = "<group>"; };
 		D2EB00FD24D912C6009EAFD6 /* Algorithm_Swift */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = Algorithm_Swift; sourceTree = BUILT_PRODUCTS_DIR; };
 		D2EB00FF24D912C6009EAFD6 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
 		D2EB010824D9136D009EAFD6 /* BubbleSort.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BubbleSort.swift; sourceTree = "<group>"; };
@@ -1431,6 +1433,8 @@
 				D21287E625A45A95005A744C /* iOS Dynamic Method Resolution与Message Forwarding官方文档翻译.md */,
 				D212880F25B67838005A744C /* iOS NSOperation、NSBlockOperation、NSInvocationOperation、NSOperationQueue官方文档.md */,
 				D2EA09BB25B7B5000054B58A /* iOS《Core Animation Programming Guide》官方文档.md */,
+				D2EA09BD25B97C1C0054B58A /* iOS CALayer 官方文档.md */,
+				D2EA09BC25B972B90054B58A /* iOS NSCoding.md */,
 			);
 			path = "已发布";
 			sourceTree = "<group>";

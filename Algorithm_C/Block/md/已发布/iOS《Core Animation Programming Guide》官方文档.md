@@ -1,146 +1,5 @@
 # iOS《Core Animation Programming Guide》官方文档
 
-> &emsp;The base layer class.
-
-## CALayer
-&emsp;管理基于图像的内容并允许你对该内容执行动画的对象。
-```c++
-API_AVAILABLE(macos(10.5), ios(2.0), watchos(2.0), tvos(9.0))
-@interface CALayer : NSObject <NSSecureCoding, CAMediaTiming>
-{
-@private
-  struct _CALayerIvars {
-    int32_t refcount;
-    uint32_t magic;
-    void *layer;
-#if TARGET_OS_MAC && !TARGET_RT_64_BIT
-    void * _Nonnull unused1[8];
-#endif
-  } _attr;
-}
-```
-### Overview
-&emsp;Layers 通常用于为 view 提供备份存储，但也可以在没有 view 的情况下使用以显示内容。layer 的主要工作是管理你提供的视觉内容，但 layer 本身也具有可以设置的视觉属性，例如背景色、边框和阴影。除了管理视觉内容外，layer 还维护有关其内容的几何图形（例如其位置、大小和变换（transform））的信息，这些信息用于在屏幕上显示该内容。修改 layer 的属性是在 layer 的内容或几何体上启动动画的方式。layer 对象通过 CAMediaTiming 协议封装 layer 及其动画的持续时间和步调（pacing），该协议定义了 layer 的计时信息（timing information）。
-
-&emsp;如果 layer 对象是由 view 创建的，则 view 通常会自动将自身指定为 layer 的代理，并且不应更改该关系。对于你自己创建的 layer，可以指定一个 delegate，并使用该对象动态提供 layer 的内容并执行其他任务。layer 还可以具有布局管理器（layout manager）对象（指定给 layoutManager 属性），以分别管理子视图（subviews）的布局。
-### Creating a Layer（创建 layer）
-#### + layer
-&emsp;创建并返回 layer 对象的实例。
-```c++
-+ (instancetype)layer;
-```
-&emsp;Return Value: 初始化的 layer 对象；如果初始化失败，则返回 nil。
-
-&emsp;如果你是 CALayer 的子类，则可以重写此方法，并使用该函数提供特定子类的实例。
-#### - init
-&emsp;返回一个初始化的 CALayer 对象。
-```c++
-- (instancetype)init;
-```
-&emsp;这是不在 presentation layer 中的 layer 对象的指定初始化程序。
-#### - initWithLayer:
-&emsp;重写以复制或初始化指定 layer 的自定义字段。
-
-&emsp;CoreAnimation 使用此初始值设定项来创建 layers 的 shadow 副本，例如用作 presentation layers。子类可以重写此方法，以将其实例变量复制到 presentation layer 中（子类随后应调用超类）。在任何其他情况下调用此方法都将导致未定义的行为。
-```c++
-- (instancetype)initWithLayer:(id)layer;
-```
-&emsp;`layer`: 应从其复制自定义字段的 layer。
-
-&emsp;Return Value:从 `layer` 复制的任何自定义实例变量的 layer 实例。
-
-&emsp;此初始化程序用于创建 layer 的 shadow 副本，例如，用于 presentationLayer 方法。在任何其他情况下使用此方法都会产生不确定的行为。例如，请勿使用此方法用现有 layer 的内容初始化新 layer。
-
-&emsp;如果要实现自定义 layer 子类，则可以重写此方法并将其用于将实例变量的值复制到新对象中。子类应始终调用超类实现。
-
-&emsp;此方法是 presentation layer 中各 layer 对象的指定初始化器。
-### Accessing Related Layer Objects（访问相关 layer 对象）
-#### - presentationLayer
-&emsp;返回 presentation layer 对象的副本，该对象表示当前在屏幕上显示的 layer 的状态。
-```c++
-- (nullable instancetype)presentationLayer;
-```
-&emsp;Return Value: 当前 presentation layer 对象的副本。
-
-&emsp;通过此方法返回的 layer 对象提供了当前在屏幕上显示的 layer 的近似值。在动画制作过程中，你可以检索该对象并使用它来获取那些动画的当前值。
-
-&emsp;返回 layer 的 sublayers、mask 和 superlayer 属性从表示树（presentation tree）（而不是模型树）返回相应的对象。此模式也适用于任何只读 layer 方法。例如，返回对象的 hitTest: 方法查询 presentation tree 中的 layer 对象。
-#### - modelLayer
-
-### Accessing the Delegate
-#### delegate
-
-### Providing the Layer’s Content
-#### contents
-#### contentsRect
-#### contentsCenter
-#### - display
-#### - drawInContext:
-
-### Modifying the Layer’s Appearance
-#### contentsGravity
-#### Contents Gravity Values
-#### opacity
-#### hidden
-#### masksToBounds
-#### mask
-#### doubleSided
-#### cornerRadius
-#### maskedCorners
-#### CACornerMask
-#### borderWidth
-#### borderColor
-#### backgroundColor
-#### shadowOpacity
-#### shadowRadius
-#### shadowOffset
-#### shadowColor
-#### shadowPath
-#### style
-#### allowsEdgeAntialiasing
-
-### Layer Filters
-#### filters
-#### compositingFilter
-#### backgroundFilters
-#### minificationFilter
-#### minificationFilterBias
-#### magnificationFilter
-
-### Configuring the Layer’s Rendering Behavior
-
-### Modifying the Layer Geometry
-
-### Managing the Layer’s Transform
-
-### Managing the Layer Hierarchy
-
-### Updating Layer Display
-
-### Layer Animations
-
-### Managing Layer Resizing and Layout
-
-### Managing Layer Constraints
-
-### Getting the Layer’s Actions
-
-### Mapping Between Coordinate and Time Spaces
-
-### Hit Testing
-
-### Scrolling
-
-### Identifying the Layer
-
-### Key-Value Coding Extensions
-
-### Constants
-
-### Instance Properties
-
-### Type Methods
-
 ## About Core Animation
 &emsp;Core Animation 是可在 iOS 和 OS X 上使用的图形渲染（graphics rendering）和动画基础结构（animation infrastructure），可用于为应用程序的 view 和其他视觉元素制作动画。使用 Core Animation，绘制动画的每一帧所需的大部分工作都已为你完成。你所要做的就是配置一些动画参数（例如起点和终点），并告诉 Core Animation 开始。其余部分由 Core Animation 完成，将大部分实际绘图工作（actual drawing work）交给板载图形硬件（GPU）以加快渲染速度。这种自动图形加速功能可实现高帧率和流畅的动画效果，而不会给 CPU 造成负担并降低应用程序的运行速度。
 
@@ -556,31 +415,827 @@ myLayer.filters = [NSArray arrayWithObject:aFilter];
 
 &emsp;简单的动画包括更改 layer 的属性，并让 Core Animation 随着时间的推移为这些更改设置动画。layer 定义了许多影响 layer 可见外观的属性。更改这些属性之一是设置外观更改动画的一种方法。例如，将 layer 的不透明度从 1.0 更改为 0.0 会导致 layer 淡出并变为透明。
 
+> &emsp;Important: 尽管有时你可以直接使用 Core Animation interfaces 为 layer 支持的 view 设置动画，但这样做通常需要额外的步骤。有关如何将 Core Animation 与 layer-backed views 结合使用的更多信息，请参见 How to Animate Layer-Backed Views。
+
+&emsp;要触发隐式动画，你所需要做的就是更新 layer 对象的属性。在 layer 树中修改 layer 对象时，这些对象会立即反映出你的更改。但是，layer 对象的视觉外观不会立即改变。相反，发生的情况是 Core Animation 使用你的更改作为触发来创建和安排一个或多个隐式动画以供执行。因此，像清单 3-1 中那样进行更改，将导致 Core Animation 为你创建一个动画对象，并安排该动画在下一个更新周期开始运行。
+
+&emsp;Listing 3-1  Animating a change implicitly（隐式地对更改进行动画处理）
+```c++
+theLayer.opacity = 0.0;
+```
+&emsp;要使用动画对象显式进行相同的更改，请创建 CABasicAnimation 对象，然后使用该对象配置动画参数。在将动画添加到 layer 之前，可以设置动画的开始和结束值，更改持续时间或更改任何其他动画参数。清单 3-2 显示了如何使用动画对象淡出图层。创建对象时，可以为要设置动画的属性指定 key path，然后设置动画参数。要执行动画，请使用 `addAnimation:forKey:` 方法将其添加到要设置动画的 layer 中。
+
+&emsp;Listing 3-2  Animating a change explicitly（明确地显示变化）
+```c++
+CABasicAnimation* fadeAnim = [CABasicAnimation animationWithKeyPath:@"opacity"];
+fadeAnim.fromValue = [NSNumber numberWithFloat:1.0];
+fadeAnim.toValue = [NSNumber numberWithFloat:0.0];
+fadeAnim.duration = 1.0;
+[theLayer addAnimation:fadeAnim forKey:@"opacity"];
+ 
+// Change the actual data value in the layer to the final value.
+theLayer.opacity = 0.0;
+```
+
+> &emsp;Tip: 创建显式动画时，建议始终将值分配给动画对象的 `fromValue` 属性。如果你未为此属性指定值，则 Core Animation 会使用 layer 的当前值作为起始值。如果你已经将该属性更新为其最终值，则可能不会产生所需的结果。
+
+&emsp;与隐式动画（更新 layer 对象的数据值）不同，显式动画不会修改 layer 树中的数据。显式动画只生成动画。在动画结束时，Core Animation 将从 layer 中移除动画对象，并使用其当前数据值重新绘制 layer。如果希望显式动画中的更改是永久性的，还必须更新层的特性，如前一示例所示。
+
+&emsp;隐式和显式动画通常在当前运行循环周期结束后开始执行，并且当前线程必须具有 run loop 才能执行动画。如果更改多个属性，或者将多个动画对象添加到一个 layer，则所有这些属性更改将同时进行动画处理。例如，你可以通过同时配置两个动画来淡出 layer，同时将其移出屏幕。但是，你也可以将动画对象配置为在特定时间开始。有关修改动画定时的更多信息，请参见 Customizing the Timing of an Animation。
+### Using a Keyframe Animation to Change Layer Properties（使用关键帧动画更改图层属性）
+&emsp;基于属性的动画将属性从开始值更改为结束值，而 CAKeyframeAnimation 对象使你可以以线性或非线性方式对一组目标值进行动画处理。关键帧动画由一组目标数据值和应达到每个值的时间组成。在最简单的配置中，你可以使用数组指定值和时间。要更改 layer 的位置，还可以使更改遵循路径。动画对象采用你指定的关键帧，并通过在给定的时间段内从一个值插入下一个值来构建动画。
+
+&emsp;图3-1 显示了 layer 的 position 属性的 5 秒动画。对该位置进行动画处理以遵循使用 CGPathRef 数据类型指定的路径。清单 3-3 显示了此动画的代码。
+
+&emsp;Figure 3-1  5-second keyframe animation of a layer’s position property
+
+![keyframing](https://p6-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/f8602d1a7c55488184cc52c9b5dfdd8d~tplv-k3u1fbpfcp-watermark.image)
+
+&emsp;清单 3-3 显示了用于实现图 3-1 中的动画的代码。此示例中的 path 对象用于为动画的每一帧定义 layer 的位置。
+
+&emsp;Listing 3-3  Creating a bounce keyframe animation（创建弹跳关键帧动画）
+```c++
+// create a CGPath that implements two arcs (a bounce)
+CGMutablePathRef thePath = CGPathCreateMutable();
+CGPathMoveToPoint(thePath,NULL,74.0,74.0);
+CGPathAddCurveToPoint(thePath,NULL,74.0,500.0,
+                                   320.0,500.0,
+                                   320.0,74.0);
+CGPathAddCurveToPoint(thePath,NULL,320.0,500.0,
+                                   566.0,500.0,
+                                   566.0,74.0);
+ 
+CAKeyframeAnimation * theAnimation;
+ 
+// Create the animation object, specifying the position property as the key path.
+theAnimation=[CAKeyframeAnimation animationWithKeyPath:@"position"];
+theAnimation.path=thePath;
+theAnimation.duration=5.0;
+ 
+// Add the animation to the layer.
+[theLayer addAnimation:theAnimation forKey:@"position"];
+```
+#### Specifying Keyframe Values（指定关键帧值）
+&emsp;关键帧值是关键帧动画中最重要的部分。这些值定义了动画执行过程中的行为。指定关键帧值的主要方法是作为对象数组，但是对于包含 CGPoint 数据类型（例如 layer 的 anchorPoint 和 position 属性）的值，可以改为指定 CGPathRef 数据类型。
+
+&emsp;指定值数组时，你要放入数组中的内容取决于属性所需的数据类型。你可以将一些对象直接添加到数组中。但是，某些对象在添加之前必须强制转换为 id，并且所有标量类型或结构必须由对象包装。例如：
+
++ 对于采用 CGRect 的属性（例如 bounds 和 frame 属性），请将每个矩形包装到 NSValue 对象中。
++ 对于 layer 的 transform 属性，将每个 CATTransform3D 矩阵包装在 NSValue 对象中。设置此属性的动画将使关键帧动画依次将每个变换矩阵应用于 layer。
++ 对于 borderColor 属性，在将每个 CGColorRef 数据类型添加到数组之前，将其强制转换为类型 id。
++ 对于采用 CGFloat 值的属性，请在将每个值添加到数组之前将其包装到 NSNumber 对象中。
++ 设置 layer contents 属性的动画时，请指定 CGImageRef 数据类型的数组。
+
+&emsp;对于采用 CGPoint 数据类型的属性，可以创建点数组（包装在 NSValue 对象中），也可以使用 CGPathRef 对象指定要遵循的路径。指定点阵列时，关键帧动画对象在每个连续点之间绘制一条直线，并沿着该路径。指定 CGPathRef 对象时，动画从路径的起点开始，并跟随其轮廓，包括沿任何曲面。你可以使用开放或封闭路径。
+#### Specifying the Timing of a Keyframe Animation（指定关键帧动画的时间）
+&emsp;关键帧动画的 timing and pacing 比基本动画的 timing and pacing 更为复杂，你可以使用几个属性来控制它：
+
++ calculationMode 属性定义用于计算动画计时的算法。此属性的值会影响其他计时相关属性的使用方式。
+  + 线性和三维动画（即 calculationMode 属性设置为 kCAAnimationLinear 或 kCAAnimationCubic 的动画）使用提供的 timing 信息来生成动画。这些模式使你可以最大程度地控制动画时间。
+  + 定时动画（即 calculationMode 属性设置为 kCAAnimationPaced 或 kCAAnimationCubicPaced 的动画）不依赖于 keyTimes 或 timingFunctions 属性提供的外部定时值。取而代之的是，隐式计算时间值，以使动画具有恒定的速度。
+  + 离散动画（即 calculationMode 属性设置为 kCAAnimationDiscrete 的动画）使动画属性从一个关键帧值跳到下一个关键帧值而没有任何插值。此计算模式使用 keyTimes 属性中的值，但忽略 timingFunctions 属性。
++ keyTimes 属性指定应用每个关键帧值的时间标记。仅当计算模式设置为 kCAAnimationLinear、kCAAnimationDiscrete 或 kCAAnimationCubic 时，才使用此属性。它不用于有节奏的动画。
++ timingFunctions 属性指定要用于每个关键帧段的计时曲线。（此属性替换继承的 timingFunction 属性。）
+
+&emsp;如果要自己处理动画定时，请使用 kCAAnimationLinear 或 kCAAnimationCubic 模式以及 keyTimes 和 timingFunctions 属性。 keyTimes 定义了应用每个关键帧值的时间点。所有中间值的时序均由 timing functions 控制，可让你将缓入或缓出曲线应用于每个段。如果未指定任何 timing functions，则 timing 是线性的。
+### Stopping an Explicit Animation While It Is Running（在运行时停止显式动画）
+&emsp;动画通常会运行到完成为止，但是如果需要，你可以使用以下一种技术将其停止：
++ 要从 layer 中移除单个动画对象，请调用 layer 的 `removeAnimationForKey:` 方法来移除动画对象。此方法使用传递给 `addAnimation:forKey:` 方法的键来标识动画。指定的键不能为 nil。
++ 要从 layer 中移除所有动画对象，请调用 layer 的 `removeAllAnimations` 方法。此方法会立即移除所有正在进行的动画，并使用 layer 的当前状态信息重新绘制 layer。
+
+> &Note: 你不能直接从 layer 中删除隐式动画。
+
+&emsp;从 layer 中删除动画时，Core Animation 会通过使用其当前值重画该 layer 来做出响应。因为当前值通常是动画的最终值，所以这可能导致图层的外观突然跳跃。如果希望 layer 的外观保持在动画最后一帧的位置，则可以使用 presentation tree 中的对象来检索这些最终值，并将其设置在 layer 树中的对象上。
+
+&emsp;有关暂时暂停动画的信息，请参见清单5-4。
+
+### Animating Multiple Changes Together（一起对多个更改进行动画处理）
+&emsp;如果要同时将多个动画应用于 layer 对象，则可以使用 CAAnimationGroup 对象将它们组合在一起。通过提供一个配置点，使用组对象可以简化多个动画对象的管理。应用于组的时间和持续时间值会覆盖各个动画对象中的相同值。
+
+&emsp;清单 3-4 显示了如何使用动画组同时执行两个与 border-related 相关的动画，并且持续时间相同。
+
+&emsp;Listing 3-4  Animating two animations together
+```c++
+// Animation 1
+CAKeyframeAnimation* widthAnim = [CAKeyframeAnimation animationWithKeyPath:@"borderWidth"];
+NSArray* widthValues = [NSArray arrayWithObjects:@1.0, @10.0, @5.0, @30.0, @0.5, @15.0, @2.0, @50.0, @0.0, nil];
+widthAnim.values = widthValues;
+widthAnim.calculationMode = kCAAnimationPaced;
+ 
+// Animation 2
+CAKeyframeAnimation* colorAnim = [CAKeyframeAnimation animationWithKeyPath:@"borderColor"];
+NSArray* colorValues = [NSArray arrayWithObjects:(id)[UIColor greenColor].CGColor,
+            (id)[UIColor redColor].CGColor, (id)[UIColor blueColor].CGColor,  nil];
+colorAnim.values = colorValues;
+colorAnim.calculationMode = kCAAnimationPaced;
+ 
+// Animation group
+CAAnimationGroup* group = [CAAnimationGroup animation];
+group.animations = [NSArray arrayWithObjects:colorAnim, widthAnim, nil];
+group.duration = 5.0;
+ 
+[myLayer addAnimation:group forKey:@"BorderChanges"];
+```
+&emsp;将动画分组在一起的更高级的方法是使用事务（transaction）对象。事务允许你创建嵌套的动画集，并为每个动画集指定不同的动画参数，从而提供了更大的灵活性。有关如何使用事务对象的信息，请参见 Explicit Transactions Let You Change Animation Parameters。
+### Detecting the End of an Animation（检测动画的结束）
+&emsp;Core Animation 为检测动画何时开始或结束提供支持。这些通知是执行与动画相关的任何内务处理任务的好时机。例如，你可以使用开始通知来设置一些相关的状态信息，并使用相应的结束通知来拆除该状态。
+
+&emsp;有两种不同的方式可以通知动画状态：
+
++ 使用 `setCompletionBlock:` 方法向当前事务添加完成 block。当事务中的所有动画完成时，事务将执行完成 block。
++ 将代理指定给 CAAnimation 对象并实现 `animationDidStart:` 和 `animationDidStop:finished:` 委托方法。
+
+&emsp;如果要将两个动画链接在一起，以便一个动画在另一个动画完成时启动，请不要使用动画通知。相反，请使用动画对象的 beginTime 属性在所需时间启动每个对象。要将两个动画链接在一起，请将第二个动画的开始时间设置为第一个动画的结束时间。有关动画和计时值的详细信息，请参见  Customizing the Timing of an Animation。
+### How to Animate Layer-Backed Views（如何对 Layer-Backed Views 进行动画处理）
+&emsp;如果 layer 属于 layer-backed view，建议使用 UIKit 或 AppKit 提供的基于 view 的动画接口来创建动画。有一些方法可以直接使用 Core Animation 接口设置 layer 的动画，但是如何创建这些动画取决于目标平台。
+#### Rules for Modifying Layers in iOS（在 iOS 中修改图层的规则）
+&emsp;因为 iOS view 总是有一个 underlying layer，UIView 类本身直接从 layer 对象派生出它的大部分数据。因此，对 layer 所做的更改也会自动反映在 view 对象中。此行为意味着你可以使用 Core Animation 或 UIView 接口进行更改。
+
+&emsp;如果要使用 Core Animation 类来启动动画，则必须从基于 view 的动画块内部发出所有 Core Animation 调用。UIView 类在默认情况下禁用 layer 动画，但在动画块中重新启用它们。因此，在动画块之外所做的任何更改都不会设置动画。清单 3-5 展示了一个如何隐式更改 layer 的不透明度（opacity）和显式更改 layer 位置的示例。在本例中，myNewPosition 变量预先计算并由块捕获。两个动画同时开始，但不透明度动画以默认计时运行，而位置动画以其动画对象中指定的计时运行。
+
+&emsp;Listing 3-5  Animating a layer attached to an iOS view（动画附加到 iOS 视图的图层）
+```c++
+[UIView animateWithDuration:1.0 animations:^{
+   // Change the opacity implicitly.
+   myView.layer.opacity = 0.0;
+ 
+   // Change the position explicitly.
+   CABasicAnimation* theAnim = [CABasicAnimation animationWithKeyPath:@"position"];
+   theAnim.fromValue = [NSValue valueWithCGPoint:myView.layer.position];
+   theAnim.toValue = [NSValue valueWithCGPoint:myNewPosition];
+   theAnim.duration = 3.0;
+   [myView.layer addAnimation:theAnim forKey:@"AnimateFrame"];
+}];
+```
+#### Rules for Modifying Layers in OS X（在 OS X 中修改图层的规则）
+&emsp;要为 OS X 中的 layer-backed view 制作动画变化，最好使用视图本身的接口。如果有的话，很少应该直接修改附加到你的 layer-backed 的 NSView 对象之一的层。 AppKit 负责创建和配置这些 layer 对象，并在你的应用运行时对其进行管理。修改 layer 可能导致其与 view 对象不同步，并可能导致意外结果。对于 layer-backed view，你的代码绝对不能修改 layer 对象的以下任何属性：
+
++ anchorPoint
++ bounds
++ compositingFilter
++ filters
++ frame
++ geometryFlipped
++ hidden
++ position
++ shadowColor
++ shadowOffset
++ shadowOpacity
++ shadowRadius
++ transform
+
+> &emsp;Important: 前面的限制不适用于 layer-hosting views。如果创建了 layer 对象并手动将其与 view 关联，则负责修改该 layer 的属性并使相应的 view 对象保持同步。
+
+&emsp;默认情况下，AppKit 为其 layer-backed views 禁用隐式动画。view 的 animator 代理对象会自动为你重新启用隐式动画。如果要直接设置 layer 属性的动画，还可以通过将当前 NSAnimationContext 对象的 allowsImplicitation 属性更改为 YES，以编程方式重新启用隐式动画。同样，你应该仅对不在上一列表中的可设置动画的属性执行此操作。
+#### Remember to Update View Constraints as Part of Your Animation（切记在动画中更新视图约束）
+&emsp;如果使用基于约束的布局规则来管理 view 的位置，则在配置该动画时，必须删除所有可能干扰动画的约束。约束会影响你对 view 的位置或大小所做的任何更改。它们还影响 view 及其子 view 之间的关系。如果要对这些项目中的任何一项进行动画处理，则可以删除约束，进行更改，然后应用所需的新约束。
+
+&emsp;有关约束以及如何使用约束管理 view 布局的更多信息，请参见 Auto Layout Guide。
+## Building a Layer Hierarchy（建立图层层次结构）
+&emsp;在大多数情况下，在应用中使用 layer 的最佳方法是将其与 view 对象结合使用。但是，有时你可能需要通过向其添加其他 layer 对象来增强 view 层次结构。这样做可能会使用 layer，以提供更好的性能，或者使你实现仅使用 view 很难实现的功能。在这些情况下，你需要了解如何管理你创建的 layer 层次结构。
+
+> &emsp;Important: 在 OS X v10.8 及更高版本中，建议你尽量减少对 layer 层次结构的使用，而只使用 layer-backed views。在该版本的 OS X 中引入的 layer 重绘策略允许你自定义 layer-backed views 的行为，并且仍然可以获得以前使用独立 layer 可能获得的性能。
+### Arranging Layers into a Layer Hierarchy
+&emsp;layer 层次结构在许多方面类似于 view 层次结构。你将一 layer 嵌入另一 layer 内，以在要嵌入的 layer（称为 sublayer）和父 layer（称为 superlayer）之间创建 parent-child 关系。这种亲子关系影响 sublayer 的各个方面。例如，其内容位于其父对象的内容之上，其位置是相对于其父对象的坐标系指定的，并且它受到应用于父对象的任何变换的影响。
+#### Adding, Inserting, and Removing Sublayers（添加、插入和删除子层）
+&emsp;每个 layer 对象都有添加、插入和删除 sublayer 的方法。表 4-1 总结了这些方法及其行为。
+
+&emsp;Table 4-1  Methods for modifying the layer hierarchy（修改图层层次结构的方法）
+| Behavior | Methods | Description |
+| --- | --- | --- |
+| Adding layers | addSublayer: | 向当前图层添加一个新的子图层对象。子层将添加到该层的子层列表的末尾。这将导致子层出现在其 zPosition 属性中具有相同值的所有同级对象的顶部。 |
+| Inserting layers | insertSublayer:above:
+insertSublayer:atIndex:
+insertSublayer:below: | 将子层插入到指定索引处或相对于另一个子层的位置的子层层次结构中。在其他子图层上方或下方插入时，你仅在子图层数组中指定子图层的位置。图层的实际可见性主要取决于其 zPosition 属性中的值，其次取决于其在 sublayers 数组中的位置。 |
+| Removing layers | removeFromSuperlayer | 从其父层移除子层。 |
+| Exchanging layers | replaceSublayer:with: | 将一个子层交换为另一个。如果要插入的子层已经在另一个层层次结构中，则首先将其从该层次结构中删除。 |
+
+&emsp;在处理自己创建的 layer 对象时，可以使用上述方法。你不会使用这些方法来排列属于 layer-backed views 的层。但是，layer-backed views 可以充当你自己创建的独立 layer 的父级。
+#### Positioning and Sizing Sublayers（定位和调整子层大小）
+&emsp;添加和插入子 layer 时，必须先设置子 layer 的大小和位置，然后该子 layer 才会出现在屏幕上。将子 layer 添加到 layer 层次结构后，可以修改其大小和位置，但是在创建 layer 时应该养成设置这些值的习惯。
+
+&emsp;你可以使用 bounds 属性设置子 layer 的大小，并使用 position 属性设置其在其上 layer 中的位置。bounds 矩形的原点几乎总是（0，0），其大小是你想要的以磅为单位指定的 layer 的大小。 position 属性中的值是相对于 layer 的锚点来解释的，默认情况下，该锚点位于 layer 的中心。如果不为这些属性分配值，则 Core Animation 会将 layer 的初始宽度和高度设置为 0，并将位置设置为（0，0）。
+
+```c++
+myLayer.bounds = CGRectMake(0, 0, 100, 100);
+myLayer.position = CGPointMake(200, 200);
+```
+&emsp;Important: 始终对 layer 的宽度和高度使用整数。
+#### How Layer Hierarchies Affect Animations（图层层次如何影响动画）
+&emsp;某些 superlayer 属性可以影响应用于其子 layer 的任何动画的行为。其中一个属性是 speed 属性，它是动画速度的倍增。默认情况下，此属性的值设置为 1.0，但将其更改为 2.0 会导致动画以两倍于其原始速度运行，从而在一半时间内完成。此属性不仅影响为其设置的 layer，而且还影响该 layer 的子 layer。这种变化也是倍增的。如果子 layer 及其 superlayer 的 speed 都为 2.0，则子 layer 上的动画将以其原始速度的 **四倍** 运行。
+
+&emsp;其他大多数 layer 更改都会以可预测的方式影响任何包含的子 layer。例如，将旋转变换应用于 layer 会旋转该 layer 及其所有子 layer。同样，更改 layer 的不透明度会更改其子 layer 的不透明度。更改 layer 大小时，请遵循 Adjusting the Layout of Your Layer Hierarchies。
+### Adjusting the Layout of Your Layer Hierarchies（调整图层层次结构的布局）
+&emsp;Core Animation 支持多种选项，可根据子 layer 的更改来调整子 layer 的大小和位置。在 iOS 中，普遍使用 layer-backed views 使创建 layer 层次结构的重要性降低。仅支持手动布局更新。对于 OS X，可以使用其他几个选项，这些选项使管理 layer 层次结构更加容易。
+
+&emsp;仅当使用创建的独立图层对象构建图层层次结构时，图层级别的布局才有意义。如果你应用的图层均与视图相关联，请使用基于视图的布局支持来更新视图的大小和位置以响应更改。
+#### Using Constraints to Manage Your Layer Hierarchies in OS X（在 OS X 中使用约束来管理你的层层次结构）
+&emsp;约束使你可以使用 layer 及其上层或同级层之间的一组详细关系来指定 layer 的位置和大小。定义约束需要执行以下步骤：
+
+1. 创建一个或多个 CAConstraint 对象。使用这些对象定义约束参数。
+2. 将约束对象添加到它们修改其属性的层。
+3. 检索共享的 CAConstraintLayoutManager 对象并将其分配给最接近的 superlayer。
+
+&emsp;图4-1 显示了可用于定义约束的属性以及它们影响的 layer 的外观。你可以使用约束基于其中点边缘相对于另一层的位置来更改该层的位置。你也可以使用它们来更改图层的大小。你所做的更改可以与上层成比例或相对于另一层。你甚至可以将比例因子或常数添加到结果更改中。这种额外的灵活性使得可以使用一组简单的规则非常精确地控制图层的大小和位置。
+
+&emsp;Figure 4-1  Constraint layout manager attributes（约束布局管理器属性）
+
+![ca_constraint](https://p9-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/e43aef4f870b4619837bb190c11f3d34~tplv-k3u1fbpfcp-watermark.image)
+
+&emsp;每个约束对象都沿同一轴封装两个图层之间的一个几何关系。每个轴最多可以分配两个约束对象，正是这两个约束确定了哪个属性是可更改的。例如，如果你为图层的左右边缘指定约束，则图层的大小会更改。如果你为图层的左边缘和宽度指定约束，则图层右边缘的位置会更改。如果你为某个图层的边缘指定了一个约束，则 Core Animation 会创建一个隐式约束，该约束将图层的大小固定在给定的尺寸上。
+
+&emsp;创建约束时，必须始终指定三项信息：
++ 要约束的 layer 的 aspect
++ 用作参照的 layer
++ 用于比较的参照 layer 的 aspect
+
+&emsp;清单4-1 显示了一个简单的约束，该约束将 layer 的垂直中点固定到其上层的垂直中点。当引用 superlayer 时，请使用字符串 superlayer。此字符串是保留用于引用 superlayer 的特殊名称。使用它可以消除指向该 layer 的指针或知道该 layer 名称的麻烦。它还允许你更改 superlayer 并使约束自动应用于新的父级。 （在创建与同级图层有关的约束时，必须使用其 name 属性标识同级图层。）
+
+&emsp;Listing 4-1  Defining a simple constraint
+```c++
+[myLayer addConstraint:[CAConstraint constraintWithAttribute:kCAConstraintMidY relativeTo:@"superlayer" attribute:kCAConstraintMidY]];
+```
+&emsp;若要在运行时应用约束，必须将共享的 CAConstraintLayoutManager 对象附加到直接上层。每层负责管理其子层的布局。将布局管理器分配给父级告诉 Core Animation 应用其子级定义的约束。布局管理器对象自动应用约束。将其分配给父层后，不必告诉它更新布局。
+
+&emsp;要查看约束在特定情况下如何工作，请考虑图 4-2。在此示例中，design 要求 layerA 的宽度和高度保持不变，并且 layerA 保持在其上层内部居中。另外，B层的宽度必须与A层的宽度匹配，B层的顶边缘必须保持在A层的底边缘下方 10 个点，B层的底边缘必须保持在上层的底边缘上方 10 个点。清单 4-2 显示了用于创建此示例的子层和约束的代码。
+
+&emsp;Figure 4-2  Example constraints based layout
+
+![constraintsManagerExample](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/e8028b7051184c84b6798dcc0611da13~tplv-k3u1fbpfcp-watermark.image)
+
+&emsp;Listing 4-2  Setting up constraints for your layers
+```c++
+// Create and set a constraint layout manager for the parent layer.
+theLayer.layoutManager=[CAConstraintLayoutManager layoutManager];
+ 
+// Create the first sublayer.
+CALayer *layerA = [CALayer layer];
+layerA.name = @"layerA";
+layerA.bounds = CGRectMake(0.0,0.0,100.0,25.0);
+layerA.borderWidth = 2.0;
+ 
+// Keep layerA centered by pinning its midpoint to its parent's midpoint.
+[layerA addConstraint:[CAConstraint constraintWithAttribute:kCAConstraintMidY
+                                                 relativeTo:@"superlayer"
+                                                  attribute:kCAConstraintMidY]];
+[layerA addConstraint:[CAConstraint constraintWithAttribute:kCAConstraintMidX
+                                                 relativeTo:@"superlayer"
+                                                  attribute:kCAConstraintMidX]];
+[theLayer addSublayer:layerA];
+ 
+// Create the second sublayer
+CALayer *layerB = [CALayer layer];
+layerB.name = @"layerB";
+layerB.borderWidth = 2.0;
+ 
+// Make the width of layerB match the width of layerA.
+[layerB addConstraint:[CAConstraint constraintWithAttribute:kCAConstraintWidth
+                                                 relativeTo:@"layerA"
+                                                  attribute:kCAConstraintWidth]];
+ 
+// Make the horizontal midpoint of layerB match that of layerA
+[layerB addConstraint:[CAConstraint constraintWithAttribute:kCAConstraintMidX
+                                                 relativeTo:@"layerA"
+                                                  attribute:kCAConstraintMidX]];
+ 
+// Position the top edge of layerB 10 points from the bottom edge of layerA.
+[layerB addConstraint:[CAConstraint constraintWithAttribute:kCAConstraintMaxY
+                                                 relativeTo:@"layerA"
+                                                  attribute:kCAConstraintMinY
+                                                     offset:-10.0]];
+ 
+// Position the bottom edge of layerB 10 points
+//  from the bottom edge of the parent layer.
+[layerB addConstraint:[CAConstraint constraintWithAttribute:kCAConstraintMinY
+                                                 relativeTo:@"superlayer"
+                                                  attribute:kCAConstraintMinY
+                                                     offset:+10.0]];
+ 
+[theLayer addSublayer:layerB];
+```
+&emsp;清单 4-2 需要注意的一件有趣的事情是，代码从不明确设置 layerB 的大小。由于定义了约束，因此每次更新布局时都会自动设置 layerB 的宽度和高度。因此，不需要使用 bounds 矩形设置大小。
+
+> &emsp;Warning: 创建约束时，不要在约束之间创建循环引用。循环约束使得无法计算所需的布局信息。当遇到这种循环引用时，布局行为是未定义的。
+
+#### Setting Up Autoresizing Rules for Your OS X Layer Hierarchies（为 OS X 层层次结构设置自动调整大小规则）
+&emsp;自动调整大小规则是在 OS X 中调整层的大小和位置的另一种方法。使用自动调整大小规则，可以指定层的边与 superlayer 的相应边之间应保持固定距离还是可变距离。同样，你可以指定图层的宽度或高度是固定的还是可变的。关系总是在层和它的 superlayer 之间。不能使用自动调整大小规则指定同级层之间的关系。
+
+&emsp;要设置图层的自动调整大小规则，必须为图层的 autoresizingMask 特性指定适当的常量。默认情况下，层被配置为具有固定的宽度和高度。在布局过程中，层的精确大小和位置由 Core Animation 自动计算，并涉及基于许多因素的一组复杂计算。核心动画在要求你的代理执行任何手动布局更新之前应用自动调整大小行为，因此你可以根据需要使用代理调整自动调整大小布局的结果。
+#### Manually Laying Out Your Layer Hierarchies（手动布置图层层次结构）
+&emsp;在 iOS 和 OS X 上，可以通过在 superlayer 的委托对象上实现 `layoutSublayersOfLayer:` 方法来手动处理布局。你可以使用该方法来调整当前嵌入在图层中的任何子图层的大小和位置。进行手动布局更新时，由你来执行必要的计算以放置每个子层。
+
+&emsp;如果要实现自定义图层子类，则你的子类可以覆盖 `layoutSublayers` 方法，并使用该方法（而不是委托）来处理所有布局任务。仅在需要完全控制自定义图层类中子图层的位置的情况下，才应覆盖此方法。替换默认实现可防止Core Animation 在 OS X 上应用约束或自动调整大小规则。
+### Sublayers and Clipping（子层和裁剪）
+&emsp;与 view 不同，superlayer 不会自动裁剪位于其 bounds 矩形之外的子图层的内容。相反，默认情况下，superlayer 允许其子层完整显示。但是，可以通过将图层的 masksToBounds 属性设置为 YES 来重新启用剪切。
+
+&emsp;图层的剪贴蒙版的形状包括该图层的圆角半径（如果已指定）。图 4-3 显示了一个图层，该图层演示了 masksToBounds 属性如何影响带有圆角的图层。如果将该属性设置为 NO，则子图层将完整显示，即使它们超出其父图层的范围也是如此。将该属性更改为 YES 将导致其内容被剪切。
+
+&emsp;Figure 4-3  Clipping sublayers to the parent’s bounds（将子图层剪切到父对象的边界）
+
+![clipping](https://p1-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/1e12eee3f2ec4cf2a872bb9e43d97521~tplv-k3u1fbpfcp-watermark.image)
+
+### Converting Coordinate Values Between Layers（在图层之间转换坐标值）
+&emsp;有时，你可能需要将一 layer 中的坐标值转换为另一 layer 中相同屏幕位置的坐标值。 CALayer 类提供了一组可用于此目的的简单转换 routines：
+
++ convertPoint:fromLayer:
++ convertPoint:toLayer:
++ convertRect:fromLayer:
++ convertRect:toLayer:
+
+&emsp;除了转换点和矩形值外，还可以使用 `convertTime:fromLayer:` 和 `convertTime:toLayer:` 方法在图层之间转换时间值。每一层都定义了自己的本地时间空间，并使用该时间空间将动画的开始和结束与系统的其余部分进行同步。这些时间空间默认情况下是同步的。但是，如果你更改一组图层的动画速度，则这些图层的时间空间会相应更改。你可以使用时间转换方法来说明所有此类因素，并确保两层的时间同步。
+
+## Advanced Animation Tricks（高级动画技巧）
+&emsp;有很多方法可以配置基于属性的动画或关键帧动画，以为你做更多的事情。需要一起或顺序执行多个动画的应用可以使用更高级的行为来同步这些动画的时间或将它们链接在一起。你还可以使用其他类型的动画对象来创建视觉过渡和其他有趣的动画效果。
+### Transition Animations Support Changes to Layer Visibility（过渡动画支持对图层可见性的更改）
+&emsp;顾名思义，过渡动画对象为图层创建了动画的视觉过渡。过渡对象最常见的用途是以一种协调的方式为一层的外观和另一层的消失设置动画。与基于属性的动画不同，在动画中，动画会更改图层的一个属性，而过渡动画会操纵图层的缓存图像来创建视觉效果，而仅通过更改属性就很难或不可能做到。标准的过渡类型可让你执行显示、推动、移动或淡入淡出动画。在 OS X 上，你还可以使用 Core Image 滤镜创建使用其他类型的效果（例如划像，页面卷曲，波纹或你设计的自定义效果）的过渡。
+
+&emsp;要执行 transition 动画，请创建 CATTransition 对象并将其添加到过渡中涉及的层。使用 transition 对象指定要执行的过渡类型以及过渡动画的起点和终点。也不需要使用整个过渡动画。通过过渡对象，可以指定设置动画时要使用的开始和结束进度值。通过这些值，可以在动画的中点开始或结束动画。
+
+&emsp;清单 5-1 显示了用于在两个视图之间创建动画 push transition 的代码。在该示例中，myView1 和 myView2 都位于同一父视图中的同一位置，但是当前仅 myView1 是可见的。按下过渡会使 myView1 向左滑动并淡入淡出，直到它被隐藏，而 myView2 从右侧滑入并变为可见。更新两个视图的 hidden 属性可确保在动画结束时两个视图的可见性正确。
+
+&emsp;Listing 5-1  Animating a transition between two views in iOS（动画 iOS 中两个视图之间的过渡）
+```c++
+CATransition* transition = [CATransition animation];
+transition.startProgress = 0;
+transition.endProgress = 1.0;
+transition.type = kCATransitionPush;
+transition.subtype = kCATransitionFromRight;
+transition.duration = 1.0;
+ 
+// Add the transition animation to both layers
+[myView1.layer addAnimation:transition forKey:@"transition"];
+[myView2.layer addAnimation:transition forKey:@"transition"];
+ 
+// Finally, change the visibility of the layers.
+myView1.hidden = YES;
+myView2.hidden = NO;
+```
+&emsp;当同一 transition 中涉及两个 layer 时，可以对这两个 layer 使用相同的 transition 对象。使用相同的 transition 对象也简化了必须编写的代码。但是，可以使用不同的 transition 对象，如果每个 layer 的 transition 参数不同，则肯定需要这样做。
+
+&emsp;清单 5-2 显示了如何使用 Core Image filter 在 OS X 上实现过渡效果。在为 filter 配置了所需的参数之后，将其分配给 transition 对象的 filter 属性。此后，应用动画的过程与其他类型的动画对象相同。
+
+&emsp;Listing 5-2  Using a Core Image filter to animate a transition on OS X（使用 Core Image 过滤器为 OS X 上的过渡设置动画）
+```c++
+// Create the Core Image filter, setting several key parameters.
+CIFilter* aFilter = [CIFilter filterWithName:@"CIBarsSwipeTransition"];
+[aFilter setValue:[NSNumber numberWithFloat:3.14] forKey:@"inputAngle"];
+[aFilter setValue:[NSNumber numberWithFloat:30.0] forKey:@"inputWidth"];
+[aFilter setValue:[NSNumber numberWithFloat:10.0] forKey:@"inputBarOffset"];
+ 
+// Create the transition object
+CATransition* transition = [CATransition animation];
+transition.startProgress = 0;
+transition.endProgress = 1.0;
+transition.filter = aFilter;
+transition.duration = 1.0;
+ 
+[self.imageView2 setHidden:NO];
+[self.imageView.layer addAnimation:transition forKey:@"transition"];
+[self.imageView2.layer addAnimation:transition forKey:@"transition"];
+[self.imageView setHidden:YES];
+```
+> &emsp;Note: 在动画中使用 Core Image filters 时，最棘手的部分是配置 filter 。例如，对于 bar swipe 过渡，指定过高或过低的输入角度可能会使其看起来好像没有发生过渡。如果没有看到预期的动画，请尝试将 filter 参数调整为不同的值，以查看这是否会更改结果。
+
+### Customizing the Timing of an Animation（自定义动画的时间）
+&emsp;Timing 是动画的重要组成部分，使用 Core Animation 可以通过 CAMediaTiming 协议的方法和属性为动画指定精确的定时信息。两个核心动画类采用此协议。 CAAnimation 类采用它，以便你可以在动画对象中指定计时信息。 CALayer 也采用了它，因此你可以为隐式动画配置一些与时间相关的功能，尽管包装那些动画的隐式事务对象通常会提供优先的默认时间信息。
+
+&emsp;在考虑 timing 和 animations 时，重要的是了解 layer 对象如何随时间工作。每个 layer 都有自己的本地时间，用于管理动画时间。通常，两个不同层的本地时间足够接近，你可以为每个层指定相同的时间值，并且用户可能不会注意到任何事情。但是，层的本地时间可以通过其父层或自己的时序参数进行修改。例如，更改图层的 speed 属性会导致该图层（及其子图层）上的动画持续时间按比例更改。
+
+&emsp;为了帮助你确保时间值适合给定的图层，CALayer 类定义了 `convertTime:fromLayer:` 和 `convertTime:toLayer:` 方法。你可以使用这些方法将固定时间值转换为图层的本地时间，或将时间值从一层转换为另一层。这些方法考虑了可能影响该图层本地时间的媒体计时属性，并返回了可与其他图层一起使用的值。清单 5-3 显示了一个示例，你应定期使用该示例来获取图层的当前本地时间。 CACurrentMediaTime 函数是一种便捷函数，它返回计算机的当前时钟时间，该方法将采用该时间并将其转换为图层的本地时间。
+
+&emsp;Listing 5-3  Getting a layer’s current local time（获取图层的当前本地时间）
+```c++
+CFTimeInterval localLayerTime = [myLayer convertTime:CACurrentMediaTime() fromLayer:nil];
+```
+&emsp;在图层的本地时间获得时间值后，就可以使用该值来更新动画对象或图层的与时间相关的属性。使用这些计时属性，你可以实现一些有趣的动画行为，包括：
++ 使用 beginTime 属性设置动画的开始时间。通常，动画在下一个更新周期中开始。可以使用 beginTime 参数将动画开始时间延迟几秒。将两个动画链接在一起的方法是将一个动画的开始时间设置为与另一个动画的结束时间匹配。
+  如果延迟动画的开始，可能还需要将 fillMode 属性设置为 kCAFillModeBackwards。此填充模式使层显示动画的开始值，即使层树中的层对象包含不同的值。如果没有此填充模式，你将看到在动画开始执行之前跳转到最终值。其他填充模式也可用。
++ autoreverses 属性使动画在指定的持续时间内执行，然后返回到动画的起始值。可以将此属性与 repeatCount 属性结合起来，在开始值和结束值之间来回设置动画。将自动反转动画的重复计数设置为整数（例如 1.0）会导致动画在其起始值停止。添加额外的半步（例如重复计数为 1.5）会导致动画在其结束值处停止。
++ 对组动画使用 timeOffset 属性可以在比其他动画晚的时间启动某些动画。
+
+### Pausing and Resuming Animations
+&emsp;要暂停动画，你可以利用图层采用 CAMediaTiming 协议并将图层动画的速度设置为 0.0 的事实。将速度设置为零会暂停动画，直到你将值更改回非零值为止。清单 5-4 给出了一个简单的示例，说明如何稍后暂停和恢复动画。
+
+&emsp;Listing 5-4  Pausing and resuming a layer’s animations（暂停和恢复图层的动画）
+```c++
+-(void)pauseLayer:(CALayer*)layer {
+   CFTimeInterval pausedTime = [layer convertTime:CACurrentMediaTime() fromLayer:nil];
+   layer.speed = 0.0;
+   layer.timeOffset = pausedTime;
+}
+ 
+-(void)resumeLayer:(CALayer*)layer {
+   CFTimeInterval pausedTime = [layer timeOffset];
+   layer.speed = 1.0;
+   layer.timeOffset = 0.0;
+   layer.beginTime = 0.0;
+   CFTimeInterval timeSincePause = [layer convertTime:CACurrentMediaTime() fromLayer:nil] - pausedTime;
+   layer.beginTime = timeSincePause;
+}
+```
+### Explicit Transactions Let You Change Animation Parameters（显式事务可让你更改动画参数）
+&emsp;对图层所做的每一个更改都必须是事务的一部分。CATransaction 类管理动画的创建和分组，并在适当的时间执行动画。在大多数情况下，你不需要创建自己的事务。无论何时向某个层添加显式或隐式动画，Core Animation 都会自动创建隐式事务。但是，你也可以创建显式事务来更精确地管理这些动画。
+
+&emsp;你可以使用 CATransaction 类的方法创建和管理事务。要开始（并隐式地创建）新事务，请调用 begin 类方法。要结束该事务，请调用 commit 类方法。在这些调用之间是要包含在事务中的更改。例如，要更改图层的两个属性，可以使用清单 5-5 中的代码。
+
+&emsp;Listing 5-5  Creating an explicit transaction
+```c++
+[CATransaction begin];
+theLayer.zPosition=200.0;
+theLayer.opacity=0.0;
+[CATransaction commit];
+```
+&emsp;使用事务的主要原因之一是，在显式事务的范围内，可以更改持续时间、计时函数和其他参数。你还可以为整个事务分配一个完成 block，以便在动画组完成时通知你的应用程序。更改动画参数需要使用 `setValue:forKey:` 方法。例如，要将默认持续时间更改为 10 秒，你需要更改 kCATransactionAnimationDuration 键，如清单 5-6 所示。
+
+&emsp;Listing 5-6  Changing the default duration of animations（更改动画的默认持续时间）
+```c++
+[CATransaction begin];
+[CATransaction setValue:[NSNumber numberWithFloat:10.0f] forKey:kCATransactionAnimationDuration];
+// Perform the animations
+[CATransaction commit];
+```
+&emsp;在希望为不同的动画集提供不同的默认值的情况下，可以嵌套事务。要将一个事务嵌套在另一个事务中，只需再次调用 `begin` 类方法。每个 `begin` 调用必须与 `commit` 方法的相应调用相匹配。只有在提交最外层事务的更改之后，Core Animation 才会开始关联的动画。
+
+&emsp;清单 5-7 显示了一个嵌套在另一个事务中的事务的示例。在本例中，内部事务更改与外部事务相同的动画参数，但使用不同的值。
+
+&emsp;Listing 5-7  Nesting explicit transactions
+```c++
+[CATransaction begin]; // Outer transaction
+ 
+// Change the animation duration to two seconds
+[CATransaction setValue:[NSNumber numberWithFloat:2.0f]
+                forKey:kCATransactionAnimationDuration];
+// Move the layer to a new position
+theLayer.position = CGPointMake(0.0,0.0);
+ 
+[CATransaction begin]; // Inner transaction
+// Change the animation duration to five seconds
+[CATransaction setValue:[NSNumber numberWithFloat:5.0f]
+                 forKey:kCATransactionAnimationDuration];
+ 
+// Change the zPosition and opacity
+theLayer.zPosition=200.0;
+theLayer.opacity=0.0;
+ 
+[CATransaction commit]; // Inner transaction
+ 
+[CATransaction commit]; // Outer transaction
+```
+### Adding Perspective to Your Animations（为动画添加透视图）
+&emsp;应用程序可以在三个空间维度上操纵图层，但为简单起见，Core Animation 使用平行投影来显示图层，该投影实质上将场景展平为二维平面。此默认行为会导致具有相同 zPosition 值的大小相同的图层显示为相同的大小，即使它们在 z 轴上相距很远也是如此。你通常可以从三个维度查看此类场景的透视图（perspective）已消失。但是，你可以通过修改图层的转换矩阵以包括透视图（perspective）信息来更改该行为。
+
+&emsp;修改场景的透视图（perspective）时，需要修改包含正在查看的图层的 superlayer 的 sublayerTransform 矩阵。通过对所有子层应用相同的透视图信息，修改 superlayer 可简化你必须编写的代码。它还确保将透视图正确地应用于在不同平面中彼此重叠的同级子层。
+
+&emsp;清单5-8 显示了为 parent layer 创建简单的透视变换（perspective transform）的方法。在这种情况下，自定义 eyePosition 变量指定沿 z 轴查看图层的相对距离。通常，你为 eyePosition 指定一个正值，以使图层保持预期的方向。较大的值会导致场景更平整，而较小的值会导致图层之间更明显的视觉差异。
+
+&emsp;Listing 5-8  Adding a perspective transform to a parent layer（向父图层添加透视变换）
+```c++
+CATransform3D perspective = CATransform3DIdentity;
+perspective.m34 = -1.0/eyePosition;
+ 
+// Apply the transform to a parent layer.
+myParentLayer.sublayerTransform = perspective;
+```
+&emsp;配置了 parent layer 后，你可以更改任何 child layers 的 zPosition 属性，并根据它们与 eye position 的相对距离来观察其大小如何变化。
+## Changing a Layer’s Default Behavior（更改图层的默认行为）
+&emsp;Core Animation 使用 action 对象实现 layer 的隐式动画行为。action 对象是符合 CAAction 协议并定义要在 layer 上执行的一些相关行为的对象。所有 CAAnimation 对象都实现了该协议，并且通常是这些对象被指定在图层属性更改时执行。
+
+&emsp;动画属性是 action 的一种，但是你可以定义具有几乎任何所需行为的 action。不过，为此，你必须定义 action 对象并将其与应用程序的 layer 对象相关联。
+### Custom Action Objects Adopt the CAAction Protocol（自定义 Action 对象采用 CAAction 协议）
+&emsp;要创建自己的 action 对象，请从你的一个类中采用 CAAction 协议，并实现 `runActionForKey:object:arguments:` 方法。在该方法中，使用可用信息来执行要在 layer 上执行的任何 action。你可以使用该方法将动画对象添加到 layer，也可以使用它执行其他任务。
+
+&emsp;定义 action 对象时，必须决定如何触发该 action。一个 action 的触发器定义了你以后用来注册该动作的 key。可以通过以下任意一种情况触发 action 对象：
+
++ layer 属性之一的值已更改。这可以是 layer 的任何属性，而不仅仅是可设置动画的属性。（也可以将动作与添加到图层的自定义属性相关联。）标识此 action 的键是属性的名称。
++ layer 变为可见或已添加到 layer 层次结构中。识别此 action 的 key 是 kCAOnOrderIn。
++ layer 已从 layer 层次结构中删除。识别此 action 的 key 是 kCAOnOrderOut。
++ layer 即将参与 transition 动画。识别此 action 的 key 是 kCATransition。
+
+### Action Objects Must Be Installed On a Layer to Have an Effect（action 对象必须安装在层上才能生效）
+&emsp;在可以执行 action 之前，该 layer 需要找到要执行的相应 action 对象。与 layer 相关的 action 的 key 是要修改的属性的名称或标识 action 的特殊字符串。当 layer 上发生适当的事件时，layer 将调用其 `actionForKey:` 方法来搜索与 key 关联的 action 对象。在此搜索过程中，你的应用可以将自己插入多个位置，并为该 key 提供相关的 action 对象。
+
+&emsp;Core Animation 按以下顺序查找 action 对象：
+1. 如果 layer 有一个 delegate 并且该 delegate 实现了 `actionForLayer:forKey:` 方法，layer 调用该方法。delegate 必须执行以下操作之一：
+  + 返回给定 key 的 action 对象。
+  + 返回 nil，如果它不处理该 action，则继续搜索。
+  + 返回 NSNull 对象，在这种情况下，搜索立即结束。
+2. layer 在 layer 的 actions 字典中查找给定的 key。
+3. layer 在 style 字典中查找包含 key 的 actions 字典。（换句话说，style 字典包含一个 actions 键，其值也是字典。layer 在第二个字典中查找给定的 key。）
+4. layer 调用 defaultActionForKey: 类方法。
+5. layer 执行由 Core Animation 定义的隐式动作（如果有）。
+
+&emsp;如果在任何适当的搜索点提供 action 对象，则 layer 将停止其搜索并执行返回的 action 对象。找到 action 对象后，该 layer 会调用该对象的 `runActionForKey:object:arguments:` 方法来执行该 action。如果你为给定 key 定义的 action 已经是 CAAnimation 类的实例，则可以使用该方法的默认实现来执行动画。如果你要定义自己的符合 CAAction 协议的自定义对象，则必须使用该方法的对象实现来执行适当的操作。
+
+&emsp;action 对象的安装位置取决于你打算如何修改 layer。
+
++ 对于可能仅在特定情况下应用的 actions，或者对于已使用 delegate 对象的 layer，请提供 delegate 并实现其 `actionForLayer:forKey:` 方法。
++ 对于通常不使用 delegate 的 layer 对象，请将 action 添加到 layer 的 actions 字典中。
++ 对于与在 layer 对象上定义的自定义属性相关的 action，请将该 action 包含在 layer 的 style 字典中。
++ 对于对 layer 的行为至关重要的 action，请对 layer 进行子类化并重写 `defaultActionForKey:` 方法。
+
+&emsp;清单 6-1 显示了用于提供 action 对象的 delegate 方法的实现。在这种情况下，delegate 将查找对 layer 的 contents 属性的更改，并使用 transition 动画将新内容交换到位。
+
+&emsp;Listing 6-1  Providing an action using a layer delegate object（使用图层委托对象提供动作）
+```c++
+- (id<CAAction>)actionForLayer:(CALayer *)theLayer forKey:(NSString *)theKey {
+    CATransition *theAnimation=nil;
+ 
+    if ([theKey isEqualToString:@"contents"]) {
+ 
+        theAnimation = [[CATransition alloc] init];
+        theAnimation.duration = 1.0;
+        theAnimation.timingFunction = [CAMediaTimingFunction functionWithName:kCAMediaTimingFunctionEaseIn];
+        theAnimation.type = kCATransitionPush;
+        theAnimation.subtype = kCATransitionFromRight;
+    }
+    return theAnimation;
+}
+```
+### Disable Actions Temporarily Using the CATransaction Class（使用 CATransaction 类暂时禁用操作）
+&emsp;你可以使用 CATransaction 类暂时禁用 layer action。更改 layer 的属性时，Core Animation 通常会创建一个隐式事务对象以使更改动起来。如果不想为更改设置动画，则可以通过创建显式事务并将其 kCATransactionDisableActions 属性设置为 true 来禁用隐式动画。清单 6-2 显示了一段代码片段，当从 layer 树中删除指定的 layer 时，该片段将禁用动画。
+
+&emsp;Listing 6-2  Temporarily disabling a layer’s actions（暂时停用图层操作）
+```c++
+[CATransaction begin];
+[CATransaction setValue:(id)kCFBooleanTrue forKey:kCATransactionDisableActions];
+[aLayer removeFromSuperlayer];
+[CATransaction commit];
+```
+&emsp;有关使用 transaction 对象管理动画行为的更多信息，请参见 Explicit Transactions Let You Change Animation Parameters。
+## Improving Animation Performance（改善动画效果）
+&emsp;Core Animation 是提高 app-based 的动画帧速率的好方法，但它的使用并不能保证性能的提高。尤其是在 OS X 中，你仍然必须选择使用 Core Animation 行为的最有效方法。与所有与性能相关的问题一样，你应该使用工具来测量和跟踪应用程序的性能，这样你就可以确保性能正在改善，而不是倒退。
+### Choose the Best Redraw Policy for Your OS X Views（为你的 OS X 视图选择最佳重绘策略）
+&emsp;NSView 类的默认重绘策略将保留该类的原始绘制行为，即使视图是基于图层（layer-backed）的。如果你在应用程序中使用层支持（ layer-backed）的视图，则应检查重绘策略选择，然后选择为你的应用程序提供最佳性能的选择。在大多数情况下，默认策略不是最有可能提供最佳性能的策略。相反，NSViewLayerContentsRedrawOnSetNeedsDisplay 策略更有可能减少应用程序绘制的次数并提高性能。其他策略也可能为特定类型的视图提供更好的性能。
+
+&emsp;有关视图重绘策略的更多信息，请参见 The Layer Redraw Policy for OS X Views Affects Performance。
+
+### Update Layers in OS X to Optimize Your Rendering Path（更新 OS X 中的图层以优化渲染路径）
+&emsp;在 OS X v10.8 及更高版本中，视图有两个更新底层内容的选项。在 OS X v10.7 及更早版本中更新以图层为背景（layer-backed）的视图时，图层会将视图的 `drawRect:` 方法中的绘图命令捕获到背景位图图像中。缓存图形命令是有效的，但不是所有情况下最有效的选项。如果你知道如何直接提供层的内容而不实际呈现它们，那么可以使用 `updateLayer` 方法来实现。
+
+&emsp;有关渲染的不同路径（包括涉及 `updateLayer` 方法的路径）的信息，请参见 Using a Delegate to Provide the Layer’s Content。
+### General Tips and Tricks（一般提示和技巧）
+&emsp;有几种方法可以使你的图层实现更加高效。但是，与任何此类优化一样，在尝试进行优化之前，应始终测量代码的当前性能。这为你提供了一个基准，可用于确定优化是否有效。
+#### Use Opaque Layers Whenever Possible（尽可能使用不透明层）
+&emsp;将图层的 opaque 属性设置为 YES，可以使 Core Animation 知道它不需要为图层维护 Alpha 通道。没有 Alpha 通道意味着合成器不需要将图层的内容与其背景内容混合在一起，从而节省了渲染时间。但是，此属性主要与作为图层支持视图一部分的图层或 Core Animation 创建基础图层位图的情况有关。如果你直接将图像分配给图层的 content 属性，则无论 opaque 属性中的值如何，该图像的 Alpha 通道都会保留。
+#### Use Simpler Paths for CAShapeLayer Objects（为 CAShapeLayer 对象使用更简单的路径）
+&emsp;CAShapeLayer 类通过在合成时将你提供的路径渲染到位图图像中来创建其内容。优点是该层始终以最佳分辨率绘制路径，但是该优点是以增加渲染时间为代价的。如果你提供的路径很复杂，则光栅化（rasterizing）该路径可能会变得过于昂贵。而且，如果层的大小频繁更改（因此必须频繁重绘），则绘制所花费的时间可能加起来并成为性能瓶颈。
+
+&emsp;最小化 shape layers 绘制时间的一种方法是将复杂的形状分解为更简单的形状。使用更简单的路径并将多个 CAShapeLayer 对象彼此叠加在合成器中，比绘制一条大型复杂路径要快得多。这是因为绘制操作发生在 CPU 上，而合成发生在 GPU 上。但是，与这种性质的任何简化一样，潜在的性能提升取决于你的内容。因此，在优化之前测量代码的性能尤其重要，这样你就可以将基准用于比较。
+#### Set the Layer Contents Explicitly for Identical Layers（明确设置相同图层的图层内容）
+&emsp;如果要在多个图层对象中使用同一图像，请自行加载该图像并将其直接分配给那些图层对象的 content 属性。将图像分配给 contents 属性可防止该层为备份存储（backing store）分配内存。而是，图层使用你提供的图像作为备份存储（backing store）。当多个层使用同一图像时，这意味着所有这些层都共享同一内存，而不是为它们自己分配图像的副本。
+#### Always Set a Layer’s Size to Integral Values（始终将图层大小设置为整数值）
+&emsp;为了获得最佳结果，请始终将图层对象的宽度和高度设置为整数值。尽管你使用浮点数指定了图层 bounds 的宽度和高度，但最终还是使用图层 bounds 来创建位图图像。指定宽度和高度的整数值可简化 Core Animation 创建和管理备份存储以及其他图层信息所必须完成的工作。
+#### Use Asynchronous Layer Rendering As Needed（根据需要使用异步层渲染）
+&emsp;你在委托人的 `drawLayer:inContext:` 方法或视图的 `drawRect:` 方法中所做的任何绘制通常在应用程序的主线程上同步发生。但是，在某些情况下，同步绘制内容可能无法提供最佳性能。如果发现动画效果不佳，则可以尝试在图层上启用 `drawsAsynchronously` 属性，以将这些操作移至后台线程。如果这样做，请确保绘图代码是线程安全的。与往常一样，在将其放入生产代码之前，你应该始终异步测量绘图的性能。
+#### Specify a Shadow Path When Adding a Shadow to Your Layer（在图层上添加阴影时指定阴影路径）
+&emsp;让 Core Animation 确定阴影的形状可能会很昂贵，并且会影响应用的性能。而不是让 Core Animation 确定阴影的形状，而是使用 CALayer 的 shadowPath 属性显式指定阴影形状。当你为此属性指定路径对象时，Core Animation 将使用该形状绘制并缓存阴影效果。对于形状从未改变或很少改变的图层，这可以通过减少 Core Animation 完成的渲染量来大大提高性能。
+
+## Appendix A: Layer Style Property Animations（图层样式属性动画）
+&emsp;在渲染过程中，Core Animation 会采用图层的不同属性，并以特定顺序进行渲染。此顺序确定层的最终外观。本章说明通过设置不同的图层样式属性获得的渲染结果。
+
+> &emsp;Note: Mac OS X 和 iOS 上可用的图层样式属性有所不同，并在本章中进行了说明。
+
+### Geometry Properties（几何属性）
+&emsp;layer 的 geometry 属性指定相对于其 parent layer 的显示方式。geometry 还指定了用于使 layer 角变圆的半径以及应用于该 layer 及其 sublayers 的变换。图 A-1 显示了示例 layer 的 bounding 矩形。
+
+&emsp;Figure A-1  Layer geometry
+
+![visual-geometry](https://p6-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/669e07b69b3b4b9ba3a16f2164d3e53e~tplv-k3u1fbpfcp-watermark.image)
+
+&emsp;以下 CALayer 属性指定了 layer 的 geometry：
+
++ bounds
++ position
++ frame (从 bounds 和 position 计算得出，并且不能设置动画)
++ anchorPoint
++ cornerRadius
++ transform
++ zPosition
+
+> &emsp;iOS Note: 只有 iOS 3.0 及更高版本才支持 cornerRadius 属性。
+
+### Background Properties（背景属性）
+&emsp;Core Animation 渲染的第一件事是 layer 的背景。你可以为背景指定颜色。在 OS X 中，你还可以指定要应用于背景内容的 Core Image 过滤器。图 A-2 显示了一个示例 layer 的两个版本。左侧的 layer 设置有 backgroundColor 属性，而右侧的 layer 则没有背景色，但是确实有一些内容的边框，并且为其 backgroundFilters 属性分配了捏变形滤镜（pinch distortion filter）。
+
+&emsp;Figure A-2  Layer with background color（具有背景色的图层）
+
+![visual-background](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/76550ea6322c48c6823a3f3e6c8fd865~tplv-k3u1fbpfcp-watermark.image)
+
+&emsp;背景过滤器（background filter）将应用于位于 layer 后面的内容，该内容主要由 parent layer 的内容组成。你可以使用 background filter 使前景层（foreground layer）内容突出。例如，通过应用模糊滤镜（blur filter）。
+
+&emsp;以下 CALayer 属性会影响图层背景的显示：
+
++ backgroundColor
++ backgroundFilters (not supported in iOS)
+
+> &emsp;Platform Note: 在 iOS 中，backgroundFilters 属性在 CALayer 类中公开，但你分配给该属性的过滤器将被忽略。
+
+### Layer Content（图层内容）
+&emsp;如果该 layer 包含任何内容，则该内容将呈现在 background color 之上。你可以通过直接设置位图，使用 delegate 指定内容或子类化图层并直接绘制内容来提供图层内容。你可以使用许多不同的绘图技术（包括 Quartz、Metal、OpenGL 和 Quartz Composer）来提供该内容。图 A-3 显示了一个示例图层，其内容是直接设置的位图。位图内容由一个高度透明的空间组成，右下角有 Automator 图标。
+
+&emsp;Figure A-3  Layer displaying a bitmap image（显示位图图像的图层）
+
+![visual-contents](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/ab8e6a84e5764afca16ce412508097c0~tplv-k3u1fbpfcp-watermark.image)
+
+&emsp;具有 corner radius 的 layer 不会自动裁剪其内容。但是，将 layer 的 masksToBounds 属性设置为 YES 会导致 layer 裁剪到其 corner radius。
+
+&emsp;以下 CALayer 属性会影响 layer 内容的显示：
+
++ contents
++ contentsGravity
++ masksToBounds
+
+### Sublayers Content（子层内容）
+&emsp;任何一 layer 都可以包含一个或多个 child layers，称为 sublayers。sublayers 是递归渲染的，并且相对于 parent layer 的 bounds 矩形定位。此外，Core Animation 还将 parent layer 的 sublayerTransform 应用于相对于 parent layer 锚点（anchor point）的每个 sublayer 。你可以使用 sublayer transform 将 perspective 和其他效果均等地应用于所有 layers。图 A-4 显示了具有两个 sublayers 的示例 layer。左侧的版本包含背景色，而右侧的版本则不包含背景色。
+
+&emsp;Figure A-4  Layer displaying the sublayers content（显示子图层内容的图层）
+
+![visual-sublayers](https://p9-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/1a0bd0c450dc4c468b52d670fdcc8626~tplv-k3u1fbpfcp-watermark.image)
+
+&emsp;将图层的 masksToBounds 属性设置为 YES 会导致所有 sublayers 都被裁剪到该图层的 bounds。
+
+&emsp;以下 CALayer 属性会影响图层 sublayers 的显示：
+
++ sublayers
++ masksToBounds
++ sublayerTransform
+
+### Border Attributes（边框属性）
+&emsp;图层可以使用指定的颜色和宽度显示可选 border。border 遵循图层的 bounds 矩形，并考虑了所有 corner radius。图 A-5 显示了应用 border 后的示例图层。请注意，超出图层 bounds 的内容和子图层将在 border 下方呈现。
+
+Figure A-5  Layer displaying the border attributes content
+
+![visual-borderwidth](https://p6-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/3411106522a649249b3402a8ba873bcf~tplv-k3u1fbpfcp-watermark.image)
+
+&emsp;以下 CALayer 属性会影响图层 board 的显示：
+
++ borderColor
++ borderWidth
+
+> &emsp;Platform Note: 只有 iOS 3.0 和更高版本才支持 borderColor 和 borderWidth 属性。
+
+### Filters Property（过滤器属性）
+&emsp;在 OS X 中，你可以将一个或多个过滤器应用于图层的内容，并使用自定义合成过滤器来指定图层的内容如何与底层图层的内容混合。图 A-6 显示了一个示例层，其中应用了 Core Image Posterize 过滤器。
+
+&emsp;Figure A-6  Layer displaying the filters properties
+
+![visual-filters](https://p1-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/118f204f4e114dec80e7b0df3975fa45~tplv-k3u1fbpfcp-watermark.image)
+
+&emsp;以下 CALayer 属性指定图层内容过滤器：
+
++ filters
++ compositingFilter
+
+> &emsp;Platform Note: 在 iOS 中，图层会忽略你分配给它们的所有过滤器。
+
+### Shadow Properties
+&emsp;图层可以显示阴影效果，并配置其形状、不透明度、颜色、偏移和模糊半径。如果未指定自定义阴影形状，则阴影将基于图层的不完全透明的部分。图A-7 显示了同一示例图层的几种不同版本，并应用了红色阴影。左侧和中间版本包括背景色，因此阴影仅出现在图层边框周围。但是，右侧的版本不包含背景色。在这种情况下，阴影将应用于图层的内容，边框和子图层。
+
+&emsp;Figure A-7  Layer displaying the shadow properties
+
+![visual-shadow](https://p9-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/9440dbb267a049a294468b781700ceed~tplv-k3u1fbpfcp-watermark.image)
+
+&emsp;以下 CALayer 属性会影响图层阴影的显示：
+
++ shadowColor
++ shadowOffset
++ shadowOpacity
++ shadowRadius
++ shadowPath
+
+> &emsp;Platform Note: iOS 3.2 及更高版本支持 shadowColor、shadowOffset、shadowOpacity 和 shadowRadius 属性。 iOS 3.2 和更高版本以及 OS X v10.7 和更高版本支持 shadowPath 属性。
+
+### Opacity Property
+&emsp;图层的不透明度属性决定了该图层显示多少背景内容。图 A-8 显示了不透明度设置为 0.5 的示例图层。这样可以使部分背景图像显示出来。
+
+&emsp;Figure A-8  Layer including the opacity property
+
+![visual-opacity](https://p6-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/d1e31cdee2384a07826d9e71bc3de00c~tplv-k3u1fbpfcp-watermark.image)
+
+&emsp;以下 CALayer 属性指定图层的不透明度：
+
++ opacity
+
+### Mask Properties
+&emsp;你可以使用 mask 遮盖层的全部或部分内容。mask 本身就是一个图层对象，其 Alpha 通道用于确定哪些对象被阻止以及哪些对象被传输。mask layer 内容的不透明部分使底层的内容可以显示出来，而透明部分会部分或完全遮盖底层的内容。图 A-9 显示了一个与 mask layer 和两个不同背景合成的示例层。在左侧版本中，图层的不透明度设置为 1.0。在右侧的版本中，图层的不透明度设置为 0.5，这会增加通过图层的蒙版部分传输的背景内容的数量。
+
+&emsp;Figure A-9  Layer composited with the mask property
+
+![visual-mask](https://p1-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/fba60b432ee8419da5fab9a16c772b2a~tplv-k3u1fbpfcp-watermark.image)
+
+&emsp;以下 CALayer 属性指定图层的遮罩：
+
++ mask
+
+> &emsp;Platform Note: iOS 3.0 及更高版本支持 mask 属性。
+
+## Appendix B: Animatable Properties（可动画属性）
+&emsp;CALayer 和 CIFilter 中的许多属性都可以设置动画。本附录列出了这些属性，以及默认情况下使用的动画。
+
+### CALayer Animatable Properties（CALayer 动画属性）
+&emsp;表 B-1 列出了可以考虑设置动画的 CALayer 类的属性。对于每个属性，该表还列出了为执行隐式动画而创建的默认动画对象的类型。
+
+Table B-1  Layer properties and their default animations（图层属性及其默认动画）
+
+| Property | Default animation |
+| --- | --- |
+| anchorPoint | Uses the default implied CABasicAnimation object, described in Table B-2. |
+| backgroundColor | Uses the default implied CABasicAnimation object, described in Table B-2. |
+| backgroundFilters | Uses the default implied CATransition object, described in Table B-3. Sub-properties of the filters are animated using the default implied CABasicAnimation object, described in Table B-2. |
+| borderColor | Uses the default implied CABasicAnimation object, described in Table B-2. |
+| borderWidth | Uses the default implied CABasicAnimation object, described in Table B-2. |
+| bounds | Uses the default implied CABasicAnimation object, described in Table B-2. |
+| compositingFilter | Uses the default implied CATransition object, described in Table B-3. Sub-properties of the filters are animated using the default implied CABasicAnimation object, described in Table B-2. |
+| contents | Uses the default implied CABasicAnimation object, described in Table B-2. |
+| contentsRect | Uses the default implied CABasicAnimation object, described in Table B-2. |
+| cornerRadius | Uses the default implied CABasicAnimation object, described in Table B-2. |
+| doubleSided | There is no default implied animation. |
+| filters | Uses the default implied CABasicAnimation object, described in Table B-2. Sub-properties of the filters are animated using the default implied CABasicAnimation object, described in Table B-2. |
+| frame | This property is not animatable. You can achieve the same results by animating the bounds and position properties. |
+| hidden | Uses the default implied CABasicAnimation object, described in Table B-2. |
+| mask | Uses the default implied CABasicAnimation object, described in Table B-2. |
+| masksToBounds | Uses the default implied CABasicAnimation object, described in Table B-2. |
+| opacity | Uses the default implied CABasicAnimation object, described in Table B-2. |
+| position | Uses the default implied CABasicAnimation object, described in Table B-2. |
+| shadowColor | Uses the default implied CABasicAnimation object, described in Table B-2. |
+| shadowOffset | Uses the default implied CABasicAnimation object, described in Table B-2. |
+| shadowOpacity | Uses the default implied CABasicAnimation object, described in Table B-2. |
+| shadowPath | Uses the default implied CABasicAnimation object, described in Table B-2. |
+| shadowRadius | Uses the default implied CABasicAnimation object, described in Table B-2. |
+| sublayers | Uses the default implied CABasicAnimation object, described in Table B-2. |
+| sublayerTransform | Uses the default implied CABasicAnimation object, described in Table B-2. |
+| transform | Uses the default implied CABasicAnimation object, described in Table B-2. |
+| zPosition | Uses the default implied CABasicAnimation object, described in Table B-2. |
 
 
+&emsp;表 B-2 列出了默认基于属性的动画的动画属性。
 
+&emsp;Table B-2  Default Implied Basic Animation（默认隐式基本动画）
 
+| Description | Value |
+| --- | --- |
+| Class | CABasicAnimation |
+| Duration | 0.25 秒, 或当前 transaction 的持续时间 |
+| Key path | 设置为 layer 的属性名称。 |
 
+&emsp;表 B-3 列出了基于默认过渡（transition-based）的动画的动画对象配置。
 
+&emsp;Table B-3  Default Implied Transition（默认隐式过渡）
 
+| Description | Value |
+| Class | CATransition |
+| Duration | 0.25 秒, 或当前 transaction 的持续时间 |
+| Type | Fade (kCATransitionFade) |
+| Start progress | 0.0 |
+| End progress | 1.0 |
 
+### CIFilter Animatable Properties
+&emsp;Core Animation 将以下可设置动画的属性添加到 Core Image 的 CIFilter 类中。这些属性仅在 OS X 上可用。
 
++ name
++ enabled
 
+&emsp;有关这些添加的更多信息，请参见 CIFilter Core Animation Additions。
 
+## Appendix C: Key-Value Coding Extensions（键值编码扩展）
+&emsp;Core Animation 扩展了 NSKeyValueCoding 协议，因为它与 CAAnimation 和 CALayer 类有关。此扩展为某些 key 添加了默认值，扩展了包装约定，并为 CGPoint、CGRect、CGSize 和 CATransform3D 类型添加了 key path 支持。
+### Key-Value Coding Compliant Container Classes（符合键值编码的容器类）
+&emsp;CAAnimation 和 CALayer 类是符合键值编码的容器类，这意味着你可以为任意键设置值。即使键 someKey 不是 CALayer 类的声明属性，你仍然可以按以下方式为其设置值：
+```c++
+[theLayer setValue:[NSNumber numberWithInteger:50] forKey:@"someKey"];
+```
+&emsp;你还可以检索任意键的值，就像检索其他 key path 的值一样。例如，要检索先前设置的 someKey 路径的值，可以使用以下代码：
+```c++
+someKeyValue=[theLayer valueForKey:@"someKey"];
+```
+> &emsp;OS X Note: CAAnimation 和 CALayer 类 automatically archive 为这些类的实例设置的所有其他键，它们支持 NSCoding 协议。
 
+### Default Value Support
+&emsp;Core Animation 为键值编码添加了约定，从而类可以为没有设置值的 key 提供默认值。 CAAnimation 和 CALayer 类使用 `defaultValueForKey:` 类方法支持此约定。
 
+&emsp;要为 key 提供默认值，请创建所需类的子类并重写其 `defaultValueForKey:` 方法。此方法的实现应该检查 key 参数并返回适当的默认值。清单 C-1 显示了一个 layer 对象的 `defaultValueForKey:` 方法的示例实现，该 layer 对象为 masksToBounds 属性提供默认值。
 
+&emsp;Listing C-1  Example implementation of defaultValueForKey:
+```c++
++ (id)defaultValueForKey:(NSString *)key {
+    if ([key isEqualToString:@"masksToBounds"])
+         return [NSNumber numberWithBool:YES];
+ 
+    return [super defaultValueForKey:key];
+}
+```
+### Wrapping Conventions
+&emsp;当 key 的数据由标量值或 C 数据结构组成时，必须在将该类型指定给 layer 之前将其包装到对象中。类似地，在访问该类型时，必须检索一个对象，然后使用相应类的扩展来展开相应的值。表 C-1 列出了常用的 C 类型和用于包装它们的 Objective-C 类。
 
+&emsp;Table C-1  Wrapper classes for C types
 
-
-
-
-
-
-
-
-
-
+| C type | Wrapping class |
+| --- | --- |
+| CGPoint | NSValue |
+| CGSize | NSValue |
+| CGRect | NSValue |
+| CATransform3D | NSValue |
+| CGAffineTransform | NSAffineTransform(OS X only) |
 
 
 ## 参考链接
