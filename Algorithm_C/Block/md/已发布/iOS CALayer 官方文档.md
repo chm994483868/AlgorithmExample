@@ -117,10 +117,38 @@ CA_EXTERN CAMediaTimingFillMode const kCAFillModeRemoved    API_AVAILABLE(macos(
 + kCAFillModeRemoved: 动画完成后，receiver 将从 presentation 中删除。
 
 ## CAAction
-&emsp;
-```c++
+&emsp;允许对象响应由 CALayer 更改触发的 actions 的接口。(仅有一个代理方法的 protocol，CAAnimation 类遵循此协议)
 
+&emsp;当使用 action 标识符（key path、外部 action 名称或预定义 action 标识符）查询时，CALayer 返回相应的 action 对象（必须实现 CAAction 协议），并向其发送 `runActionForKey:object:arguments:` 消息。
+
+### Responding to an action（响应操作）
+#### - runActionForKey:object:arguments:
+&emsp;调用以触发标识符指定的 action。
+
+&emsp;`key`: action 的标识符。标识符可以是相对于对象的键或键路径、任意外部 action 或 CALayer 中定义的 action 标识符之一。`anObject`: 发生 action 的 CALayer。`dict`: 包含与此 `event` 关联的参数的字典。可能是 nil。
+```c++
+/** Action (event handler) protocol. **/
+
+@protocol CAAction
+
+- (void)runActionForKey:(NSString *)event object:(id)anObject arguments:(nullable NSDictionary *)dict;
+
+@end
+
+/** NSNull protocol conformance. **/
+
+@interface NSNull (CAActionAdditions) <CAAction>
+
+@end
 ```
+> &emsp;/* Called to trigger the event named 'path' on the receiver. 
+  *调用以触发 receiver 上名为 'event' 的事件。
+  * The object (e.g. the layer) on which the event happened is 'anObject'. 
+  * 发生事件的对象（例如 CALayer）为 'anObject'。
+  * The arguments dictionary may be nil, if non-nil it carries parameters associated with the event. 
+  * 参数字典可能是 nil，如果非 nil，它携带与事件关联的参数。
+  */
+  
 ## CALayerDelegate
 &emsp;CALayer 的 delegate 对象需要遵循此协议，以响应与 CALayer 相关的事件。
 ```c++
@@ -147,7 +175,7 @@ NSLog(@"😻😻 view 的 layer 的 delegate: %@", self.view.layer.delegate);
 ```
 &emsp;`layer`: 其内容需要更新的 CALayer。
 
-&emsp;`displayLayer:` 委托方法在 CALayer 被标记为要重新加载其内容时被调用，通常由 `setNeedsDisplay` 方法启动（标记）。典型的更新技术是设置 CALayer 的 contents 属性。
+&emsp;`- displayLayer:` 委托方法在 CALayer 被标记为要重新加载其内容时被调用，通常由 `setNeedsDisplay` 方法启动（标记）。典型的更新技术是设置 CALayer 的 contents 属性。
 
 > &emsp;如果已实现此委托方法，则由 `- display` 方法的默认实现调用，在这种情况下，它应该实现整个显示过程（通常通过设置 contents 属性）。
 #### - drawLayer:inContext:
@@ -185,7 +213,7 @@ NSLog(@"😻😻 view 的 layer 的 delegate: %@", self.view.layer.delegate);
 &emsp;`layoutSublayersOfLayer:` 方法在 CALayer 的 bounds 发生更改时调用，例如通过更改其 frame 的大小。如果需要精确控制 CALayer 的 sublayers 的布局，可以实现此方法。
 
 > &emsp;在检查 layout manager 之前，由默认的 `- layoutSublayers` 实现调用。请注意，如果调用了委托方法（`- layoutSublayersOfLayer:`），则 layout manager 将被忽略。
-### Providing a Layer's Actions
+### Providing a Layer's Actions（提供图层的操作）
 #### - actionForLayer:forKey:
 &emsp;返回 `actionForKey:` 方法的默认 action。
 ```c++
@@ -199,8 +227,21 @@ NSLog(@"😻😻 view 的 layer 的 delegate: %@", self.view.layer.delegate);
 
 > &emsp;如果已实现此委托方法，则由 `- actionForKey:` 方法的默认实现调用。应返回实现 CAAction 协议的对象。如果 delegate 未指定当前 `event` 的行为，则可能返回 nil。返回空对象（即 [NSNull null]）会明确强制不再进行进一步的搜索。（即，`+ defaultActionForKey:` 方法将不会被调用。）
 
+## CAMediaTiming、CAAction、CALayerDelegate 总结 
+&emsp;到这里看完了 CAMediaTiming、CAAction、CALayerDelegate 三个 protocol。其中 CAAnimation 遵循 CAMediaTiming 和 CAAction 协议，CALayer 遵循 CAMediaTiming 协议，而 CALayerDelegate 则是 CALayer 的 delegate 遵循的协议。
+
++ CAMediaTiming 协议中控制动画开始时间（beginTime、timeOffset 属性）、设置重复动画的次数或者重复时间（repeatCount、repeatDuration 属性）、设置动画的持续时间和速度（duration、speed 属性）、动画播放模式（autoreverses 是否结束后反向播放、fillMode 动画结束后的 向前、向后、两端、移除）。
++ CAAction 协议则是仅有 CAAnimation 类遵循此协议，仅有一个委托方法 `- runActionForKey:object:arguments:` 用于响应当 CALayer 更改时触发 Action。（执行添加到 CALayer 上的某个 CAAnimation 动画对象）
++ CALayerDelegate 协议则是提供给 CALayer 的 delegate 必须遵守的协议，实现三个作用：提供 CALayer 的内容、布局 CALayer 子图层（`- layoutSublayersOfLayer:`）、提供图层的操作（`- actionForLayer:forKey:`）。
+  但是它的所有协议方法默认都是可选的（@optional）。其中 `- displayLayer:` 或 `- drawLayer:inContext:` 以两种不同的方式为 CALayer 提供内容，不过 `- displayLayer:` 执行级别高于 `- drawLayer:inContext:`，当 CALayer 的 delegate 实现了 `- displayLayer:` 方法后则不再调用 `- drawLayer:inContext:` 方法。
+  `- displayLayer:` 委托方法通常在 CALayer 调用其 `setNeedsDisplay` 方法标记 CALayer 需要重新加载其内容时被调用，且 CALayer 的 `- display` 方法的默认实现会调用 `- displayLayer:` 委托方法。
+  同样，当 `- displayLayer:` 委托方法未实现时，`- drawLayer:inContext:`  委托方法通常在 CALayer 调用其 `setNeedsDisplay` 方法标记 CALayer 需要重新加载其内容时被调用，不同的是 CALayer 的 `- drawInContext:` 方法的默认实现会调用 `- drawLayer:inContext:`  委托方法。
+  而 `- layerWillDraw:` 委托方法则是在 `- drawLayer:inContext:` 之前调用。你可以使用此方法在 `- drawLayer:inContext:` 之前配置影响 contents 的任何 CALayer 状态，例如 contentsFormat 和 opaque。
+
+&emsp;那么下面我们继续详细分析 CALayer 的文档。
+
 ## CALayer
-&emsp;管理基于图像的内容并允许你对该内容执行动画的对象。
+&emsp;管理基于图像的内容并允许你对该内容执行动画的对象。（继承自 NSObject 并遵循 CAMediaTiming 协议）
 ```c++
 API_AVAILABLE(macos(10.5), ios(2.0), watchos(2.0), tvos(9.0))
 @interface CALayer : NSObject <NSSecureCoding, CAMediaTiming>
@@ -216,7 +257,7 @@ API_AVAILABLE(macos(10.5), ios(2.0), watchos(2.0), tvos(9.0))
   } _attr;
 }
 ```
-### Overview
+### Overview（概述）
 &emsp;Layers 通常用于为 view 提供 backing store，但也可以在没有 view 的情况下使用以显示内容。layer 的主要工作是管理你提供的视觉内容（visual content），但 layer 本身也具有可以设置的视觉属性（visual attributes），例如背景色（background color）、边框（border）和阴影（shadow）。除了管理视觉内容外，layer 还维护有关其内容的几何（geometry）（例如其位置（position）、大小（size）和变换（transform））的信息，这些信息用于在屏幕上显示该内容。修改 layer 的属性是在 layer 的内容或几何（geometry）上启动动画的方式。layer 对象通过 CAMediaTiming 协议封装 layer 及其动画的持续时间（duration）和步调（pacing），该协议定义了 layer 的时间信息（timing information）。
 
 &emsp;如果 layer 对象是由 view 创建的，则 view 通常会自动将自身指定为 layer 的 delegate，并且不应更改该关系。对于你自己创建的 layers，可以为其指定一个 delegate 对象，并使用该对象动态提供 layer 的内容并执行其他任务。layer 可能还具有布局管理器（layout manager）对象（指定给 layoutManager 属性），以分别管理子图层（sublayers）的布局。
@@ -263,59 +304,44 @@ API_AVAILABLE(macos(10.5), ios(2.0), watchos(2.0), tvos(9.0))
 
 &emsp;返回 layer 的 sublayers、mask 和 superlayer 属性从表示树（presentation tree）（而不是模型树）返回相应的对象。此模式也适用于任何只读 layer 方法。例如，返回对象的 hitTest: 方法查询 presentation tree 中的 layer 对象。
 
-Returns a copy of the layer containing all properties as they were at the start of the current transaction, with any active animations applied. This gives a close approximation to the version of the layer that is currently displayed. Returns nil if the layer has not yet been committed.
-返回包含所有属性的层的副本，这些属性与当前事务开始时的属性相同，并应用了所有活动动画。这非常接近当前显示的图层版本。如果尚未提交该层，则返回 nil。
-
-The effect of attempting to modify the returned layer in any way is undefined.
-尝试以任何方式修改返回的图层的效果是不确定的。
-
-The sublayers, mask and superlayer properties of the returned layer return the presentation versions of these properties. This carries through to read-only layer methods. E.g., calling -hitTest: on the result of the -presentationLayer will query the presentation values of the layer tree.
-返回层的“ sublayers”，“ mask”和“ superlayer”属性返回这些属性的表示形式。这将执行只读层方法。例如，在-presentationLayer的结果上调用-hitTest：将查询层树的表示值。
+> &emsp;返回包含所有属性的 CALayer 的副本，这些属性与当前 transaction 开始时的属性相同，并应用了所有活动动画。这非常接近当前显示的 CALayer 版本。如果尚未 committed 该 CALayer，则返回 nil。
+> &emsp;尝试以任何方式修改返回的 CALayer 对象，其产生的效果都是不确定的。（返回的 CALayer 对象仅应当用于读取其当前的各种属性）
+> &emsp;返回的 CALayer 对象的 sublayers、mask 和 superlayer 属性返回的是这些属性的 presentation versions 。这将执行只读 CALayer 方法。例如，在 `- presentationLayer` 返回的 CALayer 对象上调用 `- hitTest:` 将查询 layer tree 的 presentation values。
 
 #### - modelLayer
-&emsp;返回与 receiver 关联的模型层对象（如果有）。
+&emsp;返回与 receiver 关联的 model layer 对象（如果有）。
 ```c++
 - (instancetype)modelLayer;
 ```
-&emsp;Return Value: 表示基础模型层的层实例。
+&emsp;Return Value: 表示基础模型层（underlying model layer）的 CALayer 实例。
 
-&emsp;在表示树中的图层上调用此方法将返回模型树中的相应图层对象。仅当涉及表示层更改的事务正在进行时，此方法才返回值。如果没有正在进行的事务，则调用此方法的结果是不确定的。
+&emsp;在 presentation tree 中的 CALayer 上调用此方法将返回 model tree 中的相应 CALayer 对象。仅当涉及表示层更改的事务正在进行时，此方法才返回值。如果没有正在进行的事务，则调用此方法的结果是不确定的。
 
-/* When called on the result of the -presentationLayer method, returns the underlying layer with the current model values. When called on a non-presentation layer, returns the receiver. The result of calling this method after the transaction that produced the presentation layer has completed is undefined. */
-在 -presentationLayer 方法的结果上调用时，返回具有当前模型值的基础层。在非表示层上调用时，返回接收者。产生表示层的事务完成后调用此方法的结果是不确定的。
-### Accessing the Delegate
+> &emsp;在 `- presentationLayer` 方法的结果上调用时，返回具有当前模型值的基础层。在非表示层上调用时，返回接收者。产生表示层的事务完成后调用此方法的结果是不确定的。
 
+&emsp;上面 `- presentationLayer` 和 `- modelLayer` 函数涉及到的 “表示树” 和 “模型树” 在后面的 Core Animation 文档中有详细解释。
+### Accessing the Delegate（访问 CALayer 的代理）
 #### delegate
-&emsp;layer 的委托对象。
+&emsp;CALayer 的委托对象。（delegate 是遵循 CALayerDelegate 协议的 weak 属性）
 ```c++
 @property(nullable, weak) id <CALayerDelegate> delegate;
 ```
-&emsp;你可以使用委托对象来提供图层的内容，处理任何子图层的布局以及提供自定义操作以响应与图层相关的更改。您分配给此属性的对象应实现 CALayerDelegate 非正式协议的一种或多种方法。关于协议的更多信息，请参见 CALayerDelegate。
+&emsp;你可以使用委托对象来提供图层的内容，处理任何子图层的布局以及提供自定义操作以响应与图层相关的更改。你分配给此属性的对象应实现 CALayerDelegate 非正式协议的一种或多种方法。关于协议的更多信息，请参见上面 CALayerDelegate 协议分析。
 
-&emsp;在 iOS 中，如果图层与 UIView 对象关联，则必须将此属性设置为拥有该图层的视图。
-
-An object that will receive the CALayer delegate methods defined below (for those that it implements). The value of this property is not retained. Default value is nil.
-一个对象，它将接收下面定义的 CALayer 委托方法（针对其实现的方法）。不保留此属性的值。默认值为 nil。
-
-### Providing the Layer’s Content
+&emsp;在 iOS 中，如果图层与 UIView 对象关联，则必须将此属性设置为拥有该 CALayer 的 UIView。（在 iOS 中 UIView 默认作为其 layer 属性的 delegate 对象，但是对于自己创建的 CALayer 对象其 delegate 属性默认是 nil）
+### Providing the Layer’s Content（提供 CALayer 的内容）
 #### contents
-&emsp;提供图层内容的对象。可动画的。
+&emsp;提供 CALayer 内容的对象。可动画的。（strong 修饰的 id 类型的属性）
 ```c++
 @property(nullable, strong) id contents;
 ```
 &emsp;此属性的默认值为 nil。
 
-&emsp;如果使用图层显示静态图像，则可以将此属性设置为 CGImageRef，其中包含要显示的图像。 （在macOS 10.6及更高版本中，你也可以将属性设置为 NSImage 对象。）为该属性分配值会导致图层使用你的图像，而不是创建单独的后备存储（backing store）。
+&emsp;如果使用 CALayer 显示静态图像，则可以将此属性设置为 CGImageRef，其中包含要显示的图像。 （在 macOS 10.6 及更高版本中，你也可以将此属性设置为 NSImage 对象。）为该属性分配值会导致 CALayer 使用你的图像，而不是创建单独的 backing store。
 
-&emsp;如果图层对象绑定到视图对象，则应避免直接设置此属性的内容。视图和图层之间的相互作用通常会导致视图在后续更新期间替换此属性的内容。
-
-/** Layer content properties and methods. **/
-图层内容的属性和方法。
-
-/* An object providing the contents of the layer, typically a CGImageRef, but may be something else. (For example, NSImage objects are supported on Mac OS X 10.6 and later.) Default value is nil. Animatable. */
-提供该层内容的对象，通常为 CGImageRef，但也可以为其他对象。 （例如，Mac OS X 10.6 和更高版本支持 NSImage 对象。）默认值为 nil。可动画的。
+&emsp;如果图层对象绑定到 UIView 对象，则应避免直接设置此属性的内容。视图和图层之间的相互作用通常会导致视图在后续更新期间替换此属性的内容。
 #### contentsRect
-&emsp;单位坐标空间中的矩形，用于定义应使用的图层内容部分。可动画的。
+&emsp;单位坐标空间中的矩形，用于定义应使用的 CALayer 内容部分。可动画的。
 ```c++
 @property CGRect contentsRect;
 ```
@@ -325,86 +351,76 @@ An object that will receive the CALayer delegate methods defined below (for thos
 
 &emsp;如果提供了一个空矩形，则结果是不确定的。
 
-/* A rectangle in normalized image coordinates defining the subrectangle of the `contents' property that will be drawn into the layer. If pixels outside the unit rectangles are requested, the edge pixels of the contents image will be extended outwards. If an empty rectangle is provided, the results are undefined. Defaults to the unit rectangle [0 0 1 1]. Animatable. */
-标准化图像坐标中的矩形，定义了将被绘制到图层中的“ contents”属性的子矩形。如果请求单位矩形之外的像素，则内容图像的边缘像素将向外扩展。如果提供了一个空矩形，则结果是不确定的。默认为单位矩形[0 0 1 1]。可动画的。
+> &emsp;标准化图像坐标中的矩形，定义了将被绘制到图层中的 contents 属性的子矩形。如果请求单位矩形之外的像素，则内容图像的边缘像素将向外扩展。如果提供了一个空矩形，则结果是不确定的。默认为单位矩形[0 0 1 1]。可动画的。
 
 #### contentsCenter
-&emsp;矩形，用于定义在调整图层内容大小时如何缩放图层内容。可动画的。
+&emsp;用于定义在调整图层内容大小时如何缩放图层内容。可动画的。
 ```c++
 @property CGRect contentsCenter;
 ```
-&emsp;可以使用此属性将图层内容细分为 3x3 网格。此属性中的值指定网格中中心矩形的位置和大小。如果层的 contentsGravity 属性设置为某个调整大小模式，则调整层的大小会导致网格的每个矩形中发生不同的缩放。中心矩形在两个维度上都拉伸，上中心和下中心矩形仅水平拉伸，左中心和右中心矩形仅垂直拉伸，四角矩形完全不拉伸。因此，你可以使用此技术来实现可拉伸的背景或使用三部分或九部分图像的图像。
+&emsp;可以使用此属性将图层内容细分为 3x3 网格。此属性中的值指定网格中中心矩形的位置和大小。如果层的 contentsGravity 属性设置为某个调整大小模式，则调整层的大小会导致网格的每个矩形中发生不同的缩放。中心矩形在两个维度上都拉伸，上中心和下中心矩形仅水平拉伸，左中心和右中心矩形仅垂直拉伸，四角矩形完全不拉伸。因此，你可以使用此技术使用三部分或九部分图像来实现可拉伸的背景或图像。
 
 &emsp;默认情况下，此属性中的值设置为单位矩形（0.0,0.0）（1.0,1.0），这将导致整个图像在两个维度上缩放。如果指定的矩形超出单位矩形，则结果未定义。只有在将 contentsRect 属性应用于图像之后，才应用指定的矩形。
 
 > &emsp;Note: 如果此属性中矩形的宽度或高度很小或为 0，则该值将隐式更改为以指定位置为中心的单个源像素的宽度或高度。
 
-/* A rectangle in normalized image coordinates defining the scaled center part of the `contents' image.
-标准化图像坐标中的矩形定义了“内容”图像的缩放中心部分。
+> &emsp;标准化图像坐标中的矩形定义了 contents 图像的缩放中心部分。
+> &emsp;当图像由于其 contentsGravity 属性而调整大小时，其中心部分隐式定义了 3x3 网格，该网格控制如何将图像缩放到其绘制的大小。中心部分在两个方向上都拉伸。顶部和底部仅水平拉伸；左右部分仅垂直拉伸；四个角部分根本没有拉伸。 （这通常称为 "9-slice scaling"。）
+> &emsp;矩形在应用了 contentsRect 属性的效果后被解释。默认为单位矩形 [0 0 1 1]，表示整个图像都会缩放。作为特殊情况，如果宽度或高度为零，则将其隐式调整为以该位置为中心的单个源像素的宽度或高度。如果矩形延伸到 [0 0 1 1] 单元矩形的外部，则结果不确定。可动画的。
 
-* When an image is resized due to its `contentsGravity' property its center part implicitly defines the 3x3 grid that controls how the image is scaled to its drawn size. The center part is stretched in both dimensions; the top and bottom parts are only stretched horizontally; the left and right parts are only stretched vertically; the four corner parts are not stretched at all. (This is often called "9-slice scaling".)
-当图像由于其“ contentsGravity”属性而调整大小时，其中心部分隐式定义了 3x3 网格，该网格控制如何将图像缩放到其绘制的大小。中心部分在两个方向上都拉伸。顶部和底部仅水平拉伸；左右部分仅垂直拉伸；四个角部分根本没有拉伸。 （这通常称为“ 9切片缩放”。）
-
-* The rectangle is interpreted after the effects of the `contentsRect' property have been applied. It defaults to the unit rectangle [0 0 1 1] meaning that the entire image is scaled. As a special case, if the width or height is zero, it is implicitly adjusted to the width or height of a single source pixel centered at that position. If the rectangle extends outside the [0 0 1 1] unit rectangle the result is undefined. Animatable. */
-矩形在应用了 contentsRect 属性的效果后被解释。默认为单位矩形[0 0 1 1]，表示整个图像都会缩放。作为特殊情况，如果宽度或高度为零，则将其隐式调整为以该位置为中心的单个源像素的宽度或高度。如果矩形延伸到[0 0 1 1]单元矩形的外部，则结果不确定。可动画的。
 #### - display
 &emsp;重新加载该层的内容。
 ```c++
 - (void)display;
 ```
-&emsp;不要直接调用此方法。图层会在适当的时候调用此方法以更新图层的内容。如果图层具有委托对象，则此方法尝试调用委托的 displayLayer：方法，委托可使用该方法来更新图层的内容。如果委托未实现 displayLayer：方法，则此方法将创建后备存储并调用图层的 drawInContext：方法以将内容填充到该后备存储中。新的后备存储将替换该层的先前内容。
+&emsp;不要直接调用此方法。CALayer 会在适当的时候调用此方法以更新 CALayer 的内容。如果 CALayer 具有 delegate 对象，则此方法尝试调用 delegate 的 `displayLayer:` 方法，delegate 可使用该方法来更新 CALayer 的内容。如果 delegate 未实现 `displayLayer:` 方法，则此方法将创建 backing store 并调用 CALayer 的 `drawInContext:` 方法以将内容填充到该 backing store 中。新的 backing store 将替换该 CALayer 的先前内容。
 
-&emsp;子类可以重写此方法，并使用它直接设置图层的 contents 属性。如果你的自定义图层子类对图层更新的处理方式不同，则可以执行此操作。
+&emsp;子类可以重写此方法，并使用它直接设置 CALayer 的 contents 属性。如果你的自定义 CALayer 子类对图层更新的处理方式不同，则可以执行此操作。
 
-/* Reload the content of this layer. Calls the -drawInContext: method then updates the `contents' property of the layer. Typically this is not called directly. */
-重新加载该层的内容。调用 -drawInContext：方法，然后更新图层的 “ contents” 属性。通常，不直接调用它。
+> &emsp;重新加载 CALayer 的内容。调用 `- drawInContext:` 方法，然后更新 CALayer 的 contents 属性。通常，不直接调用它。
+
 #### - drawInContext:
-&emsp;使用指定的图形上下文绘制图层的内容。
+&emsp;使用指定的图形上下文绘制 CALayer 的内容。
 ```c++
 - (void)drawInContext:(CGContextRef)ctx;
 ```
-&emsp;`ctx`: 在其中绘制内容的图形上下文。上下文可以被裁剪以保护有效的层内容。希望找到要绘制的实际区域的子类可以调用 CGContextGetClipBoundingBox。
+&emsp;`ctx`: 在其中绘制内容的图形上下文。上下文可以被裁剪以保护有效的 CALayer 内容。希望找到要绘制的实际区域的子类可以调用 CGContextGetClipBoundingBox。
 
-&emsp;此方法的默认实现本身不会进行任何绘制。如果图层的委托实现了 drawLayer：inContext：方法，则会调用该方法进行实际绘制。
+&emsp;此方法的默认实现本身不会进行任何绘制。如果 CALayer 的 delegate 实现了 `- drawLayer:inContext:` 方法，则会调用该方法进行实际绘制。
 
-&emsp;子类可以重写此方法，并使用它来绘制图层的内容。绘制时，应在逻辑坐标空间中的点中指定所有坐标。
+&emsp;子类可以重写此方法，并使用它来绘制 CALayer 的内容。绘制时，应在逻辑坐标空间中的点指定所有坐标。
 
-/* Called via the -display method when the `contents' property is being updated. Default implementation does nothing. The context may be clipped to protect valid layer content. Subclasses that wish to find the actual region to draw can call CGContextGetClipBoundingBox(). */
-当 contents 属性被更新时，通过-display方法调用。默认实现不执行任何操作。上下文可以被裁剪以保护有效的层内容。希望找到要绘制的实际区域的子类可以调用 CGContextGetClipBoundingBox（）。
-### Modifying the Layer’s Appearance
+> &emsp;当 contents 属性被更新时，通过 `- display` 方法调用。默认实现不执行任何操作。上下文可以被裁剪以保护有效的 CALayer 内容。希望找到要绘制的实际区域的子类可以调用 `CGContextGetClipBoundingBox()`。
+
+### Modifying the Layer’s Appearance（修改 CALayer 的外观）
 #### contentsGravity
-&emsp;一个常数，指定图层内容如何在其边界内定位或缩放。
+&emsp;一个常数，指定 CALayer 的 contents 如何在其 bounds 内 positioned 或 scaled。
 ```c++
 @property(copy) CALayerContentsGravity contentsGravity;
 ```
 &emsp;Contents Gravity Values 中列出了此属性的可能值。
 
-&emsp;此属性的默认值为 kCAGravityResize。
+&emsp;此属性的默认值为 kCAGravityResize。（调整内容大小以适合整个 bounds 矩形，可能会被拉伸变形）
 
-> &emsp;Important: 内容重力常数的命名基于垂直轴的方向。如果将重力常数与垂直分量（例如 kCAGravityTop）一起使用，则还应检查层的内容是否重叠。如果该选项为“是”，kCAGravityTop将内容与层的底部对齐，kCAGravityBottom将内容与层的顶部对齐。
+> &emsp;Important: 内容重力常数（contents gravity constants）的命名基于垂直轴的方向。如果将重力常数与垂直分量（例如 kCAGravityTop）一起使用，则还应检查层的 contentsAreFlipped。如果该选项为 YES，kCAGravityTop 将 contents 与 CALayer 的底部对齐，kCAGravityBottom 将内容与层的顶部对齐。
 > 
 > &emsp;macOS 和 iOS 中视图的默认坐标系在垂直轴的方向上不同：在 macOS 中，默认坐标系的原点位于绘图区域的左下角，正值从中向上延伸，在 iOS 中，默认坐标系的原点位于绘图区域的左上角，正值从该坐标系向下延伸。
 
-&emsp;图1显示了四个示例，这些示例为图层的contentsGravity属性设置不同的值。
+&emsp;图1显示了四个示例，这些示例为图层的 contentsGravity 属性设置不同的值。
 
 &emsp;Figure 1 Different effects of setting a layer's contents gravity
 
-![]()
+![layer_contents_gravity](https://p6-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/8a686a27637c4a11a1177ac37b7acba9~tplv-k3u1fbpfcp-watermark.image)
 
 1. Contents gravity is kCAGravityResize - the default
-
 2. Contents gravity is kCAGravityCenter
-
 3. Contents gravity is contentsAreFlipped ? kCAGravityTop : kCAGravityBottom
-
 4. Contents gravity is contentsAreFlipped ? kCAGravityBottomLeft : kCAGravityTopLeft
 
+> &emsp;一个字符串，定义了如何将 CALayer 的 contents 映射到其 bounds 矩形。选项为'center'，'top'，'bottom'，'left'，'right'，'topLeft'，'topRight'，'bottomLeft'，'bottomRight'，'resize'，'resizeAspect'，'resizeAspectFill'。默认值为`resize'。注意，'bottom' 始终表示 **最小 Y**，'top' 始终表示 **最大 Y**。
 
-/* A string defining how the contents of the layer is mapped into its bounds rect. Options are 'center', 'top', 'bottom', 'left', 'right', 'topLeft', 'topRight', 'bottomLeft', 'bottomRight', 'resize', 'resizeAspect', 'resizeAspectFill'. The default value is `resize'. Note that "bottom" always means "Minimum Y" and "top" always means "Maximum Y". */
-
-一个字符串，定义了如何将图层的内容映射到其边界 rect。选项为'center'，'top'，'bottom'，'left'，'right'，'topLeft'，'topRight'，'bottomLeft'，'bottomRight'，'resize'，'resizeAspect'，'resizeAspectFill'。默认值为`resize'。注意，“底部”始终表示“最小Y”，“顶部”始终表示“最大Y”。
 #### Contents Gravity Values
-&emsp;当层边界大于内容对象的边界时，内容重力常量指定内容对象的位置。它们由 contentsGravity 属性使用。
+&emsp;当 CALayer bounds 大于内容对象的 bounds 时，内容重力常量指定内容对象的位置。它们由 contentsGravity 属性使用。
 ```c++
 CA_EXTERN CALayerContentsGravity const kCAGravityCenter API_AVAILABLE(macos(10.5), ios(2.0), watchos(2.0), tvos(9.0));
 CA_EXTERN CALayerContentsGravity const kCAGravityTop API_AVAILABLE(macos(10.5), ios(2.0), watchos(2.0), tvos(9.0));
@@ -419,91 +435,80 @@ CA_EXTERN CALayerContentsGravity const kCAGravityResize API_AVAILABLE(macos(10.5
 CA_EXTERN CALayerContentsGravity const kCAGravityResizeAspect API_AVAILABLE(macos(10.5), ios(2.0), watchos(2.0), tvos(9.0));
 CA_EXTERN CALayerContentsGravity const kCAGravityResizeAspectFill API_AVAILABLE(macos(10.5), ios(2.0), watchos(2.0), tvos(9.0));
 ```
-+ kCAGravityCenter: 内容在边界矩形中水平和垂直居中。
-+ kCAGravityTop: 内容在边界矩形的上边缘水平居中。
-+ kCAGravityBottom: 内容在边界矩形的下边缘水平居中。
-+ kCAGravityLeft: 内容在边界矩形的左边缘垂直居中。
-+ kCAGravityRight: 内容在边界矩形的右边缘垂直居中。
-+ kCAGravityTopLeft: 内容位于边界矩形的左上角。
-+ kCAGravityTopRight: 内容位于边界矩形的右上角。
-+ kCAGravityBottomLeft: 内容位于边界矩形的左下角。
-+ kCAGravityBottomRight: 内容位于边界矩形的右下角。
-+ kCAGravityResize: 调整内容大小以适合整个边界矩形。
-+ kCAGravityResizeAspect: 调整内容大小以适合边界矩形，从而保留内容的外观。如果内容没有完全填充边界矩形，则内容将以部分轴为中心。
-+ kCAGravityResizeAspectFill:调整内容大小以完全填充边界矩形，同时仍保留内容的外观。内容以其超过的轴为中心。
++ kCAGravityCenter: 内容在 bounds 矩形中水平和垂直居中。
++ kCAGravityTop: 内容在 bounds 矩形的上边缘水平居中。
++ kCAGravityBottom: 内容在 bounds 矩形的下边缘水平居中。
++ kCAGravityLeft: 内容在 bounds 矩形的左边缘垂直居中。
++ kCAGravityRight: 内容在 bounds 矩形的右边缘垂直居中。
++ kCAGravityTopLeft: 内容位于 bounds 矩形的左上角。
++ kCAGravityTopRight: 内容位于 bounds 矩形的右上角。
++ kCAGravityBottomLeft: 内容位于 bounds 矩形的左下角。
++ kCAGravityBottomRight: 内容位于 bounds 矩形的右下角。
++ kCAGravityResize: 调整内容大小以适合整个 bounds 矩形。（可能会拉伸变形）
++ kCAGravityResizeAspect: 调整内容大小以适合 bounds 矩形，从而保留内容的外观（保留宽高比例）。如果内容没有完全填充 bounds 矩形，则内容将以部分轴为中心。
++ kCAGravityResizeAspectFill:调整内容大小以完全填充 bounds 矩形，同时仍保留内容的外观（保留宽高比例）。内容以其超过的轴为中心。
 
 #### opacity
 &emsp;receiver 的不透明度。可动画的。
 ```c++
 @property float opacity;
 ```
-&emsp;此属性的值必须在0.0（透明）到1.0（不透明）之间。超出该范围的值将被限制为最小值或最大值。此属性的默认值为1.0。
+&emsp;此属性的值必须在 0.0（透明）到 1.0（不透明）之间。超出该范围的值将被限制为最小值或最大值。此属性的默认值为1.0。
 
-/* The opacity of the layer, as a value between zero and one. Defaults to one. Specifying a value outside the [0,1] range will give undefined results. Animatable. */
-图层的不透明度，介于0和1之间的值。默认为1。指定超出[0,1]范围的值将产生不确定的结果。可动画的。
+> &emsp;CALayer 的不透明度，介于 0 和 1 之间的值。默认为 1。指定超出 [0,1] 范围的值将产生不确定的结果。可动画的。
 
 #### hidden
-&emsp;指示是否显示图层的布尔值。可动画的。
+&emsp;指示是否隐藏 CALayer 的布尔值。可动画的。
 ```c++
 @property(getter=isHidden) BOOL hidden;
 ```
 &emsp;此属性的默认值为 NO。
 
-/* When true the layer and its sublayers are not displayed. Defaults to NO. Animatable. */
-如果为true，则不显示该图层及其子图层。默认为NO。可动画的。
+> &emsp;如果为true，则不显示该图层及其子图层。默认为 NO。可动画的。
+
 #### masksToBounds
-&emsp;一个布尔值，指示是否将子层裁剪到该层的边界。可动画的。
+&emsp;一个布尔值，指示是否将 sublayers 裁剪到该 CALayer 的 bounds。可动画的。
 ```c++
 @property BOOL masksToBounds;
 ```
-&emsp;当此属性的值为YES时，Core Animation将创建一个隐含的剪贴蒙版，该蒙版与图层的边界匹配并包括任何角半径效果。如果还指定了mask属性的值，则将两个掩码相乘以获得最终的掩码值。
+&emsp;当此属性的值为 YES 时，Core Animation 将创建一个隐含的剪贴 mask，该 mask 与 CALayer 的 bounds 匹配并包括任何 corner radius 效果。如果还指定了 mask 属性的值，则将两个 masks 相乘以获得最终的 mask 值。
 
-&emsp;此属性的默认值为NO。
-
-/* When true an implicit mask matching the layer bounds is applied to the layer (including the effects of the 'cornerRadius' property). If both 'mask' and 'masksToBounds' are non-nil the two masks are multiplied to get the actual mask values. Defaults to NO. Animatable. */
-如果为 true，则将与图层范围匹配的隐式蒙版应用于该图层（包括“ cornerRadius”属性的效果）。如果“ mask”和“ masksToBounds”都不为零，则将两个掩码相乘以获得实际的掩码值。默认为 NO。可动画的。
+&emsp;此属性的默认值为 NO。
 #### mask
-&emsp;可选图层，其 Alpha 通道用于掩盖图层的内容。
+&emsp;可选图层，其 Alpha 通道用于屏蔽 CALaer 的内容。
 ```c++
 @property(nullable, strong) __kindof CALayer *mask;
 ```
-&emsp;图层的 Alpha 通道决定了该图层的内容和背景可以显示多少。完全或部分不透明的像素允许基础内容显示出来，但是完全透明的像素会阻止该内容。
+&emsp;CALayer 的 Alpha 通道决定了该 CALayer 的内容和背景可以显示多少。完全或部分不透明的像素允许基础内容显示出来，但是完全透明的像素会阻止该内容。
 
-&emsp;此属性的默认值为 nil。配置遮罩时，请记住设置遮罩层的大小和位置，以确保其与遮罩的层正确对齐。
+&emsp;此属性的默认值为 nil。配置 mask 时，请记住设置 mask 层的大小和位置，以确保其与 mask 的 CALayer 正确对齐。
 
-&emsp;你分配给此属性的图层不得具有 superlayer。如果是这样，则行为是不确定的。
+&emsp;你分配给此属性的 CALayer 不得具有 superlayer。如果是这样，则行为是不确定的。
 
-/* A layer whose alpha channel is used as a mask to select between the layer's background and the result of compositing the layer's contents with its filtered background. Defaults to nil. When used as a mask the layer's 'compositingFilter' and `backgroundFilters' properties are ignored. When setting the mask to a new layer, the new layer must have a nil superlayer, otherwise the behavior is undefined. Nested masks (mask layers with their own masks) are unsupported. */
-图层，其 alpha 通道用作遮罩，以在图层的背景和将其内容与其过滤的背景合成的结果之间进行选择。默认为零。当用作遮罩时，图层的'compositingFilter'和'backgroundFilters'属性将被忽略。将蒙版设置为新层时，新层必须具有 nil 超级层，否则行为是不确定的。不支持嵌套蒙版（具有自己的蒙版的蒙版层）。
+> &emsp;一个 CALayer，其 alpha 通道用作 mask，以在 CALayer 的背景和将其内容与其过滤的背景合成的结果之间进行选择。默认为 nil。当用作 mask 时，图层的 compositingFilter 和 backgroundFilters 属性将被忽略。将 mask 设置为 new layer 时，其 superlayer 必须为 nil，否则行为是不确定的。不支持嵌套 masks（具有自己的 mask 的 mask layer）。
+
 #### doubleSided
-&emsp;一个布尔值，指示当背离查看器时，图层是否显示其内容。可动画的。
+&emsp;一个布尔值，指示当 facing away from the viewer，CALayer 是否显示其内容。可动画的。
 ```c++
 @property(getter=isDoubleSided) BOOL doubleSided;
 ```
-&emsp;当此属性的值为 NO 时，该层将背对查看器时隐藏其内容。此属性的默认值为 YES。
+&emsp;当此属性的值为 NO 时，该层将背对查看器时隐藏其内容（when it faces away from the viewer）。此属性的默认值为 YES。
 
-/* When false layers facing away from the viewer are hidden from view. Defaults to YES. Animatable. */
-当假面背对观察者时，将其隐藏起来。默认为 YES。可动画的。
 #### cornerRadius
-&emsp;为图层的背景绘制圆角时要使用的半径。可动画的。
+&emsp;为 CAlayer 的背景绘制圆角时要使用的半径。可动画的。
 ```c++
 @property CGFloat cornerRadius;
 ```
-&emsp;将“半径”设置为大于0.0的值将导致图层开始在其背景上绘制圆角。默认情况下，角半径不应用于图层内容属性中的图像；它仅应用于图层的背景色和边框。但是，将masksToBounds属性设置为YES会将内容剪裁到圆角。
+&emsp;将 radius 设置为大于 0.0 时 CALayer 可开始在其背景上绘制圆角。默认情况下，corner radius 不应用于 CALayer contents 属性中的图像；它仅应用于 CALayer 的背景色和边框。但是，将 masksToBounds 属性设置为 YES 会将内容剪裁到圆角。
 
 &emsp;此属性的默认值为 0.0。
-
-/* When positive, the background of the layer will be drawn with rounded corners. Also effects the mask generated by the 'masksToBounds' property. Defaults to zero. Animatable. */
-当为正时，将以圆角绘制图层的背景。还影响“ masksToBounds”属性生成的蒙版。默认为 zero。可动画的。
 #### maskedCorners
-&emsp;定义使用“ cornerRadius”属性时四个角中的哪个角接受遮罩。默认为所有四个角。
+&emsp;定义使用 cornerRadius 属性时四个角中的哪个角接受遮罩。默认为所有四个角。
 ```c++
 @property CACornerMask maskedCorners API_AVAILABLE(macos(10.13), ios(11.0), watchos(4.0), tvos(11.0));
 ```
-/* Defines which of the four corners receives the masking when using 'cornerRadius' property. Defaults to all four corners. */
 #### CACornerMask
-&emsp;maskedCorners属性的位定义。
-/* Bit definitions for `maskedCorners' property. */
+&emsp;maskedCorners 属性的位定义。
 ```c++
 typedef NS_OPTIONS (NSUInteger, CACornerMask)
 {
@@ -514,97 +519,81 @@ typedef NS_OPTIONS (NSUInteger, CACornerMask)
 };
 ```
 #### borderWidth
-&emsp;图层 border 的宽度。可动画的。
+&emsp;CALayer 边框的宽度。可动画的。
 ```c++
 @property CGFloat borderWidth;
 ```
-&emsp;当此值大于0.0时，图层将使用当前的borderColor值绘制边框。边框是根据此属性中指定的值从接收者的边界绘制的。它在接收者的内容和子层之上进行了合成，并包含cornerRadius属性的效果。
+&emsp;当此值大于 0.0 时，CALayer 将使用当前的 borderColor 值绘制边框。边框是根据此属性中指定的值从接收者的 bounds 绘制的。它在接收者的内容和子层之上进行了合成，并包含 cornerRadius 属性的效果。
 
 &emsp;此属性的默认值为 0.0。
-
-/* The width of the layer's border, inset from the layer bounds. The border is composited above the layer's content and sublayers and includes the effects of the 'cornerRadius' property. Defaults to zero. Animatable. */
-图层边界的宽度，从图层边界插入。边框在图层内容和子图层上方合成，并包含“ cornerRadius”属性的效果。默认为零。可动画的。
 #### borderColor
-&emsp;图层边框的颜色。可动画的。
+&emsp;CALayer 边框的颜色。可动画的。（类型是 CGColorRef）
 ```c++
 @property(nullable) CGColorRef borderColor;
 ```
 &emsp;此属性的默认值为不透明的黑色。
 
-&emsp;使用Core Foundation保留/释放语义保留此属性的值。尽管该属性声明似乎使用默认的assign语义进行对象保留，但仍会发生此行为。
-
-/* The color of the layer's border. Defaults to opaque black. Colors created from tiled patterns are supported. Animatable. */
-图层边框的颜色。默认为不透明黑色。支持从平铺模式创建的颜色。可动画的。
-
+&emsp;使用 Core Foundation retain/release 语义保留此属性的值。尽管该属性声明似乎使用默认的 assign 语义进行对象保留，但仍会发生此行为。
 #### backgroundColor
-&emsp;接收器的背景色。可动画的。
+&emsp;CALayer 的背景色。可动画的。
 ```c++
 @property(nullable) CGColorRef backgroundColor;
 ```
-&emsp;此属性的默认值为nil。
+&emsp;此属性的默认值为 nil。
 
-&emsp;使用Core Foundation保留/释放语义保留此属性的值。尽管该属性声明似乎使用默认的assign语义进行对象保留，但仍会发生此行为。
-
-/* The background color of the layer. Default value is nil. Colors created from tiled patterns are supported. Animatable. */
-图层的背景色。默认值为零。支持从平铺模式创建的颜色。可动画的。
+&emsp;使用 Core Foundation retain/release 语义保留此属性的值。尽管该属性声明似乎使用默认的 assign 语义进行对象保留，但仍会发生此行为。
 #### shadowOpacity
-&emsp;图层阴影的不透明度。可动画的。
+&emsp;CALayer 阴影的不透明度。可动画的。
 ```c++
 @property float shadowOpacity;
 ```
-&emsp;此属性中的值必须在0.0（透明）到1.0（不透明）之间。此属性的默认值为0.0。
+&emsp;此属性中的值必须在 0.0（透明）到 1.0（不透明）之间。此属性的默认值为 0.0。
 
-/* The opacity of the shadow. Defaults to 0. Specifying a value outside the [0,1] range will give undefined results. Animatable. */
-阴影的不透明度。默认值为 0。指定[0,1]范围以外的值将得到不确定的结果。可动画的。
+> &emsp;阴影的不透明度。默认值为 0。指定 [0,1] 范围以外的值将得到不确定的结果。可动画的。
+
 #### shadowRadius
-&emsp;用于渲染图层阴影的模糊半径（以磅为单位）。可动画的。
+&emsp;用于渲染 CALayer 阴影的模糊半径（以 points 为单位）。可动画的。
 ```c++
 @property CGFloat shadowRadius;
 ```
-&emsp;指定半径此属性的默认值为3.0。
+&emsp;指定半径此属性的默认值为 3.0。
 
-/* The blur radius used to create the shadow. Defaults to 3. Animatable. */
-用于创建阴影的模糊半径。默认值为 3。可设置动画。
+> &emsp;用于创建阴影的模糊半径。默认值为 3.0。可设置动画。
+
 #### shadowOffset
-&emsp;图层阴影的偏移量（以磅为单位）。可动画的。
+&emsp;CALayer 阴影的偏移量（以 points 为单位）。可动画的。
 ```c++
 @property CGSize shadowOffset;
 ```
 &emsp;此属性的默认值为（0.0，-3.0）。
-
-/* The shadow offset. Defaults to (0, -3). Animatable. */
-阴影偏移。默认为（0，-3）可动画的。
 #### shadowColor
-&emsp;图层阴影的颜色。可动画的。
+&emsp;CALayer 阴影的颜色。可动画的。
 ```c++
 @property(nullable) CGColorRef shadowColor;
 ```
-&emsp;图层阴影的颜色。可动画的。
+&emsp;使用 Core Foundation retain/release 语义保留此属性的值。尽管该属性声明似乎使用默认的 assign 语义进行对象保留，但仍会发生此行为。
 
-&emsp;使用 Core Foundation 保留/释放语义保留此属性的值。尽管该属性声明似乎使用默认的assign语义进行对象保留，但仍会发生此行为。
+> &emsp;阴影的颜色。默认为不透明黑色。当前不支持从图案创建的颜色。可动画的。
 
-/* The color of the shadow. Defaults to opaque black. Colors created from patterns are currently NOT supported. Animatable. */
-阴影的颜色。默认为不透明黑色。当前不支持从图案创建的颜色。可动画的。
 #### shadowPath
-&emsp;图层阴影的形状。可动画的。
+&emsp;CALayer 阴影的形状。可动画的。
 ```c++
 @property(nullable) CGPathRef shadowPath;
 ```
-&emsp;此属性的默认值为 nil，这会导致层使用标准阴影形状。如果为此属性指定值，则层将使用指定的路径而不是层的合成 alpha 通道创建其阴影。你提供的路径定义了阴影的轮廓。使用非零缠绕规则和当前阴影颜色、不透明度和模糊半径填充。
+&emsp;此属性的默认值为 nil，这会导致 CALayer 使用标准阴影形状（tandard shadow shape）。如果为此属性指定值，则 CALayer 将使用指定的路径而不是 CALayer 的合成 alpha 通道创建其阴影。你提供的路径定义了阴影的轮廓。使用 non-zero winding 规则和当前阴影颜色、不透明度和模糊半径填充。
 
-&emsp;与大多数可设置动画的属性不同，此属性（与所有CGPathRef可设置动画的属性一样）不支持隐式动画。但是，可以使用CAPropertyAnimation的任何具体子类为路径对象设置动画。路径将插值为“在线”点的线性混合；“离线”点可以非线性插值（以保持曲线导数的连续性）。如果两条路径具有不同数量的控制点或段，则结果未定义。如果路径延伸到层边界之外，它将不会自动剪裁到层，只有在正常的层掩蔽规则导致这种情况时。
+&emsp;与大多数可设置动画的属性不同，此属性（与所有 CGPathRef 可设置动画的属性一样）不支持隐式动画。但是，可以使用 CAPropertyAnimation 的任何具体子类为路径对象设置动画。路径将插值为 "on-line" 点的线性混合；"off-line" 点可以非线性插值（以保持曲线导数的连续性）。如果两条路径具有不同数量的控制点或段，则结果未定义。如果路径延伸到层边界之外，它将不会自动剪裁到层，只有在正常的 masking rules 规则导致这种情况时。
 
 &emsp;指定显式路径通常可以提高渲染性能。
 
-&emsp;使用 Core Foundation 保留/释放语义保留此属性的值。尽管该属性声明似乎使用默认的assign语义进行对象保留，但仍会发生此行为。
+&emsp;使用 Core Foundation retain/release 语义保留此属性的值。尽管该属性声明似乎使用默认的 assign 语义进行对象保留，但仍会发生此行为。
 
-/* When non-null this path defines the outline used to construct the layer's shadow instead of using the layer's composited alpha channel. The path is rendered using the non-zero winding rule. Specifying the path explicitly using this property will usually improve rendering performance, as will sharing the same path reference across multiple layers. Upon assignment the path is copied. Defaults to null. Animatable. */
-当为非null时，此路径定义用于构造图层阴影的轮廓，而不是使用图层的合成Alpha通道。使用非零缠绕规则渲染路径。使用此属性显式指定路径通常可以提高渲染性能，因为可以在多个图层之间共享相同的路径引用。分配后，路径将被复制。默认为空。可动画的。
+> &emsp;当为非 null 时，此路径定义用于构造图层阴影的轮廓，而不是使用图层的合成 Alpha 通道。使用非零缠绕规则渲染路径。使用此属性显式指定路径通常可以提高渲染性能，因为可以在多个图层之间共享相同的路径引用。分配后，路径将被复制。默认为 nil。可动画的。
 
 ##### Using Shadow Path for Special Effects（使用阴影路径进行特殊效果）
 &emsp;你可以使用图层的阴影路径来创建特殊效果，例如模拟 Pages 中可用的阴影。
 
-&emsp;清单1 显示了将椭圆阴影添加到图层底部以模拟Pages Contact Shadow 效果所需的代码。
+&emsp;清单1 显示了将椭圆阴影添加到图层底部以模拟 Pages Contact Shadow 效果所需的代码。
 
 &emsp;Listing 1 Creating a contact shadow path
 ```c++
@@ -627,13 +616,13 @@ layer.shadowPath = shadowPath
 ```
 &emsp;Figure 1 Layer with contact shadow effect
 
-![]()
+![Layer_with_contact_shadow_effect](https://p6-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/ef7dae0dc97c4891863b84ab28ce2183~tplv-k3u1fbpfcp-watermark.image)
 
-&emsp;清单 2 显示了如何创建路径来模拟Pages Curved Shadow。路径的左侧，顶部和右侧是直线，而底部是凹曲线，如图2所示。
+&emsp;清单 2 显示了如何创建路径来模拟 Pages Curved Shadow。路径的左侧，顶部和右侧是直线，而底部是凹曲线，如图 2 所示。
 
 &emsp;Figure 2 Shadow path for curved shadow effect
 
-![]()
+![Shadow_path_for_curved_shadow_effect](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/e7fb1edcb830450693b85583968ece0b~tplv-k3u1fbpfcp-watermark.image)
 
 &emsp;Listing 2 Creating a curved shadow path
 ```c++
@@ -665,61 +654,47 @@ layer.shadowPath = shadowPath
 ```
 &emsp;Figure 3 Layer with curved shadow effect
 
-![]()
+![Layer_with_curved_shadow_effect](https://p6-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/68a673c08d0b46149bb04743af64ab96~tplv-k3u1fbpfcp-watermark.image)
 
 #### style
-&emsp;可选字典，用于存储未由图层明确定义的属性值
+&emsp;可选 NSDictionary，用于存储未由 CALayer 明确定义的属性值
 ```c++
 @property(nullable, copy) NSDictionary *style;
 ```
-&emsp;该字典又可以具有样式键，从而形成默认值的层次结构。如果是分层样式字典，则使用属性的最浅值。例如，“ style.someValue”的值优先于“ style.style.someValue”。
 
-&emsp;如果样式字典未为属性定义值，则调用接收者的defaultValueForKey：方法。此属性的默认值为nil。
+&emsp;该 NSDictionary 又可以具有 style key，从而形成默认值的层次结构。如果是分层样式字典（hierarchical style dictionaries），则使用属性的最浅值。例如，style.someValue 的值优先于 style.style.someValue。
 
-&emsp;下列关键字不参考样式词典：bounds，frame。
+&emsp;如果 style dictionary 未为属性定义值，则调用 CALayer 的 `+ defaultValueForKey:` 方法。此属性的默认值为 nil。
 
-> &emsp;Warning: 如果修改了 style 字典或其任何祖先，则在重置样式属性之前，图层属性的值是不确定的。
+&emsp;下列关键字不参考 style dictionary：bounds、frame。
 
-/* When non-nil, a dictionary dereferenced to find property values that aren't explicitly defined by the layer. (This dictionary may in turn have a `style' property, forming a hierarchy of default values.) If the style dictionary doesn't define a value for an attribute, the +defaultValueForKey: method is called. Defaults to nil.
-不为nil时，将取消引用字典以查找该层未明确定义的属性值。 （此字典可能又具有“样式”属性，形成默认值的层次结构。）如果样式字典未为属性定义值，则调用+ defaultValueForKey：方法。默认为零。
+> &emsp;Warning: 如果修改了 style dictionary 或其任何 ancestors，则在重置样式属性之前，CALayer 属性的值是不确定的。
 
-* Note that if the dictionary or any of its ancestors are modified, the values of the layer's properties are undefined until the 'style' property is reset. */
-请注意，如果修改了字典或其任何祖先，则在重置“样式”属性之前，图层属性的值是不确定的。
+> &emsp;非 nil 时，dictionary 取消引用以查找 CALayer 未显式定义的属性值。 （此 dictionary 可能又具有 style 属性，形成默认值的层次结构。）如果 style dictionary 未为属性定义值，则调用 `+ defaultValueForKey:` 方法。默认为 nil。
+
 #### allowsEdgeAntialiasing
-&emsp;一个布尔值，指示是否允许该图层执行边缘抗锯齿。
+&emsp;一个布尔值，指示是否允许该 CALayer 执行边缘抗锯齿。
 ```c++
 @property BOOL allowsEdgeAntialiasing API_AVAILABLE(macos(10.10), ios(2.0), watchos(2.0), tvos(9.0));
 ```
-&emsp;值为YES时，允许图层按照其edgeAntialiasingMask属性中的值要求对其边缘进行抗锯齿。默认值是从主捆绑包的Info.plist文件中的boolean UIViewEdgeAntialiasing属性读取的。如果未找到任何值，则默认值为NO。
-
-/* When true this layer is allowed to antialias its edges, as requested by the value of the edgeAntialiasingMask property.
-设置为true时，允许该层按照edgeAntialiasingMask属性值的要求对边缘进行抗锯齿。
-
-* The default value is read from the boolean UIViewEdgeAntialiasing property in the main bundle's Info.plist. If no value is found in the Info.plist the default value is NO. */
-从主包的Info.plist中的布尔UIViewEdgeAntialiasing属性读取默认值。如果在Info.plist中找不到值，则默认值为NO。
+&emsp;值为 YES 时，允许 CALayer 按照其 edgeAntialiasingMask 属性中的值要求对其边缘进行抗锯齿。默认值是从 main bundle 的 Info.plist 文件中的 boolean UIViewEdgeAntialiasing 属性读取的。如果未找到任何值，则默认值为 NO。
 #### allowsGroupOpacity
-&emsp;一个布尔值，指示是否允许该图层将自身与其父级分开组合为一个组。
+&emsp;一个布尔值，指示是否允许该 CALayer 将自身与其父级分开组合为一个组。
 ```c++
 @property BOOL allowsGroupOpacity API_AVAILABLE(macos(10.10), ios(2.0), watchos(2.0), tvos(9.0));
 ```
-&emsp;当值为YES且图层的不透明度属性值小于1.0时，允许图层将其自身组合为与其父级分开的组。当图层包含多个不透明组件时，这会给出正确的结果，但可能会降低性能。
+&emsp;当值为 YES 且 CALayer 的 opacity 属性值小于 1.0 时，允许 CALayer 将其自身组合为与其父级分开的组。当 CALayer 包含多个不透明组件时，这会给出正确的结果，但可能会降低性能。
 
-&emsp;默认值是从主捆绑包的Info.plist文件中的boolean UIViewGroupOpacity属性读取的。如果未找到任何值，则对与iOS 7 SDK或更高版本链接的应用程序的默认值为“YES”，对于与较早的SDK链接的应用程序的默认值为“否”。
-
-/* When true, and the layer's opacity property is less than one, the layer is allowed to composite itself as a group separate from its parent. This gives the correct results when the layer contains multiple opaque components, but may reduce performance.
-如果为 true，并且图层的不透明度属性小于1，则允许图层将其自身组合为与其父级分开的组。当图层包含多个不透明组件时，这将给出正确的结果，但可能会降低性能。
-
-* The default value of the property is read from the boolean UIViewGroupOpacity property in the main bundle's Info.plist. If no value is found in the Info.plist the default value is YES for applications linked against the iOS 7 SDK or later and NO for applications linked against an earlier SDK. */
-该属性的默认值是从主捆绑包的Info.plist中的布尔UIViewGroupOpacity属性读取的。如果在Info.plist中找不到值，则对于与iOS 7 SDK或更高版本链接的应用程序，默认值为YES；对于与早期SDK链接的应用程序，默认值为NO。
-### Layer Filters
+&emsp;默认值是从 main bundle 的 Info.plist 文件中的 boolean UIViewGroupOpacity 属性读取的。如果未找到任何值，则对与 iOS 7 SDK 或更高版本链接的应用程序的默认值为 YES，对于与较早的 SDK 链接的应用程序的默认值为 NO。
+### Layer Filters（图层过滤器）
 #### filters
-&emsp;一组 Core Image 过滤器，可应用于图层及其子图层的内容。可动画的。
+&emsp;一组 Core Image 过滤器，可应用于 CALayer 及其 sublayers 的内容。可动画的。
 ```c++
 @property(nullable, copy) NSArray *filters;
 ```
-&emsp;你添加到此属性的过滤器会影响图层的内容，包括其边框，填充的背景和子图层。此属性的默认值为nil。
+&emsp;你添加到此属性的过滤器会影响 CALayer 的内容，包括其 border，填充的背景和 sublayers。此属性的默认值为 nil。
 
-&emsp;在 CIFilter 对象附加到层之后直接更改其输入会导致未定义的行为。可以在将过滤器参数附着到图层后修改过滤器参数，但必须使用图层的设置值：forKeyPath：执行此操作的方法。此外，必须为筛选器指定一个名称，以便在数组中标识它。例如，要更改过滤器的inputRadius参数，可以使用类似以下代码：
+&emsp;在 CIFilter 对象附加到 CALayer 之后直接更改其输入会导致未定义的行为。可以在将过滤器附着到 CALayer 后修改过滤器参数，但必须使用图层的 `setValue:forKeyPath:` 方法执行此操作。此外，必须为过滤器指定一个名称，以便在数组中标识它。例如，要更改过滤器的 inputRadius 参数，可以使用类似以下代码：
 ```c++
 CIFilter *filter = ...;
 CALayer *layer = ...;
@@ -729,11 +704,8 @@ layer.filters = [NSArray arrayWithObject:filter];
 [layer setValue:[NSNumber numberWithInt:1] forKeyPath:@"filters.myFilter.inputRadius"];
 ```
 &emsp;iOS 中的图层不支持此属性。
-
-/* An array of filters that will be applied to the contents of the layer and its sublayers. Defaults to nil. Animatable. */
-一系列过滤器，将应用于该图层及其子图层的内容。默认为 nil。可动画的。
 #### compositingFilter
-&emsp;一个CoreImage滤镜，用于合成图层及其背后的内容。可动画的。
+&emsp;一个 Core Image 滤镜，用于合成 CALayer 及其背后的内容。可动画的。
 ```c++
 @property(nullable, strong) id compositingFilter;
 ```
