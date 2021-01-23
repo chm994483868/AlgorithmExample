@@ -116,14 +116,88 @@ CA_EXTERN CAMediaTimingFillMode const kCAFillModeRemoved    API_AVAILABLE(macos(
 + kCAFillModeBoth: receiver 将值固定在对象时间空间的两端。
 + kCAFillModeRemoved: 动画完成后，receiver 将从 presentation 中删除。
 
+## CAAction
+&emsp;
+```c++
+
+```
 ## CALayerDelegate
 &emsp;CALayer 的 delegate 对象需要遵循此协议，以响应与 CALayer 相关的事件。
 ```c++
 @protocol CALayerDelegate <NSObject>
+@optional // CALayerDelegate 的协议方法都是可选的
 ...
 @end
 ```
-&emsp;你可以实施此协议的方法来提供 CALayer 的内容，处理 sublayers 的布局以及提供要执行的自定义动画动作（custom animation actions）。必须将实现此协议的对象分配给图层对象的委托属性。
+&emsp;你可以实现此协议的方法来提供 CALayer 的内容、处理 sublayers 的布局以及提供要执行的自定义动画动作（custom animation actions）。必须将实现此协议的对象分配给 CALyer 对象的 delegate 属性。
+
+&emsp;在 iOS 中 View 的 layer 的 delegate 默认是 View 本身。如下示例代码打印：
+```c++
+NSLog(@"😻😻 view 本身: %@", self.view);
+NSLog(@"😻😻 view 的 layer 的 delegate: %@", self.view.layer.delegate);
+// 控制台打印：
+😻😻 view 本身: <UIView: 0x7fcdf090b170; frame = (0 0; 390 844); autoresize = W+H; layer = <CALayer: 0x6000038df680>>
+😻😻 view 的 layer 的 delegate: <UIView: 0x7fcdf090b170; frame = (0 0; 390 844); autoresize = W+H; layer = <CALayer: 0x6000038df680>>
+```
+### Providing the Layer's Content（提供 CALayer 的内容）
+#### - displayLayer:
+&emsp;告诉 delegate 执行显示过程。
+```c++
+- (void)displayLayer:(CALayer *)layer;
+```
+&emsp;`layer`: 其内容需要更新的 CALayer。
+
+&emsp;`displayLayer:` 委托方法在 CALayer 被标记为要重新加载其内容时被调用，通常由 `setNeedsDisplay` 方法启动（标记）。典型的更新技术是设置 CALayer 的 contents 属性。
+
+> &emsp;如果已实现此委托方法，则由 `- display` 方法的默认实现调用，在这种情况下，它应该实现整个显示过程（通常通过设置 contents 属性）。
+#### - drawLayer:inContext:
+&emsp;告诉 delegate 使用 CALayer 的 CGContextRef 实现显示过程。
+```c++
+- (void)drawLayer:(CALayer *)layer inContext:(CGContextRef)ctx;
+```
+&emsp;`layer`: 需要绘制其内容的 CALayer。`ctx`: 用于绘图的图形上下文。图形上下文包含用于绘制到目标屏幕的适当比例因子。
+
+&emsp;`drawLayer:inContext:` 委托方法在 CALayer 被标记为要重新加载其内容时调用，通常使用 `setNeedsDisplay` 方法标记。如果 delegate 实现了 `displayLayer:` 方法，则不调用它。可以使用上下文来绘制向量，例如曲线和直线，或者使用 `draw(_:in:byTiling:)` 方法绘制图像。
+
+> &emsp;Important:如果 delegate 实现了 `displayLayer:` 方法，则不会调用此方法。
+
+> &emsp;如果已实现此委托方法，则由 `- drawInContext:` 方法的默认实现调用。
+#### - layerWillDraw:
+&emsp;通知 delegate 即将 draw。
+```c++
+- (void)layerWillDraw:(CALayer *)layer API_AVAILABLE(macos(10.12), ios(10.0), watchos(3.0), tvos(10.0));
+```
+&emsp;`layer`: 将绘制其内容的 CALayer。
+
+&emsp;在 `drawLayer:inContext:` 之前调用 `layerWillDraw:` 方法。你可以使用此方法在 `drawLayer:inContext:` 之前配置影响 contents 的任何 CALayer 状态，例如 contentsFormat 和 opaque。
+
+> &emsp;Important:如果 delegate 实现了 `displayLayer:` 方法，则不会调用此方法。
+
+> &emsp;如果已实现此委托方法，则由 `- display` 方法的默认实现调用。允许委托在 `- drawLayer:InContext:` 之前配置影响 contents 的任何 CALayer 状态，例如 contentsFormat 和 opaque。如果委托实现 `- displayLayer`，则不会调用该方法。
+### Laying Out Sublayers（布局子图层）
+#### - layoutSublayersOfLayer:
+&emsp;告诉 delegate CALayer 的 bounds 已更改。
+```c++
+- (void)layoutSublayersOfLayer:(CALayer *)layer;
+```
+&emsp;`layer`: 需要布局其 sublayers 的 CALayer。
+
+&emsp;`layoutSublayersOfLayer:` 方法在 CALayer 的 bounds 发生更改时调用，例如通过更改其 frame 的大小。如果需要精确控制 CALayer 的 sublayers 的布局，可以实现此方法。
+
+> &emsp;在检查 layout manager 之前，由默认的 `- layoutSublayers` 实现调用。请注意，如果调用了委托方法（`- layoutSublayersOfLayer:`），则 layout manager 将被忽略。
+### Providing a Layer's Actions
+#### - actionForLayer:forKey:
+&emsp;返回 `actionForKey:` 方法的默认 action。
+```c++
+- (nullable id<CAAction>)actionForLayer:(CALayer *)layer forKey:(NSString *)event;
+```
+&emsp;`layer`: 作为 action target 的 CALayer。`event`: action 的标识符。
+
+&emsp;Return Value: 实现 CAAction 协议的对象，如果 delegate 没有为指定的 event 指定行为，则为 nil。
+
+&emsp;实现此方法的 CALayer 的 delegate 返回指定键的 action 并停止任何进一步的搜索（即，不返回 CALayer 的 actions 字典中相同键的 action 或 `+ defaultActionForKey:` 指定的 action）。
+
+> &emsp;如果已实现此委托方法，则由 `- actionForKey:` 方法的默认实现调用。应返回实现 CAAction 协议的对象。如果 delegate 未指定当前 `event` 的行为，则可能返回 nil。返回空对象（即 [NSNull null]）会明确强制不再进行进一步的搜索。（即，`+ defaultActionForKey:` 方法将不会被调用。）
 
 ## CALayer
 &emsp;管理基于图像的内容并允许你对该内容执行动画的对象。
