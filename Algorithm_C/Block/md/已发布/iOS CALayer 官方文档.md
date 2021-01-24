@@ -1058,10 +1058,10 @@ layer.backgroundFilters = [NSArray arrayWithObject:filter];
 ```c++
 - (void)setNeedsDisplay;
 ```
-&emsp;调用此方法将导致图层重新缓存其内容。这导致该层可能调用其委托的displayLayer：或drawLayer：inContext：方法。图层的contents属性中的现有内容将被删除，以便为新内容腾出空间。
+&emsp;调用此方法将导致图层重新缓存其内容。这导致该层可能调用其 delegate 的 `displayLayer:` 或 `drawLayer:inContext:` 方法。图层的 contents 属性中的现有内容将被删除，以便为新内容腾出空间。
 
-/* Marks that -display needs to be called before the layer is next committed. If a region is specified, only that region of the layer is invalidated. */
-标记-display需要在下一次提交层之前被调用。如果指定了区域，则仅该层的该区域无效。
+> &emsp;标记 `- display` 需要在下一次提交层之前被调用。如果指定了区域，则仅该层的该区域无效。
+
 #### - setNeedsDisplayInRect:
 &emsp;将指定矩形内的区域标记为需要更新。
 ```c++
@@ -1069,32 +1069,31 @@ layer.backgroundFilters = [NSArray arrayWithObject:filter];
 ```
 &emsp;`r`: 标记为无效的图层的矩形区域。你必须在图层自己的坐标系中指定此矩形。
 #### needsDisplayOnBoundsChange
-&emsp;一个布尔值，指示当其边界矩形更改时是否必须更新图层内容。
+&emsp;一个布尔值，指示当其 bounds 矩形更改时是否必须更新图层内容。
 ```c++
 @property BOOL needsDisplayOnBoundsChange;
 ```
-/* When true -setNeedsDisplay will automatically be called when the bounds of the layer changes. Default value is NO. */
-如果为 true，则在更改图层边界时将自动调用-setNeedsDisplay。默认值为“否”。
+> &emsp;如果为 true，则在更改图层 bounds 时将自动调用 `- setNeedsDisplay`。默认值为 NO。
 #### - displayIfNeeded
 &emsp;如果图层当前被标记为需要更新，则启动该图层的更新过程。
 ```c++
 - (void)displayIfNeeded;
 ```
-&emsp;你可以根据需要调用此方法，以在正常更新周期之外强制对图层内容进行更新。但是，通常不需要这样做。更新图层的首选方法是调用setNeedsDisplay，并让系统在下一个周期更新图层。
+&emsp;你可以根据需要调用此方法，以在正常更新周期之外强制对图层内容进行更新。但是，通常不需要这样做。更新图层的首选方法是调用 `- setNeedsDisplay`，并让系统在下一个周期更新图层。
 
-/* Call -display if receiver is marked as needing redrawing. */
-如果接收方被标记为需要重绘，则调用-display。
+> &emsp;如果接收方被标记为需要重绘，则调用 `- display`。
+
 #### - needsDisplay
 &emsp;返回一个布尔值，指示该图层是否已标记为需要更新。
 ```c++
 - (BOOL)needsDisplay;
 ```
-&emsp;是，如果需要更新图层。
+&emsp;YES，如果需要更新图层。
 
-/* Returns true when the layer is marked as needing redrawing. */
-将图层标记为需要重绘时，返回true。
+> &emsp;将图层标记为需要重绘时，返回 YES。
+
 #### + needsDisplayForKey:
-&emsp;返回一个布尔值，指示对指定键的更改是否需要重新显示该图层。
+&emsp;返回一个布尔值，指示对指定 key 的更改是否需要重新显示该图层。
 ```c++
 + (BOOL)needsDisplayForKey:(NSString *)key;
 ```
@@ -1106,78 +1105,70 @@ layer.backgroundFilters = [NSArray arrayWithObject:filter];
 
 &emsp;此方法的默认实现返回 NO。
 
-/* Method for subclasses to override. Returning true for a given property causes the layer's contents to be redrawn when the property is changed (including when changed by an animation attached to the layer). The default implementation returns NO. Subclasses should call super for properties defined by the superclass. (For example, do not try to return YES for properties implemented by CALayer, doing will have undefined results.) */
-子类重写的方法。对于给定的属性，返回true会导致更改属性时（包括通过附加到该图层的动画进行更改时）重绘该图层的内容。默认实现返回NO。子类应为超类定义的属性调用超类。（例如，不要尝试对 CALayer 实现的属性返回YES，这样做会产生不确定的结果。）
-### Layer Animations
+> &emsp;子类重写的方法。对于给定的属性，返回 YES 会导致更改属性时（包括通过附加到该图层的动画进行更改时）重绘该图层的内容。默认实现返回 NO。子类应为超类定义的属性调用超类。（例如，不要尝试对 CALayer 实现的属性返回YES，这样做会产生不确定的结果。）
+
+### Layer Animations（CALayer 动画）
 #### - addAnimation:forKey:
-&emsp;将指定的动画对象添加到图层的渲染树。
+&emsp;将指定的动画对象添加到图层的渲染树（render tree）。（目前为止已经见到过 "表示树"、"模型树"、"渲染树"、"层级树"，在 Core Animation 文档里面都能得到解释）
 ```c++
 - (void)addAnimation:(CAAnimation *)anim forKey:(nullable NSString *)key;
 ```
-&emsp;`anim`: 要添加到渲染树的动画。该对象由渲染树复制，未引用。因此，对对象的后续修改不会传播到渲染树中。`key`: 标识动画的字符串。每个唯一键仅将一个动画添加到该层。特殊键kCATransition自动用于过渡动画。你可以为此参数指定 nil。
+&emsp;`anim`: 要添加到渲染树的动画。该对象由渲染树复制，不引用（not referenced）。因此，对动画对象的后续修改不会传播到渲染树中。`key`: 标识动画的字符串。每个唯一键仅将一个动画添加到该层。特殊键 kCATransition 自动用于过渡动画。你可以为此参数指定 nil。
 
-&emsp;如果动画的duration属性为零或负，则将 duration 更改为 kCATransactionAnimationDuration 事务属性的当前值（如果已设置）或默认值为 0.25 秒。
+&emsp;如果动画的 duration 属性为零或负，则将 duration 更改为 kCATransactionAnimationDuration 事务属性的当前值（如果已设置）或默认值为 0.25 秒。
 
-/* Attach an animation object to the layer. Typically this is implicitly invoked through an action that is an CAAnimation object.
-将动画对象附加到图层。通常，这是通过作为 CAAnimation 对象的操作隐式调用的。
+> &emsp;将动画对象附加到图层。通常，这是通过作为 CAAnimation 对象的 action 隐式调用的。（CAAnimation 遵循 CAAction 协议）
 
-* 'key' may be any string such that only one animation per unique key is added per layer. The special key 'transition' is automatically used for transition animations. The nil pointer is also a valid key.
-“键”可以是任何字符串，因此每个唯一键每个图层仅添加一个动画。特殊键 “过渡” 会自动用于过渡动画。 nil 指针也是有效的键。
+ > &emsp;key 可以是任何字符串，因此每个唯一 key 每个图层仅添加一个动画。特殊键 transition 会自动用于过渡动画（transition animations）。 nil 指针也是有效的键。
 
-* If the `duration' property of the animation is zero or negative it is given the default duration, either the value of the 'animationDuration' transaction property or .25 seconds otherwise.
-如果动画的“持续时间”属性为零或负数，则指定默认持续时间，否则为“ animationDuration”交易属性的值，否则为.25秒。
+> &emsp;如果动画的 duration 属性为零或负数，则指定默认持续时间，否则为 animationDuration transaction 属性的值，否则为 0.25 秒。
 
-* The animation is copied before being added to the layer, so any subsequent modifications to `anim' will have no affect unless it is added to another layer. */
-在将动画添加到图层之前先对其进行复制，因此，除非对动画进行任何后续修改，否则将其添加到另一层都不会产生影响。
+> &emsp;在将动画添加到图层之前先对其进行复制，因此，除非对动画进行任何后续修改，否则将其添加到另一层都不会产生影响。
+
 #### - animationForKey:
 &emsp;返回具有指定标识符的动画对象。
 ```c++
 - (nullable __kindof CAAnimation *)animationForKey:(NSString *)key;
 ```
-&emsp;`key`: 一个字符串，指定动画的标识符。该字符串对应于你传递给 addAnimation：forKey：方法的标识符字符串。
+&emsp;`key`: 一个字符串，指定动画的标识符。该字符串对应于你传递给 `- addAnimation:forKey:` 方法的标识符字符串。
 
-&emsp;Return Value: 匹配标识符的动画对象；如果不存在这样的动画，则为nil。
+&emsp;Return Value: 匹配标识符的动画对象；如果不存在这样的动画，则为 nil。
 
 &emsp;你可以使用此字符串来检索已经与图层关联的动画对象。但是，你不得修改返回对象的任何属性。这样做将导致不确定的行为。
 
-/* Returns the animation added to the layer with identifier 'key', or nil if no such animation exists. Attempting to modify any properties of the returned object will result in undefined behavior. */
-返回添加到带有标识符“键”的层的动画；如果不存在这样的动画，则返回 nil。尝试修改返回对象的任何属性将导致未定义的行为。
+> &emsp;返回添加到带有标识符 key 的 CALyaer 的动画；如果不存在这样的动画，则返回 nil。尝试修改返回对象的任何属性将导致未定义的行为。
+
 #### - removeAllAnimations
 &emsp;删除所有附加到该图层的动画。
 ```c++
 - (void)removeAllAnimations;
 ```
-/* Remove all animations attached to the layer. */
-删除所有附加到该图层的动画。
 #### - removeAnimationForKey:
-&emsp;使用指定的关键帧删除动画对象。
+&emsp;使用指定的 key 删除动画对象。
 ```c++
 - (void)removeAnimationForKey:(NSString *)key;
 ```
 &emsp;`key`: 要删除的动画的标识符。
-
-/* Remove any animation attached to the layer for 'key'. */
-删除任何附加到“关键点”层的动画。
 #### - animationKeys
 &emsp;返回一个字符串数组，这些字符串标识当前附加到该图层的动画。
 ```c++
 - (nullable NSArray<NSString *> *)animationKeys;
 ```
-&emsp;Return Value: 标识当前动画的NSString对象数组。
+&emsp;Return Value: 标识当前动画的 NSString 对象数组。
 
 &emsp;数组的顺序与将动画应用于图层的顺序匹配。
 
-/* Returns an array containing the keys of all animations currently attached to the receiver. The order of the array matches the order in which animations will be applied. */
-返回一个数组，其中包含当前附加到接收器的所有动画的关键点。数组的顺序与应用动画的顺序匹配。
-### Managing Layer Resizing and Layout
+&emsp;可看到 layout 和 display 的一组方法的使用方式和命名方式基本相同。`- setNeedsDisplay/- setNeedsLayout` 标记在下一个周期需要进行 display/layout，`- displayIfNeeded/- layoutIfNeeded` 如果需要则执行 display/layout，`- needsDisplay/- needsLayout` 返回是否需要 display/layout，`- display/- layoutSublayers` 更新执行 display/layout。
+
+### Managing Layer Resizing and Layout（管理图层调整大小和布局）
 #### layoutManager
-&emsp;负责布置图层的子图层的对象。
+&emsp;负责管理图层的子图层布局的对象。
 ```c++
 @property(strong) id<CALayoutManager> layoutManager;
 ```
-&emsp;你分配给此属性的对象必须名义上实现 CALayoutManager 非正式协议非正式协议。如果图层的代表不处理布局更新，则分配给此属性的对象将有机会更新图层的子图层的布局。
+&emsp;你分配给此属性的对象必须名义上实现 CALayoutManager 非正式协议非正式协议。如果图层的 delegate 不处理布局更新，则分配给此属性的对象将有机会更新图层的子图层的布局。
 
-&emsp;在macOS中，如果您的图层使用基于图层的约束来处理布局更改，则将CAConstraintLayoutManager类的实例分配给此属性。
+&emsp;在 macOS 中，如果你的图层使用 layer-based 的约束来处理布局更改，则将 CAConstraintLayoutManager 类的实例分配给此属性。
 
 &emsp;此属性的默认值为nil。
 #### - setNeedsLayout
@@ -1185,34 +1176,32 @@ layer.backgroundFilters = [NSArray arrayWithObject:filter];
 ```c++
 - (void)setNeedsLayout;
 ```
-&emsp;你可以调用此方法来指示图层的子图层的布局已更改，必须进行更新。通常，在更改图层边界或添加或删除子图层时，系统会自动调用此方法。在macOS中，如果你图层的layoutManager属性包含一个实现invalidateLayoutOfLayer：方法的对象，则也将调用该方法。
+&emsp;你可以调用此方法来指示图层的子图层的布局已更改，必须进行更新。通常，在更改图层 bounds 或添加或删除子图层时，系统会自动调用此方法。在 macOS 中，如果你图层的 layoutManager 属性包含一个实现 `invalidateLayoutOfLayer:` 方法的对象，则也将调用该方法。
 
-&emsp;在下一个更新周期中，系统将调用需要布局更新的任何图层的 layoutSublayers 方法。
+&emsp;在下一个更新周期中，系统将调用需要布局更新的任何图层的 `- layoutSublayers` 方法。
 
-/* Marks that -layoutSublayers needs to be invoked on the receiver before the next update. If the receiver's layout manager implements the -invalidateLayoutOfLayer: method it will be called.
+> &emsp;只要修改了 sublayers 或 layoutManager 属性，便会在该层上自动调用此方法，并且只要修改其 bounds 或 transform 属性，便会在该层及其 superlayer 上自动调用此方法。如果图层当前正在执行其 `- layoutSublayers` 方法，则将跳过对 `- setNeedsLayout` 的隐式调用。
 
-* This method is automatically invoked on a layer whenever its 'sublayers' or `layoutManager' property is modified, and is invoked on the layer and its superlayer whenever its 'bounds' or 'transform' properties are modified. Implicit calls to -setNeedsLayout are skipped if the layer is currently executing its -layoutSublayers method. */
-只要修改了“ sublayers”或“ layoutManager”属性，便会在该层上自动调用此方法，并且只要修改其“ bounds”或“ transform”属性，便会在该层及其上层上自动调用此方法。如果图层当前正在执行其-layoutSublayers方法，则将跳过对-setNeedsLayout的隐式调用。
 #### - layoutSublayers
 &emsp;告诉图层更新其布局。
 ```c++
 - (void)layoutSublayers;
 ```
-&emsp;子类可以重写此方法，并使用它来实现自己的布局算法。你的实现必须设置由接收器管理的每个子层的框架。
+&emsp;子类可以重写此方法，并使用它来实现自己的布局算法。你的实现必须设置由 CALayer 管理的每个子层的 frame。
 
-&emsp;此方法的默认实现调用该图层的委托对象的layoutSublayersOfLayer：方法。如果没有委托对象，或者委托没有实现该方法，则此方法在layoutManager属性中调用对象的layoutSublayersOfLayer：方法。
+&emsp;此方法的默认实现调用该图层的 delegate 的 `layoutSublayersOfLayer:` 方法。如果没有 delegate 对象，或者 delegate 没有实现该方法，则此方法在 layoutManager 属性中调用对象的 `layoutSublayersOfLayer:` 方法。
 
-/* Called when the layer requires layout. The default implementation calls the layout manager if one exists and it implements the -layoutSublayersOfLayer: method. Subclasses can override this to provide their own layout algorithm, which should set the frame of each sublayer. */
-在图层需要布局时调用。默认实现会调用布局管理器（如果存在的话），并且会实现-layoutSublayersOfLayer：方法。子类可以重写此方法以提供自己的布局算法，该算法应设置每个子层的框架。
+> &emsp;在图层需要布局时调用。默认实现会调用布局管理器（如果存在的话），并且会实现 `- layoutSublayersOfLayer:` 方法。子类可以重写此方法以提供自己的布局算法，该算法应设置每个子层的 frame。
+
 #### - layoutIfNeeded
-&emsp;如果需要，请重新计算接收器的布局。
+&emsp;如果需要，请重新计算 CALayer 的布局。
 ```c++
 - (void)layoutIfNeeded;
 ```
-&emsp;收到此消息后，将遍历图层的超级图层，直到找到不需要布局的祖先图层。然后在该祖先下的整个层树上执行布局。
+&emsp;收到此消息后，将遍历图层的 super layers，直到找到不需要布局的祖先图层（沿着 superlayer 链一直找到不需要布局的 CALayer）。然后在该祖先下的整个层树上执行布局。
 
-/* Traverse upwards from the layer while the superlayer requires layout. Then layout the entire tree beneath that ancestor. */
-从图层向上遍历，而上层需要布局。然后将整个树布置在该祖先下。
+> &emsp;从图层向上遍历，而 superlayer 需要布局。然后将整个树布局在该祖先下。
+
 #### - needsLayout
 &emsp;返回一个布尔值，指示是否已将图层标记为需要布局更新
 ```c++
@@ -1220,50 +1209,45 @@ layer.backgroundFilters = [NSArray arrayWithObject:filter];
 ```
 &emsp;如果已将图层标记为需要布局更新，则为 YES。
 
-/* Returns true when the receiver is marked as needing layout. */
-当接收方被标记为需要布局时，返回true。
 #### autoresizingMask
-&emsp;一个位掩码，用于定义当其上层边界更改时如何调整其大小。
+&emsp;一个位掩码，用于定义当其 superlayer  bounds 更改时如何调整其大小。
 ```c++
 @property CAAutoresizingMask autoresizingMask;
 ```
-&emsp;如果您的应用未使用布局管理器或约束来处理布局更改，则可以为该属性分配一个值，以响应超级图层范围的更改来调整图层的大小。有关可能值的列表，请参见CAAutoresizingMask。
+&emsp;如果你的应用未使用布局管理器或约束来处理布局更改，则可以为该属性分配一个值，以响应 superlayer bounds 的更改来调整图层的大小。有关可能值的列表，请参见 CAAutoresizingMask。
 
-&emsp;此属性的默认值为kCALayerNotSizable。
+&emsp;此属性的默认值为 kCALayerNotSizable。
 #### - resizeWithOldSuperlayerSize:
-&emsp;通知接收者其上层大小已更改。
+&emsp;通知 CALayer 其 superlayer 大小已更改。
 ```c++
 - (void)resizeWithOldSuperlayerSize:(CGSize)size;
 ```
-&emsp;`size`: 上层的先前大小。
+&emsp;`size`: superlayer 的先前大小。
 
-&emsp;当autoresizingMask属性用于调整大小并且层的边界更改时，该层在其每个子层上调用此方法。子层使用此方法调整自己的帧矩形以反映新的超层边界，可以直接从超层检索。超层的旧大小被传递给这个方法，这样子层就有了它必须进行的任何计算所需的信息。
+&emsp;当 autoresizingMask 属性用于调整大小并且层的 bounds 更改时，该层在其每个子层上调用此方法。子层使用此方法调整自己的 frame 矩形以反映新的 superlayer bounds，可以直接从 superlayer 检索。superlayer 的旧大小被传递给这个方法，这样子层就有了它必须进行的任何计算所需的信息。
 #### - resizeSublayersWithOldSize:
-&emsp;通知接收者的子层接收者的尺寸已更改。
+&emsp;通知 CALayer 的子层接收者的尺寸已更改。
 ```c++
 - (void)resizeSublayersWithOldSize:(CGSize)size;
 ```
-&emsp;`size`: 当前图层的先前大小。
+&emsp;`size`: 当前 CALayer 的先前大小。
 
-&emsp;当将autoresizingMask属性用于调整大小并且此层的边界发生变化时，该层将调用此方法。默认实现会调用每个子层的 resizeWithOldSuperlayerSize：方法，以使其知道其上层的边界已更改。你不需要直接调用或重写此方法。
+&emsp;当将 autoresizingMask 属性用于调整大小并且此层的 bounds 发生变化时，该层将调用此方法。默认实现会调用每个子层的 `resizeWithOldSuperlayerSize:` 方法，以使其知道其 superlayer 的 bounds 已更改。你不需要直接调用或重写此方法。
 #### - preferredFrameSize
-&emsp;返回其上层坐标空间中该层的首选大小。
+&emsp;返回其 superlayer 坐标空间中该层的首选大小。
 ```c++
 - (CGSize)preferredFrameSize;
 ```
-&emsp;Return Value: 图层的首选帧大小。
+&emsp;Return Value: 图层的首选 frame 大小。
 
-&emsp;在macOS中，此方法的默认实现调用其布局管理器的preferredSizeOfLayer:方法，即layoutManager属性中的对象。如果该对象不存在或未实现该方法，则此方法返回映射到其超层坐标空间的层当前边界矩形的大小。
-
-/* Returns the preferred frame size of the layer in the coordinate space of the superlayer. The default implementation calls the layout manager if one exists and it implements the -preferredSizeOfLayer: method, otherwise returns the size of the bounds rect mapped into the superlayer. */
-返回在超级层的坐标空间中该层的首选帧大小。默认实现会调用布局管理器（如果存在的话），并且会实现-preferredSizeOfLayer：方法，否则返回映射到超层中的rect的大小。
-### Managing Layer Constraints
+&emsp;在 macOS 中，此方法的默认实现调用其布局管理器的 `- preferredSizeOfLayer:` 方法，即 layoutManager 属性中的对象。如果该对象不存在或未实现该方法，则此方法返回映射到其 superlayer 坐标空间的层当前 bounds 矩形的大小。
+### Managing Layer Constraints（管理 CALayer 约束）
 #### constraints
 &emsp;用于定位当前图层的子图层的约束。
 ```c++
 @property(copy) NSArray<CAConstraint *> *constraints;
 ```
-&emsp;macOS应用程序可以使用此属性来访问其基于层的约束。在应用约束之前，还必须将CAConstraintLayoutManager对象分配给图层的layoutManager属性。
+&emsp;macOS 应用程序可以使用此属性来访问其 layer-based 的约束。在应用约束之前，还必须将 CAConstraintLayoutManager 对象分配给图层的 layoutManager 属性。
 
 &emsp;iOS 应用程序不支持基于图层的约束。
 #### - addConstraint:
@@ -1271,79 +1255,68 @@ layer.backgroundFilters = [NSArray arrayWithObject:filter];
 ```c++
 - (void)addConstraint:(CAConstraint *)c;
 ```
-&emsp;`c`: 约束对象添加到接收者的约束对象数组中。
+&emsp;`c`: 约束对象添加到 CALayer 的约束对象数组中。
 
-&emsp;在macOS中，通常向层添加约束以管理该层子层的大小和位置。在应用约束之前，还必须将CAConstraintLayoutManager对象指定给层的layoutManager属性。有关管理基于层的约束的详细信息，请参见  Core Animation Programming Guide.。
+&emsp;在 macOS 中，通常向层添加约束以管理该层子层的大小和位置。在应用约束之前，还必须将 CAConstraintLayoutManager 对象指定给层的 layoutManager 属性。有关管理基于层的约束的详细信息，请参见  Core Animation Programming Guide.。
 
 &emsp;iOS 应用程序不支持基于图层的约束。
-### Getting the Layer’s Actions
+### Getting the Layer’s Actions（获取 CALayer 的 action）
 #### - actionForKey:
-&emsp;返回分配给指定键的操作对象。
+&emsp;返回分配给指定 key 的 action 对象。
 ```c++
 - (nullable id<CAAction>)actionForKey:(NSString *)event;
 ```
-&emsp;`event`: 动作的标识符。
+&emsp;`event`: action 的标识符。
 
 &emsp;Return Value: 返回提供键操作的对象。该对象必须实现 CAAction 协议。
 
-&emsp;此方法搜索层的给定动作对象。动作定义层的动态行为。例如，层的可设置动画的特性通常具有相应的动作对象来启动实际动画。当该属性更改时，层将查找与属性名称关联的动作对象并执行它。还可以将自定义动作对象与层关联，以实现特定于应用程序的动作。
+&emsp;此方法搜索层的给定 action 对象。action 定义层的动态行为。例如，层的可设置动画的属性通常具有相应的 action 对象来启动实际动画。当该属性更改时，层将查找与属性名称关联的 action 对象并执行它。还可以将自定义 action 对象与层关联，以实现特定于应用程序的动作。
 
+> &emsp;返回与由字符串 event 关联的 action 对象。默认实现在以下位置搜索 action 对象：
+> 
+> 1. if defined, call the delegate method -actionForLayer:forKey:（如果已实现，则调用 delegate 方法 `- actionForLayer:forKey:`）
+> 2. look in the layer's 'actions' dictionary（查看一下 CALayer 的 actions dictionaries）
+> 3. look in any 'actions' dictionaries in the 'style' hierarchy（查看 style 层次结构中的所有 actions dictionaries）
+> 4. call +defaultActionForKey: on the layer's class（在 layer 的类上调用 `+ defaultActionForKey:` 方法）
+> 
+> &emsp;如果这些步骤中的任何一个导致非空 action 对象，则以下步骤将被忽略。如果最终结果是 NSNull 的实例，则将其转换为 nil。
 
-/* Returns the action object associated with the event named by the string 'event'. The default implementation searches for an action object in the following places:
-返回与由字符串“ event” 命名的事件关联的操作对象。默认实现在以下位置搜索动作对象：
-
-* 1. if defined, call the delegate method -actionForLayer:forKey: 如果已定义，则调用委托方法-actionForLayer：forKey：
-* 2. look in the layer's `actions' dictionary 看一下图层的“动作”字典
-* 3. look in any `actions' dictionaries in the `style' hierarchy 查看“样式”层次结构中的所有“动作”字典
-* 4. call +defaultActionForKey: on the layer's class 在图层的类上调用+ defaultActionForKey：
-*
-* If any of these steps results in a non-nil action object, the following steps are ignored. If the final result is an instance of NSNull, it is converted to 'nil'. */
-如果这些步骤中的任何一个导致非空操作对象，则以下步骤将被忽略。如果最终结果是NSNull的实例，则将其转换为'nil'。
 #### actions
-&emsp;包含图层动作的字典。
+&emsp;包含图层 action 的字典。
 ```c++
 @property(nullable, copy) NSDictionary<NSString *, id<CAAction>> *actions;
 ```
-&emsp;此属性的默认值为 nil。你可以使用此字典存储图层的自定义操作。搜索该词典的内容，作为 actionForKey：方法的标准实现的一部分。
+&emsp;此属性的默认值为 nil。你可以使用此字典存储图层的自定义 action。搜索该 dictionary 的内容，作为 `- actionForKey:` 方法的标准实现的一部分。
 
-/* A dictionary mapping keys to objects implementing the CAAction protocol. Default value is nil. */
-字典将键映射到实现 CAAction 协议的对象。默认值为 nil。
+> &emsp;dictionary 将 key 映射到实现 CAAction 协议的对象。默认值为 nil。
+
 #### + defaultActionForKey:
-&emsp;返回当前类的默认操作。
+&emsp;返回当前类的默认 action 对象。
 ```c++
 + (nullable id<CAAction>)defaultActionForKey:(NSString *)event;
 ```
-&emsp;`event`: 动作的标识符。
+&emsp;`event`: action 的标识符。
 
-&emsp;Return Value: 返回给定键的合适操作对象，或者没有与该键关联的操作对象的 nil。
+&emsp;Return Value: 返回给定 enent 的合适 action 对象，或者没有与该 event 关联的 action 对象时返回 nil。
 
-&emsp;想要提供默认动作的类可以重写此方法，并使用它返回那些动作。
+&emsp;想要提供默认 action 的类可以重写此方法，并使用它返回那些 action。
 
 /* An "action" is an object that responds to an "event" via the CAAction protocol (see below). Events are named using standard dot-separated key paths. Each layer defines a mapping from event key paths to action objects. Events are posted by looking up the action object associated with the key path and sending it the method defined by the CAAction protocol.
-“动作”是通过CAAction协议响应“事件”的对象（请参见下文）。使用标准的点分隔键路径来命名事件。每一层都定义了从事件键路径到操作对象的映射。通过查找与键路径关联的操作对象并向其发送CAAction协议定义的方法，可以发布事件。
- 
- * When an action object is invoked it receives three parameters: the key path naming the event, the object on which the event happened (i.e. the layer), and optionally a dictionary of named arguments specific to each event.
- 调用动作对象时，它会接收三个参数：命名事件的键路径，发生事件的对象（即图层），以及可选的特定于每个事件的命名参数字典。
- 
- * To provide implicit animations for layer properties, an event with the same name as each property is posted whenever the value of the property is modified. A suitable CAAnimation object is associated by default with each implicit event (CAAnimation implements the action protocol).
- 为了为图层属性提供隐式动画，只要属性值被修改，就会发布一个与每个属性同名的事件。默认情况下，合适的 CAAnimation 对象与每个隐式事件关联（CAAnimation 实现动作协议）。
- 
- * The layer class also defines the following events that are not linked directly to properties:
- 图层类还定义了以下未直接链接到属性的事件：
- 
- * onOrderIn
-  Invoked when the layer is made visible, i.e. either its superlayer becomes visible, or it's added as a sublayer of a visible layer
-  当该图层变为可见时调用，即该图层的上层变为可见，或将其添加为可见层的子层
- 
- * onOrderOut
- Invoked when the layer becomes non-visible. 当图层变为不可见时调用。
 
-/* Returns the default action object associated with the event named by the string 'event'. The default implementation returns a suitable animation object for events posted by animatable properties, nil otherwise.
-返回与由字符串“ event”命名的事件关联的默认操作对象。默认实现为可动画属性发布的事件返回合适的动画对象，否则为nil。
+> &emsp;action 是通过 CAAction 协议响应 event 字符串的对象。使用标准的点分隔 key path 来命名事件。每一层都定义了从 event key path 到 action 对象的映射。通过查找与 key path 关联的 action 对象并向其发送 CAAction 协议定义的方法，可以发布事件（执行 action）。
+> &emsp;调用 action 对象时，它会接收三个参数：命名事件的键路径，发生事件的对象（即图层）以及可选的特定于每个事件的命名参数字典。（即 CAAction 协议中的唯一一个协议函数：`- (void)runActionForKey:(NSString *)event object:(id)anObject arguments:(nullable NSDictionary *)dict;`）
+> &emsp;为了给图层属性提供隐式动画，只要属性值被修改，就会发布一个与每个属性同名的事件。默认情况下，合适的 CAAnimation 对象与每个隐式事件关联（CAAnimation 实现动作协议）。
+> 图层类还定义了以下未直接链接到属性的事件： 
+> &emsp;onOrderIn
+> &emsp;Invoked when the layer is made visible, i.e. either its superlayer becomes visible, or it's added as a sublayer of a visible layer
+> &emsp;当该图层变为可见时调用，即该图层的 superlayer 变为可见，或将其添加为可见层的子层。
+> &emsp;onOrderOut
+> &emsp;Invoked when the layer becomes non-visible. 当图层变为不可见时调用。
+> &emsp;返回与字符串 event 命名的事件关联的默认 action 对象。默认实现为可动画属性发布的事件返回合适的动画对象，否则为 nil。
 
-### Mapping Between Coordinate and Time Spaces
+### Mapping Between Coordinate and Time Spaces（坐标与时间空间的映射）
 #### - convertPoint:fromLayer:
-&emsp;将点从指定图层的坐标系转换为接收者的坐标系。
+&emsp;将点从指定图层的坐标系转换为 receiver 的坐标系。
 ```c++
 - (CGPoint)convertPoint:(CGPoint)p fromLayer:(nullable CALayer *)l;
 ```
@@ -1358,37 +1331,37 @@ layer.backgroundFilters = [NSArray arrayWithObject:filter];
 ```c++
 - (CGPoint)convertPoint:(CGPoint)p toLayer:(nullable CALayer *)l;
 ```
-&emsp;`p`: 指定l坐标系中位置的点。`l`: 要将坐标系p转换为的图层。接收者和l必须共享一个公共父层。此参数可以为nil。
+&emsp;`p`: 指定 l 坐标系中位置的点。`l`: 要将坐标系 p 转换为的图层。接收者和 l 必须共享一个公共父层。此参数可以为 nil。
 
 &emsp;Return Value: 点转换为图层的坐标系。
 
-&emsp;如果为l参数指定nil，则此方法返回添加到图层框架原点的原始点。
+&emsp;如果为 l 参数指定 nil，则此方法返回添加到图层 frame 原点的原始点。
 #### - convertRect:fromLayer:
 &emsp;将矩形从指定图层的坐标系转换为接收者的坐标系。
 ```c++
 - (CGRect)convertRect:(CGRect)r fromLayer:(nullable CALayer *)l;
 ```
-&emsp;`r`: 指定l坐标系中位置的点。`l`: 在其坐标系中具有r的图层。接收者和l和必须共享一个公共父层。此参数可以为nil。
+&emsp;`r`: 指定 l 坐标系中位置的 CGRect。`l`: 在其坐标系中具有 r 的图层。接收者和 l 和必须共享一个公共父层。此参数可以为 nil。
 
 &emsp;Return Value: 矩形将转换为接收者的坐标系。
 
-&emsp;如果为l参数指定nil，则此方法将返回原始rect，其原点将从图层帧的原点中减去。
+&emsp;如果为 l 参数指定 nil，则此方法将返回原始 rect，其原点将从图层 frame 的原点中减去。
 #### - convertRect:toLayer:
 &emsp;将矩形从接收者的坐标系转换为指定图层的坐标系。
 ```c++
 - (CGRect)convertRect:(CGRect)r toLayer:(nullable CALayer *)l;
 ```
-&emsp;`r`: 指定l坐标系中位置的点。`l`: 要转换其坐标系r的图层。接收者和l和必须共享一个公共父层。此参数可以为nil。
+&emsp;`r`: 指定 l 坐标系中位置的点。`l`: 要转换其坐标系 r 的图层。接收者和 l 必须共享一个公共父层。此参数可以为 nil。
 
-&emsp;Return Value: 矩形转换为l的坐标系。
+&emsp;Return Value: 矩形转换为 l 的坐标系。
 
-&emsp;如果为l参数指定nil，则此方法将返回原始rect，并将其原点添加到图层框架的原点。
+&emsp;如果为 l 参数指定 nil，则此方法将返回原始 rect，并将其原点添加到图层 frame 的原点。
 #### - convertTime:fromLayer:
 &emsp;将时间间隔从指定层的时间空间转换为接收者的时间空间。
 ```c++
 - (CFTimeInterval)convertTime:(CFTimeInterval)t fromLayer:(nullable CALayer *)l;
 ```
-&emsp;`t`: 将时间间隔从指定层的时间空间转换为接收者的时间空间。`l`: 时空为t的图层。接收者和l和必须共享一个公共父层。
+&emsp;`t`: 将时间间隔从指定层的时间空间转换为接收者的时间空间。`l`: 时空为 t 的图层。接收者和 l 必须共享一个公共父层。
 
 &emsp;Return Value: 时间间隔转换为接收者的时间空间。
 #### - convertTime:toLayer:
@@ -1396,32 +1369,29 @@ layer.backgroundFilters = [NSArray arrayWithObject:filter];
 ```c++
 - (CFTimeInterval)convertTime:(CFTimeInterval)t toLayer:(nullable CALayer *)l;
 ```
-&emsp;`t`: 指定l坐标系中位置的点。`l`: 要将时间空间t转换为该层。接收者和l和必须共享一个公共父层。
+&emsp;`t`: 指定 l 坐标系中位置的点。`l`: 要将时间空间 t 转换为该层。接收者和 l 和必须共享一个公共父层。
 
 &emsp;时间间隔转换为图层的时间空间。
-### Hit Testing
+### Hit Testing（命中测试）
 #### - hitTest:
-&emsp;返回包含指定点的图层层次结构中接收者的最远后代（包括自身）。
+&emsp;返回包含指定点的图层层次结构中接收者的最远后代（包括自身）。（看来 iOS 中 UIView 的 Hit-Testing 内部完全是靠 CALayer 的 Hit-Testing 实现的）
 ```c++
 - (nullable __kindof CALayer *)hitTest:(CGPoint)p;
 ```
-&emsp;`p`: 接收者的上层坐标系中的一点。
+&emsp;`p`: 接收者的 superlayer 坐标系中的一点。
 
-&emsp;Return Value: 包含 thePoint的图层；如果该点位于接收者的边界矩形之外，则为nil。
+&emsp;Return Value: 包含 thePoint 的图层；如果该点位于接收者的 bounds 矩形之外，则为 nil。
 
 /* Returns the farthest descendant of the layer containing point 'p'. Siblings are searched in top-to-bottom order. 'p' is defined to be in the coordinate space of the receiver's nearest ancestor that isn't a CATransformLayer (transform layers don't have a 2D coordinate space in which the point could be specified). */
-返回包含点“ p”的层的最远后代。兄弟姐妹以自上而下的顺序搜索。 “ p”被定义为位于接收者的最近祖先的坐标空间中，该坐标空间不是CATransformLayer（转换层没有可以在其中指定点的2D坐标空间）。
+> &emsp;返回包含点 p 的层的最远后代。兄弟姐妹以自上而下的顺序搜索。p 被定义为位于接收者的最近祖先的坐标空间中，该坐标空间不是 CATransformLayer（转换层没有可以在其中指定点的 2D 坐标空间）。
 
 #### - containsPoint:
-&emsp;返回接收方是否包含指定点。
+&emsp;返回接收者是否包含指定点。
 ```c++
 - (BOOL)containsPoint:(CGPoint)p;
 ```
 &emsp;`p`: 接收者坐标系中的一个点。
-
-/* Returns true if the bounds of the layer contains point 'p'. */
-如果图层的边界包含点“ p”，则返回true。
-### Scrolling
+### Scrolling（滚动）
 #### visibleRect
 &emsp;图层在其自己的坐标空间中的可见区域。
 ```c++
@@ -1444,90 +1414,88 @@ layer.backgroundFilters = [NSArray arrayWithObject:filter];
 &emsp;`r`: 要显示的矩形。
 
 &emsp;如果 CAScrollLayer 对象不包含该图层，则此方法不执行任何操作。
-### Identifying the Layer
+### Identifying the Layer（标识 CALyaer）
 #### name
 &emsp;接收者的名字。
 ```c++
 @property(nullable, copy) NSString *name;
 ```
 &emsp;某些布局管理器使用图层名称来标识图层。此属性的默认值为 nil。
-
-/* The name of the layer. Used by some layout managers. Defaults to nil. */
-图层的名称。由某些布局管理器使用。默认为零。
-### Key-Value Coding Extensions
+### Key-Value Coding Extensions（键值编码扩展）
 #### - shouldArchiveValueForKey:
 &emsp;返回一个布尔值，指示是否应归档指定键的值。
 ```c++
 - (BOOL)shouldArchiveValueForKey:(NSString *)key;
 ```
-&emsp;`key`: 收件人属性之一的名称。
+&emsp;`key`: 接收者属性之一的名称。
 
-&emsp;Return Value: 如果应将指定的属性归档，则为YES；否则，则为NO。
+&emsp;Return Value: 如果应将指定的属性归档，则为 YES；否则，则为 NO。
 
 &emsp;默认实现返回 YES。
 
-/* Called by the object's implementation of -encodeWithCoder:, returns false if the named property should not be archived. The base implementation returns YES. Subclasses should call super for unknown properties. */
-由对象的-encodeWithCoder：的实现调用，如果不应存储命名属性，则返回false。基本实现返回YES。子类应为未知属性调用super。
+> &emsp;由对象的 `- encodeWithCoder:` 的实现调用，如果不应 archived 命名属性，则返回 false。基本实现返回 YES。子类应为未知属性调用 super。
+
 #### + defaultValueForKey:
 &emsp;指定与指定键关联的默认值。
 ```c++
 + (nullable id)defaultValueForKey:(NSString *)key;
 ```
-&emsp;`key`: 收件人属性之一的名称。
+&emsp;`key`: 接收者属性之一的名称。
 
-&emsp;Return Value: 命名属性的默认值。如果未设置默认值，则返回nil。
+&emsp;Return Value: 命名属性的默认值。如果未设置默认值，则返回 nil。
 
-&emsp;如果为图层定义自定义特性，但未设置值，则此方法将基于键的预期值返回适当的“零”默认值。例如，如果key的值是CGSize结构，则该方法返回一个包含（0.0,0.0）的大小结构，该结构封装在NSValue对象中。对于CGRect，返回一个空矩形。对于CGAffineTransform和CATransform3D，将返回相应的单位矩阵。
+&emsp;如果为图层定义自定义属性，但未设置值，则此方法将基于键的预期值返回适当的 zero 默认值。例如，如果 key 的值是 CGSize 结构，则该方法返回一个包含（0.0,0.0）的大小结构，该结构封装在 NSValue 对象中。对于 CGRect，返回一个空矩形。对于 CGAffineTransform 和 CATransform3D，将返回相应的单位矩阵。
 
-&emsp;如果key对于该类的属性未知，则该方法的结果不确定。
+&emsp;如果 key 对于该类的属性未知，则该方法的结果不确定。
 
 /* CALayer implements the standard NSKeyValueCoding protocol for all Objective C properties defined by the class and its subclasses. It dynamically implements missing accessor methods for properties declared by subclasses.
-CALayer为该类及其子类定义的所有Objective C属性实现标准的NSKeyValueCoding协议。它为子类声明的属性动态实现缺少的访问器方法。
+
+&emsp;CALayer 为该类及其子类定义的所有 Objective-C 属性实现标准的 NSKeyValueCoding 协议。它为子类声明的属性动态实现缺少的访问器方法。
  
 When accessing properties via KVC whose values are not objects, the standard KVC wrapping conventions are used, with extensions to support the following types:
-通过值不是对象的KVC访问属性时，将使用标准的KVC包装约定，并带有扩展以支持以下类型：
 
-C Type                  Class
-------                  -----
-CGPoint                 NSValue
-CGSize                  NSValue
-CGRect                  NSValue
-CGAffineTransform       NSValue
-CATransform3D           NSValue  */
+&emsp;通过值不是对象的 KVC 访问属性时，将使用标准的 KVC 包装约定，并带有扩展以支持以下类型：
 
-/* Returns the default value of the named property, or nil if no default value is known. Subclasses that override this method to define default values for their own properties should call 'super' for unknown properties. */
-返回指定属性的默认值，如果没有默认值，则返回 nil。重写此方法为自己的属性定义默认值的子类应为未知属性调用“ super”。
+| C Type | Class |
+| --- | --- |
+| CGPoint | NSValue |
+| CGSize | NSValue |
+| CGRect | NSValue |
+| CGAffineTransform | NSValue |
+| CATransform3D | NSValue | 
 
-### Constants
+&emsp;返回指定属性的默认值，如果没有默认值，则返回 nil。重写此方法为自己的属性定义默认值的子类应为未知属性调用 super。
+
+### Constants（常量）
 #### CAAutoresizingMask
-&emsp;这些常量由autoresizingMask属性使用。
+&emsp;这些常量由 autoresizingMask 属性使用。
 ```c++
 typedef enum CAAutoresizingMask : unsigned int {
     ...
 } CAAutoresizingMask;
 ```
 + kCALayerNotSizable = 0: 接收器无法调整大小。
-+ kCALayerMinXMargin = 1U << 0: 接收者及其超级视图之间的左边界是灵活的。
++ kCALayerMinXMargin = 1U << 0: 接收者及其 superlayer 之间的左边界是灵活的。
 + kCALayerWidthSizable = 1U << 1: 接收器的宽度很灵活。
-+ kCALayerMaxXMargin = 1U << 2: 接收者及其超级视图之间的右边距是灵活的。
-+ kCALayerMinYMargin = 1U << 3: 接收器及其超级视图之间的底部边距很灵活。
++ kCALayerMaxXMargin = 1U << 2: 接收者及其 superlayer 之间的右边距是灵活的。
++ kCALayerMinYMargin = 1U << 3: 接收器及其 superlayer 之间的底部边距很灵活。
 + kCALayerHeightSizable = 1U << 4: 接收器的高度是灵活的。
-+ kCALayerMaxYMargin = 1U << 5: 接收者及其超级视图之间的上边界是灵活的。
++ kCALayerMaxYMargin = 1U << 5: 接收者及其 superlayer 之间的上边界是灵活的。
 
 #### Action Identifiers
-&emsp;这些常量是actionForKey:，add使用的预定义操作标识符动画：福基：、defaultActionForKey:、removeAnimationForKey:、层筛选器和CAAction协议方法runActionForKey:对象:论据：。
+&emsp;这些常量是预定义 action 标识符用于: `actionForKey:`、`addAnimation:forKey:`、`defaultActionForKey:`、`removeAnimationForKey:`、Layer Filters 和 CAAction 协议的 `runActionForKey:object:arguments:` 方法。
 ```c++
 NSString *const kCAOnOrderIn;
 NSString *const kCAOnOrderOut;
 NSString *const kCATransition;
 ```
 
-+ kCAOnOrderIn: 表示当某个图层变为可见时（由于将结果插入可见图层层次结构或将该图层不再设置为隐藏）而采取的操作的标识符。
-+ kCAOnOrderOut: 标识符，表示从图层层次结构中删除图层或隐藏图层时所采取的操作。
++ kCAOnOrderIn: 表示当某个图层变为可见时（由于将结果插入可见图层层次结构或将该图层不再设置为隐藏）而采取的 action 的标识符。
++ kCAOnOrderOut: 表示从图层层次结构中删除图层或隐藏图层时所采取的 action。
 + kCATransition: 代表过渡动画的标识符。
 
 #### CAEdgeAntialiasingMask
-&emsp;edgeAntialiasingMask属性使用此蒙版。
+&emsp;edgeAntialiasingMask 属性使用此掩码。
 ```c++
 typedef NS_OPTIONS (unsigned int, CAEdgeAntialiasingMask)
 {
@@ -1547,11 +1515,9 @@ typedef NS_OPTIONS (unsigned int, CAEdgeAntialiasingMask)
 ```c++
 const CATransform3D CATransform3DIdentity;
 ```
-CATransform3DIdentity
-&emsp;The identity transform: [1 0 0 0; 0 1 0 0; 0 0 1 0; 0 0 0 1].
-
+&emsp;CATransform3DIdentity.The identity transform: [1 0 0 0; 0 1 0 0; 0 0 1 0; 0 0 0 1].
 #### Scaling Filters
-&emsp;这些常量指定magnificationFilter和minificationFilter使用的缩放过滤器。
+&emsp;这些常量指定 magnificationFilter 和 minificationFilter 使用的缩放过滤器。
 ##### kCAFilterLinear
 &emsp;线性插值滤波器。
 ```c++
@@ -1563,14 +1529,14 @@ const CALayerContentsFilter kCAFilterLinear;
 const CALayerContentsFilter kCAFilterNearest;
 ```
 ##### kCAFilterTrilinear
-&emsp;三线性缩小滤波器。启用mipmap生成。一些渲染器可能会忽略这一点，或施加其他限制，例如需要二维幂的源图像。
+&emsp;三线性缩小过滤器。启用 mipmap 生成。一些渲染器可能会忽略这一点，或施加其他限制，例如需要二维幂的源图像。
 ```c++
 const CALayerContentsFilter kCAFilterTrilinear;
 ```
 #### CATransform3D
-&emsp;整个Core Animation中使用的标准转换矩阵。
+&emsp;整个 Core Animation中 使用的标准转换矩阵。
 
-&emsp;变换矩阵用于旋转，缩放，平移，倾斜和投影图层内容。提供了用于创建，连接和修改CATransform3D数据的功能。
+&emsp;变换矩阵用于旋转，缩放，平移，倾斜和投影图层内容。提供了用于创建，连接和修改 CATransform3D 数据的功能。
 ```c++
 struct CATransform3D
 {
@@ -1580,30 +1546,23 @@ struct CATransform3D
   CGFloat m41, m42, m43, m44;
 };
 ```
-
 ### Instance Properties
+#### cornerCurve
+&emsp;定义用于渲染层圆角的曲线。默认是 kCACornerCurveCircular。
+```c++
+typedef NSString * CALayerCornerCurve NS_TYPED_ENUM;
 
+CA_EXTERN CALayerCornerCurve const kCACornerCurveCircular API_AVAILABLE(macos(10.15), ios(13.0), watchos(6.0), tvos(13.0));
+CA_EXTERN CALayerCornerCurve const kCACornerCurveContinuous API_AVAILABLE(macos(10.15), ios(13.0), watchos(6.0), tvos(13.0));
+
+@property(copy) CALayerCornerCurve cornerCurve API_AVAILABLE(macos(10.15), ios(13.0), watchos(6.0), tvos(13.0));
+```
 ### Type Methods
-
-
-## CAAction
-&emsp;一个允许对象响应 CALayer 更改触发的 action 的接口。
+#### + cornerCurveExpansionFactor:
+&emsp;使用特定拐角曲线时应用于圆角边界框大小的扩展比例因子。
 ```c++
-@protocol CAAction
-- (void)runActionForKey:(NSString *)event object:(id)anObject arguments:(nullable NSDictionary *)dict;
-@end
++ (CGFloat)cornerCurveExpansionFactor:(CALayerCornerCurve)curveAPI_AVAILABLE(macos(10.15), ios(13.0), watchos(6.0), tvos(13.0));
 ```
-&emsp;当使用动作标识符（键路径，外部动作名称或预定义的动作标识符）查询时，层将返回适当的动作对象（必须实现CAAction协议），并向其发送 `runActionForKey:object:arguments:` 消息。
-
-/* Called to trigger the event named 'path' on the receiver. The object (e.g. the layer) on which the event happened is 'anObject'. The arguments dictionary may be nil, if non-nil it carries parameters associated with the event. */
-调用以触发接收器上名为“ path”的事件。发生事件的对象（例如图层）是“ anObject”。参数字典可以为 nil，如果为非 nil，则其携带与事件关联的参数。
-### runActionForKey:object:arguments:
-&emsp;调用以触发标识符指定的操作。
-```c++
-- (void)runActionForKey:(NSString *)event object:(id)anObject arguments:(nullable NSDictionary *)dict;
-```
-&emsp;`key`: 动作的标识符。该标识符可以是相对于对象，任意外部动作或CALayer中定义的动作标识符之一的键或键路径。`anObject`: 应在其上发生操作的层。`dict`: 包含与此事件关联的参数的字典。可能为零。
-
 ## 参考链接
 **参考链接:🔗**
 + [CALayer](https://developer.apple.com/documentation/quartzcore/calayer?language=objc)
