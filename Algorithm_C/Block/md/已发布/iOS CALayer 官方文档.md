@@ -709,9 +709,9 @@ layer.filters = [NSArray arrayWithObject:filter];
 ```c++
 @property(nullable, strong) id compositingFilter;
 ```
-&emsp;此属性的默认值为 nil，这将导致图层使用源覆盖合成。尽管你可以将任何 Core Image滤镜用作图层的合成滤镜，但为获得最佳效果，请使用 CICategoryCompositeOperation 类别中的滤镜。
+&emsp;此属性的默认值为 nil，这将导致图层使用源覆盖合成。尽管你可以将任何 Core Image 滤镜用作图层的合成滤镜，但为获得最佳效果，请使用 CICategoryCompositeOperation 类别中的滤镜。
 
-&emsp;在 macOS 中，可以在将过滤器的参数附加到图层后对其进行修改，但是您必须使用该图层的setValue：forKeyPath：方法。例如，要更改过滤器的inputRadius参数，可以使用类似于以下代码：
+&emsp;在 macOS 中，可以在将过滤器附加到图层后再对其参数进行修改，但是你必须使用该图层的 `setValue:forKeyPath:` 方法。例如，要更改过滤器的 inputRadius 参数，可以使用类似于以下代码：
 ```c++
 CIFilter *filter = ...;
 CALayer *layer = ...;
@@ -722,22 +722,16 @@ layer.compositingFilter = filter;
 &emsp;在 CIFilter 对象附加到层之后直接更改其输入会导致未定义的行为。
 
 &emsp;iOS 中的图层不支持此属性。
-
-/* A filter object used to composite the layer with its (possibly filtered) background. Default value is nil, which implies source-over compositing. Animatable.
-一个过滤器对象，用于将其背景（可能已过滤）合成层。默认值为 nil，这意味着源于合成。可动画的。
-
-Note that if the inputs of the filter are modified directly after the filter is attached to a layer, the behavior is undefined. The filter must either be reattached to the layer, or filter properties should be modified by calling -setValue:forKeyPath: on each layer that the filter is attached to. (This also applies to the 'filters' and 'backgroundFilters' properties.) */
-请注意，如果将过滤器附加到图层后直接修改了过滤器的输入，则行为是不确定的。过滤器必须重新连接到该层，或者应该通过在连接过滤器的每一层上调用-setValue：forKeyPath：来修改过滤器属性。 （这也适用于“过滤器”和“背景过滤器”属性。
 #### backgroundFilters
-&emsp;一组核心图像过滤器，可应用于紧靠该图层后面的内容。可动画的。
+&emsp;一组 Core Image 过滤器，可应用于紧靠该图层后面的内容。可动画的。
 ```c++
 @property(nullable, copy) NSArray *backgroundFilters;
 ```
-&emsp;背景过滤器会影响显示在图层本身中的图层后面的内容。通常，此内容属于充当该层父级的超层。这些滤镜不会影响图层本身的内容，包括图层的背景颜色和边框。
+&emsp;背景过滤器会影响显示在图层本身中的图层后面的内容。通常，此内容属于充当该层父级的 superlayer。这些滤镜不会影响图层本身的内容，包括图层的背景颜色和边框。
 
-&emsp;此属性的默认值为nil。
+&emsp;此属性的默认值为 nil。
 
-&emsp;在CIFilter对象附加到层之后直接更改其输入会导致未定义的行为。在macOS中，可以在将过滤器参数附加到图层后修改过滤器参数，但必须使用图层的设置值：forKeyPath：执行此操作的方法。此外，必须为筛选器指定一个名称，以便在数组中标识它。例如，要更改过滤器的inputRadius参数，可以使用类似以下代码：
+&emsp;在 CIFilter 对象附加到层之后直接更改其输入会导致未定义的行为。在 macOS 中，可以在将过滤器附加到图层后修改过滤器参数，但必须使用图层的 `setValue:forKeyPath:` 执行此操作的方法。此外，必须为过滤器指定一个名称，以便在数组中标识它。例如，要更改过滤器的 inputRadius 参数，可以使用类似以下代码：
 ```c++
 CIFilter *filter = ...;
 CALayer *layer = ...;
@@ -746,149 +740,128 @@ filter.name = @"myFilter";
 layer.backgroundFilters = [NSArray arrayWithObject:filter];
 [layer setValue:[NSNumber numberWithInt:1] forKeyPath:@"backgroundFilters.myFilter.inputRadius"];
 ```
-&emsp;你可以使用图层的masksToBounds来控制其背景滤镜效果的程度。
+&emsp;你可以使用图层的 masksToBounds 来控制其背景滤镜效果的程度。
 
-/* An array of filters that are applied to the background of the layer. The root layer ignores this property. Animatable. */
-应用于图层背景的滤镜数组。根层将忽略此属性。可动画的。
+> &emsp;应用于图层背景的滤镜数组。root layer 将忽略此属性。可动画的。
+
 #### minificationFilter
 &emsp;减小内容大小时使用的过滤器。
 ```c++
 @property(copy) CALayerContentsFilter minificationFilter;
 ```
-&emsp;缩放过滤器中列出了此属性的可能值。
+&emsp;Scaling Filters 中列出了此属性的可能值。
 
-&emsp;此属性的默认值为kCAFilterLinear。
+&emsp;此属性的默认值为 kCAFilterLinear。
 
-/* The filter types to use when rendering the 'contents' property of the layer. The minification filter is used when to reduce the size of image data, the magnification filter to increase the size of image data. Currently the allowed values are 'nearest' and 'linear'. Both properties default to 'linear'. */
-呈现图层的“内容”属性时要使用的过滤器类型。缩小滤镜用于减小图像数据的大小，放大滤镜用于增大图像数据的大小。当前允许的值为“最近”和“线性”。这两个属性默认为“线性”。
+> &emsp;呈现 CALayer 的 contents 属性时要使用的过滤器类型。缩小滤镜用于减小图像数据的大小，放大滤镜用于增大图像数据的大小。当前允许的值为 "nearest" 和 "linear"。这两个属性默认为 "linear"。
 
 #### minificationFilterBias
 &emsp;缩小过滤器用来确定详细程度的偏差因子。
 ```c++
 @property float minificationFilterBias;
 ```
-&emsp;当将此值设置为kCAFilterTrilinear时，minificationFilter将使用此值。
+&emsp;当将此值设置为 kCAFilterTrilinear 时，minificationFilter 将使用此值。
 
-&emsp;此属性的默认值为0.0。
+&emsp;此属性的默认值为 0.0。
 
-/* The bias factor added when determining which levels of detail to use when minifying using trilinear filtering. The default value is 0. Animatable. */
-在确定使用三线性过滤最小化时使用的细节级别时添加的偏差因子。默认值为 0。可设置动画。
+> &emsp;在确定使用三线性过滤最小化时使用的细节级别时添加的偏差因子。默认值为 0。可设置动画。
 
 #### magnificationFilter
 &emsp;增加内容大小时使用的过滤器。
 ```c++
 @property(copy) CALayerContentsFilter magnificationFilter;
 ```
-&emsp;缩放过滤器中列出了此属性的可能值。
+&emsp;Scaling Filters 中列出了此属性的可能值。
 
-&emsp;此属性的默认值为kCAFilterLinear。
+&emsp;此属性的默认值为 kCAFilterLinear。
 
-&emsp;图1显示了当将一个10 x 10点的圆图像放大10倍时，线性滤波和最近滤波之间的差异。
+&emsp;图 1 显示了当将一个10 x 10 点的圆图像放大 10 倍时，线性 filtering 和最近 filtering 之间的差异。
 
 &emsp;Figure 1 Circle with different magnification filters
 
-![]()
+![Circle_with_different_magnification_filters](https://p6-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/524d0e4609cf4fdf8dd14721e90fb785~tplv-k3u1fbpfcp-watermark.image)
 
-&emsp;左侧的圆圈使用kCAFilterLinear，右侧的圆圈使用kCAFilterNearest。
-### Configuring the Layer’s Rendering Behavior
+&emsp;左侧的圆圈使用 kCAFilterLinear，右侧的圆圈使用 kCAFilterNearest。
+### Configuring the Layer’s Rendering Behavior（配置图层的渲染行为）
 #### opaque
 &emsp;一个布尔值，指示该图层是否包含完全不透明的内容。
 ```c++
 @property(getter=isOpaque) BOOL opaque;
 ```
-&emsp;此属性的默认值为“否”。如果应用程序绘制的内容完全不透明，并且填充了层的边界，则将此属性设置为“是”可使系统优化层的呈现行为。具体来说，当层为绘图命令创建备份存储时，核心动画会忽略该备份存储的alpha通道。这样做可以提高合成操作的性能。如果将此属性的值设置为“是”，则必须用不透明内容填充图层边界。
+&emsp;此属性的默认值为 NO。如果应用程序绘制的内容完全不透明，并且填充了层的 bounds，则将此属性设置为 YES 可使系统优化层的呈现行为。具体来说，当层为绘图命令创建 backing store 时，Core Animation 会忽略该 backing store 的 alpha 通道。这样做可以提高合成操作的性能。如果将此属性的值设置为 YES，则必须用不透明内容填充图层 bounds。
 
-&emsp;设置此属性仅影响由 Core Animation 管理的后备存储。如果你将具有Alpha通道的图像分配给图层的content属性，则该图像将保留其Alpha通道，而不管该属性的值如何。
+&emsp;设置此属性仅影响由 Core Animation 管理的 backing store。如果你将具有 Alpha 通道的图像分配给图层的 contents 属性，则该图像将保留其 Alpha 通道，而不管该属性的值如何。
 
-/* A hint marking that the layer contents provided by -drawInContext: is completely opaque. Defaults to NO. Note that this does not affect the interpretation of the 'contents' property directly. */
-提示 -drawInContext：提供的图层内容是完全不透明的。默认为 NO。请注意，这不会直接影响对“ contents”属性的解释。
+> &emsp;提示 `- drawInContext:` 提供的图层内容是完全不透明的。默认为 NO。请注意，这不会直接影响对 contents 属性的解释。
 
 #### edgeAntialiasingMask
-&emsp;定义如何光栅化接收器边缘的位掩码。
+&emsp;定义如何光栅化 CALayer 边缘的位掩码。
 ```c++
 @property CAEdgeAntialiasingMask edgeAntialiasingMask;
 ```
-&emsp;此属性指定层的哪些边缘被消除锯齿，并且是CAEdgeAntialiasingMask中定义的常量的组合。您可以分别为每个边缘（顶部，左侧，底部，右侧）启用或禁用抗锯齿。默认情况下，所有边缘均启用抗锯齿。
+&emsp;此属性指定层的哪些边缘被消除锯齿，并且是 CAEdgeAntialiasingMask 中定义的常量的组合。你可以分别为每个边缘（顶部，左侧，底部，右侧）启用或禁用抗锯齿。默认情况下，所有边缘均启用抗锯齿。
 
 &emsp;通常，你将使用此属性为与其他层的边缘邻接的边缘禁用抗锯齿，以消除否则会发生的接缝。
-
-/* Defines how the edges of the layer are rasterized. For each of the four edges (left, right, bottom, top) if the corresponding bit is set the edge will be antialiased. Typically this property is used to disable antialiasing for edges that abut edges of other layers, to eliminate the seams that would otherwise occur. The default value is for all edges to be antialiased. */
-定义如何对图层的边缘进行栅格化。对于四个边缘中的每个边缘（左，右，底部，顶部），如果设置了相应的位，则将对边缘进行抗锯齿。通常，此属性用于禁用与其他层的边缘相邻的边缘的抗锯齿，以消除否则会发生的接缝。默认值是对所有边缘进行抗锯齿。
 #### - contentsAreFlipped
 &emsp;返回一个布尔值，指示在渲染时是否隐式翻转图层内容。
 ```c++
 - (BOOL)contentsAreFlipped;
 ```
-&emsp;Return Value: 如果在渲染时隐式翻转了图层内容，则为；否则为否。默认情况下，此方法返回NO。
+&emsp;Return Value: 如果在渲染时隐式翻转了图层内容，则为 YES；否则为 NO。默认情况下，此方法返回 NO。
 
-&emsp;此方法提供有关在绘制过程中是否翻转图层内容的信息。您不应尝试覆盖此方法并返回其他值。
+&emsp;此方法提供有关在绘制过程中是否翻转图层内容的信息。你不应尝试覆盖此方法并返回其他值。
 
-&emsp;如果图层需要翻转其内容，则它会从此方法返回YES，并将y-flip转换应用于图形上下文，然后再将其传递给图层的 drawInContext：方法。同样，该图层会将传递给其 setNeedsDisplayInRect：的所有矩形转换为翻转的坐标空间。
+&emsp;如果图层需要翻转其内容，则它会从此方法返回 YES，并将 y-flip 转换应用于图形上下文，然后再将其传递给图层的 `- drawInContext:` 方法。同样，该图层会将传递给其 `- setNeedsDisplayInRect:` 的所有矩形转换为翻转的坐标空间。
 
-/* Returns true if the contents of the contents property of the layer will be implicitly flipped when rendered in relation to the local coordinate space (e.g. if there are an odd number of layers with flippedGeometry=YES from the receiver up to and including the implicit container of the root layer). Subclasses should not attempt to redefine this method. When this method returns true the CGContextRef object passed to -drawInContext: by the default -display method will have been y- flipped (and rectangles passed to -setNeedsDisplayInRect: will be similarly flipped). */
-如果相对于本地坐标空间进行渲染时，如果层的内容属性的内容将被隐式翻转，则返回true（例如，如果从接收器到包含（包括）的隐式容器的层数为奇数，且 flippedGeometry = YES）根层）。子类不应尝试重新定义此方法。当此方法返回 true 时，默认情况下，传递给 -drawInContext：的 CGContextRef对象将被y-翻转（传递给 -setNeedsDisplayInRect：的矩形也将被相似地翻转）。
 #### geometryFlipped
-&emsp;一个布尔值，指示该层及其子层的几何形状是否垂直翻转。
+&emsp;一个布尔值，指示该层及其子层的 geometry 是否垂直翻转。
 ```c++
 @property(getter=isGeometryFlipped) BOOL geometryFlipped;
 ```
-&emsp;如果层为层支持的视图提供支持，则该视图负责管理此属性中的值。对于独立图层，此属性控制是使用标准坐标系还是翻转坐标系来解释图层的几何值。此属性的值不影响图层内容的呈现。
+&emsp;如果层为 layer-backed view 提供支持，则该视图负责管理此属性中的值。对于独立图层，此属性控制是使用标准坐标系还是翻转坐标系来解释图层的 geometry。此属性的值不影响图层内容的呈现。
 
 &emsp;此属性的默认值为 NO。
 
-/* Whether or not the geometry of the layer (and its sublayers) is flipped vertically. Defaults to NO. Note that even when geometry is flipped, image orientation remains the same (i.e. a CGImageRef stored in the `contents' property will display the same with both flipped=NO and flipped=YES, assuming no transform on the layer). */
-图层（及其子图层）的几何形状是否垂直翻转。默认为 NO。请注意，即使在翻转几何图形时，图像方向也保持不变（即存储在``contents''属性中的 CGImageRef 将显示相同的内容，并假设在层上未进行任何变换时，flipd = NO 和 flipped = YES）。
+> &emsp;图层（及其子图层）的几何形状是否垂直翻转。默认为 NO。请注意，即使在翻转几何图形时，图像方向也保持不变（即存储在 contents 属性中的 CGImageRef 将显示相同的内容，并假设在层上未进行任何变换时，flipd = NO 和 flipped = YES）。
+
 #### drawsAsynchronously
 &emsp;一个布尔值，指示是否在后台线程中延迟和异步处理绘制命令。
 ```c++
 @property BOOL drawsAsynchronously API_AVAILABLE(macos(10.8), ios(6.0), watchos(2.0), tvos(9.0));
 ```
-&emsp;当此属性设置为“是”时，用于绘制图层内容的图形上下文将对绘制命令进行排队，并在后台线程上执行这些命令，而不是同步执行这些命令。异步执行这些命令可以提高某些应用程序的性能。但是，在启用此功能之前，你应该始终衡量实际的性能优势。
+&emsp;当此属性设置为 YES 时，用于绘制图层内容的图形上下文将对绘制命令进行排队，并在后台线程上执行这些命令，而不是同步执行这些命令。异步执行这些命令可以提高某些应用程序的性能。但是，在启用此功能之前，你应该始终衡量实际的性能优势。
 
 &emsp;此属性的默认值为 NO。
 
-/* When true, the CGContext object passed to the -drawInContext: method may queue the drawing commands submitted to it, such that they will be executed later (i.e. asynchronously to the execution of the -drawInContext: method). This may allow the layer to complete its drawing operations sooner than when executing synchronously. The default value is NO. */
-如果为 true，则传递给 -drawInContext：方法的 CGContext 对象可以将提交给它的绘图命令排入队列，以便稍后执行它们（即，与-drawInContext：方法的执行异步）。这可以允许该层比同步执行时更快地完成其绘制操作。默认值为“否”。
+> &emsp;如果为 true，则传递给 `- drawInContext:` 方法的 CGContext 对象可以将提交给它的绘图命令排入队列，以便稍后执行它们（即，与 `- drawInContext:` 方法的执行异步）。这可以允许该层比同步执行时更快地完成其绘制操作。默认值为 NO。
+
 #### shouldRasterize
 &emsp;一个布尔值，指示在合成之前是否将图层渲染为位图。可动画的
 ```c++
 @property BOOL shouldRasterize;
 ```
-&emsp;当此属性的值为“是”时，层将在其局部坐标空间中渲染为位图，然后与任何其他内容合成到目标。阴影效果和“过滤器”属性中的任何过滤器都将光栅化并包含在位图中。但是，层的当前不透明度未光栅化。如果光栅化位图在合成过程中需要缩放，则会根据需要应用“缩小过滤器”和“放大过滤器”属性中的过滤器。
+&emsp;当此属性的值为 YES 时，层将在其局部坐标空间中渲染为位图，然后与任何其他内容合成到目标。阴影效果和 filters 属性中的任何过滤器都将光栅化并包含在位图中。但是，层的当前不透明度未光栅化。如果光栅化位图在合成过程中需要缩放，则会根据需要应用 minificationFilter 和 magnificationFilter 属性中的过滤器。
 
 &emsp;如果此属性的值为 NO，则在可能的情况下将图层直接复合到目标中。如果合成模型的某些功能（例如包含滤镜）需要，则在合成之前仍可以对图层进行栅格化。
 
 &emsp;此属性的默认值为 NO。
-
-/* When true, the layer is rendered as a bitmap in its local coordinate space ("rasterized"), then the bitmap is composited into the destination (with the minificationFilter and magnificationFilter properties of the layer applied if the bitmap needs scaling). Rasterization occurs after the layer's filters and shadow effects are applied, but before the opacity modulation. As an implementation detail the rendering engine may attempt to cache and reuse the bitmap from one frame to the next. (Whether it does or not will have no affect on the rendered output.)
-如果为 true，则在其局部坐标空间中将图层渲染为位图（“栅格化”），然后将位图组合到目标中（如果位图需要缩放，则应用图层的 minificationFilter 和 magnificationFilter 属性）。栅格化发生在应用图层的滤镜和阴影效果之后，但在不透明度调制之前。作为实现细节，渲染引擎可以尝试从一帧到下一帧缓存和重用位图。 （无论是否影响渲染的输出。）
-
-* When false the layer is composited directly into the destination whenever possible (however, certain features of the compositing model may force rasterization, e.g. adding filters).
-如果为 false，则在可能的情况下将图层直接合成到目标中（但是，合成模型的某些功能可能会强制进行栅格化，例如添加滤镜）。
-
-* Defaults to NO. Animatable. */
-默认为NO。可动画的。
-
 #### rasterizationScale
 &emsp;相对于图层的坐标空间栅格化内容的比例。可动画的。
 ```c++
 @property CGFloat rasterizationScale;
 ```
-&emsp;当shouldRasterize属性中的值为YES时，图层将使用此属性来确定是否缩放栅格化的内容（以及缩放多少）。此属性的默认值为1.0，这表示应以当前大小对其进行栅格化。较大的值将放大内容，较小的值将缩小内容。
-
-/* The scale at which the layer will be rasterized (when the shouldRasterize property has been set to YES) relative to the coordinate space of the layer. Defaults to one. Animatable. */
-相对于图层的坐标空间进行图层栅格化的比例（将 shouldRasterize 属性设置为 YES时）。默认为 1。可动画的。
+&emsp;当 shouldRasterize 属性中的值为 YES时，图层将使用此属性来确定是否缩放栅格化的内容（以及缩放多少）。此属性的默认值为 1.0，这表示应以当前大小对其进行栅格化。较大的值将放大内容，较小的值将缩小内容。
 #### contentsFormat
 &emsp;有关所需的图层内容存储格式的提示。
 ```c++
 @property(copy) CALayerContentsFormat contentsFormat API_AVAILABLE(macos(10.12), ios(10.0), watchos(3.0), tvos(10.0));
 ```
-&emsp;此属性的默认值为kCAContentsFormatRGBA8Uint。
+&emsp;此属性的默认值为 kCAContentsFormatRGBA8Uint。
 
 &emsp;UIView 和层备份 NSView 对象可能会将值更改为适合当前设备的格式。
 
-/* A hint for the desired storage format of the layer contents provided by -drawLayerInContext. Defaults to kCAContentsFormatRGBA8Uint. Note that this does not affect the interpretation of the `contents' property directly. */
--drawLayerInContext 提供的层内容的所需存储格式的提示。默认为 kCAContentsFormatRGBA8Uint。注意，这不会直接影响对“ contents”属性的解释。
+> &emsp;`- drawLayerInContext` 提供的层内容的所需存储格式的提示。默认为 kCAContentsFormatRGBA8Uint。注意，这不会直接影响对 contents 属性的解释。
+
 #### - renderInContext:
 &emsp;将图层及其子图层渲染​​到指定的上下文中。
 ```c++
@@ -898,29 +871,24 @@ layer.backgroundFilters = [NSArray arrayWithObject:filter];
 
 &emsp;此方法直接从图层树进行渲染，而忽略添加到渲染树的所有动画。在图层的坐标空间中渲染。
 
-> &emsp;Important: 此方法的 OS X v10.5实现不支持整个Core Animation合成模型。不呈现QCCompositionLayer，CAOpenGLLayer和QTMovieLayer图层。此外，不会渲染使用3D变换的图层，也不会渲染指定backgroundFilters，filters，compositingFilter或mask值的图层。未来的macOS版本可能会增加对渲染这些图层和属性的支持。
+> &emsp;Important: 此方法的 OS X v10.5 实现不支持整个 Core Animation 合成模型。不呈现 QCCompositionLayer、CAOpenGLLayer 和 QTMovieLayer 图层。此外，不会渲染使用 3D 变换的图层，也不会渲染指定 backgroundFilters、filters、compositingFilter 或 mask 值的图层。未来的 macOS 版本可能会增加对渲染这些图层和属性的支持。
 
-/* Renders the receiver and its sublayers into 'ctx'. This method renders directly from the layer tree. Renders in the coordinate space of the layer.
-
-* WARNING: currently this method does not implement the full CoreAnimation composition model, use with caution. */
-将接收器及其子层渲染为“ ctx”。此方法直接从图层树渲染。在图层的坐标空间中渲染。
-警告：当前此方法未实现完整的CoreAnimation合成模型，请谨慎使用。
-### Modifying the Layer Geometry
+### Modifying the Layer Geometry（修改图层 Geometry）
 #### frame
 &emsp;图层的 frame 矩形。
 ```c++
 @property CGRect frame;
 ```
-&emsp;frame 矩形是在上层坐标空间中指定的层的位置和大小。对于图层，框架矩形是从边界，anchorPoint和position属性中的值派生的计算属性。为该属性分配新值时，图层将更改其位置和边界属性以匹配你指定的矩形。矩形中每个坐标的值以点为单位。
+&emsp;frame 矩形是在 superlayer 坐标空间中指定的层的位置和大小。对于图层，frame 矩形是从 bounds、anchorPoint 和 position 属性中的值派生的计算属性。为该属性分配新值时，图层将更改其 position 和 bounds 属性以匹配你指定的矩形。矩形中每个坐标的值以点为单位。
 
-&emsp;如果 transform 属性应用的旋转变换不是90度的倍数，则不要设置 frame。
+&emsp;如果 transform 属性应用的旋转变换不是 90 度的倍数，则不要设置 frame。
 
-&emsp;有关框架，边界，anchorPoint和位置属性之间的关系的更多信息，请参见 Core Animation Programming Guide。
+&emsp;有关 frame、bounds、anchorPoint 和 position 属性之间的关系的更多信息，请参见 Core Animation Programming Guide。
 
-> &emsp;Note: frame 属性不能直接设置动画。相反，你应该为边界，anchorPoint和position属性的适当组合设置动画，以实现所需的结果。
+> &emsp;Note: frame 属性不能直接设置动画。相反，你应该为 bounds、anchorPoint 和 position 属性的适当组合设置动画，以实现所需的结果。
 
-/* Unlike NSView, each Layer in the hierarchy has an implicit frame rectangle, a function of the 'position', 'bounds', 'anchorPoint', and 'transform' properties. When setting the frame the 'position' and 'bounds.size' are changed to match the given frame. */
-与NSView不同，层次结构中的每个图层都有一个隐式 frame 矩形，它是“位置”，“边界”，“ anchorPoint”和“ transform”属性的函数。设置框架时，将更改“ position”和“ bounds.size”以匹配给定 frame。
+> &emsp;与 NSView 不同，层次结构中的每个图层都有一个隐式 frame 矩形，它是 position、bounds、anchorPoint 和 transform 属性的函数。设置 frame 时，将更改 position 和 bounds.size 以匹配给定的 frame 的值。
+
 #### bounds
 &emsp;图层的边界矩形。可动画的。
 ```c++
@@ -928,64 +896,55 @@ layer.backgroundFilters = [NSArray arrayWithObject:filter];
 ```
 &emsp;边界矩形是图层在其自身坐标空间中的原点和大小。创建新的独立图层时，此属性的默认值为一个空矩形，你必须在使用该图层之前对其进行更改。矩形中每个坐标的值以点为单位。
 
-&emsp;有关框架，边界，anchorPoint和位置属性之间的关系的更多信息，请参见 Core Animation Programming Guide。
+> &emsp;图层的边界。默认为 CGRectZero。可动画的。
 
-/* The bounds of the layer. Defaults to CGRectZero. Animatable. */
-图层的边界。默认为CGRectZero。可动画的。
 #### position
-&emsp;图层在其上层坐标空间中的位置。可动画的。
+&emsp;图层在其 superlayer 坐标空间中的位置。可动画的。
 ```c++
 @property CGPoint position;
 ```
-&emsp;此属性的值以磅为单位指定，并且始终相对于anchorPoint属性中的值指定。对于新的独立图层，默认位置设置为（0.0，0.0）。更改frame属性也会更新此属性中的值。
+&emsp;此属性的值以磅为单位指定，并且始终相对于 anchorPoint 属性中的值指定。对于新的独立图层，默认位置设置为（0.0，0.0）。更改 frame 属性也会更新此属性中的值。
 
-&emsp;有关框架，边界，anchorPoint和位置属性之间的关系的更多信息，请参见 Core Animation Programming Guide。
+> &emsp;层边界的定位点 rect 对准的 superlayer 位置。默认为零。可动画的。
 
-/* The position in the superlayer that the anchor point of the layer's bounds rect is aligned to. Defaults to the zero point. Animatable. */
-层边界的定位点rect对准的上层位置。默认为零。可动画的。
 #### zPosition
 &emsp;图层在 z 轴上的位置。可动画的。
 ```c++
 @property CGFloat zPosition;
 ```
-&emsp;该属性的默认值为 0。更改此属性的值将更改屏幕上各图层的前后顺序。较高的值比较低的值在视觉上更靠近该图层。这会影响框架矩形重叠的图层的可见性。
+&emsp;该属性的默认值为 0。更改此属性的值将更改屏幕上各图层的前后顺序。较高的值比较低的值在视觉上更靠近该图层。这会影响 frame 矩形重叠的图层的可见性。
 
-&emsp;此属性的值以点为单位。此属性的范围是单精度浮点-greatestFiniteMagnitude 到 greatFiniteMagnitude。
+&emsp;此属性的值以点为单位。此属性的范围是单精度浮点 `-greatestFiniteMagnitude` 到 `greatFiniteMagnitude`。
 
-/* The Z component of the layer's position in its superlayer. Defaults to zero. Animatable. */
-图层在其上层中位置的Z分量。默认为零。可动画的。
+> &emsp;图层在其 superlayer 中位置的 Z 分量。默认为 zero。可动画的。
+
 #### anchorPointZ
 &emsp;图层沿 z 轴位置的锚点。可动画的。
 ```c++
 @property CGFloat anchorPointZ;
 ```
-&emsp;此属性指定围绕 z 轴进行几何操作的锚点。该点表示为沿z轴的距离（以点为单位）。此属性的默认值为0。
+&emsp;此属性指定围绕 z 轴进行几何操作的锚点。该点表示为沿 z 轴的距离（以点为单位）。此属性的默认值为 0。
 
-/* The Z component of the layer's anchor point (i.e. reference point for position and transform). Defaults to zero. Animatable. */
-图层锚点（即位置和变换的参考点）的 Z 分量。默认为零。可动画的。
+> &emsp;图层锚点（即位置和变换的参考点）的 Z 分量。默认为 zero。可动画的。
+
 #### anchorPoint
 &emsp;定义图层边界矩形的锚点。可动画的。
 ```c++
 @property CGPoint anchorPoint;
 ```
 &emsp;你可以使用单位坐标空间为此属性指定值。此属性的默认值为（0.5，0.5），它表示图层边界矩形的中心。视图的所有几何操作都在指定点附近发生。例如，对具有默认锚点的图层应用旋转变换会导致该图层绕其中心旋转。将锚点更改到其他位置将导致图层围绕该新点旋转。
-
-&emsp;有关框架，边界，anchorPoint 和位置属性之间的关系的更多信息，请参见 Core Animation Programming Guide。
-
-/* Defines the anchor point of the layer's bounds rect, as a point in normalized layer coordinates - '(0, 0)' is the bottom left corner of the bounds rect, '(1, 1)' is the top right corner. Defaults to '(0.5, 0.5)', i.e. the center of the bounds rect. Animatable. */
-定义图层边界 rect 的锚点，作为归一化图层坐标中的点-“（0，0）”是边界rect的左下角，“（1，1）”是右上角。默认为'（0.5，0.5）'，即边界rect的中心。可动画的。
 #### contentsScale
 &emsp;应用于图层的比例因子。
 ```c++
 @property CGFloat contentsScale API_AVAILABLE(macos(10.7), ios(4.0), watchos(2.0), tvos(9.0));
 ```
-&emsp;此值定义层的逻辑坐标空间（以点为单位）和物理坐标空间（以像素为单位）之间的映射。比例因子越高，表示渲染时该层中的每个点都由一个以上的像素表示。例如，如果比例因子为2.0，并且图层边界为50 x 50点，则用于显示图层内容的位图大小为100 x 100像素。
+&emsp;此值定义层的逻辑坐标空间（以点为单位）和物理坐标空间（以像素为单位）之间的映射。比例因子越高，表示渲染时该层中的每个点都由一个以上的像素表示。例如，如果比例因子为 2.0，并且图层边界为 50 x 50 点，则用于显示图层内容的位图大小为 100 x 100 像素。
 
 &emsp;此属性的默认值为 1.0。对于附加到视图的图层，视图将比例因子自动更改为适合当前屏幕的值。对于你自己创建和管理的图层，你必须根据屏幕的分辨率和所提供的内容自行设置此属性的值。 Core Animation 使用你指定的值作为提示来确定如何呈现内容。
 
-/* Defines the scale factor applied to the contents of the layer. If the physical size of the contents is '(w, h)' then the logical size (i.e. for contentsGravity calculations) is defined as '(w /contentsScale, h / contentsScale)'. Applies to both images provided explicitly and content provided via -drawInContext: (i.e. if contentsScale is two -drawInContext: will draw into a buffer twice as large as the layer bounds). Defaults to one. Animatable. */
-定义应用于图层内容的比例因子。如果内容的物理大小为'（w，h）'，则逻辑大小（即用于 contentGravity 计算）定义为'（w / contentsScale，h / contentsScale）'。适用于显式提供的图像和通过 -drawInContext 提供的内容：（即，如果 contentScale 为两个，则 -drawInContext：将绘制为两倍于图层边界的缓冲区）。默认为1。可动画的。
-### Managing the Layer’s Transform
+> &emsp;定义应用于图层内容的比例因子。如果内容的物理大小为（w，h），则逻辑大小（即用于 contentGravity 计算）定义为（w / contentsScale，h / contentsScale）。适用于显式提供的图像和通过 `- drawInContext:` 提供的内容（即，如果 contentScale 为 two，则 `- drawInContext:` 将绘制为两倍于图层边界的缓冲区）。默认为 1。可动画的。
+
+### Managing the Layer’s Transform（管理图层的转换（旋转））
 #### transform
 &emsp;转换应用于图层的内容。可动画的。
 ```c++
@@ -993,17 +952,17 @@ layer.backgroundFilters = [NSArray arrayWithObject:filter];
 ```
 &emsp;默认情况下，此属性设置为标识转换。你应用于图层的所有变换都相对于图层的锚点进行。
 
-/* A transform applied to the layer relative to the anchor point of its bounds rect. Defaults to the identity transform. Animatable. */
-相对于其边界 rect 的锚点应用于图层的变换。默认为身份转换。可动画的。
+> &emsp;相对于其 bounds rect 的锚点应用于图层的变换。默认为 identity 转换。可动画的。
+
 #### sublayerTransform
 &emsp;指定在渲染时应用于子层的变换。可动画的。
 ```c++
 @property CATransform3D sublayerTransform;
 ```
-&emsp;通常，你可以使用此属性为嵌入的图层添加透视图和其他查看效果。你可以通过将子层变换设置为所需的投影矩阵来添加透视图。此属性的默认值为身份转换。
+&emsp;通常，你可以使用此属性为嵌入的图层添加 perspective 和其他 view 效果。你可以通过将子层变换设置为所需的投影矩阵（projection matrix）来添加 perspective。此属性的默认值为 identity 转换。
 
-/* A transform applied to each member of the `sublayers' array while rendering its contents into the receiver's output. Typically used as the projection matrix to add perspective and other viewing effects into the model. Defaults to identity. Animatable. */
-在将其内容呈现到接收器的输出中时，将变换应用于“子层”数组的每个成员。通常用作投影矩阵，以将透视图和其他查看效果添加到模型中。默认为身份。可动画的。
+> &emsp;在将其内容呈现到 CALayer 的输出中时，将变换应用于 sublayers 数组的每个成员。通常用作 projection matrix，以将透视图和其他查看效果添加到模型中。默认为 identity。可动画的。
+
 #### - affineTransform
 &emsp;返回图层变换的仿射版本。
 ```c++
@@ -1011,35 +970,33 @@ layer.backgroundFilters = [NSArray arrayWithObject:filter];
 ```
 &emsp;仿射变换结构，对应于图层的 transform 属性中的值。
 
-/* Convenience methods for accessing the `transform' property as an affine transform. */
-作为仿射变换访问“ transform”属性的便捷方法。
+> &emsp;作为仿射变换访问 transform 属性的便捷方法。
+
 #### - setAffineTransform:
 &emsp;将图层的变换设置为指定的仿射变换。
 ```c++
 - (void)setAffineTransform:(CGAffineTransform)m;
 ```
 &emsp;`m`: 仿射变换，用于图层的变换。
-### Managing the Layer Hierarchy
+### Managing the Layer Hierarchy（管理 CALayer 层次结构）
 #### sublayers
 &emsp;包含图层子图层的数组。
 ```c++
 @property(nullable, copy) NSArray<__kindof CALayer *> *sublayers;
 ```
-&emsp;子层以从前到后的顺序列出。此属性的默认值为nil。
+&emsp;子层以从前到后的顺序列出。此属性的默认值为 nil。
 
-&emsp;将sublayers属性设置为填充有图层对象的数组时，该数组中的每个图层都必须尚未具有超图层-也就是说，其超图层属性当前必须为nil。
+&emsp;将 sublayers 属性设置为填充有图层对象的数组时，该数组中的每个图层都必须尚未具有 superlayer -也就是说，其 superlayer 属性当前必须为 nil。
 
-/* The array of sublayers of this layer. The layers are listed in back to front order. Defaults to nil. When setting the value of the property, any newly added layers must have nil superlayers, otherwise the behavior is undefined. Note that the returned array is not guaranteed to retain its elements. */
-此层子层的数组。层以从后到前的顺序列出。默认为 零。设置属性的值时，任何新添加的层都必须具有nil个超级层，否则行为是不确定的。请注意，不能保证返回的数组保留其元素。
+> &emsp;此 CALayer 的 sublayers 数组。层以从后到前的顺序列出。默认为 零。设置属性的值时，任何新添加的层都必须具有 nil superlayer，否则行为是不确定的。请注意，不能保证返回的数组 retain 其元素。
+
 #### superlayer
-&emsp;层的上层。
+&emsp;层的 superlayer。
 ```c++
 @property(nullable, readonly) CALayer *superlayer;
 ```
-&emsp;超级层管理其子层的布局。
+&emsp;superlayer 管理其子层的布局。
 
-/* The receiver's superlayer object. Implicitly changed to match the hierarchy described by the 'sublayers' properties. */
-接收者的超层对象。隐式更改以匹配“ sublayers”属性描述的层次结构。
 #### - addSublayer:
 &emsp;将图层添加到图层的子图层列表中。
 ```c++
@@ -1047,39 +1004,37 @@ layer.backgroundFilters = [NSArray arrayWithObject:filter];
 ```
 &emsp;`layer`: 要添加的层。
 
-&emsp;如果 sublayers 属性中的数组为nil，则调用此方法将为该属性创建一个数组，并将指定的图层添加到该数组。
+&emsp;如果 sublayers 属性中的数组为 nil，则调用此方法将为该属性创建一个数组，并将指定的图层添加到该数组。
 
-/* Add 'layer' to the end of the receiver's sublayers array. If 'layer' already has a superlayer, it will be removed before being added. */
-在接收器的子层数组的末尾添加“层”。如果“层”已经具有超层，则将其删除后再添加。
+> &emsp;在 CALayer 的子层数组的末尾添加 CALayer。如果 CALayer 已经具有 superlayer，则将其删除后再添加。（更改其 superlayer）
+
 #### - removeFromSuperlayer
-&emsp;从其父层分离该层。
+&emsp;从其父层移除该层。
 ```c++
 - (void)removeFromSuperlayer;
 ```
-&emsp;你可以使用此方法从图层层次结构中删除图层（及其所有子图层）。此方法会同时更新超级图层的子图层列表，并将该图层的超级图层属性设置为nil。
+&emsp;你可以使用此方法从图层层次结构中删除图层（及其所有子图层）。此方法会同时更新 superlayer 的子图层列表，并将该图层的 superlayer 属性设置为 nil。
 
-/* Removes the layer from its superlayer, works both if the receiver is in its superlayer's 'sublayers' array or set as its 'mask' value. */
-从接收者的上层移除该层，如果接收者位于其上层的“子层”数组中或设置为“掩码”值，则两者均可工作。
+> &emsp;从 CALayer 的 superlayer 移除该层，如果接收者位于其 superlayer 的 sublayers 数组中或设置为 mask 值，则两者均可工作。（CALayer 的 mask 也是作为该 CALayer 的子层存在的。）
+
 #### - insertSublayer:atIndex:
-&emsp;将指定的图层插入到指定索引处的接收者的子图层列表中。
+&emsp;将指定的图层插入到 CALayer 的 sublayers 列表的指定索引处。
 ```c++
 - (void)insertSublayer:(CALayer *)layer atIndex:(unsigned)idx;
 ```
-&emsp;`layer`: 要插入当前层的子层。`idx`: 插入图层的索引。此值必须是 sublayers 数组中基于0的有效索引。
+&emsp;`layer`: 要插入当前层的子层。`idx`: 插入图层的索引。此值必须是 sublayers 数组中基于 0 的有效索引。
 
-/* Insert 'layer' at position 'idx' in the receiver's sublayers array. If 'layer' already has a superlayer, it will be removed before being inserted. */
-在接收器的子图层数组中的“ idx”位置插入“图层”。如果“层”已经具有超层，则在插入之前将其删除。
+> &emsp;在 CALayer 的 sublayers 中的 idx 位置插入 layer 。如果 layer 已经具有 superlayer，则在插入之前将其删除。
+
 #### - insertSublayer:below:
-&emsp;将指定的子层插入已经属于接收方的另一个子层下。
+&emsp;将指定的子层插入已经属于 CALayer 的另一个子层下。
 ```c++
 - (void)insertSublayer:(CALayer *)layer below:(nullable CALayer *)sibling;
 ```
 &emsp;`layer`: 要插入当前层的子层。`sibling`: 当前层中的现有子层。图层中的图层在子图层阵列中插入到该图层的前面，因此在外观上看起来是在其后面。
 
-&emsp;如果子图层不在接收者的子图层数组中，则此方法会引发异常。
+&emsp;如果 sibling 不在接收者的子图层数组中，则此方法会引发异常。
 
-/* Insert 'layer' either above or below the specified layer in the receiver's sublayers array. If 'layer' already has a superlayer, it will be removed before being inserted. */
-在接收器的 sublayers 数组中指定层的上方或下方插入“ layer”。如果“层”已经具有超层，则在插入之前将其删除。
 #### - insertSublayer:above:
 &emsp;将指定的子层插入到已经属于接收方的另一个子层之上。
 ```c++
@@ -1095,9 +1050,9 @@ layer.backgroundFilters = [NSArray arrayWithObject:filter];
 
 &emsp;如果 oldLayer 不在接收者的子图层数组中，则此方法的行为是不确定的。
 
-/* Remove 'oldLayer' from the sublayers array of the receiver and insert 'newLayer' if non-nil in its position. If the superlayer of 'oldLayer' is not the receiver, the behavior is undefined. */
-从接收器的子层数组中删除“ oldLayer”，并在其位置非零时插入“ newLayer”。如果“ oldLayer”的超层不是接收者，则行为是不确定的。
-### Updating Layer Display
+> &emsp;从 CALayer 的 sublayers 中删除 oldLayer，并在其位置非零时插入 newLayer。如果 oldLayer 的 superlayer 不是接收者，则行为是不确定的。
+
+### Updating Layer Display（更新 CALayer 显示）
 #### - setNeedsDisplay
 &emsp;将图层的内容标记为需要更新。
 ```c++
