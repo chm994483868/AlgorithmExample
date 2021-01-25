@@ -360,7 +360,7 @@ myLayer.borderWidth = 3.0;
 
 > &emsp;Note: 您无法将过滤器添加到 iOS 中的 layer 对象。
 
-&emsp;对于给定的 layer，你可以将过滤器应用于该 layer 的前景和背景内容。前景内容包括 layer 本身包含的所有内容，包括其 contents 属性中的图像，其背景颜色，其边框以及其子 layer 的内容。背景内容是直接在 layer 下面但实际上不是 layer 本身一部分的内容。大多数 layer 的背景内容是其直接上层的内容，该内容可能被该层完全或部分遮盖。例如，当你希望用户专注于 layer 的前景内容时，可以对背景内容应用模糊滤镜。
+&emsp;对于给定的 layer，你可以将过滤器应用于该 layer 的前景和背景内容。前景内容包括 layer 本身包含的所有内容，包括其 contents 属性中的图像，其背景颜色，其边框以及其子 layer 的内容。背景内容是直接在 layer 下面但实际上不是 layer 本身一部分的内容。大多数 layer 的背景内容是其直接 superlayer 的内容，该内容可能被该层完全或部分遮盖。例如，当你希望用户专注于 layer 的前景内容时，可以对背景内容应用模糊滤镜。
 
 &emsp;你可以通过将 CIFilter 对象添加到 layer 的以下属性来指定过滤器：
 
@@ -393,8 +393,7 @@ myLayer.filters = [NSArray arrayWithObject:aFilter];
 
 | Policy | Usage |
 | --- | --- |
-| NSViewLayerContentsRedrawOnSetNeedsDisplay | 这是推荐的策略。使用此策略，view geometry 更改不会自动导致 view 更新其 layer 内容。相反，layer 的现有内容会被拉伸和操纵，以便于 geometry 更改。要强制 view 重新绘制自身并更新 layer 的内容，必须显式调用 view 的 `setNeedsDisplay:`方法。
-此策略最接近于表示 Core Animation layers 的标准行为。但是，它不是默认策略，必须显式设置。 |
+| NSViewLayerContentsRedrawOnSetNeedsDisplay | 这是推荐的策略。使用此策略，view geometry 更改不会自动导致 view 更新其 layer 内容。相反，layer 的现有内容会被拉伸和操纵，以便于 geometry 更改。要强制 view 重新绘制自身并更新 layer 的内容，必须显式调用 view 的 `setNeedsDisplay:`方法。此策略最接近于表示 Core Animation layers 的标准行为。但是，它不是默认策略，必须显式设置。 |
 | NSViewLayerContentsRedrawDuringViewResize | 这是默认的重绘策略。此策略通过在 view 的 geometry 发生更改时重新生成 layer 的内容来保持与传统 AppKit 绘图的最大兼容性。此行为导致在调整大小操作期间在应用程序的主线程上多次调用 view 的 `drawRect:` 方法。 |
 | NSViewLayerContentsRedrawBeforeViewResize | 使用此策略，AppKit 在执行任何调整大小操作之前以最终大小绘制 layer，并缓存该位图。调整大小操作使用缓存的位图作为起始图像，缩放它以适应旧的 bounds 矩形。然后将位图设置为最终大小。此行为可能导致 view 的内容在动画开始时出现拉伸或扭曲，在初始外观不重要或不明显的情况下效果更好。 |
 | NSViewLayerContentsRedrawNever | 使用此策略，即使调用 `setNeedsDisplay:` 方法，AppKit 也不会更新 layer。此策略最适用于内容从不更改且 view 大小很少更改（如果有的话）的 view。例如，你可以将其用于显示固定大小内容或背景元素的 view。 |
@@ -505,10 +504,52 @@ theAnimation.duration=5.0;
 
 > &Note: 你不能直接从 layer 中删除隐式动画。
 
-&emsp;从 layer 中删除动画时，Core Animation 会通过使用其当前值重画该 layer 来做出响应。因为当前值通常是动画的最终值，所以这可能导致图层的外观突然跳跃。如果希望 layer 的外观保持在动画最后一帧的位置，则可以使用 presentation tree 中的对象来检索这些最终值，并将其设置在 layer 树中的对象上。
+&emsp;从 layer 中删除动画时，Core Animation 会通过使用其当前值重画该 layer 来做出响应。因为当前值通常不是动画的最终值，所以这可能导致图层的外观突然跳跃。如果希望 layer 的外观保持在动画最后一帧的位置，则可以使用 presentation tree 中的对象来检索这些最终值，并将其设置在 layer 树中的对象上。
+
+&emsp;关于暂停动画并希望 layer 的外观保持在动画最后一帧的位置可参考如下代码（在动画执行过程中点击屏幕即可保持在动画的最后一帧）:
+```c++
+- (void)viewDidLoad {
+    [super viewDidLoad];
+    // Do any additional setup after loading the view
+
+    self.ttView = [[UIView alloc] initWithFrame:CGRectMake(50, 200, 100, 100)];
+    self.ttView.backgroundColor = [UIColor greenColor];
+    [self.view addSubview:self.ttView];
+
+    CABasicAnimation* fadeAnim = [CABasicAnimation animationWithKeyPath:@"opacity"];
+    fadeAnim.fromValue = [NSNumber numberWithFloat:1.0];
+    fadeAnim.toValue = [NSNumber numberWithFloat:0.0];
+    fadeAnim.duration = 5.0;
+    [self.ttView.layer addAnimation:fadeAnim forKey:@"opacity"];
+    
+    // Change the actual data value in the layer to the final value.
+    // self.ttView.layer.opacity = 0.0
+}
+
+// 在动画执行过程中点击屏幕即可保持在动画的最后一帧
+- (void)touchesBegan:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
+    [super touchesBegan:touches withEvent:event];
+    
+    [self.ttView.layer removeAnimationForKey:@"opacity"];
+    // 设置最后一帧的 opacity 
+    self.ttView.layer.opacity = self.ttView.layer.presentationLayer.opacity;
+}
+
+// 下面代码也可用于暂停动画
+CFTimeInterval pausedTime = [self.ttView.layer convertTime:CACurrentMediaTime() fromLayer:nil];
+self.ttView.layer.speed = 0.0;
+self.ttView.layer.timeOffset = pausedTime;
+
+// 下面的代码可恢复动画
+CFTimeInterval pausedTime = [self.ttView.layer timeOffset];
+self.ttView.layer.speed = 1.0;
+self.ttView.layer.timeOffset = 0.0;
+self.ttView.layer.beginTime = 0.0;
+CFTimeInterval timeSincePause = [self.ttView.layer convertTime:CACurrentMediaTime() fromLayer:nil] - pausedTime;
+self.ttView.layer.beginTime = timeSincePause;
+```
 
 &emsp;有关暂时暂停动画的信息，请参见清单5-4。
-
 ### Animating Multiple Changes Together（一起对多个更改进行动画处理）
 &emsp;如果要同时将多个动画应用于 layer 对象，则可以使用 CAAnimationGroup 对象将它们组合在一起。通过提供一个配置点，使用组对象可以简化多个动画对象的管理。应用于组的时间和持续时间值会覆盖各个动画对象中的相同值。
 
@@ -630,13 +671,13 @@ myLayer.position = CGPointMake(200, 200);
 
 &emsp;仅当使用创建的独立图层对象构建图层层次结构时，图层级别的布局才有意义。如果你应用的图层均与视图相关联，请使用基于视图的布局支持来更新视图的大小和位置以响应更改。
 #### Using Constraints to Manage Your Layer Hierarchies in OS X（在 OS X 中使用约束来管理你的层层次结构）
-&emsp;约束使你可以使用 layer 及其上层或同级层之间的一组详细关系来指定 layer 的位置和大小。定义约束需要执行以下步骤：
+&emsp;约束使你可以使用 layer 及其 superlayer 或同级层之间的一组详细关系来指定 layer 的位置和大小。定义约束需要执行以下步骤：
 
 1. 创建一个或多个 CAConstraint 对象。使用这些对象定义约束参数。
 2. 将约束对象添加到它们修改其属性的层。
 3. 检索共享的 CAConstraintLayoutManager 对象并将其分配给最接近的 superlayer。
 
-&emsp;图4-1 显示了可用于定义约束的属性以及它们影响的 layer 的外观。你可以使用约束基于其中点边缘相对于另一层的位置来更改该层的位置。你也可以使用它们来更改图层的大小。你所做的更改可以与上层成比例或相对于另一层。你甚至可以将比例因子或常数添加到结果更改中。这种额外的灵活性使得可以使用一组简单的规则非常精确地控制图层的大小和位置。
+&emsp;图4-1 显示了可用于定义约束的属性以及它们影响的 layer 的外观。你可以使用约束基于其中点边缘相对于另一层的位置来更改该层的位置。你也可以使用它们来更改图层的大小。你所做的更改可以与 superlayer 成比例或相对于另一层。你甚至可以将比例因子或常数添加到结果更改中。这种额外的灵活性使得可以使用一组简单的规则非常精确地控制图层的大小和位置。
 
 &emsp;Figure 4-1  Constraint layout manager attributes（约束布局管理器属性）
 
@@ -649,15 +690,15 @@ myLayer.position = CGPointMake(200, 200);
 + 用作参照的 layer
 + 用于比较的参照 layer 的 aspect
 
-&emsp;清单4-1 显示了一个简单的约束，该约束将 layer 的垂直中点固定到其上层的垂直中点。当引用 superlayer 时，请使用字符串 superlayer。此字符串是保留用于引用 superlayer 的特殊名称。使用它可以消除指向该 layer 的指针或知道该 layer 名称的麻烦。它还允许你更改 superlayer 并使约束自动应用于新的父级。 （在创建与同级图层有关的约束时，必须使用其 name 属性标识同级图层。）
+&emsp;清单4-1 显示了一个简单的约束，该约束将 layer 的垂直中点固定到其 superlayer 的垂直中点。当引用 superlayer 时，请使用字符串 superlayer。此字符串是保留用于引用 superlayer 的特殊名称。使用它可以消除指向该 layer 的指针或知道该 layer 名称的麻烦。它还允许你更改 superlayer 并使约束自动应用于新的父级。 （在创建与同级图层有关的约束时，必须使用其 name 属性标识同级图层。）
 
 &emsp;Listing 4-1  Defining a simple constraint
 ```c++
 [myLayer addConstraint:[CAConstraint constraintWithAttribute:kCAConstraintMidY relativeTo:@"superlayer" attribute:kCAConstraintMidY]];
 ```
-&emsp;若要在运行时应用约束，必须将共享的 CAConstraintLayoutManager 对象附加到直接上层。每层负责管理其子层的布局。将布局管理器分配给父级告诉 Core Animation 应用其子级定义的约束。布局管理器对象自动应用约束。将其分配给父层后，不必告诉它更新布局。
+&emsp;若要在运行时应用约束，必须将共享的 CAConstraintLayoutManager 对象附加到直接 superlayer。每层负责管理其子层的布局。将布局管理器分配给父级告诉 Core Animation 应用其子级定义的约束。布局管理器对象自动应用约束。将其分配给父层后，不必告诉它更新布局。
 
-&emsp;要查看约束在特定情况下如何工作，请考虑图 4-2。在此示例中，design 要求 layerA 的宽度和高度保持不变，并且 layerA 保持在其上层内部居中。另外，B层的宽度必须与A层的宽度匹配，B层的顶边缘必须保持在A层的底边缘下方 10 个点，B层的底边缘必须保持在上层的底边缘上方 10 个点。清单 4-2 显示了用于创建此示例的子层和约束的代码。
+&emsp;要查看约束在特定情况下如何工作，请考虑图 4-2。在此示例中，design 要求 layerA 的宽度和高度保持不变，并且 layerA 保持在其 superlayer 内部居中。另外，B层的宽度必须与A层的宽度匹配，B层的顶边缘必须保持在A层的底边缘下方 10 个点，B层的底边缘必须保持在 superlayer 的底边缘上方 10 个点。清单 4-2 显示了用于创建此示例的子层和约束的代码。
 
 &emsp;Figure 4-2  Example constraints based layout
 
@@ -1183,6 +1224,7 @@ Table B-1  Layer properties and their default animations（图层属性及其默
 &emsp;Table B-3  Default Implied Transition（默认隐式过渡）
 
 | Description | Value |
+| --- | --- |
 | Class | CATransition |
 | Duration | 0.25 秒, 或当前 transaction 的持续时间 |
 | Type | Fade (kCATransitionFade) |
