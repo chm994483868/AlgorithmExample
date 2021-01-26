@@ -19,7 +19,6 @@ void MergeSort::mergeSort(int nums[], int first, int last, int temp[]) {
     }
     
     int mid = ((last - first) >> 1) + first;
-    
     mergeSort(nums, first, mid, temp);
     mergeSort(nums, mid + 1, last, temp);
     

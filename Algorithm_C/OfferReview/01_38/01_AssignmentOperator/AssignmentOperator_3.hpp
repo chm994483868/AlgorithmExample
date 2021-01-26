@@ -2,7 +2,7 @@
 //  AssignmentOperator_3.hpp
 //  OfferReview
 //
-//  Created by CHM on 2021/1/22.
+//  Created by CHM on 2021/1/26.
 //  Copyright © 2021 CHM. All rights reserved.
 //
 
@@ -12,8 +12,6 @@
 #include <stdio.h>
 #include <cstring>
 #include <cstdio>
-
-using namespace std;
 
 namespace AssignmentOperator_3 {
 
@@ -25,11 +23,11 @@ public:
     
     CMyString& operator = (const CMyString& str);
     
-    void Print();
+    void Print(void);
+    
 private:
     char* m_pData;
 };
 
 }
-
 #endif /* AssignmentOperator_3_hpp */

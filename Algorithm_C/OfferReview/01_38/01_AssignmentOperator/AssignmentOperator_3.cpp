@@ -2,7 +2,7 @@
 //  AssignmentOperator_3.cpp
 //  OfferReview
 //
-//  Created by CHM on 2021/1/22.
+//  Created by CHM on 2021/1/26.
 //  Copyright © 2021 CHM. All rights reserved.
 //
 
@@ -25,6 +25,10 @@ AssignmentOperator_3::CMyString::CMyString(const CMyString& str) {
     strcpy(m_pData, str.m_pData);
 }
 
+AssignmentOperator_3::CMyString::~CMyString() {
+    delete [] m_pData;
+}
+
 AssignmentOperator_3::CMyString& AssignmentOperator_3::CMyString::operator = (const CMyString& str) {
 //    if (this == &str) {
 //        return *this;
@@ -37,7 +41,7 @@ AssignmentOperator_3::CMyString& AssignmentOperator_3::CMyString::operator = (co
 //    strcpy(m_pData, str.m_pData);
     
     if (this != &str) {
-        CMyString strTemp(str);
+        CMyString strTemp = CMyString(str);
         char* pTemp = strTemp.m_pData;
         strTemp.m_pData = m_pData;
         m_pData = pTemp;
@@ -46,10 +50,4 @@ AssignmentOperator_3::CMyString& AssignmentOperator_3::CMyString::operator = (co
     return *this;
 }
 
-AssignmentOperator_3::CMyString::~CMyString() {
-    delete [] m_pData;
-}
 
-void AssignmentOperator_3::CMyString::Print() {
-    printf("%s", m_pData);
-}
