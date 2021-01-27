@@ -501,12 +501,12 @@ self.window = [[[UIWindow alloc] initWithFrame:[[UIScreen mainScreen] bounds]] a
 | backgroundColor | 修改此属性以更改 view 的背景色。 |
 | contentStretch | 修改此属性可更改 view 内容被拉伸以填充可用空间的方式。 |
 
-&emsp;Animated view transitions 是你对 view 层次进行更改的一种方法，可以超越 view controller 提供的那些方法。尽管你应该使用视图控制器来管理简洁的视图层次结构，但是有时你可能希望替换全部或部分视图层次结构。在这种情况下，你可以使用基于视图的 transitions 来为视图的添加和删除添加动画效果。
+&emsp;Animated view transitions 是你对 view 层次进行更改的一种方法，可以超越 view controller 提供的那些方法。尽管你应该使用 view controllers 来管理简洁的 view 层次结构，但是有时你可能希望替换全部或部分 view 层次结构。在这种情况下，你可以使用 view-based 的 transitions 来为 view 的添加和删除添加动画效果。
 
-&emsp;在你想要执行更复杂的动画或 UIView 类不支持的动画的地方，可以使用 Core Animation 和视图的基础 layer 来创建动画。由于视图和图层对象错综复杂地链接在一起，因此对视图图层的更改会影响视图本身。使用 Core Animation，可以为视图的图层设置以下类型的动画：
+&emsp;在你想要执行更复杂的动画或 UIView 类不支持的动画的地方，可以使用 Core Animation 和视图的基础 layer 来创建动画。由于 view 和 layer 对象错综复杂地链接在一起，因此对 view layer 的更改会影响 view 本身。使用 Core Animation，可以为 view 的 layer 设置以下类型的动画：
 
-+ 图层的大小和位置
-+ 执行 transformations 时使用的中心点
++ layer 的大小和位置
++ 执行 transformations 时使用的 center 点
 + Transformations 为 3D 空间中的 layer 或其 sublayers
 + 在 layer 层次结构中添加或删除 layer 
 + layer 相对于其他同级图层（sibling layers）的 Z 顺序（Z-order ）
@@ -515,7 +515,7 @@ self.window = [[[UIWindow alloc] initWithFrame:[[UIScreen mainScreen] bounds]] a
 + 在调整大小操作期间拉伸的 layer 部分
 + layer 的不透明度（opacity）
 + 超出 layer bounds 的 sublayers 的裁剪行为
-+ layer 的当前内容
++ layer 的当前内容（contents）
 + layer 的栅格化行为（rasterization behavior）
 
 > Note: 如果 view 承载自定义 layer 对象（即没有关联 view 的 layer 对象），则必须使用 Core Animation 来设置对其所做任何更改的动画。
@@ -523,25 +523,553 @@ self.window = [[[UIWindow alloc] initWithFrame:[[UIScreen mainScreen] bounds]] a
 &emsp;尽管本章介绍了一些 Core Animation 行为，但它是从 view  代码启动它们相关的。有关如何使用 Core Animation 为 layers 设置动画的详细信息，请参见 Core Animation Programming Guide 和 Core Animation Cookbook。
 
 ### Animating Property Changes in a View（在 View 中动画化属性更改）
-&emsp;
+&emsp;为了对 UIView 类的属性更改设置动画，必须将这些更改包装在动画块中。术语 animation block 在一般意义上用于指代指定可设置动画的更改的任何代码。在 iOS4 及更高版本中，使用 block object 创建动画块。在早期版本的 iOS 中，可以使用 UIView 类的特殊类方法标记动画块的开始和结束。（即在两个类方法调用之间包裹动画代码）这两种技术支持相同的配置选项，并对动画执行提供相同的控制量。然而，只要可能，就首选基于块的方法。
+
+&emsp;以下各节重点介绍为 view 属性的更改设置动画所需的代码。有关如何在多组 views 之间创建 animated transitions 的信息，请参见 Creating Animated Transitions Between Views。
+
+#### Starting Animations Using the Block-Based Methods（使用基于块的方法开始动画）
+&emsp;在 iOS 4 及更高版本中，使用基于 block 的类方法来启动动画。有几种基于 block 的方法可以为 animation block 提供不同级别的配置。这些方法是：
+
++ `+ animateWithDuration:animations:`
++ `+ animateWithDuration:animations:completion:`
++ `+ animateWithDuration:delay:options:animations:completion:`
+
+&emsp;因为这些是类方法，所以使用它们创建的 animation block  不会绑定到单个 view。因此，可以使用这些方法创建一个包含对多个 views 的更改的动画。例如，清单 4-1 显示了在一个 view 中淡入而在一秒钟内淡出另一个 view 所需的代码。当此代码执行时，指定的动画会立即在另一个线程上启动，以避免阻塞当前线程或应用程序的主线程。
+
+&emsp;Listing 4-1  Performing a simple block-based animation
+```c++
+[UIView animateWithDuration:1.0 animations:^{
+        firstView.alpha = 0.0;
+        secondView.alpha = 1.0;
+}];
+```
+&emsp;上一个示例中的动画仅使用缓入、缓出动画曲线运行一次。如果要更改默认动画参数，必须使用 `+ animateWithDuration:delay:options:animations:completion:` 执行动画。使用此方法可以自定义以下动画参数：
+
++ 开始动画之前的延迟时间
++ 动画期间要使用的时序曲线的类型
++ 动画应重复的次数
++ 动画到达终点时是否应自动反转自身
++ 动画进行期间是否将触摸事件传递给 views
++ 动画是应该中断正在进行的动画，还是等到完成后再开始播放
+
+&emsp;另一件事是 `+ animateWithDuration:animations:completion:` 和 `+ animateWithDuration:delay:options:animations:completion:` 支持指定完成处理程序块的功能。你可以使用完成处理程序向应用程序发出特定动画已完成的信号。完成处理程序也是将单独的动画链接在一起的方法。
+
+&emsp;清单 4-2 展示了一个 animation block 的示例，它使用完成处理程序在第一个动画完成后启动一个新的动画。第一次调用 `+ animateWithDuration:delay:options:animations:completion:` 设置淡出动画并使用一些自定义选项对其进行配置。当动画完成时，它的完成处理程序运行并设置动画的后半部分，该后半部分在延迟后淡入视图。
+
+&emsp;使用完成处理程序是链接多个动画的主要方式。
+
+&emsp;Listing 4-2  Creating an animation block with custom options
+```c++
+- (IBAction)showHideView:(id)sender {
+    // Fade out the view right away
+    [UIView animateWithDuration:1.0
+        delay: 0.0
+        options: UIViewAnimationOptionCurveEaseIn
+        animations:^{
+        
+             thirdView.alpha = 0.0;
+             
+        }
+        completion:^(BOOL finished){
+            // Wait one second and then fade in the view
+            [UIView animateWithDuration:1.0
+                 delay: 1.0
+                 options:UIViewAnimationOptionCurveEaseOut
+                 animations:^{
+                 
+                    thirdView.alpha = 1.0;
+                    
+                 }
+                 completion:nil];
+        }];
+}
+```
+
+> Important：在涉及某个属性的动画正在进行时更改该属性的值不会停止当前动画。取而代之的是，当前动画将继续并设置为刚指定给属性的新值的动画。
+
+#### Starting Animations Using the Begin/Commit Methods（使用 Begin/Commit 方法开始动画）
+&emsp;如果你的应用程序在 iOS 3.2 及更早版本中运行，则必须使用 `+ beginAnimations:context:` 和 UIView 的 `+ commitAnimations` 类方法来定义 animation blocks。这些方法标记 animation blocks 的开始和结束。在调用 `commitAnimations` 方法后，在这些方法之间更改的任何可设置动画的属性都将设置为其新值的动画。动画在另一个线程上执行，以避免阻塞当前线程或应用程序的主线程。
+
+> Note: 如果你正在为 iOS 4 或更高版本编写应用程序，则应该使用 block-based 的方法来设置内容的动画。有关如何使用这些方法的信息，请参见 Starting Animations Using the Block-Based Methods。
+
+&emsp;清单 4-3 显示了实现与清单 4-1 相同的行为所需的代码，但是使用了 `begin/commit` 方法。如清单 4-1 所示，此代码淡出一个视图，而淡出另一个视图的时间超过 1 秒。但是，在本例中，必须使用单独的方法调用设置动画的持续时间。
+
+&emsp;Listing 4-3  Performing a simple begin/commit animation
+```c++
+   [UIView beginAnimations:@"ToggleViews" context:nil];
+   [UIView setAnimationDuration:1.0];
+
+   // Make the animatable changes.
+   firstView.alpha = 0.0;
+   secondView.alpha = 1.0;
+
+   // Commit the changes and perform the animation.
+   [UIView commitAnimations];
+```
+&emsp;默认情况下，animation block 中所有可设置动画的属性更改都将设置动画。如果要为某些更改设置动画，但不为其他更改设置动画，请使用 `setAnimationsEnabled:` 方法暂时禁用动画，进行任何不希望设置动画的更改，然后再次调用 `setAnimationsEnabled:` 以重新启用动画。你可以通过调用 `areAnimationsEnabled` 类方法来确定动画是在当前是启用的。
+
+> Note: 在涉及某个属性的动画正在进行时更改该属性的值不会停止当前动画。相反，动画将继续并以刚指定给属性的新值设置动画。
+
+##### Configuring the Parameters for Begin/Commit Animations（配置 Begin/Commit 动画的参数）
+&emsp;要为 begin/commit animation block 配置动画参数，可以使用几种 UIView 类方法中的任意一种。表 4-2 列出了这些方法，并描述了如何使用它们来配置动画。这些方法中的大多数应该只从 begin/commit animation block 内部调用，但是有些方法也可以用于 block-based 的动画。如果不从 animation block 调用这些方法之一，则使用相应属性的默认值。有关与每个方法关联的默认值的详细信息，请参见 UIView Class Reference。
+
+&emsp;Table 4-2  Methods for configuring animation blocks
+| Method | Usage |
+| --- | --- |
+| setAnimationStartDate: setAnimationDelay: | 使用这些方法中的任何一个来指定执行应该在何时开始执行。如果指定的开始日期在过去（或延迟为 0），动画将尽快开始。 |
+| setAnimationDuration: | 使用此方法可以设置执行动画的时间。 |
+| setAnimationCurve: | 使用此方法可以设置动画的时间曲线。这控制动画是线性执行还是在特定时间更改速度。 |
+| setAnimationRepeatCount: setAnimationRepeatAutoreverses: | 使用这些方法可以设置动画重复的次数，以及动画在每个完整循环结束时是否反向运行。有关使用这些方法的更多信息，请参见 Implementing Animations That Reverse Themselves。 |
+| setAnimationDelegate: setAnimationWillStartSelector: setAnimationDidStopSelector: | 使用这些方法可以在动画之前或之后立即执行代码。有关使用 delegate 的更多信息，请参见 Configuring an Animation Delegate。|
+| setAnimationBeginsFromCurrentState: | 使用此方法可以立即停止所有先前的动画，并从停止点开始新的动画。如果将 NO 传递给此方法，而不是 YES，则新动画直到之前的动画停止后才开始执行。 |
+
+&emsp;清单 4-4 显示了实现与清单 4-2 中的代码相同的行为所需的代码，但是使用 `begin/commit` 方法。和前面一样，此代码淡出视图，等待一秒钟，然后淡入。为了实现动画的第二部分，代码设置了一个动画委托并实现了一个 did-stop 处理程序方法。然后，该处理程序方法设置动画的后半部分并运行它们。
+
+&emsp;Listing 4-4  Configuring animation parameters using the begin/commit methods
+```c++
+// This method begins the first animation.
+- (IBAction)showHideView:(id)sender {
+    [UIView beginAnimations:@"ShowHideView" context:nil];
+    [UIView setAnimationCurve:UIViewAnimationCurveEaseIn];
+    [UIView setAnimationDuration:1.0];
+    [UIView setAnimationDelegate:self];
+    [UIView setAnimationDidStopSelector:@selector(showHideDidStop:finished:context:)];
+ 
+    // Make the animatable changes.
+    thirdView.alpha = 0.0;
+ 
+    // Commit the changes and perform the animation.
+    [UIView commitAnimations];
+}
+ 
+// Called at the end of the preceding animation.
+- (void)showHideDidStop:(NSString *)animationID finished:(NSNumber *)finished context:(void *)context {
+    [UIView beginAnimations:@"ShowHideView2" context:nil];
+    [UIView setAnimationCurve:UIViewAnimationCurveEaseOut];
+    [UIView setAnimationDuration:1.0];
+    [UIView setAnimationDelay:1.0];
+ 
+    thirdView.alpha = 1.0;
+ 
+    [UIView commitAnimations];
+}
+```
+##### Configuring an Animation Delegate（配置动画委托）
+&emsp;如果要在动画之前或之后立即执行代码，则必须将代理对象和开始或停止选择器与 `begin/commit` 动画块相关联。使用 UIView 的 `+ setAnimationDelegate:` 类方法设置委托对象，并使用 `+ setAnimationWillStartSelector:` 和 `+ setAnimationDidStopSelector:` 类方法设置开始和停止选择器。在动画过程中，动画系统会在适当的时间调用委托方法，以使你有机会执行代码。
+
+&emsp;动画委托方法的签名必须类似于以下内容：
+```c++
+- (void)animationWillStart:(NSString *)animationID context:(void *)context;
+- (void)animationDidStop:(NSString *)animationID finished:(NSNumber *)finished context:(void *)context;
+```
+&emsp;两个方法的 animationID 和 context 参数与传递给 `+ beginAnimations:context:` 动画块开头的方法：
+
++ animationID - 应用程序提供的字符串，用于标识动画。
++ context - 应用程序提供的对象，可用于将其他信息传递给 delegate。
+
+&emsp;`setAnimationDidStopSelector:` selector 方法有一个额外的参数，如果动画运行到完成状态，这个布尔值就是 YES。如果此参数的值为 NO，则动画已被另一个动画取消或提前停止。
+
+> Note: 尽管可以在 block-based 的方法中使用动画代理，但通常不需要在那里使用它们。相反，将要运行的任何代码放在块开头的动画之前，并将要在动画完成后运行的任何代码放在完成处理程序中。
+
+#### Nesting Animation Blocks（嵌套动画块）
+&emsp;通过嵌套其他 animation blocks，可以为 animation blocks 的各个部分指定不同的计时和配置选项。顾名思义，嵌套 animation blocks 是在现有 animation blocks 中创建的新 animation blocks。嵌套动画与任何父动画同时启动，但使用它们自己的配置选项运行（大多数情况下）。默认情况下，嵌套动画确实会继承父级的持续时间和动画曲线，但甚至可以根据需要覆盖这些选项。
+
+&emsp;清单 4-5 展示了如何使用嵌套动画来更改整个组中某些动画的计时、持续时间和行为的示例。在这种情况下，两个 views 将淡入完全透明状态，但另一个 view 对象的透明度在最终隐藏之前会来回更改几次。嵌套动画块中使用的 UIViewAnimationOptionOverrideInheritedCurve 和 UIViewAnimationOptionOverrideInheritedDuration keys 允许为第二个动画修改第一个动画中的曲线和持续时间值。如果这些 keys 不存在，则将使用外部 animation block 的持续时间和曲线。
+
+&emsp;Listing 4-5  Nesting animations that have different configurations
+```c++
+[UIView animateWithDuration:1.0
+       delay: 1.0
+       options:UIViewAnimationOptionCurveEaseOut
+       animations:^{
+       
+           aView.alpha = 0.0;
+
+           // Create a nested animation that has a different
+           // duration, timing curve, and configuration.
+           [UIView animateWithDuration:0.2
+                delay:0.0
+                options: UIViewAnimationOptionOverrideInheritedCurve |
+                         UIViewAnimationOptionCurveLinear |
+                         UIViewAnimationOptionOverrideInheritedDuration |
+                         UIViewAnimationOptionRepeat |
+                         UIViewAnimationOptionAutoreverse
+                animations:^{
+                
+                     [UIView setAnimationRepeatCount:2.5];
+                     anotherView.alpha = 0.0;
+                     
+                }
+                completion:nil];
+
+       }
+       completion:nil];
+```
+&emsp;如果使用 begin/commit 方法创建动画，嵌套的工作方式与基于块的方法基本相同。每次连续调用 `+ beginAnimations:context:` 在已打开的 animation block 中创建新的嵌套 animation block，你可以根据需要进行配置。所做的任何配置更改都将应用于最近打开的 animation block。在提交和执行动画之前，必须通过调用 `commitAnimations` 关闭所有 animation blocks。
+
+#### Implementing Animations That Reverse Themselves（实现颠倒自己的动画）
+&emsp;在结合 repeat count 创建可逆动画时，请考虑为 repeat count 指定非整数值。对于自动反转动画，动画的每个完整循环都涉及从原始值到新值再到新值的动画制作。如果希望动画以新值结束，则将 0.5 添加到 repeat count 会导致动画完成以新值结束所需的额外半个周期。如果不包括这半步，动画将设置为原始值，然后快速捕捉到新值，这可能不是你想要的视觉效果。
+
+### Creating Animated Transitions Between Views（在视图之间创建动画过渡）
+&emsp;View transitions 有助于隐藏与在 view 层次结构中添加、删除、隐藏或显示 view 相关的突然更改。使用 view transitions 可以实现以下类型的更改：
+
++ **更改现有 view 的可见 subviews。** 如果要对现有 view 进行相对较小的更改，通常会选择此选项。
++ **将 view 层次结构中的一个 view 替换为其他 view。** 通常，当你要替换跨越整个或大部分屏幕的 view 层次结构时，会选择此选项。
+
+> Important: View transitions 不应与 view controllers 启动的 transitions 相混淆，例如 modal 模式视图控制器（presentation of modal view controllers）或将新视图控制器推到导航堆栈上（pushing of new view controllers onto a navigation stack）。View transitions 仅影响 view 层次，而 view-controller transitions 也会更改 active view controller。因此，对于 view transitions，启动 transition 时处于活动状态的 view controller 在 transition 完成时保持 active 状态。
+> 有关如何使用 view controllers 来呈现新内容的更多信息，请参见 View Controller Programming Guide for iOS。
+
+#### Changing the Subviews of a View（更改视图的子视图）
+&emsp;通过更改 view 的 subviews，可以对 view 进行适度更改。例如，可以添加或删除 subviews 以在两种不同的状态之间切换 superview。动画完成时，将显示相同的 view，但其内容现在不同。
+
+&emsp;在 iOS 4 及更高版本中，使用 `+ transitionWithView:duration:options:animations:completion:` 为 view 启动 transition animation 的方法。在传递给此方法的 animations block 中，通常设置动画的唯一更改是与显示、隐藏、添加或删除 subviews 相关联的更改。将动画限制为该集允许视图创建视图的前后版本的 snapshot 图像，并在两个图像之间设置动画，这样效率更高。但是，如果需要设置其他更改的动画，则可以在调用该方法时包括 UIViewAnimationOptionAllowAnimatedContent 选项。包括该选项可防止 view 创建 snapshot 并直接设置所有更改的动画。
+
+&emsp;清单 4-6 是一个如何使用 transition animation 使其看起来好像添加了新的文本输入页的示例。在本例中，main view 包含两个嵌入的 text views。文本视图的配置相同，但其中一个始终可见，而另一个始终隐藏。当用户点击按钮创建一个新页面时，此方法切换两个视图的可见性，从而生成一个新的空页面，其中一个空文本视图准备接受文本。转换完成后，视图使用私有方法保存旧页中的文本，并重置现在隐藏的文本视图，以便以后可以重用。然后，视图排列其指针，以便在用户请求另一个新页面时，它可以准备执行相同的操作。
+
+&emsp;Listing 4-6  Swapping an empty text view for an existing one
+```c++
+- (IBAction)displayNewPage:(id)sender {
+    [UIView transitionWithView:self.view
+        duration:1.0
+        options:UIViewAnimationOptionTransitionCurlUp
+        animations:^{
+        
+            currentTextView.hidden = YES;
+            swapTextView.hidden = NO;
+            
+        }
+        completion:^(BOOL finished){
+            // Save the old text and then swap the views.
+            [self saveNotes:temp];
+ 
+            UIView* temp = currentTextView;
+            currentTextView = swapTextView;
+            swapTextView = temp;
+            
+        }];
+}
+```
+&emsp;如果需要在 iOS 3.2 及更早版本中执行 view transitions，可以使用 `setAnimationTransition:forView:cache:` 方法指定 transitions 的参数。传递给该方法的 view 与你作为第一个参数传递给该 view 的视图相同 `transitionWithView:duration:options:animations:completion:`。清单 4-7 显示了需要创建的 animation block 的基本结构。请注意，要实现清单 4-6 中所示的完成块，需要使用 did-stop 处理程序配置动画代理，如 Configuring an Animation Delegate 中所述。
+
+&emsp;Listing 4-7  Changing subviews using the begin/commit methods
+```c++
+[UIView beginAnimations:@"ToggleSiblings" context:nil];
+[UIView setAnimationTransition:UIViewAnimationTransitionCurlUp forView:self.view cache:YES];
+[UIView setAnimationDuration:1.0];
+
+// Make your changes
+
+[UIView commitAnimations];
+```
+#### Replacing a View with a Different View（用其他视图替换视图）
+&emsp;当你希望你的界面有很大的不同时，可以替换 view。因为这种技术只交换 views（而不是 view controllers），所以你需要负责适当地设计应用程序的 controller 对象。这种技术只是使用一些 standard transitions 快速呈现新 views 的一种方法。
+
+&emsp;在 iOS 4 及更高版本中，使用 `transitionFromView:toView:duration:options:completion:` 在两个 views 之间转换。此方法实际上从层次结构中删除第一个 view 并插入另一个 view，因此如果要保留第一个 view，应该确保有对它的引用。如果要隐藏 view 而不是将其从 view 层次结构中删除，请将 UIViewAnimationOptionShowHideTransitionViews 作为选项之一传递。
+
+&emsp;清单 4-8 显示了在由单个视图控制器管理的两个主视图之间交换所需的代码。在本例中，视图控制器的根视图始终显示两个子视图（primaryView 或 secondaryView）中的一个。每个视图呈现相同的内容，但方式不同。视图控制器使用 displayingPrimary 成员变量（布尔值）跟踪在任何给定时间显示的视图。翻转方向根据显示的视图而改变。
+
+&emsp;Listing 4-8  Toggling between two views in a view controller
+```c++
+- (IBAction)toggleMainViews:(id)sender {
+    [UIView transitionFromView:(displayingPrimary ? primaryView : secondaryView)
+        toView:(displayingPrimary ? secondaryView : primaryView)
+        duration:1.0
+        options:(displayingPrimary ? UIViewAnimationOptionTransitionFlipFromRight :
+                    UIViewAnimationOptionTransitionFlipFromLeft)
+        completion:^(BOOL finished) {
+            if (finished) {
+                displayingPrimary = !displayingPrimary;
+            }
+    }];
+}
+```
+> Note: 除了交换 views 外，view controller 代码还需要管理主视图和次视图的加载和卸载。有关视图控制器如何加载和卸载视图的信息，请参见 View Controller Programming Guide for iOS。
+
+### Linking Multiple Animations Together（将多个动画链接在一起）
+&emsp;UIView 动画接口支持链接单独的 animation blocks，以便它们按顺序而不是同时执行。链接 animation blocks 的过程取决于使用的是 block-based 的动画方法还是 begin/commit 方法：
+
++ 对于 block-based 的动画，请使用 `animateWithDuration:animations:completion:` 和 `animateWithDuration:delay:options:animations:completion:` 方法支持的完成处理程序来执行任何后续动画。
++ 对于 begin/commit 动画，请将代理对象和 did-stop 选择器与动画相关联。有关如何将代理与动画关联的信息，请参见 Configuring an Animation Delegate。
+
+&emsp;将动画链接在一起的另一种方法是使用具有不同延迟因子的嵌套动画，以便在不同时间启动动画。有关如何嵌套动画的详细信息，请参见 Nesting Animation Blocks.。
+
+### Animating View and Layer Changes Together（一起对视图和图层更改进行动画处理）
+&emsp;应用程序可以根据需要自由混合 view-based 和 layer-based 的动画代码，但配置动画参数的过程取决于 layer 的所有者。更改 view 拥有的 layer 与更改 view 本身是相同的，并且应用于 layer 属性的任何动画都会考虑当前 view-based 的 animation block 的动画参数。对于你自己创建的 layer，情况并非如此。自定义 layer 对象忽略 view-based 的 animation block 参数，而使用默认的 Core Animation 参数。
+
+&emsp;如果要自定义所创建 layer 的动画参数，则必须直接使用 Core Animation。通常，使用 Core Animation 设置动画，涉及创建 CABasicAnimation 对象或 CAAnimation 的其他一些具体子类。然后，将该动画添加到相应的 layer。你可以在 view-based 的 animation block 的内部或外部应用动画。
+
+&emsp;清单 4-9 显示了一个同时修改 view 和自定义 layer 的动画。本例中的 view 在其 bounds 的中心包含一个自定义 CALayer 对象。动画逆时针旋转 view，同时顺时针旋转 layer。因为旋转方向相反，所以 layer 保持其相对于屏幕的原始方向，并且看起来没有明显的旋转。但是，该 layer 下面的 view 会旋转 360 度并返回到其原始方向。本示例主要演示如何混合 view 和 layer 动画。这种类型的混合不应用于需要精确定时的情况。
+
+&emsp;Listing 4-9  Mixing view and layer animations
+```c++
+[UIView animateWithDuration:1.0
+    delay:0.0
+    options: UIViewAnimationOptionCurveLinear
+    animations:^{
+        // Animate the first half of the view rotation.
+        CGAffineTransform  xform = CGAffineTransformMakeRotation(DEGREES_TO_RADIANS(-180));
+        backingView.transform = xform;
+ 
+        // Rotate the embedded CALayer in the opposite direction.
+        CABasicAnimation*    layerAnimation = [CABasicAnimation animationWithKeyPath:@"transform"];
+        layerAnimation.duration = 2.0;
+        layerAnimation.beginTime = 0; //CACurrentMediaTime() + 1;
+        layerAnimation.valueFunction = [CAValueFunction functionWithName:kCAValueFunctionRotateZ];
+        layerAnimation.timingFunction = [CAMediaTimingFunction
+                        functionWithName:kCAMediaTimingFunctionLinear];
+        layerAnimation.fromValue = [NSNumber numberWithFloat:0.0];
+        layerAnimation.toValue = [NSNumber numberWithFloat:DEGREES_TO_RADIANS(360.0)];
+        layerAnimation.byValue = [NSNumber numberWithFloat:DEGREES_TO_RADIANS(180.0)];
+        [manLayer addAnimation:layerAnimation forKey:@"layerAnimation"];
+    }
+    completion:^(BOOL finished){
+        // Now do the second half of the view rotation.
+        [UIView animateWithDuration:1.0
+             delay: 0.0
+             options: UIViewAnimationOptionCurveLinear
+             animations:^{
+                 CGAffineTransform  xform = CGAffineTransformMakeRotation(DEGREES_TO_RADIANS(-359));
+                 backingView.transform = xform;
+             }
+             completion:^(BOOL finished){
+                 backingView.transform = CGAffineTransformIdentity;
+         }];
+}];
+```
+
+> Note: 在清单 4-9 中，你还可以在基于视图的动画块之外创建并应用 CABasicAnimation 对象，以获得相同的结果。所有动画最终都依赖于 Core Animation 来执行。因此，如果它们几乎同时提交，它们将一起运行。
+
+&emsp;如果需要在 view-based 的动画和 layer-based 的动画之间进行精确计时，则建议您使用 Core Animation 创建所有动画。你可能会发现，无论如何，使用 Core Animation 更容易执行某些动画。例如，清单 4-9 中的 view-based 的旋转需要多步序列才能旋转 180 度以上，而 Core Animation 部分使用的旋转值函数从开始到结束一直旋转到中间值。
+
+&emsp;有关如何使用 Core Animation 创建和配置动画的详细信息，请参见 Core Animation Programming Guide 和 Core Animation Cookbook。
 
 
 
+## Views
+&emsp;因为 view 对象是应用程序与用户交互的主要方式，所以它们有许多职责。以下是一些：
 
++ 布局和 subview 管理
+  + view 相对于其 superview 定义了自己的默认大小调整行为。
+  + view 可以管理 subviews 列表。
+  + view 可以根据需要覆盖其 subviews 的大小和位置。
+  + view 可以将其坐标系中的点转换为其他 views 或 window 的坐标系。
++ 绘图和动画
+  + view 在其矩形区域中绘制内容。
+  + 某些 view 属性可以设置为新值时附加动画。
++ 事件处理
+  + view 可以接收触摸事件。
+  + view 参与 responder chain。
 
+&emsp;本章重点介绍创建、管理和绘制 views 以及处理 view 层次结构的布局和管理的步骤。有关如何在 views 中处理触摸事件（和其他事件）的信息，请参见 Event Handling Guide for iOS。
 
+### Creating and Configuring View Objects（创建和配置视图对象）
+&emsp;以编程方式或使用 Interface Builder 将 views 创建为自包含（self-contained）对象，然后将它们组装到 view 层次结构中以供使用。
+#### Creating View Objects Using Interface Builder（使用 Interface Builder 创建视图对象）
+&emsp;创建 view 的最简单方法是使用 Interface Builder 以图形方式组装 views。从 Interface Builder，你可以向界面添加 views，将这些 views 排列成层次结构，配置每个 view 的设置，并将 view 相关行为连接到代码。因为 Interface Builder 使用实时 view 对象，也就是说，在设计时看到的 view 类的实际实例就是在运行时得到的。然后将这些活动对象保存在 nib 文件中，该文件是一个资源文件，用于保存对象的状态和配置。
 
+&emsp;通常创建 nib 文件是为了存储应用程序的某个 view controller 的整个 view 层次结构。nib 文件的顶层通常包含一个表示视图控制器的视图对象。（视图控制器本身通常由文件的所有者对象表示。）顶级 view 的大小应适合目标设备，并包含要显示的所有其他 views。很少使用 nib 文件只存储视图控制器视图层次结构的一部分。
 
+&emsp;将 nib 文件与 view controller 一起使用时，只需使用 nib 文件信息初始化 view controller。view controller 在适当的时间处理 view 的加载和卸载。但是，如果 nib 文件未与 view controller 关联，则可以使用 NSBundle 或 UINib 对象手动加载 nib 文件内容，后者使用 nib 文件中的数据重新构建 view 对象。
 
+&emsp;有关如何使用 Interface Builder 创建和配置 view 的详细信息，请参见 nterface Builder User Guide。有关 view controller 如何加载和管理其关联的 nib 文件的信息，请参见 View Controller Programming Guide for iOS 中的 Creating Custom Content View Controllers 。有关如何从 nib 文件以编程方式加载 view 的详细信息，请参见 Resource Programming Guide 中的 Nib Files。
 
+#### Creating View Objects Programmatically（以编程方式创建视图对象）
+&emsp;如果希望以编程方式创建 views，可以使用标准的 allocation/initialization pattern。view 的默认初始化方法是 `initWithFrame:` 方法，它设置 view 相对于其父视图（即将建立）的初始大小和位置。例如，要创建新的通用 UIView 对象，可以使用类似以下代码：
+```c++
+CGRect  viewRect = CGRectMake(0, 0, 100, 100);
+UIView* myView = [[UIView alloc] initWithFrame:viewRect];
+```
+> Note: 尽管所有 views 都支持 `initWithFrame:` 方法，但有些 view 可能有你应该使用的首选初始化方法。有关任何自定义初始化方法的信息，请参见该类的参考文档。
 
+&emsp;创建 view 后，必须将其添加到 window（或 window 中的另一个 view）中，才能使其可见。有关如何将 view 添加到 view 层次结构的信息，请参见 Adding and Removing Subviews。
 
+#### Setting the Properties of a View（设置视图的属性）
+&emsp;UIView 类有几个声明的属性，用于控制 view 的外观和行为。这些属性用于操纵 view 的大小和位置、view 的透明度、背景色及其渲染行为。所有这些属性都有适当的默认值，你可以稍后根据需要进行更改。你还可以使用 Inspector 窗口从 Interface Builder 中配置许多这些属性。
 
+&emsp;表 3-1 列出了一些更常用的属性（和一些方法），并描述了它们的用法。相关属性列在一起，以便你可以看到影响 view 某些方面的选项。
 
+&emsp;Table 3-1  Usage of some key view properties
+&emsp;......
 
+### Modifying Views at Runtime（在运行时修改视图）
+&emsp;当应用程序接收到来自用户的输入时，它们会根据该输入调整其用户界面。应用程序可以通过重新排列视图、更改视图的大小或位置、隐藏或显示视图或加载一组全新的视图来修改视图。在 iOS 应用程序中，有几个地方和方法可以执行这些类型的操作：
++ 在视图控制器中：
+  + 视图控制器必须在显示视图之前创建视图。它可以从 nib 文件加载视图，也可以通过编程方式创建视图。当不再需要这些视图时，它就会处理掉它们。
+  + 当设备改变方向时，视图控制器可能会调整视图的大小和位置以匹配。作为调整新方向的一部分，它可能会隐藏一些视图并显示其他视图。
+  + 当视图控制器管理可编辑内容时，在切换到编辑模式或从编辑模式切换时，它可能会调整其视图层次结构。例如，它可能会添加额外的按钮和其他控件，以便于编辑其内容的各个方面。这可能还需要调整任何现有视图的大小以容纳额外的控件。
++ 在动画块中：
+  + 如果要在用户界面中的不同视图集之间转换，可以隐藏一些视图，并从动画块内部显示其他视图。
+  + 实现特殊效果时，可以使用动画块修改视图的各种特性。例如，要对视图大小的更改设置动画，可以更改其 frame 矩形的大小。
++ 其他方式：
+  + 当发生触摸事件或手势时，你的界面可能会通过加载新的视图集或更改当前视图集来做出响应。有关处理事件的信息，请参见 iOS 事件处理指南。
+  + 当用户与滚动视图交互时，一个大的可滚动区域可能会隐藏和显示平铺子视图。有关支持可滚动内容的更多信息，请参阅 Scroll View Programming Guide For iOS。
+  + 当键盘出现时，你可以重新定位或调整视图的大小，使它们不在键盘下面。有关如何与键盘交互的信息，请参阅适用于 iOS 的文本编程指南。
+  
+&emsp;视图控制器是启动视图更改的常用位置。因为视图控制器管理与所显示内容相关联的视图层次结构，所以它最终要对这些视图发生的一切负责。加载视图或处理方向更改时，视图控制器可以添加新视图、隐藏或替换现有视图，并进行任意数量的更改，以使视图准备好显示。如果实现了对编辑视图内容的支持，则 `setEditing:animated:` 方法为你提供了一个将视图转换为可编辑版本和从可编辑版本转换视图的位置。
+  
+&emsp;动画块是启动视图相关更改的另一个常见位置。UIView 类中内置的动画支持使对视图属性的更改设置动画变得容易。你也可以使用 `transitionWithView:duration:options:animations:completion:` 或 `transitionFromView:toView:duration:options:completion:`  将整组视图交换为新视图的方法。
 
+### Interacting with Core Animation Layers（与 Core Animation 层交互）
+&emsp;每个视图对象都有一个专用的Core Animation Layers，用于管理视图内容在屏幕上的显示和动画。尽管可以对视图对象进行大量处理，但也可以根据需要直接处理相应的 layer 对象。视图的图层对象存储在视图的 layer 属性中。
 
+#### Changing the Layer Class Associated with a View（更改与视图关联的图层类）
+&emsp;创建视图后，无法更改与视图关联的图层类型。因此，每个视图都使用 `layerClass` 类方法来指定其图层对象的类。此方法的默认实现返回 CALayer 类，更改此值的唯一方法是子类化、重写该方法并返回不同的值。可以更改此值以使用不同类型的 layer。例如，如果视图使用平铺来显示大的可滚动区域，则可能需要使用 CATiledLayer 类来支持视图。
 
+&emsp;`layerClass` 方法的实现应该只是创建所需的类对象并返回它。例如，使用平铺的视图将具有此方法的以下实现：
+```c++
++ (Class)layerClass {
+    return [CATiledLayer class];
+}
+```
+&emsp;每个视图在其初始化过程的早期调用其 `layerClass` 方法，并使用返回的类创建其 layer 对象。此外，视图始终将自己指定为其图层对象的 delegate。此时，视图拥有其层，视图和层之间的关系不得更改。也不能指定与任何其他图层对象的代理相同的视图。更改视图的所有权或委托关系将在应用程序中导致绘图问题和潜在崩溃。
+
+&emsp;有关 Core Animation 提供的不同类型的层对象的详细信息，请参见 Core Animation Reference Collection。
+
+#### Embedding Layer Objects in a View（在视图中嵌入图层对象）
+&emsp;如果希望主要处理图层对象而不是视图，可以根据需要将自定义图层对象合并到视图层次中。自定义图层对象是不属于视图的 CALayer 的任何实例。通常以编程方式创建自定义层，并使用 Core Animation 例程合并它们。自定义层不接收事件或参与响应者链，但会根据 Core Animation 规则绘制自身并响应其父视图或层中的大小更改。
+&emsp;清单 3-2 显示了一个视图控制器的 viewDidLoad 方法示例，该视图控制器创建一个自定义图层对象并将其添加到其根视图中。该层用于显示已设置动画的静态图像。不是将层添加到视图本身，而是将其添加到视图的 layer。
+
+&emsp;Listing 3-2  Adding a custom layer to a view
+```c++
+- (void)viewDidLoad {
+    [super viewDidLoad];
+ 
+    // Create the layer.
+    CALayer* myLayer = [[CALayer alloc] init];
+ 
+    // Set the contents of the layer to a fixed image. And set
+    // the size of the layer to match the image size.
+    UIImage layerContents = [[UIImage imageNamed:@"myImage"] retain];
+    CGSize imageSize = layerContents.size;
+ 
+    myLayer.bounds = CGRectMake(0, 0, imageSize.width, imageSize.height);
+    myLayer = layerContents.CGImage;
+ 
+    // Add the layer to the view.
+    CALayer*    viewLayer = self.view.layer;
+    [viewLayer addSublayer:myLayer];
+ 
+    // Center the layer in the view.
+    CGRect        viewBounds = backingView.bounds;
+    myLayer.position = CGPointMake(CGRectGetMidX(viewBounds), CGRectGetMidY(viewBounds));
+ 
+    // Release the layer, since it is retained by the view's layer
+    [myLayer release];
+}
+```
+&emsp;如果需要，可以添加任意数量的子 layer 并将它们排列成子层层次结构。但是，在某些情况下，这些图层必须附着到视图的图层对象。
+有关如何直接使用层的信息，请参见 Core Animation Programming Guide。
+
+### Defining a Custom View（定义自定义视图）
+&emsp;如果标准系统 views 不能完全满足你的需要，你可以定义一个自定义视图。自定义视图使你能够完全控制应用程序内容的外观以及如何处理与该内容的交互。
+
+> Note: 如果你使用 OpenGL ES 进行绘图，那么应该使用 GLKView 类而不是 UIView 子类。有关如何使用 OpenGL ES 绘图的更多信息，请参见 OpenGL ES Programming Guide。
+
+#### Checklist for Implementing a Custom View（实施自定义视图的清单）
+&emsp;自定义视图的任务是呈现内容并管理与该内容的交互。但是，自定义视图的成功实现不仅仅涉及绘制和处理事件。以下清单包括在实现自定义视图时可以重写的更重要的方法（以及可以提供的行为）：
+
++ 为你的 views 定义适当的初始化方法：
+  + 对于计划以编程方式创建的视图，请重写 `initWithFrame:` 方法或定义自定义初始化方法。
+  + 对于计划从 nib 文件加载的视图，请重写 `initWithCoder:` 方法。使用此方法初始化视图并将其置于已知状态。
++ 实现一个 `dealloc` 方法来处理所有自定义数据的清理。
++ 要处理任何自定义绘图，请重写 `drawRect:` 方法并在那里进行图形绘制。
++ 设置视图的 `autoresizingMask` 属性以定义其自动调整大小行为。
++ 如果你的视图类管理一个或多个整体子视图，请执行以下操作：
+  + 在视图的初始化序列中创建这些子视图。
+  + 在创建时设置每个子视图的 `autoresizingMask` 属性。
+  + 如果你的子视图需要自定义布局，请重写 `layoutSubviews` 方法并在那里实现布局代码。
++ 要处理基于触摸的事件，请执行以下操作：
+  + 使用 `addGestureRecognizer:` 方法将任何合适的手势识别器附加到视图。
+  + 对于要自己处理触摸的情况，请重写 `touchesBegan:withEvent:`、`touchesMoved:withEvent:`、`touchesEnded:withEvent:` 和 `touchesCancelled:withEvent:` 方法。 （请记住，无论你要重写其他与触摸相关的其他方法，都应始终覆盖 `touchesCancelled:withEvent:` 方法。）
++ 如果希望视图的打印版本看起来与屏幕上的版本不同，请实现 `drawRect:forViewPrintFormatter:` 方法。有关如何在视图中支持打印的详细信息，请参见 Drawing and Printing Guide for iOS。
+
+&emsp;除了重写方法之外，请记住，可以对视图的现有属性和方法做很多事情。例如：contentMode 和 contentStretch 属性允许你更改视图的最终呈现外观，并且可能比自己重新绘制内容更可取。除了 UIView 类本身之外，还可以直接或间接配置视图的底层 CALayer 对象的许多方面。甚至可以更改 layer 对象本身的类。
+
+&emsp;有关视图类的方法和属性的更多信息，请参见 UIView Class Reference。
+
+#### Initializing Your Custom View（初始化你的自定义视图）
+&emsp;你定义的每个新视图对象都应该包含一个自定义的 `initWithFrame:` initializer 方法。此方法负责在创建时初始化类，并将视图对象置于已知状态。在代码中以编程方式创建视图实例时，可以使用此方法。
+
+&emsp;清单 3-3 显示了一个标准 `initWithFrame:` 方法的 skeletal 实现。此方法首先调用方法的继承实现，然后在返回初始化对象之前初始化类的实例变量和状态信息。传统上首先调用继承的实现，这样如果出现问题，就可以中止自己的初始化代码并返回 nil。
+
+&emsp;Listing 3-3  Initializing a view subclass
+```c++
+- (id)initWithFrame:(CGRect)aRect {
+    self = [super initWithFrame:aRect];
+    if (self) {
+          // setup the initial properties of the view
+          ...
+       }
+    return self;
+}
+```
+&emsp;如果你计划从 nib 文件加载自定义视图类的实例，那么应该注意，在 iOS 中，nib 加载代码不使用 `initWithFrame:` 方法来实例化新的视图对象。相反，它使用 `initWithCoder:` 方法，该方法是 NSCoding 协议的一部分。
+
+&emsp;即使视图采用 NSCoding 协议，Interface Builder 也不知道视图的自定义属性，因此不会将这些属性编码到 nib 文件中。因此，你自己的 `initWithCoder:` 方法应该尽可能执行任何初始化代码，以将视图置于已知状态。你还可以在视图类中实现 `awakeFromNib` 方法，并使用该方法执行额外的初始化。
+
+#### Implementing Your Drawing Code（实施绘图代码）
+&emsp;对于需要进行自定义绘制的视图，需要重写 `drawRect:` 方法并在那里进行绘制。只有在万不得已的情况下才建议使用自定义绘图。一般来说，如果你可以使用其他视图来显示你的内容，这是首选。
+
+&emsp;`drawRect:` 方法的实现应该只做一件事：绘制内容。此方法不适合更新应用程序的数据结构或执行与绘图无关的任何任务。它应该配置绘图环境、绘制内容，并尽快退出。如果你的 `drawRect:` 方法可能经常被调用，那么你应该尽一切可能优化绘图代码，并且每次调用该方法时尽可能少地进行绘图。
+
+&emsp;在调用视图的 `drawRect:` 方法之前，UIKit 会为视图配置基本的绘图环境。具体来说，它创建一个图形上下文，并调整坐标系和剪裁区域以匹配视图的坐标系和可见边界。因此，在调用 `drawRect:` 方法时，可以开始使用 native 绘图技术（如 UIKit 和 Core Graphics）绘制内容。可以使用 UIGraphicsGetCurrentContext 函数获取指向当前图形上下文的指针。
+
+> Important: 当前图形上下文仅在对视图的 `drawRect:` 方法的一次调用期间有效。UIKit 可能会为随后对该方法的每次调用创建不同的图形上下文，因此你不应该尝试缓存该对象并在以后使用它。
+
+&emsp;清单 3-4 展示了 `drawRect:` 方法的一个简单实现，该方法在视图周围绘制一个 10 像素宽的红色边框。由于 UIKit 绘图操作将 Core Graphics 用于其底层实现，因此可以混合绘图调用（如图所示）以获得预期的结果。
+
+&emsp;Listing 3-4  A drawing method
+```c++
+- (void)drawRect:(CGRect)rect {
+    CGContextRef context = UIGraphicsGetCurrentContext();
+    CGRect    myFrame = self.bounds;
+ 
+    // Set the line width to 10 and inset the rectangle by
+    // 5 pixels on all sides to compensate for the wider line.
+    CGContextSetLineWidth(context, 10);
+    CGRectInset(myFrame, 5, 5);
+ 
+    [[UIColor redColor] set];
+    UIRectFrame(myFrame);
+}
+```
+&emsp;如果你知道视图的图形代码始终使用不透明内容覆盖视图的整个表面，则可以通过将视图的 opaque 属性设置为 YES 来提高系统性能。将视图标记为不透明时，UIKit 会避免位于视图后面的图形内容。这不仅减少了绘图所花费的时间，而且还可以最大限度地减少将视图与其他内容合成所必须完成的工作。但是，只有当你知道视图的内容完全不透明时，才应该将此属性设置为 YES。如果视图不能保证其内容始终不透明，则应将属性设置为 NO。
+
+&emsp;另一种提高绘图性能的方法，特别是在滚动期间，是将视图的 ClearContextBeforeDrawing 属性设置为 NO。当此属性设置为 YES 时，UIKIt 会在调用方法之前自动用透明黑色填充 `drawRect:` 方法要更新的区域。将此属性设置为 NO 可以消除填充操作的开销，但会给应用程序带来用内容填充传递给 `drawRect:` 方法的更新矩形的负担。
+
+#### Responding to Events
+&emsp;视图对象是 UIResponder 类的 responder 对象实例，因此能够接收触摸事件。当发生触摸事件时，window 将相应的事件对象分派到发生触摸的视图。如果你的视图对某个事件不感兴趣，它可以忽略该事件，或者将其传递给响应者链，由其他对象处理。
+
+&emsp;除了直接处理触摸事件外，视图还可以使用手势识别器来检测轻触、滑动、挤压和其他类型的常见触摸相关手势。手势识别器完成了跟踪触摸事件并确保它们遵循正确的标准来将它们限定为目标手势的艰巨工作。应用程序不必跟踪触摸事件，你可以创建手势识别器，为其指定适当的目标对象和操作方法，并使用 `addGestureRecognizer:` 方法将其安装到视图中。然后，当相应的手势出现时，手势识别器调用 action 方法。
+
+&emsp;如果你喜欢直接处理触摸事件，则可以为视图实现以下方法，这些方法在 iOS 事件处理指南中有更详细的描述：
+
++ touchesBegan:withEvent:
++ touchesMoved:withEvent:
++ touchesEnded:withEvent:
++ touchesCancelled:withEvent:
+
+&emsp;视图的默认行为是一次只响应一次触摸。如果用户放下第二根手指，系统将忽略触摸事件，并且不会将其报告给你的视图。如果计划从视图的事件处理程序方法跟踪多指手势，则需要通过将视图的 `multipleTouchEnabled` 属性设置为 YES 来启用多点触控事件。
+
+&emsp;一些视图（如标签和图像）最初完全禁用事件处理。你可以通过更改视图的 `userInteractionEnabled` 属性的值来控制视图是否能够接收触摸事件。你可以临时将此属性设置为 NO，以防止用户在长时间操作挂起时操纵视图的内容。为了防止事件到达任何视图，还可以使用 UIApplication 对象的 `beginIgnoringInteractionEvents` 和 `endIgnoringInteractionEvents` 方法。这些方法影响整个应用程序的事件传递，而不仅仅是单个视图。
+
+> Note: UIView 的动画方法通常在动画进行时禁用触摸事件。可以通过适当配置动画来覆盖此行为。有关执行动画的详细信息，请参见 Animations。
+
+&emsp;在处理触摸事件时，UIKit 使用 `hitTest:withEvent:` 和 `pointInside:withEvent:` 的 UIView 的方法，以确定触摸事件是否发生在给定视图的 bounds 内。尽管你很少需要重写这些方法，但你可以这样做来实现视图的自定义触摸行为。例如，可以重写这些方法以防止子视图处理触摸事件。
+
+#### Cleaning Up After Your View（查看后清理）
+&emsp;如果视图类分配任何内存、存储对任何自定义对象的引用，或者保存在视图释放时必须释放的资源，则必须实现 `dealloc` 方法。当视图的引用计数为零时，系统将调用 `dealloc` 方法，现在是取消分配视图的时候了。这个方法的实现应该释放视图持有的任何对象或资源，然后调用继承的实现，如清单 3-5 所示。不应使用此方法执行任何其他类型的任务。
+
+&emsp;Listing 3-5  Implementing the dealloc method
+```c++
+- (void)dealloc {
+    // Release a retained UIColor object
+    [color release];
+ 
+    // Call the inherited implementation
+    [super dealloc];
+}
+```
 
 ## UIView
 
@@ -668,17 +1196,6 @@ self.window = [[[UIWindow alloc] initWithFrame:[[UIScreen mainScreen] bounds]] a
 &emsp;当你的代码更改该视图上的 tintColor 属性的值时，系统将在该视图上调用此方法。此外，系统在继承了更改的交互色的子视图上调用此方法。
 
 &emsp;在你的实现中，根据需要刷新视图渲染。
-
-
-
-
-
-
-
-
-
-
-
 
 ## 参考链接
 **参考链接:🔗**
