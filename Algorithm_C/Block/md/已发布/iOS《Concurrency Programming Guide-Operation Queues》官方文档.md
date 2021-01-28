@@ -123,6 +123,45 @@ NSBlockOperation* theOp = [NSBlockOperation blockOperationWithBlock: ^{
 #### Responding to Cancellation Events（响应取消事件）
 &emsp;在一个 operation 开始执行之后，它继续执行它的任务，直到它完成或者直到你的代码显式取消该 operation 为止。取消可以在任何时候发生，甚至在 operation 开始执行之前。尽管 NSOperation 类为 clients 提供了取消 operation 的方法，但根据需要，识别取消事件是自愿的（recognizing the cancellation event is voluntary by necessity）。如果一个 operation 被完全终止，可能就没有办法回收已分配的资源。因此，operation 对象需要检查取消事件，并在它们发生在操作过程中时正常退出。
 
+&emsp;要在 operation 对象中支持取消，你所要做的就是定期从自定义代码中调用对象的 `isCancelled` 方法，如果返回 YES，则立即返回。无论操作的持续时间如何，或者你是直接将 NSOperation 子类化还是使用其具体子类之一，支持取消操作都很重要。`isCancelled` 方法本身是非常轻量级的，可以频繁调用，而不会造成任何明显的性能损失。在设计 operation 对象时，应考虑在代码中的以下位置调用 `isCancelled` 方法：
+
++ 在执行任何实际工作之前
++ 在循环的每次迭代中至少一次，如果每次迭代相对较长，则更频繁
++ 在代码中相对容易中止操作的任何地方
+
+&emsp;清单 2-4 提供了一个非常简单的示例，说明如何在 operation 对象的 `main` 方法中响应取消事件。在这种情况下，每次通过 while 循环调用 `isCancelled` 方法，允许在工作开始之前快速退出，并定期再次调用。
+
+&emsp;Listing 2-4  Responding to a cancellation request
+```c++
+- (void)main {
+   @try {
+      BOOL isDone = NO;
+ 
+      while (![self isCancelled] && !isDone) {
+          // Do some work and set isDone to YES when finished
+      }
+   }
+   @catch(...) {
+      // Do not rethrow exceptions.
+   }
+}
+```
+&emsp;尽管前面的示例不包含清理代码，但是你自己的代码应该确保释放自定义代码分配的所有资源。
+
+#### Configuring Operations for Concurrent Execution（为并发执行配置 Operations）
+&emsp;默认情况下，Operation 对象以同步方式执行，也就是说，它们在调用其 `start` 方法的线程中执行任务。但是，由于 operation queues 为非并发 operations 提供线程，因此大多数 operations 仍然异步运行。但是，如果你计划手动执行 operations，但仍希望它们异步运行，则必须采取适当的操作以确保它们能够异步运行。你可以通过将 operations 对象定义为并发 operations 来实现这一点。
+
+&emsp;表 2-2 列出了为实现并发 operation 而通常重写的方法。
+
+&emsp;Table 2-2  Methods to override for concurrent operations
+
+| Method | Description |
+| --- | --- |
+| start | （Required）所有并发 operations 都必须重写此方法，并用自己的自定义实现替换默认实现。要手动执行操作，可以调用其 start 方法。因此，此方法的实现是操作的起点，也是设置执行任务的线程或其他执行环境的地方。你的实现在任何时候都不能调用 super。 |
+| main | （Optional）此方法通常用于实现与 operations 对象关联的任务。尽管可以在 start 方法中执行任务，但使用此方法实现任务可以使设置代码和任务代码更清晰地分离。 |
+| isExecuting isFinished | （Required）并发 operations 负责设置其执行环境，并向外部 clients 报告该环境的状态。因此，并发 operations 必须维护一些状态信息，以便知道它何时执行任务以及何时完成任务。然后，它必须使用这些方法报告该状态。
+这些方法的实现必须能够安全地同时从其他线程调用。更改这些方法报告的值时，还必须为预期的 key path 生成适当的 KVO 通知。 |
+| isConcurrent |  |
 
 
 
@@ -136,14 +175,9 @@ NSBlockOperation* theOp = [NSBlockOperation blockOperationWithBlock: ^{
 
 
 
-To support cancellation in an operation object, all you have to do is call the object’s isCancelled method periodically from your custom code and return immediately if it ever returns YES. Supporting cancellation is important regardless of the duration of your operation or whether you subclass NSOperation directly or use one of its concrete subclasses. The isCancelled method itself is very lightweight and can be called frequently without any significant performance penalty. When designing your operation objects, you should consider calling the isCancelled method at the following places in your code:
 
-Immediately before you perform any actual work
-At least once during each iteration of a loop, or more frequently if each iteration is relatively long
-At any points in your code where it would be relatively easy to abort the operation
-Listing 2-4 provides a very simple example of how to respond to cancellation events in the main method of an operation object. In this case, the isCancelled method is called each time through a while loop, allowing for a quick exit before work begins and again at regular intervals.
 
-Listing 2-4  Responding to a cancellation request
+
 
 
 

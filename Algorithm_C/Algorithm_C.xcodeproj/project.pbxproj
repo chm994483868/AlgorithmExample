@@ -1452,13 +1452,13 @@
 				D21287E525A45A3E005A744C /* iOS 响应者链（Responder Chain）与触摸事件处理全过程分析.md */,
 				D21287E625A45A95005A744C /* iOS Dynamic Method Resolution与Message Forwarding官方文档翻译.md */,
 				D212880F25B67838005A744C /* iOS NSOperation、NSBlockOperation、NSInvocationOperation、NSOperationQueue官方文档.md */,
+				D2EA09DE25C2BC0F0054B58A /* iOS《Concurrency Programming Guide-Operation Queues》官方文档.md */,
 				D2EA09BB25B7B5000054B58A /* iOS《Core Animation Programming Guide》官方文档.md */,
 				D2EA09C925BEB8560054B58A /* iOS《View Programming Guide for iOS》官方文档.md */,
 				D2EA09BD25B97C1C0054B58A /* iOS CALayer 官方文档.md */,
 				D2EA09BC25B972B90054B58A /* iOS NSCoding.md */,
 				D2EA09D425C2540B0054B58A /* iOS 渲染过程全解析.md */,
 				D2EA09D325C241A30054B58A /* iOS 2021 面试前的准备（从网络搜集各种面试题并解答）.md */,
-				D2EA09DE25C2BC0F0054B58A /* iOS《Concurrency Programming Guide-Operation Queues》官方文档.md */,
 			);
 			path = "已发布";
 			sourceTree = "<group>";
