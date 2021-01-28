@@ -548,6 +548,9 @@
 		D2EA09CE25BFBEAF0054B58A /* FindDuplication_2.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = FindDuplication_2.hpp; sourceTree = "<group>"; };
 		D2EA09D025BFC3AC0054B58A /* FindDuplicationNoEdit_2.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = FindDuplicationNoEdit_2.cpp; sourceTree = "<group>"; };
 		D2EA09D125BFC3AD0054B58A /* FindDuplicationNoEdit_2.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = FindDuplicationNoEdit_2.hpp; sourceTree = "<group>"; };
+		D2EA09D325C241A30054B58A /* iOS 2021 面试前的准备（从网络搜集各种面试题并解答）.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 2021 面试前的准备（从网络搜集各种面试题并解答）.md"; sourceTree = "<group>"; };
+		D2EA09D425C2540B0054B58A /* iOS 渲染过程全解析.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 渲染过程全解析.md"; sourceTree = "<group>"; };
+		D2EA09DE25C2BC0F0054B58A /* iOS《Concurrency Programming Guide-Operation Queues》官方文档.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS《Concurrency Programming Guide-Operation Queues》官方文档.md"; sourceTree = "<group>"; };
 		D2EB00FD24D912C6009EAFD6 /* Algorithm_Swift */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = Algorithm_Swift; sourceTree = BUILT_PRODUCTS_DIR; };
 		D2EB00FF24D912C6009EAFD6 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
 		D2EB010824D9136D009EAFD6 /* BubbleSort.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BubbleSort.swift; sourceTree = "<group>"; };
@@ -1453,6 +1456,9 @@
 				D2EA09C925BEB8560054B58A /* iOS《View Programming Guide for iOS》官方文档.md */,
 				D2EA09BD25B97C1C0054B58A /* iOS CALayer 官方文档.md */,
 				D2EA09BC25B972B90054B58A /* iOS NSCoding.md */,
+				D2EA09D425C2540B0054B58A /* iOS 渲染过程全解析.md */,
+				D2EA09D325C241A30054B58A /* iOS 2021 面试前的准备（从网络搜集各种面试题并解答）.md */,
+				D2EA09DE25C2BC0F0054B58A /* iOS《Concurrency Programming Guide-Operation Queues》官方文档.md */,
 			);
 			path = "已发布";
 			sourceTree = "<group>";
