@@ -2,7 +2,7 @@
 //  FindDuplication_2.hpp
 //  OfferReview
 //
-//  Created by CHM on 2021/1/26.
+//  Created by CHM on 2021/1/29.
 //  Copyright © 2021 CHM. All rights reserved.
 //
 
@@ -10,10 +10,15 @@
 #define FindDuplication_2_hpp
 
 #include <stdio.h>
+#include <cstring>
+#include <cstdio>
+
+using namespace std;
 
 namespace FindDuplication_2 {
 
-bool duplicate(int nums[], int count, int* duplication);
+bool duplicate(int numbers[], int length, int* duplication);
 
 }
+
 #endif /* FindDuplication_2_hpp */

@@ -2,29 +2,29 @@
 //  FindDuplicationNoEdit_2.cpp
 //  OfferReview
 //
-//  Created by CHM on 2021/1/26.
+//  Created by CHM on 2021/1/29.
 //  Copyright © 2021 CHM. All rights reserved.
 //
 
 #include "FindDuplicationNoEdit_2.hpp"
 
-int FindDuplicationNoEdit_2::countRange(const int* nums, int count, int start, int end) {
-    if (nums == nullptr) {
+int FindDuplicationNoEdit_2::countRange(const int* numbers, int length, int start, int end) {
+    if (numbers == nullptr) {
         return 0;
     }
     
-    int result = 0;
-    for (int i = 0; i < count; ++i) {
-        if (nums[i] >= start && nums[i] <= end) {
-            ++result;
+    int count = 0;
+    for (int i = 0; i < length; ++i) {
+        if (numbers[i] >= start && numbers[i] <= end) {
+            ++count;
         }
     }
     
-    return result;
+    return count;
 }
 
-int FindDuplicationNoEdit_2::getDuplication(const int* nums, int length) {
-    if (nums == nullptr || length <= 0) {
+int FindDuplicationNoEdit_2::getDuplication(const int* number, int length) {
+    if (number == nullptr || length <= 0) {
         return -1;
     }
     
@@ -32,8 +32,8 @@ int FindDuplicationNoEdit_2::getDuplication(const int* nums, int length) {
     int end = length - 1;
     
     while (start <= end) {
-        int mid = ((end - start) >> 1) + start;
-        int count = countRange(nums, length, start, mid);
+        int middle = ((end - start) >> 1) + start;
+        int count = countRange(number, length, start, middle);
         
         if (start == end) {
             if (count > 1) {
@@ -43,10 +43,10 @@ int FindDuplicationNoEdit_2::getDuplication(const int* nums, int length) {
             }
         }
         
-        if (count > (mid - start + 1)) {
-            end = mid;
+        if (count > (middle - start + 1)) {
+            end = middle;
         } else {
-            start = mid + 1;
+            start = middle + 1;
         }
     }
     

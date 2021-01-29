@@ -1,4 +1,4 @@
-#  iOS《Concurrency Programming Guide-Operation Queues》官方文档
+# iOS《Concurrency Programming Guide-Operation Queues》官方文档
 
 ## Operation Queues
 &emsp;Cocoa operations 是一种面向对象的方法，用于封装要异步执行的工作。operations 被设计为与 operation queue 一起使用，或者单独使用。因为它们是基于 Objective-C 的，所以 operations 在 OS X 和 iOS 中最常用于 Cocoa-based 的应用程序。
@@ -159,8 +159,7 @@ NSBlockOperation* theOp = [NSBlockOperation blockOperationWithBlock: ^{
 | --- | --- |
 | start | （Required）所有并发 operations 都必须重写此方法，并用自己的自定义实现替换默认实现。要手动执行操作，可以调用其 start 方法。因此，此方法的实现是操作的起点，也是设置执行任务的线程或其他执行环境的地方。你的实现在任何时候都不能调用 super。 |
 | main | （Optional）此方法通常用于实现与 operations 对象关联的任务。尽管可以在 start 方法中执行任务，但使用此方法实现任务可以使设置代码和任务代码更清晰地分离。 |
-| isExecuting isFinished | （Required）并发 operations 负责设置其执行环境，并向外部 clients 报告该环境的状态。因此，并发 operations 必须维护一些状态信息，以便知道它何时执行任务以及何时完成任务。然后，它必须使用这些方法报告该状态。
-这些方法的实现必须能够安全地同时从其他线程调用。更改这些方法报告的值时，还必须为预期的 key path 生成适当的 KVO 通知。 |
+| isExecuting isFinished | （Required）并发 operations 负责设置其执行环境，并向外部 clients 报告该环境的状态。因此，并发 operations 必须维护一些状态信息，以便知道它何时执行任务以及何时完成任务。然后，它必须使用这些方法报告该状态。这些方法的实现必须能够安全地同时从其他线程调用。更改这些方法报告的值时，还必须为预期的 key path 生成适当的 KVO 通知。 |
 | isConcurrent | （Required）要将 operations 标识为并发操作，请重写此方法并返回 YES。 |
 
 &emsp;本节的其余部分展示了 MyOperation 类的示例实现，它演示了实现并发操作所需的基本代码。MyOperation 类只是在它创建的单独线程上执行自己的 main 方法。main 方法执行的实际工作与此无关。示例的重点是演示在定义并发操作时需要提供的基础结构。

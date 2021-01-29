@@ -138,9 +138,10 @@
 		D239E78424D4161800DA0BE5 /* MaxValueOfGifts.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D239E78224D4161800DA0BE5 /* MaxValueOfGifts.cpp */; };
 		D239E78824D4290200DA0BE5 /* LongestSubstringWithoutDup.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D239E78624D4290200DA0BE5 /* LongestSubstringWithoutDup.cpp */; };
 		D2EA09C025B982210054B58A /* AssignmentOperator_2.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D2EA09BE25B982200054B58A /* AssignmentOperator_2.cpp */; };
-		D2EA09CC25BFB63B0054B58A /* AssignmentOperator_3.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D2EA09CA25BFB63B0054B58A /* AssignmentOperator_3.cpp */; };
-		D2EA09CF25BFBEAF0054B58A /* FindDuplication_2.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D2EA09CD25BFBEAF0054B58A /* FindDuplication_2.cpp */; };
-		D2EA09D225BFC3AD0054B58A /* FindDuplicationNoEdit_2.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D2EA09D025BFC3AC0054B58A /* FindDuplicationNoEdit_2.cpp */; };
+		D2EA09E425C3EDC00054B58A /* FindDuplication_2.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D2EA09E225C3EDC00054B58A /* FindDuplication_2.cpp */; };
+		D2EA09EA25C3F3D00054B58A /* FindDuplicationNoEdit_2.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D2EA09E825C3F3D00054B58A /* FindDuplicationNoEdit_2.cpp */; };
+		D2EA09ED25C3F6C50054B58A /* FindInPartiallySortedMatrix_2.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D2EA09EB25C3F6C50054B58A /* FindInPartiallySortedMatrix_2.cpp */; };
+		D2EA09F325C3FEA70054B58A /* ReplaceSpaces_2.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D2EA09F125C3FEA70054B58A /* ReplaceSpaces_2.cpp */; };
 		D2EB010024D912C6009EAFD6 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2EB00FF24D912C6009EAFD6 /* main.swift */; };
 		D2EB010924D9136D009EAFD6 /* BubbleSort.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2EB010824D9136D009EAFD6 /* BubbleSort.swift */; };
 		D2EB010C24D91F91009EAFD6 /* BubbleSort.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D2EB010A24D91F91009EAFD6 /* BubbleSort.cpp */; };
@@ -542,15 +543,17 @@
 		D2EA09BE25B982200054B58A /* AssignmentOperator_2.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = AssignmentOperator_2.cpp; sourceTree = "<group>"; };
 		D2EA09BF25B982200054B58A /* AssignmentOperator_2.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = AssignmentOperator_2.hpp; sourceTree = "<group>"; };
 		D2EA09C925BEB8560054B58A /* iOS《View Programming Guide for iOS》官方文档.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS《View Programming Guide for iOS》官方文档.md"; sourceTree = "<group>"; };
-		D2EA09CA25BFB63B0054B58A /* AssignmentOperator_3.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = AssignmentOperator_3.cpp; sourceTree = "<group>"; };
-		D2EA09CB25BFB63B0054B58A /* AssignmentOperator_3.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = AssignmentOperator_3.hpp; sourceTree = "<group>"; };
-		D2EA09CD25BFBEAF0054B58A /* FindDuplication_2.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = FindDuplication_2.cpp; sourceTree = "<group>"; };
-		D2EA09CE25BFBEAF0054B58A /* FindDuplication_2.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = FindDuplication_2.hpp; sourceTree = "<group>"; };
-		D2EA09D025BFC3AC0054B58A /* FindDuplicationNoEdit_2.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = FindDuplicationNoEdit_2.cpp; sourceTree = "<group>"; };
-		D2EA09D125BFC3AD0054B58A /* FindDuplicationNoEdit_2.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = FindDuplicationNoEdit_2.hpp; sourceTree = "<group>"; };
 		D2EA09D325C241A30054B58A /* iOS 2021 面试前的准备（从网络搜集各种面试题并解答）.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 2021 面试前的准备（从网络搜集各种面试题并解答）.md"; sourceTree = "<group>"; };
 		D2EA09D425C2540B0054B58A /* iOS 渲染过程全解析.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 渲染过程全解析.md"; sourceTree = "<group>"; };
 		D2EA09DE25C2BC0F0054B58A /* iOS《Concurrency Programming Guide-Operation Queues》官方文档.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS《Concurrency Programming Guide-Operation Queues》官方文档.md"; sourceTree = "<group>"; };
+		D2EA09E225C3EDC00054B58A /* FindDuplication_2.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = FindDuplication_2.cpp; sourceTree = "<group>"; };
+		D2EA09E325C3EDC00054B58A /* FindDuplication_2.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = FindDuplication_2.hpp; sourceTree = "<group>"; };
+		D2EA09E825C3F3D00054B58A /* FindDuplicationNoEdit_2.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = FindDuplicationNoEdit_2.cpp; sourceTree = "<group>"; };
+		D2EA09E925C3F3D00054B58A /* FindDuplicationNoEdit_2.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = FindDuplicationNoEdit_2.hpp; sourceTree = "<group>"; };
+		D2EA09EB25C3F6C50054B58A /* FindInPartiallySortedMatrix_2.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = FindInPartiallySortedMatrix_2.cpp; sourceTree = "<group>"; };
+		D2EA09EC25C3F6C50054B58A /* FindInPartiallySortedMatrix_2.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = FindInPartiallySortedMatrix_2.hpp; sourceTree = "<group>"; };
+		D2EA09F125C3FEA70054B58A /* ReplaceSpaces_2.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = ReplaceSpaces_2.cpp; sourceTree = "<group>"; };
+		D2EA09F225C3FEA70054B58A /* ReplaceSpaces_2.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = ReplaceSpaces_2.hpp; sourceTree = "<group>"; };
 		D2EB00FD24D912C6009EAFD6 /* Algorithm_Swift */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = Algorithm_Swift; sourceTree = BUILT_PRODUCTS_DIR; };
 		D2EB00FF24D912C6009EAFD6 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
 		D2EB010824D9136D009EAFD6 /* BubbleSort.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BubbleSort.swift; sourceTree = "<group>"; };
@@ -995,8 +998,6 @@
 				8E919555254D57DA0039A12E /* AssignmentOperator_1.hpp */,
 				D2EA09BE25B982200054B58A /* AssignmentOperator_2.cpp */,
 				D2EA09BF25B982200054B58A /* AssignmentOperator_2.hpp */,
-				D2EA09CA25BFB63B0054B58A /* AssignmentOperator_3.cpp */,
-				D2EA09CB25BFB63B0054B58A /* AssignmentOperator_3.hpp */,
 			);
 			path = 01_AssignmentOperator;
 			sourceTree = "<group>";
@@ -1470,8 +1471,8 @@
 				D21B43A224CE83160078EEF9 /* FindDuplication.hpp */,
 				D202B24F254E656E00D9BFBC /* FindDuplication_1.cpp */,
 				D202B250254E656E00D9BFBC /* FindDuplication_1.hpp */,
-				D2EA09CD25BFBEAF0054B58A /* FindDuplication_2.cpp */,
-				D2EA09CE25BFBEAF0054B58A /* FindDuplication_2.hpp */,
+				D2EA09E225C3EDC00054B58A /* FindDuplication_2.cpp */,
+				D2EA09E325C3EDC00054B58A /* FindDuplication_2.hpp */,
 			);
 			path = 03_01_DuplicationInArray;
 			sourceTree = "<group>";
@@ -1483,8 +1484,8 @@
 				D21B43A624CEA24B0078EEF9 /* FindDuplicationNoEdit.hpp */,
 				D202B252254E68D700D9BFBC /* FindDuplicationNoEdit_1.cpp */,
 				D202B253254E68D700D9BFBC /* FindDuplicationNoEdit_1.hpp */,
-				D2EA09D025BFC3AC0054B58A /* FindDuplicationNoEdit_2.cpp */,
-				D2EA09D125BFC3AD0054B58A /* FindDuplicationNoEdit_2.hpp */,
+				D2EA09E825C3F3D00054B58A /* FindDuplicationNoEdit_2.cpp */,
+				D2EA09E925C3F3D00054B58A /* FindDuplicationNoEdit_2.hpp */,
 			);
 			path = 03_02_DuplicationInArrayNoEdit;
 			sourceTree = "<group>";
@@ -1496,6 +1497,8 @@
 				D21B43AA24CEB54B0078EEF9 /* FindInPartiallySortedMatrix.hpp */,
 				D202B255254E720100D9BFBC /* FindInPartiallySortedMatrix_1.cpp */,
 				D202B256254E720100D9BFBC /* FindInPartiallySortedMatrix_1.hpp */,
+				D2EA09EB25C3F6C50054B58A /* FindInPartiallySortedMatrix_2.cpp */,
+				D2EA09EC25C3F6C50054B58A /* FindInPartiallySortedMatrix_2.hpp */,
 			);
 			path = 04_FindInPartiallySortedMatrix;
 			sourceTree = "<group>";
@@ -1507,6 +1510,8 @@
 				D21B43AE24CEC0CD0078EEF9 /* ReplaceSpaces.hpp */,
 				D202B258254E882600D9BFBC /* ReplaceSpaces_1.cpp */,
 				D202B259254E882600D9BFBC /* ReplaceSpaces_1.hpp */,
+				D2EA09F125C3FEA70054B58A /* ReplaceSpaces_2.cpp */,
+				D2EA09F225C3FEA70054B58A /* ReplaceSpaces_2.hpp */,
 			);
 			path = 05_ReplaceSpaces;
 			sourceTree = "<group>";
@@ -2534,6 +2539,7 @@
 				D227131424D126F2009B180D /* NumericStrings.cpp in Sources */,
 				D227131824D139B5009B180D /* ReorderArray.cpp in Sources */,
 				8E919556254D57DA0039A12E /* AssignmentOperator_1.cpp in Sources */,
+				D2EA09ED25C3F6C50054B58A /* FindInPartiallySortedMatrix_2.cpp in Sources */,
 				D227132824D16CBB009B180D /* MergeSortedLists.cpp in Sources */,
 				D2090C1124CFCF3600FA4F51 /* Fibonacci.cpp in Sources */,
 				D202B29F255282D600D9BFBC /* SubstructureInTree_1.cpp in Sources */,
@@ -2557,6 +2563,7 @@
 				D202B2CA255525E300D9BFBC /* KLeastNumbers_1.cpp in Sources */,
 				D239E78824D4290200DA0BE5 /* LongestSubstringWithoutDup.cpp in Sources */,
 				D2EB010C24D91F91009EAFD6 /* BubbleSort.cpp in Sources */,
+				D2EA09EA25C3F3D00054B58A /* FindDuplicationNoEdit_2.cpp in Sources */,
 				D202B2DE255A482900D9BFBC /* InversePairs.cpp in Sources */,
 				D237C64324D25B20001E0B21 /* StackPushPopOrder.cpp in Sources */,
 				D202B2F1255A63D300D9BFBC /* FirstCommonNodesInLists.cpp in Sources */,
@@ -2566,7 +2573,7 @@
 				D202B300255A763900D9BFBC /* TreeDepth.cpp in Sources */,
 				D202B2792551144D00D9BFBC /* NumberOf1InBinary_1.cpp in Sources */,
 				D237C65B24D2AAF8001E0B21 /* CopyComplexList.cpp in Sources */,
-				D2EA09CF25BFBEAF0054B58A /* FindDuplication_2.cpp in Sources */,
+				D2EA09E425C3EDC00054B58A /* FindDuplication_2.cpp in Sources */,
 				D239E78424D4161800DA0BE5 /* MaxValueOfGifts.cpp in Sources */,
 				D202B251254E656E00D9BFBC /* FindDuplication_1.cpp in Sources */,
 				D202B2852551413500D9BFBC /* DeleteDuplicatedNode_1.cpp in Sources */,
@@ -2576,7 +2583,6 @@
 				D202B341255BCB7100D9BFBC /* CommonParentInTree.cpp in Sources */,
 				D2090C1D24D01FCC00FA4F51 /* RobotMove.cpp in Sources */,
 				D237C63F24D24648001E0B21 /* StackWithMin.cpp in Sources */,
-				D2EA09D225BFC3AD0054B58A /* FindDuplicationNoEdit_2.cpp in Sources */,
 				D202B29925527F7500D9BFBC /* ReverseList_1.cpp in Sources */,
 				D202B2CD2558C86A00D9BFBC /* SerializeBinaryTrees_1.cpp in Sources */,
 				D202B2AD2553E0A100D9BFBC /* StackWithMin_1.cpp in Sources */,
@@ -2585,6 +2591,7 @@
 				8E919568254EEBA80039A12E /* StackWithTwoQueues_1.cpp in Sources */,
 				D202B325255B916900D9BFBC /* ContinousCards.cpp in Sources */,
 				D202B266254FA14A00D9BFBC /* Fibonacci_1.cpp in Sources */,
+				D2EA09F325C3FEA70054B58A /* ReplaceSpaces_2.cpp in Sources */,
 				D202B28F25525FA500D9BFBC /* ReorderArray_1.cpp in Sources */,
 				D202B2FD255A738900D9BFBC /* KthNodeInBST.cpp in Sources */,
 				D2090C1524CFF75E00FA4F51 /* MinNumberInRotatedArray.cpp in Sources */,
@@ -2621,7 +2628,6 @@
 				D202B339255BB55800D9BFBC /* ConstuctArray.cpp in Sources */,
 				D202B320255B8E9A00D9BFBC /* DicesProbability.cpp in Sources */,
 				D202B25A254E882600D9BFBC /* ReplaceSpaces_1.cpp in Sources */,
-				D2EA09CC25BFB63B0054B58A /* AssignmentOperator_3.cpp in Sources */,
 				D227132C24D16E6B009B180D /* List.cpp in Sources */,
 				D202B28225513CDF00D9BFBC /* DeleteNodeInList_1.cpp in Sources */,
 				D202B331255B9F9D00D9BFBC /* Accumulate.cpp in Sources */,
