@@ -204,6 +204,10 @@
 /* Begin PBXFileReference section */
 		8E0E62B22525ECB10076A530 /* iOS 从源码解析Runtime (九)：聚焦cache_t objc-msg-arm64.s解析(2).md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 从源码解析Runtime (九)：聚焦cache_t objc-msg-arm64.s解析(2).md"; sourceTree = "<group>"; };
 		8E153AC825C4EE0F00C95D86 /* iOS《View Controller Programming Guide for iOS》官方文档.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS《View Controller Programming Guide for iOS》官方文档.md"; sourceTree = "<group>"; };
+		8E153AC925C64CA900C95D86 /* iOS《Core Image Programming Guide》官方文档.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS《Core Image Programming Guide》官方文档.md"; sourceTree = "<group>"; };
+		8E153ACA25C64DD300C95D86 /* iOS《OpenGL ES Programming Guide》官方文档.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS《OpenGL ES Programming Guide》官方文档.md"; sourceTree = "<group>"; };
+		8E153ACB25C64F4F00C95D86 /* iOS《Drawing and Printing Guide for iOS》官方文档.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS《Drawing and Printing Guide for iOS》官方文档.md"; sourceTree = "<group>"; };
+		8E153ACC25C64F8500C95D86 /* iOS《Quartz 2D Programming Guide》官方文档.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS《Quartz 2D Programming Guide》官方文档.md"; sourceTree = "<group>"; };
 		8E15F1D424E423FE00660C93 /* iOS消息转发机制.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS消息转发机制.md"; sourceTree = "<group>"; };
 		8E189A782594D1910048E34F /* iOS 从源码解析Run Loop (七)：mach msg 解析.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 从源码解析Run Loop (七)：mach msg 解析.md"; sourceTree = "<group>"; };
 		8E2572BB24D062C90080F598 /* CPower.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = CPower.cpp; sourceTree = "<group>"; };
@@ -1458,6 +1462,10 @@
 				D2EA09BB25B7B5000054B58A /* iOS《Core Animation Programming Guide》官方文档.md */,
 				D2EA09C925BEB8560054B58A /* iOS《View Programming Guide for iOS》官方文档.md */,
 				8E153AC825C4EE0F00C95D86 /* iOS《View Controller Programming Guide for iOS》官方文档.md */,
+				8E153AC925C64CA900C95D86 /* iOS《Core Image Programming Guide》官方文档.md */,
+				8E153ACA25C64DD300C95D86 /* iOS《OpenGL ES Programming Guide》官方文档.md */,
+				8E153ACB25C64F4F00C95D86 /* iOS《Drawing and Printing Guide for iOS》官方文档.md */,
+				8E153ACC25C64F8500C95D86 /* iOS《Quartz 2D Programming Guide》官方文档.md */,
 				D2EA09BD25B97C1C0054B58A /* iOS CALayer 官方文档.md */,
 				D2EA09BC25B972B90054B58A /* iOS NSCoding.md */,
 				D2EA09D425C2540B0054B58A /* iOS 渲染过程全解析.md */,

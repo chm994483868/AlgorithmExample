@@ -7,7 +7,7 @@
 ```c++
 #define TABLE_SIZE(entry) (entry->mask ? entry->mask + 1 : 0)
 ```
-&emsp;用于获取 `weak_entry_t` 或 `weak_table_t` 的哈希数组当前分配的总容量。
+&emsp;用于获取 `weak_entry_t` 或 `weak_table_t` 的哈希数组当前分配的总长度。
 + 在 `weak_entry_t` 中当对象的弱引用数量不超过 4 的时候是使用 `weak_referrer_t inline_referrers[WEAK_INLINE_COUNT]` 这个固定长度为 4 的数组存放 `weak_referrer_t`。当长度大于 4 以后使用 `weak_referrer_t *referrers` 这个哈希数组存放 `weak_referrer_t` 数据。
 
 + ~~其实这句话也不全对，还包括一种情况：`hash` 数组的长度是动态调整的，它的长度可能存在从大缩小到 4 以下的情况。（缩小操作只在哈希数组总容量超过 1024 且已使用部分少于总容量 1/16 时，缩小为总容量的 1/8） 三目运算符则正是针对使用 `hash` 数组的情况，`mask` 的值则一直保持为总长度减 1 并参与 `hash` 函数计算。~~
@@ -16,11 +16,11 @@
 
 + `weak_table_t` 的哈希数组初始长度是 64，当存储占比超过 3/4 后，哈希数组会扩容为总容量的 2 倍，然后会把之前的数据重新哈希化放在新空间内。当一些数据从哈希数组中移除后，为了提高查找效率势必要对哈希数组总长度做缩小操作，规则是当哈希数组总容量超过 1024 且已使用部分少于总容量 1/16 时，缩小为总容量的 1/8，缩小后同样会把原始数据重新哈希化放在新空间。（缩小和扩展都是使用 `calloc` 函数开辟新空间，`cache_t` 扩容后是直接忽略旧数据，这里可以比较记忆。）。牢记以上只是针对 `weak_table_t` 的哈希数组而言的。
 
-+ `weak_entry_t` 则是首先用固定长度为 4 的数组，当有新的弱引用进来时，会首先判断当前是使用的 定长数组还是哈希数组，如果此时使用的还是定长数组的话先判断定长数组还有没有空位，如果没有空位的话会为哈希数组申请长度为 4 的并用一个循环把定长数组中的数据放在哈希数组，这里看似是按下标循环存放，其实下面会重新进行哈希化，然后是判断对哈希数组进行扩容，也是如果超过总占比的 3/4 进行扩容为总容量的 2 倍，所以 `weak_entry_t` 的哈希数组第一次扩容后是 8。然后下面区别就来了 `weak_entry_t` 的哈希数组是没有缩小机制的，移除弱引用的操作其实只是把弱引用的指向置为 `nil`，做移除操作是判断如果定长数组为空或者哈希数组为空，则会把 `weak_table_t` 哈希数组中的 `weak_entry_t` 移除，然后就是对 `weak_table_t` 做一些缩小容量的操作。
++ `weak_entry_t` 则是首先用固定长度为 4 的数组，当有新的弱引用进来时，会首先判断当前是使用的定长数组还是哈希数组，如果此时使用的还是定长数组的话先判断定长数组还有没有空位，如果没有空位的话会为哈希数组申请长度为 4 的并用一个循环把定长数组中的数据放在哈希数组，这里看似是按下标循环存放，其实下面会重新进行哈希化，然后是判断对哈希数组进行扩容，也是如果超过总占比的 3/4 进行扩容为总容量的 2 倍，所以 `weak_entry_t` 的哈希数组第一次扩容后是 8。然后下面区别就来了 `weak_entry_t` 的哈希数组是没有缩小机制的，移除弱引用的操作其实只是把弱引用的指向置为 `nil`，做移除操作是判断如果定长数组为空或者哈希数组为空，则会把 `weak_table_t` 哈希数组中的 `weak_entry_t` 移除，然后就是对 `weak_table_t` 做一些缩小容量的操作。
 
 + `weak_entry_t` 和 `weak_table_t` 可以共用 `TABLE_SIZE` 因为是它们对 `mask` 的使用机制是完全一样的。这里 `weak_entry_t` 之所以不缩小，且起始用定长数组，都是对其的优化，因为本来一个对象的弱引用数量就不会太多。
 
-现在想来依然觉得 `mask` 的值用的很巧妙。（前文已经讲了 `mask` 的全部作用，其实脱离 `weak` 相关的源码，`objc4` 其他很多地方也有采用这种做法）
+&emsp;现在想来依然觉得 `mask` 的值用的很巧妙。（前文已经讲了 `mask` 的全部作用，其实脱离 `weak` 相关的源码，`objc4` 其他很多地方也有采用这种做法）
 
 ⬇️
 ```c++
@@ -52,8 +52,8 @@ static void bad_weak_table(weak_entry_t *entries)
                 "memory error somewhere else.", entries);
 }
 ```
-&emsp;`_objc_fatal` 用来退出程序或者中止运行并打印原因。 
-&emsp;这里表示 `weak_table_t` 中的的某个 `weak_entry_t` 发生了内存错误，全局搜索发现该函数只会在发生 `hash` 冲突时 `index` 持续增加直到和 `begin` 相等时被调用。
+&emsp;`_objc_fatal` 用来退出程序或者中止运行并打印原因。 这里表示 `weak_table_t` 中的的某个 `weak_entry_t` 发生了内存错误，全局搜索发现该函数只会在发生 `hash` 冲突时 `index` 持续增加直到和 `begin` 相等时被调用。
+
 ## hash_pointer 和 w_hash_pointer
 ```C++
 /** 
@@ -78,6 +78,7 @@ static inline uintptr_t w_hash_pointer(objc_object **key) {
 }
 ```
 &emsp;对一个 `objc_object` 对象的指针的指针（此处指 `weak` 变量的地址）求哈希值，用于从 `weak_entry_t` 哈希表中取得 `weak_referrer_t` 把其保存的弱引用变量的指向置为 `nil` 或者从哈希表中移除等。
+
 ## ptr_hash
 > &emsp;// Pointer hash function. This is not a terrific hash, but it is fast and not outrageously flawed for our purposes.
 >
@@ -167,6 +168,7 @@ static void grow_refs_and_insert(weak_entry_t *entry,
     if (old_refs) free(old_refs);
 }
 ```
+
 ## append_referrer
 &emsp;添加给定的 `referrer` 到 `weak_entry_t` 的哈希数组（或定长为 4 的内部数组）。
 ```c++
@@ -246,7 +248,7 @@ static void append_referrer(weak_entry_t *entry, objc_object **new_referrer)
         hash_displacement++;
         index = (index+1) & entry->mask;
         
-        // 在 index == begin 之前一定能找到空位置，因为前面已经有一个超过 3/4 占用后的扩容机制，
+        // 在 index == begin 之前一定能找到空位置，因为前面已经有一个超过 3/4 占用后的扩容机制。
         if (index == begin) bad_weak_table(entry);
     }
     
@@ -263,6 +265,7 @@ static void append_referrer(weak_entry_t *entry, objc_object **new_referrer)
     entry->num_refs++;
 }
 ```
+
 ## remove_referrer
 &emsp;从 `weak_entry_t` 的哈希数组（或定长为 4 的内部数组）中删除弱引用的地址。
 ```c++
@@ -327,6 +330,7 @@ static void remove_referrer(weak_entry_t *entry, objc_object **old_referrer)
     entry->num_refs--;
 }
 ```
+
 ## weak_entry_insert
 &emsp;添加一个新的 `weak_entry_t` 到给定的 `weak_table_t` 的哈希数组中.
 ```c++
@@ -338,7 +342,7 @@ static void remove_referrer(weak_entry_t *entry, objc_object **old_referrer)
  */
 static void weak_entry_insert(weak_table_t *weak_table, weak_entry_t *new_entry)
 {
-    // 哈希数组的起始地址
+    // weak_table 哈希数组的起始地址
     weak_entry_t *weak_entries = weak_table->weak_entries;
     
     ASSERT(weak_entries != nil);
@@ -351,7 +355,7 @@ static void weak_entry_insert(weak_table_t *weak_table, weak_entry_t *new_entry)
         
         // 这里正常情况下，当 index == begin 之前一定能找到一个空位置，
         // 因为在调用该函数前 weak_table_t 的哈希数组大小一直是动态调整的，
-        // 当总容量大于 3/4 时，会扩张为 2 倍
+        // 当总容量大于 3/4 时，会扩张为 2 倍。
         if (index == begin) bad_weak_table(weak_entries);
         
         // 偏移值自增
@@ -375,7 +379,7 @@ static void weak_entry_insert(weak_table_t *weak_table, weak_entry_t *new_entry)
 1. `weak_table_t` 调整了哈希数组的大小以后，要进行重新哈希化，此时 `weak_entry_t` 是一定不在哈希数组里的。
 2. `weak_register_no_lock` 函数内部在调用 `weak_entry_insert` 之前已经调用 `weak_entry_for_referent` 判断没有对应的 `weak_entry_t` 存在，所以 `weak_entry_insert` 函数中不需要再重复判断。（新建一个 `weak_entry_t` 添加到 `weak_table_t` 的哈希数组。）
 
-&emsp;还有一个点需要注意的，在函数最后会更新 `weak_table_t` 的 `max_hash_displacement`，记录哈希冲突时的最大偏移值。
+&emsp;还有一个点需要注意的，在函数最后会更新 `weak_table_t` 的 `max_hash_displacement`，记录当前发生哈希冲突时的最大偏移值。
 
 ## weak_resize
 &emsp;调整 `weak_table_t` 哈希数组的容量大小，并把原始哈希数组里面的 `weak_entry_t` 重新哈希化放进新空间内。
@@ -419,6 +423,7 @@ static void weak_resize(weak_table_t *weak_table, size_t new_size)
     }
 }
 ```
+
 ## weak_grow_maybe
 &emsp;对 `weak_table_t` 的哈希数组进行容量扩展。
 ```c++
@@ -545,6 +550,7 @@ weak_entry_for_referent(weak_table_t *weak_table, objc_object *referent)
     return &weak_table->weak_entries[index];
 }
 ```
+
 ## weak_unregister_no_lock
 > &emsp;Unregister an already-registered weak reference. This is used when referrer's storage is about to go away, but referent isn't dead yet. (Otherwise, zeroing referrer later would be a bad memory access.) Does nothing if referent/referrer is not a currently active weak reference. Does not zero referrer.
   FIXME currently requires old referent value to be passed in (lame). 
@@ -604,6 +610,7 @@ weak_unregister_no_lock(weak_table_t *weak_table, id referent_id,
     // value not change.
 }
 ```
+
 ## weak_register_no_lock
 &emsp;把一个对象和对象的弱引用的指针注册到 `weak_table_t` 的 `weak_entry_t` 中。
 ```c++
