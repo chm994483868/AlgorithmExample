@@ -29,6 +29,7 @@ NS_ASSUME_NONNULL_BEGIN
 
 NS_ASSUME_NONNULL_END
 ```
+
 ```c++
 #import "HMObject+category.h"
 #import <objc/runtime.h> 
@@ -75,6 +76,7 @@ NS_ASSUME_NONNULL_END
 @end
 ```
 &emsp;编译器会自动帮我们做如下三件事:
+
 1. 添加实例变量 `_cusProperty`
 2. 添加 `setter` 方法 `setCusProperty`
 3. 添加 `getter` 方法 `cusProperty`
@@ -99,6 +101,7 @@ NS_ASSUME_NONNULL_END
 
 @end
 ```
+
 ### 验证 @property
 &emsp;下面我们通过 `LLDB` 进行验证，首先我们把 `HMObject.m` 的代码都注释掉，只留下 `HMObject.h` 中的 `cusProperty` 属性。然后在 `main` 函数中编写如下代码：
 ```c++
@@ -184,12 +187,12 @@ NSLog(@"%@", cls); // ⬅️ 这里打一个断点
 ```
 &emsp;看到只有一个名字是 `cusProperty` 的属性，属性的 `attributes` 是：`"T@\"NSString\",C,N,V_cusProperty"`
 
-|code|meaning|
-|...|...|
-|T|类型|
-|C|copy|
-|N|nonatomic|
-|V|实例变量|
+| code | meaning |
+| ... | ... |
+| T | 类型 |
+| C | copy |
+| N | nonatomic |
+| V | 实例变量 |
 
 &emsp;关于它的详细信息可参考 [《Objective-C Runtime Programming Guide》](https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/ObjCRuntimeGuide/Articles/ocrtPropertyIntrospection.html)。
 
@@ -212,6 +215,7 @@ NSLog(@"%@", cls); // ⬅️ 这里打一个断点
 }
 ```
 &emsp;看到方法的 `TypeEncoding` 如下:
+
 &emsp;`types = 0x0000000100000f79 "@16@0:8"` 从左向右分别表示的含义是: `@` 表示返回类型是 `OC` 对象，16 表示所有参数总长度，再往后 `@` 表示第一个参数的类型，对应函数调用的 `self` 类型，0 表示从第 0 位开始，分隔号 : 表示第二个参数类型，对应 `SEL`，8 表示从第 8 位开始，因为前面的一个参数 `self` 占 8 个字节。下面开始是自定义参数，因为 `getter` 函数没有自定义函数，所以只有 `self` 和 `SEL` 参数就结束了。对应的函数原型正是 `objc_msgSend` 函数:
 ```c++
 void
@@ -301,6 +305,7 @@ objc_setAssociatedObject(id _Nonnull object, const void * _Nonnull key,
                          id _Nullable value, objc_AssociationPolicy policy)
     OBJC_AVAILABLE(10.6, 3.1, 9.0, 1.0, 2.0);
 ```
+
 ```c++
 /** 
  * Returns the value associated with a given object for a given key.
@@ -319,6 +324,7 @@ OBJC_EXPORT id _Nullable
 objc_getAssociatedObject(id _Nonnull object, const void * _Nonnull key)
     OBJC_AVAILABLE(10.6, 3.1, 9.0, 1.0, 2.0);
 ```
+
 ```c++
 /** 
  * Removes all associations for a given object.
@@ -337,7 +343,7 @@ objc_getAssociatedObject(id _Nonnull object, const void * _Nonnull key)
  *
  * 此功能的主要目的是使对象轻松返回“原始状态”，因此不应从该对象中普遍删除关联，
  * 因为它还会删除其他 clients 可能已添加到该对象的关联。
- * 通常，您应该将 objc_setAssociatedObject 与 nil 一起使用以清除指定关联。
+ * 通常，你应该将 objc_setAssociatedObject 与 nil 一起使用以清除指定关联。
  * 
  * @see objc_setAssociatedObject
  * @see objc_getAssociatedObject
@@ -379,6 +385,7 @@ typedef OBJC_ENUM(uintptr_t, objc_AssociationPolicy) {
 };
 ```
 &emsp;注释已经解释的很清楚了，即不同的策略对应不同的修饰符:
+
 | objc_AssociationPolicy | 修饰符 |
 | ... | ... |
 | OBJC_ASSOCIATION_ASSIGN | assign |
@@ -390,7 +397,7 @@ typedef OBJC_ENUM(uintptr_t, objc_AssociationPolicy) {
 &emsp;`objc-references.mm` 文件包含了所有的核心操作，首先来分析相关的数据结构。
 
 ### ObjcAssociation
-&emsp;`associated object` 机制中用于保存**关联策略**和**关联值**。
+&emsp;`associated object` 机制中用于保存 **关联策略** 和 **关联值**。
 ```c++
 class ObjcAssociation {
     // typedef unsigned long uintptr_t;
@@ -421,7 +428,7 @@ public:
     // 内联函数获取 _value
     inline id value() const { return _value; }
     
-    // 在 SETTER 时使用：判断是否需要持有 value
+    // 在 SETTER 时使用根据关联策略判断是否需要持有 value
     inline void acquireValue() {
         if (_value) {
             switch (_policy & 0xFF) {
@@ -461,6 +468,7 @@ public:
     }
 };
 ```
+
 ### ObjectAssociationMap
 ```c++
 typedef DenseMap<const void *, ObjcAssociation> ObjectAssociationMap;
@@ -510,12 +518,13 @@ public:
 
 // 其实这里有点想不明白，明明 AssociationsManager 已经定义了公开函数 get 获取内部 _mapStorage 的数据，
 
-// 为什么这里在类定义外面还写了这句代码 ？
+// 为什么这里在类定义外面还写了这句代码 ？（这是又把 _mapStorage 声明为全局变量吗？）
 AssociationsManager::Storage AssociationsManager::_mapStorage;
 ```
 &emsp;管理 `AssociationsHashMap` 静态变量。
 
 &emsp;总结:
+
 1. 通过 `AssociationsManager` 的 `get` 函数取得一个全局唯一 `AssociationsHashMap`。
 2. 根据我们的原始对象的 `DisguisedPtr<objc_object>` 从 `AssociationsHashMap` 取得 `ObjectAssociationMap`。
 3. 根据我们指定的关联 `key`(`const void *key`) 从 `ObjectAssociationMap` 取得 `ObjcAssociation`。
@@ -532,11 +541,11 @@ objc_setAssociatedObject(id object, const void *key, id value, objc_AssociationP
     SetAssocHook.get()(object, key, value, policy);
 }
 ```
-`SetAssocHook`:
+&emsp;`SetAssocHook`
 ```c++
 static ChainedHookFunction<objc_hook_setAssociatedObject> SetAssocHook{_base_objc_setAssociatedObject};
 ```
-`_base_objc_setAssociatedObject`
+&emsp;`_base_objc_setAssociatedObject`
 ```c++
 static void
 _base_objc_setAssociatedObject(id object, const void *key, id value, objc_AssociationPolicy policy)
@@ -544,7 +553,7 @@ _base_objc_setAssociatedObject(id object, const void *key, id value, objc_Associ
   _object_set_associative_reference(object, key, value, policy);
 }
 ```
-`forbidsAssociatedObjects`
+&emsp;`forbidsAssociatedObjects`（表示是否允许某个类的实例对象关联对象）
 ```c++
 // class does not allow associated objects on its instances
 #define RW_FORBIDS_ASSOCIATED_OBJECTS       (1<<20)
@@ -553,7 +562,7 @@ bool forbidsAssociatedObjects() {
     return (data()->flags & RW_FORBIDS_ASSOCIATED_OBJECTS);
 }
 ```
-`try_emplace`
+&emsp;`try_emplace`
 ```c++
 // Inserts key,value pair into the map if the key isn't already in the map.
 // 如果 key value 键值对在 map 中不存在则把它们插入 map
@@ -587,15 +596,21 @@ objc_object::setHasAssociatedObjects()
  retry:
     isa_t oldisa = LoadExclusive(&isa.bits);
     isa_t newisa = oldisa;
+    
+    // 如果已经被标记为有关联对象或者对象的 isa 是原始指针则直接返回就可以了。（LoadExclusive 和 ClearExclusive 是配对使用的，可以理解为加锁和解锁。）
     if (!newisa.nonpointer  ||  newisa.has_assoc) {
         ClearExclusive(&isa.bits);
         return;
     }
+    
+    // has_assoc 为置为 true，表示该对象存在关联对象。
     newisa.has_assoc = true;
+    
+    // 保证原子赋值的成功。
     if (!StoreExclusive(&isa.bits, oldisa.bits, newisa.bits)) goto retry;
 }
 ```
-`_object_set_associative_reference`
+&emsp;`_object_set_associative_reference`
 ```c++
 void
 _object_set_associative_reference(id object, const void *key, id value, uintptr_t policy)
@@ -611,7 +626,7 @@ _object_set_associative_reference(id object, const void *key, id value, uintptr_
 
     // 伪装 object 指针为 disguised
     DisguisedPtr<objc_object> disguised{(objc_object *)object};
-    // 根据入参创建一个 association
+    // 根据入参创建一个 association (关联策略和关联值)
     ObjcAssociation association{policy, value};
 
     // retain the new value (if any) outside the lock.
@@ -734,7 +749,7 @@ _object_get_associative_reference(id object, const void *key)
 }
 ```
 ### objc_removeAssociatedObjects
-`hasAssociatedObjects`
+&emsp;`hasAssociatedObjects`
 ```c++
 inline bool
 objc_object::hasAssociatedObjects()
@@ -744,7 +759,7 @@ objc_object::hasAssociatedObjects()
     return true;
 }
 ```
-`objc_removeAssociatedObjects`
+&emsp;`objc_removeAssociatedObjects`
 ```c++
 void objc_removeAssociatedObjects(id object) 
 {
@@ -754,7 +769,7 @@ void objc_removeAssociatedObjects(id object)
     }
 }
 ```
-`_object_remove_assocations`
+&emsp;`_object_remove_assocations`
 ```c++
 // Unlike setting/getting an associated reference, 
 // this function is performance sensitive because
@@ -798,8 +813,10 @@ _object_remove_assocations(id object)
 
 ## 关联对象的本质
 &emsp;在分类中到底能否实现属性？首先要知道属性是什么，属性的概念决定了这个问题的答案。
+
 + 如果把属性理解为通过方法访问的实例变量，那这个问题的答案就是不能，因为分类不能为类增加额外的实例变量。
 + 如果属性只是一个存取方法以及存储值的容器的集合，那么分类可以实现属性。
+
 &emsp;分类中对属性的实现其实只是实现了一个看起来像属性的接口而已。
 
 ## 参考链接

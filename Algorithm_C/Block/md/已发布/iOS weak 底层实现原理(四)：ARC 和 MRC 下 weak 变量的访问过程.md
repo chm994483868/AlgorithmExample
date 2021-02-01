@@ -23,6 +23,7 @@ int main(int argc, const char * argv[]) {
     return 0;
 }
 ```
+
 ## 分析汇编代码
 &emsp;这里我们只专注 `Start tag` 和 `End tag` 中间的代码。运行代码我们可以捕捉到如下内容:
 
@@ -40,7 +41,7 @@ int main(int argc, const char * argv[]) {
     0x100000c94 <+100>: callq  0x100000ddc               ; symbol stub for: NSLog
     0x100000c99 <+105>: jmp    0x100000c9b               ; <+107> at main.m:20:13
     0x100000c9b <+107>: movq   %rbx, %rdi
-    0x100000c9e <+110>: callq  *0x36c(%rip)              ; (void *)0x00007fff6cb04d20: objc_release ⬅️ 看到出右侧花括号时调用了 objc_release 和读取时的 retain 对应
+    0x100000c9e <+110>: callq  *0x36c(%rip)              ; (void *)0x00007fff6cb04d20: objc_release ⬅️ 看到出右侧花括号时调用了 objc_release 和读取时的 retain 对应抵消
     ...
 ```
 
@@ -55,6 +56,7 @@ int main(int argc, const char * argv[]) {
 0x100000cd4 <+100>: jmp    0x100000cd6               ; <+102> at main.m:22:9
 ...
 ```
+
 ## 获取被弱引用的对象
 &emsp;通过上面的汇编代码我们可以做出如下总结并先抛出一些结论，后面我们会一步一步的进行证明:
 
@@ -72,6 +74,7 @@ obj    NSObject *    0x10112f010    0x000000010112f010
 // weakPtr 指向同为 obj 对象地址
 weakPtr    NSObject *    0x10112f010    0x000000010112f010
 ```
+
 ```c++
 // 控制台右侧：
 (lldb) p weakPtr // 打印 weakPtr 指向
@@ -81,7 +84,7 @@ weakPtr    NSObject *    0x10112f010    0x000000010112f010
 (lldb) p location
 (id *) $1 = 0x00007ffeefbff558
 
-// 打印 location 内存空间里的内容，正是我们的的 obj 对象 
+// 打印 location 内存空间里的内容，正是我们的 obj 对象 
 (lldb) p *location
 (NSObject *) $2 = 0x000000010112f010
 
@@ -219,7 +222,7 @@ objc_loadWeakRetained(id *location)
             }
             // 调用 retainWeakReference，retainWeakReference 在 NSObject.mm 中默认实现是 return [self _tryRetain]
             else if (! (*tryRetain)(obj, @selector(retainWeakReference))) {
-            // 如果 retainWeakReference 函数返回 false，则返回 nil
+                // 如果 retainWeakReference 函数返回 false，则返回 nil
                 result = nil;
             }
         }
@@ -261,6 +264,7 @@ int main(int argc, const char * argv[]) {
     return 0;
 }
 ```
+
 ```c++
     0x100000d21 <+49>:  leaq   0x228(%rip), %rdi         ; "Start tag"
     ...
@@ -286,7 +290,8 @@ int main(int argc, const char * argv[]) {
 ->  0x100000dc5 <+213>: leaq   0x18e(%rip), %rdi         ; "End tag"
     ...
 ```
-`objc_loadWeak` 函数源码:
+
+&emsp;`objc_loadWeak` 函数源码:
 ```c++
 /** 
  * This loads the object referenced by a weak pointer and returns it, 
@@ -307,6 +312,7 @@ objc_loadWeak(id *location)
     return objc_autorelease(objc_loadWeakRetained(location));
 }
 ```
+
 ## objc_copyWeak
 &emsp;在把一个 `weak` 变量赋值给另一个 `weak` 变量时会调用该函数，如下代码:
 ```c++
@@ -390,7 +396,7 @@ objc_moveWeak(id *dst, id *src)
     *src = nil;
 }
 ```
-&emsp;写到这里，觉得 `weak` 的原理学习可以暂时做一个小完结了。
+&emsp;写到这里，觉得 `weak` 的原理学习完毕可以暂时做一个小完结了。
 
 ## 参考链接
 **参考链接:🔗**

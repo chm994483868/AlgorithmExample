@@ -3,7 +3,7 @@
 > &emsp;上篇我们分析学习了 category 相关的数据结构，本篇我们来分析相关的函数，以及我们定义的 category 数据是怎么附加到 objc_class 中的。
 
 ## category 相关函数分析
-&emsp;`category` 的加载涉及到 `runtime` 的初始化及加载流程且内容实在过于多，这里只是粗略的介绍下，关于 `runtime` 加载流程的详细内容准备开新篇来讲。本篇只研究 `runtime` 初始化加载过程中涉及的 `category` 的加载。`Objective-C` 的运行是依赖 `runtime` 来做的，而 `runtime` 和其他系统库一样，是由 `OS X` 和 `iOS` 通过 `dyld(the dynamic link editor)` 来动态加载的。
+&emsp;`category` 的加载涉及到 `runtime` 的初始化及加载流程且内容实在过于多，这里只是粗略的介绍下，关于 `runtime` 加载流程的详细内容准备开新篇来讲。本篇只研究 `runtime` 初始化加载过程中涉及的 `category` 的加载。`Objective-C` 的运行是依赖 `runtime` 来做的，而 `runtime` 和其他系统库一样，是由 macOS 和 iOS 通过 dyld（the dynamic link editor）来动态加载的。
 
 ### _objc_init
 &emsp;`_objc_init` 是 `runtime` 的入口函数，在 `objc-os.mm` 实现。下面我们来一起看看吧：

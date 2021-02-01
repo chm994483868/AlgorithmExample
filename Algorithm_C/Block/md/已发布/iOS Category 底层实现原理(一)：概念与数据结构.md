@@ -92,12 +92,13 @@ NS_ASSUME_NONNULL_END
 
 + 在 `.m` 中引入 `extension`，其中定义的成员变量、属性和方法只能在类内部使用。
 + 在 `.h` 中引入 `extension`，属性和方法是公开的，成员变量默认是私有的，我们可以在前面添加 `@public` 可以变为公开，访问时要用 `->`。（`.` 和 `->` 的使用在 `C/C++` 和 `Objective-C` 中有一些区别，`OC` 是 `C` 的超集，但是这里它并没有和 `C` 完全相同）
-+ 在 `.m` 中给类定义直接添加成员变量，在外部访问时会报错提示成员变量是 `protected` 的。同样也可加 `@public` 公开
++ 在 `.m` 中给类定义直接添加成员变量，在外部访问时会报错提示成员变量是 `protected` 的。同样也可加 `@public` 公开。
 
 ```c++
 object->array = @[@(1), @(2)]; ❌❌ // Instance variable 'array' is protected
 objc->name = @"chm"; ❌❌ // Instance variable 'name' is private
 ```
+
 ### extension 和 cateogry 区别
 1. `extension` 可以添加成员变量，`category` 不能添加成员变量。运行时加载类到内存以后，才会加载分类，这时类的内存布局已经确定（编译器还会对成员变量顺序做出优化，保证遵循内存对齐原则下类占用内存容量最少），如果再去添加成员变量就会破坏类的内存布局。各个成员变量的访问地址是在编译时确定的，每个成员变量的地址偏移都是固定的（相对于类的起始地址的内存偏移（硬编码））。
 2. `extension` 在编译期决议（就确定了是类的一部分），`category` 在运行期决议。`extension` 在编译期和头文件里的 `@interface` 以及实现文件里的 `@implement` 一起形成一个完整的类，`extension` 伴随类的产生而产生，亦随之一起消亡。  `category` 中的方法是在运行时决议的，没有实现也可以运行，而 `extension` 中的方法是在编译器检查的，没有实现会报错。
@@ -109,14 +110,18 @@ objc->name = @"chm"; ❌❌ // Instance variable 'name' is private
 ## Category 分类
 &emsp;`category` 是 `Objective-C 2.0` 之后添加的语言特性，**它可以在不改变或不继承原类的情况下，动态地给类添加方法**。除此之外还有一些其他的应用场景:
 1. 可以把类的的实现分开在几个不同的文件里面。这样做有几个显而易见的好处：
+
   + 可以减少单个文件的体积。
   + 可以把不同的功能组织到不同的 `category` 里面。
   + 可以由多个开发者共同完成一个类。
   + 可以按需加载想要的 `category`。
   + 声明私有方法。
+  
 2. 另外还衍生出 `category` 其他几个场景:
+
   + 模拟多继承（另外可以模拟多继承的还有 `protocol`）。
   + 把 `framework` 的私有方法公开。
+  
 ## category 特点
 1. `category` 只能给某个已有的类扩充方法，不能扩充成员变量。
 2. `category` 中也可以添加属性，只不过 `@property` 只会生成 `setter` 和 `getter` 的声明，不会生成 `setter` 和 `getter` 的实现以及成员变量。
@@ -292,7 +297,7 @@ struct category_t {
 };
 ```
 &emsp;从 `category` 定义中可以看出 `category` 可以添加实例方法、类方法甚至可以实现协议、添加属性，同时也看到不能添加成员变量。
-那为什么说不能添加属性呢？实际上，`category` 允许添加属性，可以使用 `@property` 添加，但是能添加 `@property` 不代表可以添加 “完整版的” 属性，通常我们说的添加属性是指编译器为我们生成了对应的成员变量和对应的 `setter` 和 `getter` 方法来存取属性。在 `category` 中虽说可以书写 `@property`，但是不会生成 _成员变量，也不会生成所添加属性的 `getter` 和 `setter` 方法的实现，所以尽管添加了属性，也无法使用点语法调用 `setter` 和 `getter` 方法。（实际上，点语法可以写，只不过在运行时调用到这个方法时会报找不到方法的错误: `unrecognized selector sent to instance ....`）。我们此时可以通过 `associated object` 来为属性手动实现 `setter` 和 `getter` 存取方法。
+那为什么说不能添加属性呢？实际上，`category` 允许添加属性，可以使用 `@property` 添加，但是能添加 `@property` 不代表可以添加 “完整版的” 属性，通常我们说的添加属性是指编译器为我们生成了对应的成员变量和对应的 `setter` 和 `getter` 方法来存取属性。在 `category` 中虽说可以书写 `@property`，但是不会生成 \_成员变量，也不会生成所添加属性的 `getter` 和 `setter` 方法的实现，所以尽管添加了属性，也无法使用点语法调用 `setter` 和 `getter` 方法。（实际上，点语法可以写，只不过在运行时调用到这个方法时会报找不到方法的错误: `unrecognized selector sent to instance ....`）。我们此时可以通过 `associated object` 来为属性手动实现 `setter` 和 `getter` 存取方法。
 
 ## 从 clang 编译文件来验证上面两个问题
 &emsp;我们先用 `clang` 编译文件（这里建议大家在 `xcode` 和终端上自己试一下）。首先定义如下类 `CustomObject` 只声明一个属性:
@@ -306,12 +311,14 @@ NS_ASSUME_NONNULL_BEGIN
 
 @end
 NS_ASSUME_NONNULL_END
+
 // CustomObject.m
 #import "CustomObject.h"
 @implementation CustomObject
 @end
 ```
 &emsp;然后打开终端进入到 `CustomObject.m` 文件所在文件夹，执行 `clang -rewrite-objc CustomObject.m` 指令，然后生成 `CustomObject.cpp` 文件，查看它：
+
 &emsp;`struct CustomObject_IMPL` 定义：
 ```c++
 extern "C" unsigned long OBJC_IVAR_$_CustomObject$_customProperty;
@@ -373,22 +380,24 @@ struct _ivar_t {
 ```
 &emsp;看到成员变量的访问是通过指针偏移来做的，而偏移距离都是结构体内存布局已经死死固定的。当 `category` 整合到它对应的类时，类的布局已固定，自然就不能再给它添加新的成员变量了。
 
-&emsp;下面我们 `clang` 编译 `category` 文件：
-`NSObject+customCategory.h` 文件：
+&emsp;下面我们 `clang` 编译 `category` 文件：`NSObject+customCategory.h` 文件：
 ```c++
 #import <Foundation/Foundation.h>
 NS_ASSUME_NONNULL_BEGIN
 @interface NSObject (customCategory)
+
 @property (nonatomic, copy) NSString *categoryProperty_one;
 @property (nonatomic, strong) NSMutableArray *categoryProperty_two;
+
 - (void)customInstanceMethod_one;
 - (void)customInstanceMethod_two;
 + (void)customClassMethod_one;
 + (void)customClassMethod_two;
+
 @end
 NS_ASSUME_NONNULL_END
 ```
-`NSObject+customCategory.m` 文件：
+&emsp;`NSObject+customCategory.m` 文件：
 ```c++
 #import "NSObject+customCategory.h"
 @implementation NSObject (customCategory)
@@ -424,7 +433,6 @@ static void _C_NSObject_customCategory_customClassMethod_two(Class self, SEL _cm
 // @end
 ```
 &emsp;看到只有我们的两个实例方法和两个类方法，没有添加成员变量也没有任何属性的 `setter` 和 `getter` 方法。这里即可印证：**category 不能添加属性。**
-
 ```c++
 // 两个实例方法
 static struct /*_method_list_t*/ {
@@ -477,14 +485,14 @@ static struct _category_t _OBJC_$_CATEGORY_NSObject_$_customCategory __attribute
 &emsp;以上三者构成 `_category_t` 结构体实例。
 
 ## category 原理
-> 1. 即使我们不引入 `category` 的头文件，`category` 中的方法也会被添加进主类中，我们可以通 `performSelector:` 等方式对 `category` 中的方法进行调用: 
+> 即使我们不引入 `category` 的头文件，`category` 中的方法也会被添加进主类中，我们可以通 `performSelector:` 等方式对 `category` 中的方法进行调用: 
   + 将 `category` 和它的主类（或元类）注册到哈希表中，形成映射关系。（`ExplicitInitDenseMap<Class, category_list>`）
   + 如果主类（或元类）已实现，那么重建它的方法列表。
 
 ## category 相关数据结构
 &emsp;到这里突然有些茫然，不知道从哪里入手，已知 `category` 是在 `runtime` 初始化时开始加载的，这里涉及到 `runtime` 的加载流程，暂且不表。我们还是先来一层一层剥开相关的数据结构。
 
-可绘制这样一个关系图：
+&emsp;可绘制这样一个关系图：
 ![Category 数据结构](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/40aed4dd4a944043b4e2bc0c4b1fe6bf~tplv-k3u1fbpfcp-zoom-1.image)
 
 ### category_t
@@ -541,6 +549,7 @@ category_t::propertiesForMeta(bool isMeta, struct header_info *hi)
     else return nil;
 }
 ```
+
 ### method_t
 &emsp;方法的数据结构，很简单。
 ```c++
@@ -565,10 +574,7 @@ struct method_t {
 &emsp;可参考 [stl 中 std::binary_function 的使用](https://blog.csdn.net/tangaowen/article/details/7547475)
 
 ### entsize_list_tt 
-
-&emsp;下面先看一下超长的 `entsize_list_tt`，它可理解为一个数据容器，拥有自己的迭代器用于遍历所有元素。 
-（`ent` 应该是 `entry` 的缩写）
-
+&emsp;下面先看一下超长的 `entsize_list_tt`，它可理解为一个数据容器，拥有自己的迭代器用于遍历所有元素。（`ent` 应该是 `entry` 的缩写）
 ```c++
 /***********************************************************************
 * entsize_list_tt<Element, List, FlagMask>
@@ -588,7 +594,6 @@ struct method_t {
 **********************************************************************/
 template <typename Element, typename List, uint32_t FlagMask>
 struct entsize_list_tt {
-
     uint32_t entsizeAndFlags;
     // 容器的容量
     uint32_t count;
@@ -615,6 +620,7 @@ struct entsize_list_tt {
         // 返回类型是 Element 引用
         return *(Element *)((uint8_t *)&first + i*entsize()); 
     }
+    
     // 在索引范围内返回 Element 引用
     Element& get(uint32_t i) const { 
         ASSERT(i < count);
@@ -768,6 +774,7 @@ struct entsize_list_tt {
     };
 };
 ```
+
 ### method_list_t
 ```c++
 // Two bits of entsize are used for fixup markers.
@@ -805,6 +812,7 @@ void method_list_t::setFixedUp() {
     entsizeAndFlags = entsize() | fixed_up_method_list;
 }
 ```
+
 ```c++
 /*
   Low two bits of mlist->entsize is used as the fixed-up marker.
@@ -818,8 +826,8 @@ void method_list_t::setFixedUp() {
     
     (Protocol method lists are not sorted because of their extra parallel data)
     Runtime fixed-up method lists get 3.
-    Runtime 固定方法列表获取 3，
-    （指 method_list_t 继承 entsize_list_tt 的模版参数 FlagMask hardcode 是 0x3）
+    指 method_list_t 继承 entsize_list_tt 的模版参数 FlagMask hardcode 是 0x3
+    
   UN-PREOPTIMIZED VERSION:
   未预优化版本：
   
@@ -836,11 +844,12 @@ static uint32_t fixed_up_method_list = 3;
 static uint32_t uniqued_method_list = 1;
 ```
 &emsp;`method_list_t` 的 `FlagMask` 是 `0x3`，即二进制: `0b11`，`FlagMask` 会在把 `category` 的方法追加到类前调用 `prepareMethodLists` 函数里面用到，用于判断是否需要把方法列表调整为 `uniqued and sorted`。
+
 ### protocol_list_t
 ```c++
 struct protocol_list_t {
     // count is pointer-sized by accident.
-    // 注释是指 count 是根据指针宽度计算的吗？
+    // count 是指针宽度
     
     uintptr_t count;
     
@@ -880,6 +889,7 @@ struct protocol_list_t {
     const_iterator begin() const {
         return list;
     }
+    
     iterator begin() {
         return list;
     }
@@ -893,12 +903,14 @@ struct protocol_list_t {
     }
 };
 ```
+
 ### property_list_t
 ```c++
 struct property_list_t : entsize_list_tt<property_t, property_list_t, 0> {
 };
 ```
 &emsp;继承自 `entsize_list_tt`，它的 `FlagMask` `hardcode` 是 `0`。
+
 ### property_t
 ```c++
 struct property_t {
@@ -906,6 +918,7 @@ struct property_t {
     const char *attributes;
 };
 ```
+
 ### locstamped_category_t
 ```c++
 struct locstamped_category_t {
@@ -914,6 +927,7 @@ struct locstamped_category_t {
     struct header_info *hi;
 };
 ```
+
 ### category_list
 ```c++
 // class nocopy_t 构造函数和析构函数使用编译器默认生成的，删除复制构造函数和赋值函数
@@ -1037,11 +1051,13 @@ public:
     }
 };
 ```
+
 ### UnattachedCategories
 ```c++
 // unattachedCategories 是一个静态全局变量，隶属于 namespace objc，存放未追加到类的分类数据。
 static UnattachedCategories unattachedCategories;
 ```
+
 ```c++
 // 一个公开继承自 ExplicitInitDenseMap<Class, category_list> 的类
 // 抽象参数分别是 Class、category_list
@@ -1124,7 +1140,7 @@ public:
 ```
 &emsp;到这里 `category_t` 相关的数据结构基本看完了，并不复杂。在之前我们用 `clang` 编译我们的类文件和分类文件的时候，已经看到生成的 `_category_t` 结构体，下面我们再解读一下 `clang` 后的 `.cpp` 文件内容：
 
-### _OBJC_$_CATEGORY_INSTANCE_METHODS_NSObject_$_customCategory
+### \_OBJC_$_CATEGORY_INSTANCE_METHODS_NSObject_$_customCategory
 &emsp;编译器生成实例方法列表保存在 **DATA段的** `objc_const` `section` 里（`struct /*_method_list_t*/`）。 
 ```c++
 static struct /*_method_list_t*/ {
@@ -1138,7 +1154,8 @@ static struct /*_method_list_t*/ {
     {(struct objc_selector *)"customInstanceMethod_two", "v16@0:8", (void *)_I_NSObject_customCategory_customInstanceMethod_two}}
 };
 ```
-### _OBJC_$_CATEGORY_CLASS_METHODS_NSObject_$_customCategory
+
+### \_OBJC_$_CATEGORY_CLASS_METHODS_NSObject_$_customCategory
 &emsp;编译器生成类方法列表保存在 **DATA段的** `objc_const` `section` 里（`struct /*_method_list_t*/`）。
 ```c++
 static struct /*_method_list_t*/ {
@@ -1153,8 +1170,8 @@ static struct /*_method_list_t*/ {
 };
 ```
 
-### _OBJC_$_PROP_LIST_NSObject_$_customCategory
-编译器生成属性列表保存在 **DATA段的** `objc_const` `section` 里（`struct /*_prop_list_t*/`）。
+### \_OBJC_$_PROP_LIST_NSObject_$_customCategory
+&emsp;编译器生成属性列表保存在 **DATA段的** `objc_const` `section` 里（`struct /*_prop_list_t*/`）。
 ```c++
 static struct /*_prop_list_t*/ {
     unsigned int entsize;  // sizeof(struct _prop_t)
@@ -1169,7 +1186,7 @@ static struct /*_prop_list_t*/ {
 ```
 &emsp;还有一个需要注意到的事实就是 `category` 的名字用来给各种列表以及后面的 `category` 结构体本身命名，而且有 `static` 来修饰，所以在同一个编译单元里我们的 `category` 名不能重复，否则会出现编译错误。
 
-### _OBJC_$_CATEGORY_NSObject_$_customCategory
+### \_OBJC_$_CATEGORY_NSObject_$_customCategory
 &emsp;编译器生成 `_category_t` 本身 `_OBJC_$_CATEGORY_NSObject_$_customCategory` 并用前面生成的实例方法、类方法、属性列表来初始化。还用 `OBJC_CLASS_$_NSObject` 来动态指定 `_OBJC_$_CATEGORY_NSObject_$_customCategory` 所属的类。
 ```c++
 extern "C" __declspec(dllimport) struct _class_t OBJC_CLASS_$_NSObject;
@@ -1194,6 +1211,7 @@ __declspec(allocate(".objc_inithooks$B")) static void *OBJC_CATEGORY_SETUP[] = {
     (void *)&OBJC_CATEGORY_SETUP_$_NSObject_$_customCategory,
 };
 ```
+
 ### L_OBJC_LABEL_CATEGORY_$
 &emsp;最后，编译器在 **DATA段下的** `objc_catlist` `section` 里保存了一个长度为 1 的 `struct _category_t *` 数组 `L_OBJC_LABEL_CATEGORY_$`，如果有多个 `category`，会生成对应长度的数组，用于运行期 `category` 的加载，到这里编译器的工作就接近尾声了。
 ```c++
@@ -1202,7 +1220,8 @@ static struct _category_t *L_OBJC_LABEL_CATEGORY_$ [1] __attribute__((used, sect
 };
 ```
 &emsp;这时我们大概会有一个疑问，这些准备好的的 `_category_t` 数据什么时候附加到类上去呢？或者是存放在内存哪里等着我们去调用它里面的实例函数或类函数呢？**已知分类数据是会全部追加到类本身上去的。** 不是类似 `weak` 机制或者 `associated object` 机制等，再另外准备哈希表存放数据，然后根据对象地址去查询处理数据等这样的模式。
-下面我们就开始研究分类的数据是如何追加到本类上去的。
+
+&emsp;下面我们就开始研究分类的数据是如何追加到本类上去的。
 
 ## 参考链接
 **参考链接:🔗**
