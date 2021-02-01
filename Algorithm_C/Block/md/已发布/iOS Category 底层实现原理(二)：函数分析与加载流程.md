@@ -11,12 +11,8 @@
 /*
 * _objc_init
 * Bootstrap initialization. 引导程序初始化。
-
-* Registers our image notifier with dyld.
-* 通过 dyld 来注册我们的境像（image）.
-
-* Called by libSystem BEFORE library initialization time
-* library 初始化之前由 libSystem 调用
+* Registers our image notifier with dyld. 通过 dyld 来注册我们的境像（image）。
+* Called by libSystem BEFORE library initialization time. library 初始化之前由 libSystem 调用。
 */
 void _objc_init(void)
 {
@@ -33,7 +29,7 @@ void _objc_init(void)
     // 如果需要，还可以打印一些环境变量。
     environ_init();
     
-    tls_init();
+    tls_init(); // thread local storage 线程本地存储初始化
     
     // 运行 C++ 静态构造函数，
     // 在 dyld 调用我们的静态构造函数之前，libc 调用 _objc_init（），因此我们必须自己做。
@@ -41,8 +37,7 @@ void _objc_init(void)
     
     runtime_init();
     
-    // 初始化 libobjc 的异常处理系统，
-    // 由 map_images（）调用。
+    // 初始化 libobjc 的异常处理系统，由 map_images（）调用。
     exception_init();
     
     cache_init();
@@ -60,6 +55,7 @@ void _objc_init(void)
 #endif
 }
 ```
+
 ### _dyld_objc_notify_register
 ```c++
 _dyld_objc_notify_register(&map_images, load_images, unmap_image);
@@ -82,7 +78,8 @@ typedef void (*_dyld_objc_notify_mapped)(unsigned count, const char* const paths
 typedef void (*_dyld_objc_notify_init)(const char* path, const struct mach_header* mh);
 typedef void (*_dyld_objc_notify_unmapped)(const char* path, const struct mach_header* mh);
 ```
-> &emsp;该方法是 `runtime` 特有的方法，该方法的调用时机是，当 `oc` 对象、镜像（ `images` ）被映射（ `mapped` ），未被映射（ `unmapped` ）以及被初始化了（ `initialized` ）。这个方法是 `dlyd` 中声明的，一旦调用该方法，调用结果会作为该函数的参数回传回来。比如，当所有的 `images` 以及 `section` 为 `objc-image-info` 被加载之后会回调 `mapped` 方法，在 `_objc_init` 中正是 `&map_images` 函数。`load` 方法也将在这个方法中被调用。
+
+> &emsp;该方法是 runtime 特有的方法，该方法的调用时机是，当 OC 对象、镜像（images）被映射（mapped），未被映射（unmapped）以及被初始化了（initialized）。这个方法是 dyld 中声明的，一旦调用该方法，调用结果会作为该函数的参数回传回来。比如，当所有的 images 以及 section 为 objc-image-info 被加载之后会回调 mapped 方法，在 `_objc_init` 中正是 `&map_images` 函数。load 方法也将在这个方法中被调用。
 
 &emsp;`map_images` 函数对应的函数指针类型:
 ```c++
@@ -108,18 +105,14 @@ typedef void (*_dyld_objc_notify_unmapped)(const char* path, const struct mach_h
 > ~~看到 `_dyld_objc_notify_register` 函数的第一个参数是 `map_imags` 的函数地址。`_objc_init` 里面调用 `map_images` 最终会调用 `objc-runtime-new.mm` 里面的 `_read_images` 函数，而 `category` 加载到类上面正是从 `_read_images` 函数里面开始的。~~
 
 &emsp;`objc4-781` 发生了一些修改，在 `load_images` 函数里面会调用 `loadAllCategories()` 函数，且它的前面有一句 `if` 判断 `didInitialAttachCategories` 这个全局静态变量的值，它是表示 `category` 数据是否已经完成初始化，且默认为 `false`。在 `load_images` 被设置为 `true`，且是整个 `objc4-781` 唯一的一次赋值操作，那么可以断定: 在 `load_images`  函数里面调用 `loadAllCategories()` 一定是早于 `_read_images` 里面的 `for` 循环里面调用 `load_categories_nolock` 函数的。因为 `_read_images` 里面 `for` 循环开始之前要先判断 `didInitialAttachCategories` 是否为 `true`，之前版本的 `objc4-xxx` 是没有这个逻辑的。所以这里是把 `category` 的数据附加到 `objc-class` 中的动作延后到了 `load_images` 阶段。
+
 ### map_images
 ```c++
 /*
 * map_images
-* Process the given images which are being mapped in by dyld.
-* 处理由 dyld 映射的给定 images。
-
-* Calls ABI-agnostic code after taking ABI-specific locks.
-* 取得 ABI-specific 锁后调用 ABI-agnostic.
-
-* Locking: write-locks runtimeLock
-* rutimeLock 是一个全局的互斥锁（mutex_t runtimeLock;）
+* Process the given images which are being mapped in by dyld. 处理由 dyld 映射的给定 images。
+* Calls ABI-agnostic code after taking ABI-specific locks. 取得 ABI-specific 锁后调用 ABI-agnostic.
+* Locking: write-locks runtimeLock. rutimeLock 是一个全局的互斥锁（mutex_t runtimeLock;）
 */
 void
 map_images(unsigned count, const char * const paths[],
@@ -131,16 +124,19 @@ map_images(unsigned count, const char * const paths[],
     return map_images_nolock(count, paths, mhdrs);
 }
 ```
+
 ### map_images_nolock
 &emsp;`map_images_nolock` 参数:
+
 + `mhCount`: `mach-o header count`，即 `mach-o header` 个数
 + `mhPaths`: `mach-o header Paths`，即 `header` 的路径数组
 + `mhdrs`: `mach-o headers`，即 `headers`（指针数组）
 
 &emsp;`map_images_nolock` 主要做了 4 件事:
-1. 拿到 `dlyd` 传过来的 `mach_header`，封装为 `header_info` 
-2. 初始化 `selector` 
-3. `arr_init()` 内部: 1): 初始化 `AutoreleasePoolPage` 2): 初始化 `SideTablesMap` 3): `AssociationsManager` 初始化
+
+1. 拿到 `dlyd` 传过来的 `mach_header`，封装为 `header_info`。 
+2. 初始化 `selector`。 
+3. `arr_init()` 内部: 初始化 `AutoreleasePoolPage`、初始化 `SideTablesMap`、`AssociationsManager` 初始化。
   ```c++
   void arr_init(void) {
       AutoreleasePoolPage::init(); // 自动释放池初始化
@@ -148,7 +144,7 @@ map_images(unsigned count, const char * const paths[],
       _objc_associations_init(); // AssociationsManager::init(); 初始化
   }
   ```
-4. 读取 `images`
+4. 读取 `images`。
 
 > &emsp;在 `objc4-781` 下，把 `OBJC_PRINT_IMAGES` 添加到 `Environment Variables` 中，看到控制台打印: `processing 256 newly-mapped images...`。
 
@@ -156,16 +152,14 @@ map_images(unsigned count, const char * const paths[],
 /*
 * map_images_nolock
 *
-* Process the given images which are being mapped in by dyld.
-* 处理由 dyld 映射的给定镜像。
-
+* Process the given images which are being mapped in by dyld. 处理由 dyld 映射的给定镜像。
 * All class registration and fixups are performed 
 * (or deferred pending discovery of missing superclasses etc), and +load methods are called.
 * 所有类的 注册 和 fixups 都将执行（或推迟进行以发现丢失的超类 等），并调用 +load 方法。
 *
 * info[] is in bottom-up order i.e. libobjc will be earlier
 * in the array than any library that links to libobjc.
-* info[] 按自下而上的顺序进行操作，即 libobjc 在数组中的时间比链接到 libobjc 的任何 library 都早
+* info[] 按自下而上的顺序进行操作，即 libobjc 在数组中的时间比链接到 libobjc 的任何 library 都早。
 * 
 * Locking: loadMethodLock(old) or runtimeLock(new) acquired by map_images.
 * loadMethodLock(old) 或者 runtimeLock(new) 由 map_images 获取。
@@ -187,7 +181,8 @@ if (hCount > 0) {
 ...
 }
 ```
-### _read_images
+
+### \_read_images
 &emsp;读取各个 `section` 中的数据并放到缓存中，这里的缓存大部分都是全局静态变量。
 
 > &emsp;`GETSECT(_getObjc2CategoryList, category_t *, "__objc_catlist")` 之前用 `clang` 编译 `category` 文件时，看到 `DATA段下的` `__objc_catlist` 区，保存 `category` 数据。
@@ -288,6 +283,7 @@ ts.log("IMAGE TIMES: realize non-lazy classes");
 static bool didInitialAttachCategories = false;
 ```
 &emsp;这里 `discover categories` 的内容 `objc4-781` 和 `objc4-779.1` 已经完全不一样，这里多了全局静态变量  `didInitialAttachCategories` 的控制，它默认是 `false` 表示启动时是否已经将 `category` 的数据初始化完成，全局搜索只发现在 `load_images` 函数中有把它置为 `true`。
+
 ### EACH_HEADER
 ```c++
 // header_info **hList 
@@ -299,17 +295,16 @@ hIndex = 0;         \
 hIndex < hCount && (hi = hList[hIndex]); \
 hIndex++
 ```
+
 ### realizeClassWithoutSwift
 ```c++
 /*
 * realizeClassWithoutSwift
 * Performs first-time initialization on class cls, 
-* including allocating its read-write data.
-* 在 calss cls 上执行首次初始化，为其分配 read-write data.
+* including allocating its read-write data. 在 calss cls 上执行首次初始化，为其分配 read-write data.
 * 
 * Does not perform any Swift-side initialization.
-* Returns the real class structure for the class. 
-* 返回该类的真实类结构。
+* Returns the real class structure for the class. 返回该类的真实类结构。
 *
 * Locking: runtimeLock must be write-locked by the caller
 */
@@ -417,7 +412,7 @@ static Class realizeClassWithoutSwift(Class cls, Class previously)
 
         if (DisableNonpointerIsa) {
             // Non-pointer isa disabled by environment or app SDK version
-            // 非指针 isa 被环境或应用程序SDK版本禁用
+            // 非指针 isa 被环境或应用程序 SDK 版本禁用
             // 可在 Environment Variables 中添加 OBJC_DISABLE_NONPOINTER_ISA
             instancesRequireRawIsa = true;
         }
@@ -509,6 +504,7 @@ static Class realizeClassWithoutSwift(Class cls, Class previously)
     return cls;
 }
 ```
+
 ### addSubclass
 &emsp;为 `class_rw_t` 的两个成员变量 `nextSiblingClass` `firstSubclass` 解谜，它们是在 `realizeClassWithoutSwift` 函数中被设置。
 ```c++
@@ -555,12 +551,12 @@ static void addSubclass(Class supercls, Class subcls)
     }
 }
 ```
+
 ### load_images
 ```c++
 /*
 * load_images
-* Process +load in the given images which are being mapped in by dyld.
-* 处理由 dyld 映射的给定的镜像的 +load 函数
+* Process +load in the given images which are being mapped in by dyld. 处理由 dyld 映射的给定的镜像的 +load 函数
 * Locking: write-locks runtimeLock and loadMethodLock
 */
 void
@@ -589,8 +585,9 @@ static void loadAllCategories() {
     }
 }
 ```
+
 ### load_categories_nolock
-**这里会涉及懒加载的类和非懒加载的类的，此处先不表，不影响我们阅读原始代码，我们先把函数实现一行一行读完。**
+&emsp;**这里会涉及懒加载的类和非懒加载的类的，此处先不表，不影响我们阅读原始代码，我们先把函数实现一行一行读完。**
 ```c++
 static void load_categories_nolock(header_info *hi) {
     // 是否有类属性？（目前我们还没有见过给类添加属性的操作）
@@ -604,7 +601,7 @@ static void load_categories_nolock(header_info *hi) {
     // processCatlist(_getObjc2CategoryList2(hi, &count));
     
     // _getObjc2CategoryList 和 _getObjc2CategoryList2 会给 count 赋值
-    // 并且函数返回 category_t * const *catlist
+    // 并且函数返回 category_t * const *catlist。
     
     size_t count;
     auto processCatlist = [&](category_t * const *catlist) {
@@ -888,6 +885,7 @@ attachCategories(Class cls, const locstamped_category_t *cats_list, uint32_t cat
     rwe->protocols.attachLists(protolists + ATTACH_BUFSIZ - protocount, protocount);
 }
 ```
+
 ### prepareMethodLists
 ```c++
 static void 
@@ -1066,6 +1064,7 @@ void attachLists(List* const * addedLists, uint32_t addedCount) {
 }
 ```
 &emsp;这里可明确确认 `category` 中添加的函数会放在原函数的前面，当调用同名函数时，原函数会被 “覆盖”。
+
 ### flushCaches
 ```c++
 /*
@@ -1101,6 +1100,7 @@ static void flushCaches(Class cls)
     }
 }
 ```
+
 ### methodizeClass
 &emsp;把之前类不存在时，保存的类与 `category` 的映射中的数据追加到类中。
 ```c++

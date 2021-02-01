@@ -57,10 +57,11 @@ load_images(const char *path __unused, const struct mach_header *mh)
     call_load_methods();
 }
 ```
+
 ### hasLoadMethods
 ```c++
 // Quick scan for +load methods that doesn't take a lock.
-// 为了快速扫描有没有 +load 函数没有进行加锁。
+// 为了快速扫描 +load 函数没有进行加锁。
 bool hasLoadMethods(const headerType *mhdr)
 {
     size_t count;
@@ -78,6 +79,7 @@ bool hasLoadMethods(const headerType *mhdr)
     return false;
 }
 ```
+
 ### prepare_load_methods
 ```c++
 void prepare_load_methods(const headerType *mhdr)
@@ -113,7 +115,7 @@ void prepare_load_methods(const headerType *mhdr)
                         "classes are not allowed to have +load methods");
         }
         
-        // 如果该没有实现，则实现该类，realizeClassWithoutSwift 函数结尾会追加 category 数据到本类中。
+        // 如果该类没有实现，则实现该类，realizeClassWithoutSwift 函数结尾会追加 category 数据到本类中。
         // 如果分类中有 +load 函数，那本类中的 +load 函数会不会被分类中的 +load 函数 "覆盖" 呢？
         // 其实是会覆盖的 😂
         
@@ -136,6 +138,7 @@ void prepare_load_methods(const headerType *mhdr)
     }
 }
 ```
+
 ### schedule_class_load
 ```c++
 /*
@@ -173,6 +176,7 @@ static void schedule_class_load(Class cls)
     cls->setInfo(RW_LOADED); 
 }
 ```
+
 ### add_class_to_loadable_list
 ```c++
 
@@ -238,6 +242,7 @@ void add_class_to_loadable_list(Class cls)
     loadable_classes_used++;
 }
 ```
+
 ### getLoadMethod
 ```c++
 /*
@@ -425,6 +430,7 @@ void call_load_methods(void)
     loading = NO;
 }
 ```
+
 ### call_class_loads
 ```c++
 /*
@@ -478,6 +484,7 @@ static void call_class_loads(void)
     if (classes) free(classes);
 }
 ```
+
 ### call_category_loads
 ```c++
 /*
