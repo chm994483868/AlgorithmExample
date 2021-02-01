@@ -74,6 +74,31 @@
 ### See Also
 &emsp;有关完整的打印示例，请参阅：[PrintPhoto: Using the Printing API with Photos](https://developer.apple.com/library/archive/samplecode/PrintPhoto/Introduction/Intro.html#//apple_ref/doc/uid/DTS40010366)、[Sample Print Page Renderer](https://developer.apple.com/library/archive/samplecode/PrintPhoto/Introduction/Intro.html#//apple_ref/doc/uid/DTS40010366) 和 [UIKit Printing with UIPrintInteractionController and UIViewPrintFormatter](https://developer.apple.com/library/archive/samplecode/PrintWebView/Introduction/Intro.html#//apple_ref/doc/uid/DTS40010311) 示例代码。
 
+## iOS Drawing Concepts（iOS 绘图概念）
+&emsp;高质量的图形是应用程序用户界面的重要组成部分。提供高质量的图形不仅使你的应用程序看起来很好，而且使你的应用程序看起来像是系统其他部分的自然扩展。iOS 提供了两种在系统中创建高质量图形的主要路径：OpenGL 或使用 Quartz、Core Animation 和 UIKit 进行原生渲染。本文档描述原生渲染。（要了解 OpenGL 绘图，请参见 [OpenGL ES Programming Guide](https://developer.apple.com/library/archive/documentation/3DDrawing/Conceptual/OpenGLES_ProgrammingGuide/Introduction/Introduction.html#//apple_ref/doc/uid/TP40008793)。）
+
+&emsp;Quartz 是主要的绘图接口，支持基于路径的绘图（path-based drawing）、抗锯齿渲染（anti-aliased rendering）、渐变填充模式（gradient fill patterns）、图像、颜色、坐标空间转换（coordinate-space transformations）以及 PDF 文档的创建、显示和解析。UIKit 为线条艺术（line art）、石英图像（Quartz images）和颜色处理（color manipulations）提供 Objective-C 包装器。 Core Animation 为许多 UIKit 视图属性中的动画更改提供底层支持，还可以用于实现自定义动画。
+
+&emsp;本章概述 iOS 应用程序的绘图过程，以及每种受支持绘图技术的特定绘图技术。你还将找到有关如何优化 iOS 平台绘图代码的提示和指导。
+
+> Important: 并非所有 UIKit 类都是线程安全的。在应用程序主线程以外的线程上执行与绘图相关的操作之前，请务必检查文档。
+
+### The UIKit Graphics System（UIKit 绘图系统）
+&emsp;在 iOS 中，所有到屏幕的绘图，不管它是否涉及 OpenGL、Quartz、UIKit 或 Core Animation，都发生在 UIView 类或其子类的实例范围内。视图定义了发生绘图的屏幕部分。如果使用系统提供的视图，则会自动处理此绘图。但是，如果定义自定义视图，则必须自己提供图形代码。如果使用 Quartz、Core Animation 和 UIKit 进行绘制，则使用以下各节中描述的绘制概念。
+
+&emsp;除了直接绘制到屏幕之外，UIKit 还允许你绘制到 offscreen bitmap 和 PDF 图形上下文中。在 offscreen 上下文中绘制时，你不是在视图中绘制，这意味着诸如视图绘制周期等概念不适用（除非你随后获得该图像并在图像视图或类似视图中绘制）。
+
+#### The View Drawing Cycle（View 绘图周期）
+&emsp;UIView 类的子类的基本绘图模型（basic drawing model）涉及按需更新内容。UIView 类使更新过程更简单、更高效；但是，通过收集你提出的更新请求，并在最合适的时间将它们传递到绘图代码。
+
+&emsp;当视图第一次显示或视图的一部分需要重新绘制时，iOS 会通过调用视图的 `drawRect:` 方法来请求视图绘制其内容。
+
+&emsp;有几个操作可以触发视图更新：
+
++ 移动或删除部分遮挡视图的另一个视图
++ 通过将以前隐藏的视图的 hidden 属性设置为 NO，使其再次可见
++ 滚动屏幕外的视图，然后返回到屏幕上
++ 显式调用视图的 `setNeedsDisplay` 或 `setNeedsDisplayInRect:` 方法
 
 
 
@@ -87,54 +112,13 @@
 
 
 
+System views are redrawn automatically. For custom views, you must override the drawRect: method and perform all your drawing inside it. Inside your drawRect: method, use the native drawing technologies to draw shapes, text, images, gradients, or any other visual content you want. The first time your view becomes visible, iOS passes a rectangle to the view’s drawRect: method that contains your view’s entire visible area. During subsequent calls, the rectangle includes only the portion of the view that actually needs to be redrawn. For maximum performance, you should redraw only affected content.
 
+After calling your drawRect: method, the view marks itself as updated and waits for new actions to arrive and trigger another update cycle. If your view displays static content, then all you need to do is respond to changes in your view’s visibility caused by scrolling and the presence of other views.
 
+If you want to change the contents of the view, however, you must tell your view to redraw its contents. To do this, call the setNeedsDisplay or setNeedsDisplayInRect: method to trigger an update. For example, if you were updating content several times a second, you might want to set up a timer to update your view. You might also update your view in response to user interactions or the creation of new content in your view.
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+Important: Do not call your view’s drawRect: method yourself. That method should be called only by code built into iOS during a screen repaint. At other times, no graphics context exists, so drawing is not possible. (Graphics contexts are explained in the next section.)
 
 
 
