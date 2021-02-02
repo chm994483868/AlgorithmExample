@@ -100,6 +100,48 @@
 + 滚动屏幕外的视图，然后返回到屏幕上
 + 显式调用视图的 `setNeedsDisplay` 或 `setNeedsDisplayInRect:` 方法
 
+&emsp;系统视图将自动重绘。对于自定义视图，必须重写 `drawRect:` 方法并在其中执行所有绘图。在 `drawRect:` 方法中，使用原生绘图技术绘制形状（shapes）、文本（text）、图像（images）、渐变（gradients）或任何其他所需的视觉内容。当视图第一次可见时，iOS 会将一个矩形传递给视图的 `drawRect:` 方法，该方法包含视图的整个可见区域。在随后的调用中，矩形只包含实际需要重绘的视图部分。为了获得最佳性能，你应该只重新绘制受影响的内容。
+
+&emsp;调用 `drawRect:` 方法后，视图将自身标记为已更新（标记为需要更新），并等待新操作到达并触发另一个更新周期。如果你的视图显示静态内容，那么你所需要做的就是响应由于滚动和其他视图的存在而导致的视图可见性的更改。
+
+&emsp;但是，如果要更改视图的内容，则必须告诉视图重新绘制其内容。为此，请调用 `setNeedsDisplay` 或 `setNeedsDisplayInRect:` 方法来触发更新。例如，如果一秒钟要更新几次内容，可能需要设置一个计时器来更新视图。你还可以更新视图以响应用户交互或视图中新内容的创建。
+
+> Important: 不要自己调用视图的 `drawRect:` 方法。只有在屏幕重新绘制期间，iOS 中内置的代码才应该调用该方法。在其他时候，不存在图形上下文，因此无法绘制。（下一节将解释图形上下文。） 
+
+#### Coordinate Systems and Drawing in iOS（iOS 中的坐标系和绘图）
+&emsp;当一个应用程序在 iOS 中绘制一些东西时，它必须在一个由坐标系定义的二维空间中定位绘制的内容。这个概念乍一看似乎很简单，但事实并非如此。iOS 中的应用程序有时在绘图时必须处理不同的坐标系。
+
+&emsp;在 iOS 中，所有绘图都发生在图形上下文中。从概念上讲，图形上下文是一个对象，描述绘图的位置和方式，包括基本绘图属性，例如绘图时要使用的颜色（colors）、剪裁区域（clipping area）、线宽（line width）和样式信息（style information）、字体信息（font information）、合成选项（compositing options）等。
+
+&emsp;此外，如图 1-1 所示，每个图形上下文都有一个坐标系。更准确地说，每个图形上下文有三个坐标系：
+
++ 绘图（用户）坐标系。发出绘图命令时将使用此坐标系。
++ 视图坐标系（基础空间）。该坐标系是相对于视图的固定坐标系。
++ （物理）设备坐标系。此坐标系表示物理屏幕上的像素。
+
+&emsp;Figure 1-1  The relationship between drawing coordinates, view coordinates, and hardware coordinates（绘图坐标、视图坐标和硬件坐标之间的关系）
+
+![coordinate_differences](https://p9-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/f3d89122be6d41718c6dec4ed24af288~tplv-k3u1fbpfcp-watermark.image)
+
+&emsp;iOS 的绘图框架创建用于绘制特定目的地（屏幕、位图、PDF 内容等）的图形上下文，这些图形上下文为该目的地建立初始绘图坐标系。此初始绘图坐标系称为默认坐标系（default coordinate system），是视图基础坐标系的 1:1 映射。
+
+&emsp;每个视图还有一个当前变换矩阵（CTM），一个将当前绘图坐标系中的点映射到（固定）视图坐标系的数学矩阵。应用程序可以修改此矩阵（如后面所述），以更改未来绘图操作的行为。
+
+&emsp;iOS 的每个绘图框架基于当前图形上下文建立一个默认坐标系。在 iOS 中，有两种主要类型的坐标系：
+
+
+
+
+
+
+
+
+
+
+
+An upper-left-origin coordinate system (ULO), in which the origin of drawing operations is at the upper-left corner of the drawing area, with positive values extending downward and to the right. The default coordinate system used by the UIKit and Core Animation frameworks is ULO-based.
+A lower-left-origin coordinate system (LLO), in which the origin of drawing operations is at the lower-left corner of the drawing area, with positive values extending upward and to the right. The default coordinate system used by Core Graphics framework is LLO-based.
+These coordinate systems are shown in Figure 1-2.
 
 
 
@@ -112,13 +154,9 @@
 
 
 
-System views are redrawn automatically. For custom views, you must override the drawRect: method and perform all your drawing inside it. Inside your drawRect: method, use the native drawing technologies to draw shapes, text, images, gradients, or any other visual content you want. The first time your view becomes visible, iOS passes a rectangle to the view’s drawRect: method that contains your view’s entire visible area. During subsequent calls, the rectangle includes only the portion of the view that actually needs to be redrawn. For maximum performance, you should redraw only affected content.
 
-After calling your drawRect: method, the view marks itself as updated and waits for new actions to arrive and trigger another update cycle. If your view displays static content, then all you need to do is respond to changes in your view’s visibility caused by scrolling and the presence of other views.
 
-If you want to change the contents of the view, however, you must tell your view to redraw its contents. To do this, call the setNeedsDisplay or setNeedsDisplayInRect: method to trigger an update. For example, if you were updating content several times a second, you might want to set up a timer to update your view. You might also update your view in response to user interactions or the creation of new content in your view.
 
-Important: Do not call your view’s drawRect: method yourself. That method should be called only by code built into iOS during a screen repaint. At other times, no graphics context exists, so drawing is not possible. (Graphics contexts are explained in the next section.)
 
 
 
