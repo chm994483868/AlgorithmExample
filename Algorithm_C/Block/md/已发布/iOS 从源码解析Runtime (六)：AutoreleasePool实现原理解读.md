@@ -5,8 +5,6 @@
 ## AutoreleasePool 大致结构图:
 ![AutoreleasePool结构图](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/99d0db09905044b0acd46ccde17ee813~tplv-k3u1fbpfcp-zoom-1.image)
 
-（这里的图片在 github iOS 客户端上不显示）
-
 &emsp;在 `main.m` 中编写如下函数，然后使用 `clang -rewrite-objc main.m` 指令，把 `main.m` 转化为 `main.cpp` 文件：
 ```c++
 // main.m 文件中:
@@ -78,6 +76,7 @@ objc_autoreleasePoolPop(void *ctxt)
 the pool is popped, every object hotter than the sentinel is released. 当自动释放池执行 popped，every object hotter than the sentinel is released.。（这句没有看懂）这些栈分散位于由 AutoreleasePoolPage 构成的双向链表中。AutoreleasePoolPage 会根据需要进行添加和删除。hotPage 保存在当前线程中，当有新的 autorelease 对象添加进自动释放池时会被添加到 hotPage。
 
 &emsp;如下宏定义:
+
 + `#define AUTORELEASEPOOL_VERSION 1` 自动释放池的版本号，仅当 `ABI` 的兼容性被打破时才会改变。
 + `#define PROTECT_AUTORELEASEPOOL 0` 将此设置为 1 即可进行 `mprotect()` 自动释放池的内容。（`mprotect()` 可设置自动释放池的内存区域的保护属性，限制该内存区域只可读或者可读可写）
 + `#define CHECK_AUTORELEASEPOOL (DEBUG)` 将此设置为 1 要在所有时刻都完整验证自动释放池的 `header`。（也就是 `magic_t` 的 `check()` 和 `fastcheck()`，完整验证数组的 4 个元素全部相等，还是只要验证第一个元素相等，当设置为 1 在任何地方使用 `check()` 代替 `fastcheck()`，可看出在 `Debug` 状态下是进行的完整验证，其它情况都是快速验证）
@@ -248,6 +247,7 @@ C_ASSERT(sizeof(thread_data_t) == 16);
 ```
 #### __attribute__((used))
 &emsp;`__attribute__((used))` 的作用：
+
 1. 用于告诉编译器在目标文件中保留一个 **静态函数** 或者 **静态变量**，即使它没有被引用。
 2. 标记为 `attribute__((used))` 的函数被标记在目标文件中，以避免 **链接器** 删除未使用的节。
 3. **静态变量** 也可以标记为 `used`，方法是使用 `attribute((used))`。
@@ -267,7 +267,7 @@ C_ASSERT(sizeof(thread_data_t) == 16);
   default：用它定义的符号将被导出，动态库中的函数默认是可见的。
   hidden：用它定义的符号将不被导出，并且不能从其它对象进行使用，动态库中的函数是被隐藏的。
   default 意味着该方法对其它模块是可见的。而 hidden 表示该方法符号不会被放到动态符号表里，所以其它模块(可执行文件或者动态库)不可以通过符号表访问该方法。
-  要定义 GNU 属性，需要包含 __attribute__ 和用括号括住的内容。可以将符号的可见性指定为 visibility(“hidden”)，这将不允许它们在库中被导出，但是可以在源文件之间共享。实际上，隐藏的符号将不会出现在动态符号表中，但是还被留在符号表中用于静态链接。
+  要定义 GNU 属性，需要包含 \_\_attribute\_\_ 和用括号括住的内容。可以将符号的可见性指定为 visibility(“hidden”)，这将不允许它们在库中被导出，但是可以在源文件之间共享。实际上，隐藏的符号将不会出现在动态符号表中，但是还被留在符号表中用于静态链接。
   导出列表由编译器在创建共享库的时候自动生成，也可以由开发人员手工编写。导出列表的原理是显式地告诉编译器可以通过外部文件从对象文件导出的符号是哪些。GNU 用户将此类外部文件称作为导出映射。[Linux下__attribute__((visibility ("default")))的使用](https://blog.csdn.net/fengbingchun/article/details/78898623)
 
 &emsp;在 `TARGET_OS_WIN32` 环境下定义如下: 
