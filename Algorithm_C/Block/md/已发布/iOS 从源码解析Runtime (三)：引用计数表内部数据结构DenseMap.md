@@ -649,7 +649,7 @@ void init(unsigned InitNumEntries) {
 /// Returns the number of buckets to allocate to ensure that
 /// the DenseMap can accommodate \p NumEntries without need to grow().
 // 返回分配的存储桶数，以确保 DenseMap 可以容纳 NumEntries 个 entry 而无需 grow()。
-// 当总容量使用超过 3/4 或者剩余容量少于 1/8 是，需要调用 grow() 进行扩容
+// 当总容量使用超过 3/4 或者剩余容量少于 1/8 时，需要调用 grow() 进行扩容
 
 unsigned getMinBucketToReserveForEntries(unsigned NumEntries) {
   // Ensure that "NumEntries * 4 < NumBuckets * 3"
@@ -668,6 +668,7 @@ unsigned getMinBucketToReserveForEntries(unsigned NumEntries) {
   return NextPowerOf2(NumEntries * 4 / 3 + 1);
 }
 ```
+
 ##### inline uint64_t NextPowerOf2(uint64_t A)
 ```c++
 /// NextPowerOf2 - Returns the next power of two
@@ -704,6 +705,7 @@ inline uint64_t NextPowerOf2(uint64_t A) {
   return A + 1;
 }
 ```
+
 ##### bool allocateBuckets(unsigned Num)
 ```c++
 bool allocateBuckets(unsigned Num) {
@@ -722,6 +724,7 @@ bool allocateBuckets(unsigned Num) {
   return true;
 }
 ```
+
 ##### void initEmpty()
 ```c++
 void initEmpty() {
@@ -752,6 +755,7 @@ void initEmpty() {
     ::new (&B->getFirst()) KeyT(EmptyKey);
 }
 ```
+
 ##### getEmptyKey
 ```c++
 static const KeyT getEmptyKey() {
@@ -765,6 +769,7 @@ static const KeyT getEmptyKey() {
   return KeyInfoT::getEmptyKey();
 }
 ```
+
 ##### BucketT *getBuckets() const
 ```c++
 // 取得 Buckets 起始地址
@@ -772,6 +777,7 @@ BucketT *getBuckets() const {
   return Buckets;
 }
 ```
+
 ##### const BucketT *getBucketsEnd() const
 ```c++
 // 指针偏移，指到 Buckets 末尾
@@ -779,6 +785,7 @@ const BucketT *getBucketsEnd() const {
   return getBuckets() + getNumBuckets();
 }
 ```
+
 #### void copyFrom(const DenseMap& other)
 ```c++
 void copyFrom(const DenseMap& other) {
@@ -801,6 +808,7 @@ void copyFrom(const DenseMap& other) {
   }
 }
 ```
+
 ##### void destroyAll()
 ```c++
 void destroyAll() {
@@ -824,6 +832,7 @@ void destroyAll() {
   }
 }
 ```
+
 ##### DenseMapBase:: void copyFrom()
 ```c++
 template <typename OtherBaseT>
@@ -857,6 +866,7 @@ void copyFrom(
     }
 }
 ```
+
 #### void grow(unsigned AtLeast)
 ```c++
 void grow(unsigned AtLeast) {
@@ -885,6 +895,7 @@ void grow(unsigned AtLeast) {
   operator delete(OldBuckets);
 }
 ```
+
 ##### void moveFromOldBuckets(BucketT *OldBucketsBegin, BucketT *OldBucketsEnd)
 ```c++
 void moveFromOldBuckets(BucketT *OldBucketsBegin, BucketT *OldBucketsEnd) {
@@ -935,6 +946,7 @@ void moveFromOldBuckets(BucketT *OldBucketsBegin, BucketT *OldBucketsEnd) {
   }
 }
 ```
+
 ##### bool LookupBucketFor()
 &emsp;从哈希表中取 `BucketT`。
 ```c++
@@ -1031,6 +1043,7 @@ bool LookupBucketFor(const LookupKeyT &Val,
   }
 }
 ```
+
 ##### void incrementNumEntries()
 ```c++
 // 加 1
@@ -1038,6 +1051,7 @@ void incrementNumEntries() {
   setNumEntries(getNumEntries() + 1);
 }
 ```
+
 #### void shrink_and_clear()
 ```c++
 void shrink_and_clear() {
@@ -1067,6 +1081,7 @@ void shrink_and_clear() {
   init(NewNumBuckets);
 }
 ```
+
 ##### inline unsigned Log2_32_Ceil(uint32_t Value)
 ```c++
 /// Log2_32_Ceil - This function returns the ceil log base 2 of the specified value, 

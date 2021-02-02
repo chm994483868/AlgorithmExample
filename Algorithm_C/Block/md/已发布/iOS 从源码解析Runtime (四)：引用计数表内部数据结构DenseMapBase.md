@@ -58,7 +58,7 @@ struct const_pointer_or_const_ref<
 ```
 &emsp;下面是给多个类型起别名，这里一定要谨记 `key_type` 表示的是 `KeyT`，在 `RefcountMap` 定义时用的是 `DisguisedPtr<objc_object>`，  `mapped_type` 表示的是 `ValueT`，在 `RefcountMap` 定义时用的是 `size_t`，而 `value_type` 表示的是 `BucketT`，就是 `DenseMap` 默认的模版参数 `typename BucketT = detail::DenseMapPair<KeyT, ValueT>` 即 `RefcountMap` 特化时的 `detail::DenseMapPair<DisguisedPtr<objc_object>, size_t>`。
 
-**（所以进行到这里，我们大概需要把 `RefcountMap` 理解为一张 `Key` 是 `DisguisedPtr<objc_object>`，`Value` 是 `DenseMapPair<DisguisedPtr<objc_object>, size_t>` 的哈希表。）**
+&emsp;**（所以进行到这里，我们大概需要把 `RefcountMap` 理解为一张 `Key` 是 `DisguisedPtr<objc_object>`，`Value` 是 `DenseMapPair<DisguisedPtr<objc_object>, size_t>` 的哈希表。）**
 
 + `key_type` = `KeyT` = `DisguisedPtr<objc_object>`
 + `mapped_type` = `ValueT` = `size_t`
@@ -687,7 +687,7 @@ unsigned getMinBucketToReserveForEntries(unsigned NumEntries) {
   // 由于严格的相等性，因此需要 +1。
   
   // For example if NumEntries is 48, we need to return 401.
-  // 例如，如果 NumEntries 为48，则需要返回 401。
+  // 例如，如果 NumEntries 为 48，则需要返回 401。
   
   return NextPowerOf2(NumEntries * 4 / 3 + 1);
 }
