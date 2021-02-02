@@ -264,6 +264,7 @@ objc_object::rootRetain(bool tryRetain, bool handleOverflow)
 }
 ```
 &emsp;这里增加引用计数的情况中，前两种比较普通。
+
 1. 当对象的 `isa` 是非优化的 `isa` 时，对象的引用计数全部保存在 `SideTable` 中，当要增加引用计数时就调用 `sidetable_tryRetain/sidetable_retain` 增加 `SideTable` 中的引用计数。
 2. 当对象的 `isa` 是优化的 `isa` 且对象的引用计数保存在 `extra_rc` 字段中且加 1 后未溢出时，此时也是比较清晰的，执行完加 1 后，函数也直接 `return (id)this` 结束了。
 3. 只有第三种情况比较特殊，当对象的 `isa` 是优化的 `isa` 且对象的引用计数保存在 `extra_rc` 中，此时 `extra_rc++` 后发生溢出，此时会把 `extra_rc` 赋值为 `RC_HALF`，把 `has_sidetable_rc` 赋值为 `true`，然后调用 `sidetable_addExtraRC_nolock(RC_HALF)`。其实疑问就发生在这里，如果对象的 `extra_rc` 中的引用计数已经溢出过了，并转移到了 `SideTable` 中一部分，此时 `extra_rc` 是被置为了 `RC_HALF`，那下次增加对象的引用计数时，并不是直接去 `SideTable` 中增加引用计数，其实是增加 `extra_rc` 中的值，直到增加到再次溢出时才会跑到 `SideTable` 中增加引用计数。这里还挺迷惑的，觉的最好的解释应该是尽量在 `extra_rc` 字段中增加引用计数，少去操作 `SideTable`，毕竟操作 `SideTable` 还要加锁解锁，还要哈希查找等，整体消耗肯定是大于直接操作 `extra_rc` 字段的。
@@ -300,7 +301,7 @@ objc_object::rootRetain(bool tryRetain, bool handleOverflow)
 #### SIDE_TABLE_WEAKLY_REFERENCED 等等标志位
 &emsp;我们首先要清楚一件很重要的事情，当对象的 `isa` 是原始类指针时，在 `SideTable` 的 `RefcountMap refcnts` 中取出 `objc_object` 对应的 `size_t` 的值并不是单纯的对象的引用计数这一个数字，它是明确有一些标志位存在的，且有些标志位所代表的含义与 `isa` 是非指针的 `objc_object` 的 `isa_t isa` 中的一些位是相同的。所以这里我们不能形成定式思维，觉的这些标志位只存在于 `isa_t isa` 中。
 
-如下列举当对象的 `isa` 是原始指针时，一些标志位所代表的含义：
+&emsp;如下列举当对象的 `isa` 是原始指针时，一些标志位所代表的含义：
 
 + `SIDE_TABLE_WEAKLY_REFERENCED` 是 `size_t` 的第 0 位，表示该对象是否有弱引用。（此时是针对 `isa` 是原始指针的对象，对应于 `isa` 是非指针时，`x86_64` 下 `isa_t isa` 的 `uintptr_t weakly_referenced : 1;` 字段）   
 + `SIDE_TABLE_DEALLOCATING` 是 `size_t` 的第 1 位，表示对象是否正在进行释放。（同上，对应于 `x86_64` 下 `isa_t isa` 的 `uintptr_t deallocating : 1;` 字段）
@@ -1046,6 +1047,7 @@ objc_object::sidetable_isDeallocating()
 ```
 ### clearDeallocating
 &emsp;对象释放时的清理操作，这里涉及到：
+
 1. 如果对象有弱引用的话，则对象释放了要把那些弱引用置为 `nil`。
 2. 要从 `refcnts` 中清除对象，把存放对象引用计数数据的 `BucketT` 的 `second` 执行析构操作，然后把 `first` 置为 `TombstoneKey`。
 
