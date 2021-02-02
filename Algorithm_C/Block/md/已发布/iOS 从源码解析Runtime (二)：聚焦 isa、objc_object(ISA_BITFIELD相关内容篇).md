@@ -17,6 +17,7 @@
 &emsp;`Objective-C 2.0` 下正在使用的  `objc_object` 和 `objc_class` 定义分别位于 `objc-private.h` 和 `objc-runtime-new.h` 文件下。
 
 &emsp;（2.0 下 `OBJC_TYPES_DEFINED` 的值为 1，且它的定义在 `objc-privete.h` 文件的开头处，因此声明 `objc-privete.h` 头文件必须在其它头文件之前导入。)
+
 &emsp;（我们不通过源码看到的公开的 `runtime.h` 和 `objc.h` 头文件 里面的 `objc_object` 和 `objc_class` 都是过时的。）
 
 ```c++
@@ -36,6 +37,7 @@
 #undef OBJC_OLD_DISPATCH_PROTOTYPES
 #define OBJC_OLD_DISPATCH_PROTOTYPES 0
 ```
+
 &emsp;在 `objc-api.h` 文件可看到如下代码，在 `__swift__` 为真的情况下，`OBJC_OLD_DISPATCH_PROTOTYPES` 会定为 1，其它情况下都是 0，在 `objc-privete.h` 文件中 `OBJC_OLD_DISPATCH_PROTOTYPES` 被定为 0。
 ```c++
 /* OBJC_OLD_DISPATCH_PROTOTYPES == 0 
@@ -143,7 +145,7 @@ typedef struct objc_object *id;
 
 &emsp;**在一个类的实例对象的内存布局中，第一个成员变量是 `isa`，然后根据该对象所属类的继承体系依次对成员变量排序，排列顺序是: 根类的成员变量、父类的成员变量、最后才是自己的成员变量，且每个类定义中的成员变量（仅包含使用 `@property` 声明属性后由编译器生成的同名的 _成员变量）相互之间的顺序可能会与定义时的顺序不同，编译器会在内存对齐的原则下对类定义时的成员变量的顺序做出优化，保证内存占用最少。（还会涉及到 `.h` 中的成员变量和属性，`.m` 中 `extension` 中添加的成员变量和属性，它们之间的排序顺序）**
 
-验证代码:
+&emsp;验证代码:
 ```objective-c
 // SubObject 类定义
 @interface SubObject : BaseObject {
@@ -176,7 +178,7 @@ typedef struct objc_object *id;
 ```
 &emsp;可看到 `NSObject` 的 `isa` 在最前面，然后是 `BaseObject` 的成员变量，最后才是 `SubObject` 的成员变量，然后注意 `_cus_int2` 跑到了 `_cus_dou` 前面，而在类定义时 `cus_dou` 属性是在 `cus_int2` 属性前面的。（由于内存对齐时不用再为 `double` 补位，这样至少减少了 4 个字节的内存浪费）
 
-这里大概又可以引出为什么不能动态的给类添加成员变量却可以添加方法？
+&emsp;这里大概又可以引出为什么不能动态的给类添加成员变量却可以添加方法？
 
 &emsp;类的成员变量布局以及其实例对象大小在编译时就已确定，设想一下，如果 `Objective-C` 中允许给一个类动态添加成员变量，会带来一个问题：为基类动态增加成员变量会导致所有已创建出的子类实例都无法使用。
 我们所说的 “类的实例”（对象），指的是一块内存区域，里面存储了 `isa` 指针和所有的成员变量。所以假如允许动态修改类已固定的成员变量的布局，那么那些已经创建出的对象就不符合类的定义了，就变成无效对象了。而方法的定义都是在类对象或元类对象中的，不管如何增删方法，都不会影响对象的内存布局，已经创建出的对象仍然可以正常使用。
@@ -269,9 +271,8 @@ struct objc_method {
 ```
 &emsp;`Method` 的作用，相当于在 `SEL` 和 `IMP` 之间做了一个映射，当对一个对象发送消息时，通过 `SEL` 方法名找到其对应的函数实现 `IMP`，然后执行。
 
-注意:
-&emsp;由于在类中查找方法时只是根据方法名（不包含参数和返回值）来查找的，因此在 `OC` 中同一块定义区域内，不能同时定义两个同名方法。（在分类中可以添加与类已有的方法同名的方法，会造成 "覆盖"）
-如下代码则不能同时定义：（在 `C/C++` 中只要参数或者返回值类型不同就表示是不同的函数）
+&emsp;注意:
+&emsp;由于在类中查找方法时只是根据方法名（不包含参数和返回值）来查找的，因此在 `OC` 中同一块定义区域内，不能同时定义两个同名方法。（在分类中可以添加与类已有的方法同名的方法，会造成 "覆盖"。）如下代码则不能同时定义：（在 `C/C++` 中只要参数或者返回值类型不同就表示是不同的函数）
 ```c++
 - (void)setWidth:(int)width;
 - (void)setWidth:(double)width; // Duplicate declaration of method 'setWidth:'
@@ -372,7 +373,7 @@ struct objc_category {
 }                                                            OBJC2_UNAVAILABLE;
 ```
 &emsp;`objc_category` 包含分类中定义的实例方法和类方法，在程序启动时会由 `runtime` 动态追加到对应的类和元类中。
-在 `objc_category` 中包含对象方法列表、类方法列表、协议列表。从这里我们也可以看出， `Category` 支持添加对象方法、类方法、协议，但不能保存成员变量。
+在 `objc_category` 中包含对象方法列表、类方法列表、协议列表。从这里我们也可以看出， `Category` 支持添加实例方法、类方法、协议，但不能保存成员变量。
 
 注意:
 &emsp;在 `Category` 中是可以添加属性的，但不会生成对应的成员变量、 `getter` 和 `setter` 。因此，调用 `Category` 中声明的属性时会报错。
@@ -442,7 +443,7 @@ struct objc_protocol_list {
 #endif
 ```
 
-**以下正式进入 `Objective-C 2.0` 下类和对象的学习，下面所涉及的内容都是我们当下正在运用的内容!**
+&emsp;**以下正式进入 `Objective-C 2.0` 下类和对象的学习，下面所涉及的内容都是我们当下正在运用的内容!**
 
 + `Class`
 `Class` 是指向 `struct objc_class` 的指针。
@@ -538,7 +539,8 @@ the isa field as a maskable pointer with other data around it.
 ```
 &emsp;表示平台是否支持在 `isa` 指针中插入 `Class` 指针之外的信息，可以理解为把类信息和其它的一些信息打包放在 `isa` 中。如果支持会将 `Class` 信息放入 `isa_t` 中定义的 `bits` 位域的 `shiftcls` 中，读取 `Class` 信息的话则是以掩码的方式。其它位中则放一些其它信息。如果不支持的话，那么 `union isa_t` 中的 `bits/cls` 两个成员变量共用的内存空间就只是保存一个 `Class` 指针。
 
-下列平台下不支持：
+&emsp;下列平台下不支持：
+
 1. 32 位处理器。（它使用的是 `SUPPORT_INDEXED_ISA`）
 2. `os` 是 `win32`。
 3. 在模拟器中且 `!TARGET_OS_IOSMAC`。（ `TARGET_OS_IOSMAC` 不知道是什么平台）
@@ -577,6 +579,7 @@ the isa field as a maskable pointer with other data around it.
 #endif
 ```
 &emsp;标记是否支持优化的 `isa` 指针（`isa` 中除 `Class` 指针外，可以保存更多信息）。那如何判断是否支持优化的 `isa` 指针呢？
+
 1. 首先只要支持 `SUPPORT_PACKED_ISA` 或 `SUPPORT_INDEXED_ISA` 任何一个的情况下都是支持 `SUPPORT_NONPOINTER_ISA` 的。
 2. 已知在自 `iPhone 5s` `arm64` 架构以后的 `iPhone` 中 `SUPPORT_PACKED_ISA` 都为 1，`SUPPORT_INDEXED_ISA` 为 0，则其 `SUPPORT_NONPOINTER_ISA` 为 1。
 3. 在 `Edit Scheme... -> Run -> Environment Variables` 中添加 `OBJC_DISABLE_NONPOINTER_ISA` 值为 `NO` (在 `objc-env.h` 文件我们可以看到 `OPTION( DisableNonpointerIsa, OBJC_DISABLE_NONPOINTER_ISA, "disable non-pointer isa fields")` ) 可关闭指针优化。
@@ -600,7 +603,7 @@ the isa field as a maskable pointer with other data around it.
       // 标记该对象是否有关联对象，如果没有的话对象能更快的销毁，
       // 如果有的话销毁前会调用 _object_remove_assocations 函数根据关联策略循环释放每个关联对象
       uintptr_t has_assoc         : 1;                                       \
-      // 标记该对象所属类是否有 C++ 析构函数，如果没有的话对象能更快销毁，
+      // 标记该对象所属类是否有自定义的 C++ 析构函数，如果没有的话对象能更快销毁，
       // 如果有的话对象销毁前会调用 object_cxxDestruct 函数去执行该类的析构函数
       uintptr_t has_cxx_dtor      : 1;                                       \
       // isa & ISA_MASK 得出该实例对象所属的的类的地址
@@ -616,7 +619,7 @@ the isa field as a maskable pointer with other data around it.
       // 标记 refcnts 中是否也有保存实例对象的引用计数，当 extra_rc 溢出时会把一部分引用计数保存到 refcnts 中去，
       uintptr_t has_sidetable_rc  : 1;                                       \
       // 保存该对象的引用计数 -1 的值（未溢出之前）
-      uintptr_t extra_rc          : 19 // 最大保存 2^20 - 1，觉得这个值很大呀,  mac 下是 2^8 - 1 = 255
+      uintptr_t extra_rc          : 19 // 最大保存 2^19 - 1，觉得这个值很大呀,  mac 下是 2^8 - 1 = 255
 #   define RC_ONE   (1ULL<<45)
 #   define RC_HALF  (1ULL<<18)
 ```
@@ -686,15 +689,15 @@ objc_object::ISA()
         return classForIndex((unsigned)slot);
     }
     
-    // 如果是非优化指针直接返回 isa 中的 bits，这里应该是和 (Class)isa.cls 一样的。
+    // 如果是非优化指针直接返回 isa 中的 bits，由于 isa 是 union 所以 (Class)isa.bits 和 (Class)isa.cls 的值是一样的。
     return (Class)isa.bits;
 #else
-    // 从 shiftcls 位域取得 Class，这个是我们平时用到的最多的
-    // 我们日常使用的实例对象获取所属的类
+    // 从 shiftcls 位域取得 Class 指针，这个是我们平时用到的最多的，我们日常使用的实例对象获取所属的类都是通过这种方式。
     return (Class)(isa.bits & ISA_MASK);
 #endif
 }
 ```
+
 ### Class rawISA()
 ```c++
 // rawISA() assumes this is NOT a tagged pointer object or a non pointer ISA
@@ -707,6 +710,7 @@ objc_object::rawISA()
     return (Class)isa.bits;
 }
 ```
+
 ### Class getIsa()
 ```c++
 // getIsa() allows this to be a tagged pointer object
@@ -714,7 +718,7 @@ objc_object::rawISA()
 inline Class 
 objc_object::getIsa() 
 {
-    // 直接调用 ISA()
+    // 如果是非 TaggedPointer 则直接调用 ISA()
     if (fastpath(!isTaggedPointer())) return ISA();
 
     // 从 Tagged Pointer 取得所属类，可参考上一篇深入学习 Tagged Pointer
@@ -733,6 +737,7 @@ objc_object::getIsa()
     return cls;
 }
 ```
+
 ### uintptr_t isaBits() const
 ```c++
 inline uintptr_t
@@ -742,7 +747,9 @@ objc_object::isaBits() const
     return isa.bits;
 }
 ```
+
 ### initIsa
+&emsp;下面是一组针对不同类型的 objc_object（子类）来初始化其 isa 的方法，例如初始化实例对象的 isa、初始化类对象的 isa、初始化协议对象的 isa、和初始化其他类型对象的 isa。
 ```c++
 // initIsa() should be used to init the isa of new objects only.
 // If this object already has an isa, use changeIsa() for correctness.
@@ -784,9 +791,10 @@ objc_object::initClassIsa(Class cls)
     // 环境变量开启了禁用非指针 isa 字段
     
     // cache.getBit(FAST_CACHE_REQUIRES_RAW_ISA);
-    // 从 cache 获取原始指针
+    // 从 cache 中获取是否需要原始指针的标记值
     
     if (DisableNonpointerIsa  ||  cls->instancesRequireRawIsa()) {
+        // 此时 isa 还是原始的 class 指针
         initIsa(cls, false/*not nonpointer*/, false);
     } else {
         initIsa(cls, true/*nonpointer*/, false);
@@ -821,7 +829,7 @@ objc_object::initIsa(Class cls, bool nonpointer, bool hasCxxDtor)
     ASSERT(!isTaggedPointer()); 
     
     if (!nonpointer) {
-        // 如果不是非指针，则表明 isa 中仅存一个 Class 
+        // 如果不是非指针，则表明 isa 中仅存一个 Class 指针
         isa = isa_t((uintptr_t)cls);
     } else {
         // 两条断言
@@ -882,6 +890,7 @@ objc_object::initIsa(Class cls, bool nonpointer, bool hasCxxDtor)
 &emsp;以上用于初始化类对象或者实例对象的 `isa`。实例对象的话大概率在 `callalloc` 函数中，为对象开辟完空间后，要对对象的 `isa` 进行初始化。
 
 ### changeIsa
+&emsp;changeIsa 函数包含的内容较多，涉及到不同类型的 isa 类型的转换，例如当 newCls 参数的 isa 是类指针或者优化的 ias 时，它可能转化为 isa 是类指针或者是优化的 isa，然后优化的 isa 又包含是保存的类索引（indexcls）还是直接保存的类地址（shiftcls），而且包含引用计数的转移等内容。
 ```c++
 inline Class 
 objc_object::changeIsa(Class newCls)
@@ -1011,6 +1020,7 @@ objc_object::changeIsa(Class newCls)
 }
 ```
 &emsp;修改 `isa`，包含多种不同的情况:
+
 1. 从 `0` 转换为 `nonpointer`
 2. 从 `nonpointer` 转换为 `nonpointer`
 3. 从 `nonpointer` 转换为 `raw Pointer`
@@ -1048,14 +1058,18 @@ objc_object::sidetable_moveExtraRC_nolock(size_t extra_rc,
     // 把原对象 refcnts 中的引用计数和 extra_rc 中的引用计数相加
     size_t refcnt = addc(oldRefcnt, extra_rc << SIDE_TABLE_RC_SHIFT, 0, &carry);
     
+    // 标记溢出
     if (carry) refcnt = SIDE_TABLE_RC_PINNED;
+    // 标记正在释放
     if (isDeallocating) refcnt |= SIDE_TABLE_DEALLOCATING;
+    // 标记包含弱引用
     if (weaklyReferenced) refcnt |= SIDE_TABLE_WEAKLY_REFERENCED;
 
     refcntStorage = refcnt;
 }
 ```
 &emsp;至此，`struct objc_object` 中关于初始化和修改 `isa` 的函数就都看完了，看到针对 `union isa_t` 中的 `bits` 中不同的位域进行赋值。然后下面一组函数，仍然是对位域中不同的值进行读取或者修改，下面一起来看吧。
+
 ### hasNonpointerIsa
 &emsp;读取 `union isa_t` 的 `bits` 中 `ISA_BITFIELD` 中的 `nonpointer`。
 ```c++
@@ -1065,6 +1079,7 @@ objc_object::hasNonpointerIsa()
     return isa.nonpointer;
 }
 ```
+
 ### isTaggedPointer
 &emsp;`isTaggedPointer`、`isBasicTaggedPointer`、`isExtTaggedPointer` 三个函数可参考上篇 `Tagged Pointer`。
 
@@ -1094,7 +1109,7 @@ objc_object::isClass()
 ```
 &emsp;所以此函数是判断对象所属的类是否是元类。
 
-**下面是两个特别重要也且常用的与关联对象相关的函数：**
+&emsp;**下面是两个特别重要也且常用的与关联对象相关的函数：**
 
 ### hasAssociatedObjects
 ```c++
@@ -1107,10 +1122,12 @@ objc_object::hasAssociatedObjects()
     // 如果是非指针则读取 has_assoc 位
     if (isa.nonpointer) return isa.has_assoc;
     
+    // 如果 isa 是 objc_class 指针则默认返回 true
     return true;
 }
 ```
-&emsp;判断对象是否有关联对象，实现很简单，非 `Tagged Pointer` 对象的标识存储在 `union isa_t` 的 `bits` 的 `has_assoc` 位。 
+&emsp;判断对象是否有关联对象，实现很简单，非 `Tagged Pointer` 对象的标识存储在 `union isa_t` 的 `bits` 的 `has_assoc` 位。
+
 ### setHasAssociatedObjects
 ```c++
 inline void
@@ -1124,9 +1141,10 @@ objc_object::setHasAssociatedObjects()
     isa_t oldisa = LoadExclusive(&isa.bits);
     isa_t newisa = oldisa;
     if (!newisa.nonpointer  ||  newisa.has_assoc) {
-    
-        // 清除关联对象标记位
-        ClearExclusive(&isa.bits);
+        ClearExclusive(&isa.bits); // 对应 LoadExclusive，（可理解为加锁和解锁配对使用）
+        
+        // 如果 isa 是 objc_class 指针或者 has_assoc 为 true，则什么也不做。
+        
         return;
     }
     
@@ -1137,8 +1155,12 @@ objc_object::setHasAssociatedObjects()
     if (!StoreExclusive(&isa.bits, oldisa.bits, newisa.bits)) goto retry;
 }
 ```
-&emsp;设置关联对象标志位，如果已经设置为 `true` 则清除，否则设置为 `true`。
+&emsp;设置关联对象标志位，如果已经设置为 `true` 则什么都不做，否则设置为 `true`。
+
+&emsp;如果一个对象曾经有关联对象，当所有关联对象都移除后 `has_assoc` 位置不设置为 `false`，当对象释放时会调用 `_object_remove_assocations` 函数，会不会导致性能浪费呢？ 
+
 ### ClearExclusive
+&emsp;`LoadExclusive` 和 `ClearExclusive` 配对使用，可理解为加锁解锁配对。
 ```c++
 #if __arm64__ && !__arm64e__
 
@@ -1160,11 +1182,11 @@ ClearExclusive(uintptr_t *dst __unused)
 
 #endif
 ```
-&emsp;`__arm64e__` 是 `A12` 的标识，这里比较的奇怪的是如果是 `A12` 和 `Mac` 平台下，那 `ClearExclusive` 函数不执行任何操作，如果一个对象曾经有关联对象，当所有关联对象都移除后 `has_assoc` 位置不设置为 `false`，当对象释放时会调用 `_object_remove_assocations` 函数，不会导致性能浪费吗？ 
 
-**下面是两个特别重要也且常用的与弱引用相关的函数：**
+&emsp;**下面是两个特别重要也且常用的与弱引用相关的函数：**
 
 ### isWeaklyReferenced
+&emsp;判断对象是否存在弱引用。
 ```c++
 inline bool
 objc_object::isWeaklyReferenced()
@@ -1174,7 +1196,9 @@ objc_object::isWeaklyReferenced()
     
     // 如果是非指针则返回 weakly_referenced 标记位
     if (isa.nonpointer) return isa.weakly_referenced;
+    
     // 其他情况调用 sidetable_isWeaklyReferenced
+    //（当 isa 是 objc_class 指针时，对象的弱引用标识位在 SideTable 的 refcnts 中）
     else return sidetable_isWeaklyReferenced();
 }
 ```
@@ -1217,11 +1241,12 @@ objc_object::hasCxxDtor()
     
     // 如果是非指针则读取 has_cxx_dtor 位
     if (isa.nonpointer) return isa.has_cxx_dtor;
-    // 其他情况则调用 hasCxxDtor 函数
+    
+    // 其他情况则调用调用类的 hasCxxDtor 函数
     else return isa.cls->hasCxxDtor();
 }
 
-// 这里大概涉及到动态追加，等到分析 objc_class 的时候再仔细研究
+// 当 FAST_CACHE_HAS_CXX_DTOR 存在时表示 C++ 析构函数标识位直接保存在类的 cache 成员变量中。
 #if FAST_CACHE_HAS_CXX_DTOR
     bool hasCxxDtor() {
         ASSERT(isRealized());

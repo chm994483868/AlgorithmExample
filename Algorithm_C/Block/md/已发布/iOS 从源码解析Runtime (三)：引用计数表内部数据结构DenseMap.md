@@ -1064,8 +1064,12 @@ void shrink_and_clear() {
 ```c++
 /// Log2_32_Ceil - This function returns the ceil log base 2 of the specified value, 
 /// 32 if the value is zero. (32 bit edition).
-/// 该函数返回指定值的 ceil 日志基数 2，如果该值为零，则返回 32。 （32位版本）。
 /// Ex. Log2_32_Ceil(32) == 5, Log2_32_Ceil(1) == 0, Log2_32_Ceil(6) == 3
+
+// 该函数返回指定值的以 2 为基的 log 值并向上取整。如果该值是 0，则返回 32。
+// 例如：Log2_32_Ceil(32) 结果是 5，Log2_32_Ceil(1) 结果是 0，
+// Log2_32_Ceil(6) 结果是 3
+
 inline unsigned Log2_32_Ceil(uint32_t Value) {
   return 32-CountLeadingZeros_32(Value-1);
 }
