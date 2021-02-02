@@ -11,8 +11,8 @@
 // RefcountMap 伪装了它的指针，因为我们不希望该表充当 leaks 的根。
 typedef objc::DenseMap<DisguisedPtr<objc_object>,size_t,RefcountMapValuePurgeable> RefcountMap;
 ```
-## DenseMap
 
+## DenseMap
 ```c++
 // 看到 DenseMap 的超长模版定义，不免有些头皮发麻，下面我们分析的时候就根据它的模版参数的顺序来一个一个解析 ⛽️
 template <typename KeyT, typename ValueT,
@@ -28,7 +28,7 @@ class DenseMap : public DenseMapBase<DenseMap<KeyT, ValueT, ValueInfoT, KeyInfoT
 ```
 &emsp;只看 `RefcountMap` 的 `typedef` 语句的话，我们可以直白的把 `RefcountMap` 理解为一个 `key` 是我们的对象指针 `value` 是该对象的引用计数（`size_t`）的哈希表。
 
-&emsp;深入下去 `DenseMap` 涉及的数据结构真的超多，为了秉持完成 `runtime` 每行代码都要看的通透，那我们硬着头看下去。`DenseMap` 是在 `llvm` 中用的非常广泛的数据结构，它本身的实现是一个基于`Quadratic probing`（二次探查）的散列表，键值对本身是 `std::pair<KeyT, ValueT>`。`DenseMap` 有四个成员变量: `Buckets`、`NumEntries`、`NumTombstones`、`NumBuckets` 分别用于表示散列桶的起始地址（一块连续的内存）、已存储的数据的个数、`Tombstone` 个数（表示之前存储的有值，现在被 `erase` 了的个数，初始化是置为 `EmptyKey`，当 `erase` 后被置为 `TombstoneKey`。二次探查法删除数据时需要设置 `deleted` 标识）、桶的总个数。
+&emsp;深入下去 `DenseMap` 涉及的数据结构真的超多，为了秉持完成 `runtime` 每行代码都要看的通透，那我们硬着头看下去。`DenseMap` 是在 `llvm` 中用的非常广泛的数据结构，它本身的实现是一个基于`Quadratic probing`（二次探查）的散列表，键值对本身是 `std::pair<KeyT, ValueT>`。`DenseMap` 有四个成员变量: `Buckets`、`NumEntries`、`NumTombstones`、`NumBuckets` 分别用于表示散列桶的起始地址（一块连续的内存）、已存储的数据的个数、`Tombstone` 个数（表示之前存储的有值，现在被 `erase` 了的个数，初始化是置为 `EmptyKey`，当 `erase` 后被置为 `TombstoneKey`（TombstoneKey 的值是 EmptyKey - 1）。二次探查法删除数据时需要设置 `deleted` 标识）、桶的总个数。
 
 &emsp;`DenseMap` 继承自 `DenseMapBase`，`DenseMapBase` 是 `2012` 年 `Chandler Carruth` 添加的，为了实现 `SmallDenseMap`，将 `DenseMap` 的哈希逻辑抽象到了 `DenseMapBase` 中，而内存管理的逻辑留在了 `DenseMap` 和 `SmallDenseMap` 实现。
 
@@ -56,12 +56,13 @@ struct DenseMapValueInfo {
     }
 };
 ```
+
 ### DenseMapInfo
 &emsp;`typename KeyInfoT = DenseMapInfo<KeyT>`。`DenseMapInfo` 是一个模版结构体，其内部只有四个静态函数，分别用于 `empty key`、`tombstone key` 以及哈希值的计算，它定义在 `llvm-DenseMapInfo.h` 中，该文件只有 `200` 行，文件前面的注释 `This file defines DenseMapInfo traits for DenseMap.` (该文件用来定义 `DenseMap` 的 `DenseMapInfo` 特征，取自 `llvmCore-3425.0.31`，（后期会深入学习 `LLVM`）。) 表明其核心作用，文件下面提供了针对常见类型的 `DenseMapInfo` 的特化版本，例如指针类型、整型等，这里我们主要使用 `DenseMapInfo<DisguisedPtr<T>>`。
 
 &emsp;关于模版内部实现，对于 `getEmptyKey` 函数实现，基本上返回的都是模版参数所能表示的最大值，`getTombstoneKey` 都是 `getEmptyKey` 再减 1。
 
-&emsp;针对 `DenseMapInfo<T*>` 和 `DenseMapInfo<DisguisedPtr<T>>` 版本，它们的 `getHashValue` 函数内部实现都是直接调用了 `objc4-781` 全局通用的指针哈希函数 `ptr_hash`。其它例如 `DenseMapInfo<long>` 、 `DenseMapInfo<int>` 等它们的 `getHashValue(const long& Val)` 函数都是直接返回 `Val * 37UL` 的值，哈希的值的计算都是仅用了这个乘法计算，每个 `hash seed` 都是 `37`，哈希函数中普遍都使用质数作为哈希种子，质数能够有效的避免哈希碰撞的发生，这里选择 `37` 大概是在测试过程中有比较好的性能表现。
+&emsp;针对 `DenseMapInfo<T*>` 和 `DenseMapInfo<DisguisedPtr<T>>` 版本，它们的 `getHashValue` 函数内部实现都是直接调用了 `objc4-781` 全局通用的指针哈希函数 `ptr_hash`。其它例如 `DenseMapInfo<long>` 、 `DenseMapInfo<int>` 等它们的 `getHashValue(const long& Val)` 函数都是直接返回 `Val * 37UL` 的值，哈希值的计算都是仅用了这个乘法计算，每个 `hash seed` 都是 `37`，哈希函数中普遍都使用质数作为哈希种子，质数能够有效的避免哈希碰撞的发生，这里选择 `37` 大概是在测试过程中有比较好的性能表现。
 
 ```c++
 template<typename T>
@@ -73,6 +74,7 @@ struct DenseMapInfo {
 };
 ```
 &emsp;下面是针对 `struct DenseMapInfo` 的特化版本：
+
 #### DenseMapInfo<T*>
 ```c++
 // Provide DenseMapInfo for all pointers.
@@ -143,6 +145,7 @@ struct DenseMapInfo<DisguisedPtr<T>> {
   }
 };
 ```
+
 #### DenseMapInfo<const char*>
 ```c++
 // Provide DenseMapInfo for cstrings.
@@ -181,6 +184,7 @@ template<> struct DenseMapInfo<const char*> {
   }
 };
 ```
+
 #### _objc_strhash
 ```c++
 static __inline uint32_t _objc_strhash(const char *s) {
@@ -198,8 +202,10 @@ static __inline uint32_t _objc_strhash(const char *s) {
     return hash;
 }
 ```
+
 #### DenseMapInfo<char>
 &emsp;下面的一组 `DenseMapInfo<unsigned>`、`DenseMapInfo<unsigned long>`、`DenseMapInfo<unsigned long long>`、`DenseMapInfo<int>`、`DenseMapInfo<long>`、`DenseMapInfo<long long>` 几乎都一模一样，`getEmptyKey` 都是取该抽象类型的最大值，`getTombstoneKey` 都是最大值减 1，`getHashValue` 都是乘以 `37`，`isEqual` 函数都是直接直接 `==`。
+
 #### DenseMapInfo<std::pair<T, U> >
 ```c++
 // Provide DenseMapInfo for all pairs whose members have info.
@@ -226,7 +232,7 @@ struct DenseMapInfo<std::pair<T, U> > {
   static unsigned getHashValue(const Pair& PairVal) {
   
    // 把 first 的哈希值(32位 int)左移 32 位和 second 的哈希值(32位 int)做或运算，
-   // 即把 first 和 second 的哈希值合并到一个 64 位 int 中
+   // 即把 first 和 second 的哈希值合并到一个 64 位 int 中。
     uint64_t key = (uint64_t)FirstInfo::getHashValue(PairVal.first) << 32
           | (uint64_t)SecondInfo::getHashValue(PairVal.second);
     
@@ -250,6 +256,7 @@ struct DenseMapInfo<std::pair<T, U> > {
   }
 };
 ```
+
 #### std::pair<T, U>
 ```c++
 template <class _T1, class _T2>
