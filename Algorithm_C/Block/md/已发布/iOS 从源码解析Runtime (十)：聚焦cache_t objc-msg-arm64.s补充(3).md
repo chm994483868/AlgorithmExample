@@ -13,7 +13,7 @@
  * IMP objc_msgLookup(id self, SEL _cmd, ...);
  * 
  * objc_msgLookup ABI:
- * IMP returned in x17 找到的 IMP 保存在 x17 寄存器中
+ * IMP returned in x17 找到的 IMP 保存在 x17 寄存器中（然后通过 br x17 执行该 IMP）
  * x16 reserved for our use but not used x16 寄存器则是保留寄存器
  *
  */

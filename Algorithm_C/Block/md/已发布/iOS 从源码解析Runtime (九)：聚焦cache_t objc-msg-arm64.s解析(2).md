@@ -272,7 +272,7 @@ extern IMP cache_getImp(Class cls, SEL sel); // 获得指定的 IMP
 extern void cache_fill(Class cls, SEL sel, IMP imp, id receiver); // sel 和 imp 插入 cache 中
 extern void cache_erase_nolock(Class cls); // 重置缓存
 extern void cache_delete(Class cls); // 删除 buckets
-extern void cache_collect(bool collectALot); //旧 buckets 回收
+extern void cache_collect(bool collectALot); // 旧 buckets 回收
 
 __END_DECLS
 

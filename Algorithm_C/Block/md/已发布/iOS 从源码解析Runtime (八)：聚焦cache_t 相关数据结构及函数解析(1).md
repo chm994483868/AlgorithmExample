@@ -467,7 +467,7 @@ struct bucket_t *cache_t::emptyBuckets()
 &emsp;散列数组的起始地址。
 ```c++
 // CACHE_MASK_STORAGE_OUTLINED
-// 没有任何 "锁头"，原子加载 _buckets 并返回
+// 没有任何嗦头，原子加载 _buckets 并返回
 struct bucket_t *cache_t::buckets() 
 {
     // 原子加载 _buckets 并返回
@@ -475,7 +475,7 @@ struct bucket_t *cache_t::buckets()
 }
 
 // CACHE_MASK_STORAGE_HIGH_16 
-// 也是没有任何 "锁头"，原子加载 _maskAndBuckets，然后与 bucketsMask 掩码与操作并把结果返回
+// 也是没有任何嗦头，原子加载 _maskAndBuckets，然后与 bucketsMask 掩码与操作并把结果返回
 struct bucket_t *cache_t::buckets()
 {
     // 原子加载 _maskAndBuckets
@@ -491,7 +491,7 @@ struct bucket_t *cache_t::buckets()
 // CACHE_MASK_STORAGE_OUTLINED
 mask_t cache_t::mask() 
 {
-    // 没有任何锁头，原子加载 _mask 并返回
+    // 没有任何嗦头，原子加载 _mask 并返回
     return _mask.load(memory_order::memory_order_relaxed);
 }
 
@@ -634,7 +634,7 @@ void cache_t::initializeToEmpty()
 bool cache_t::canBeFreed()
 {
     // 调用 isConstantEmptyCache 函数，如果它返回 true，
-    // 则表明 cache_t 的 buckets 当前正是那些准备的标记 emptyBuckets 的静态值
+    // 则表明 cache_t 的 buckets 当前正是那些准备的标记 emptyBuckets 的静态值。
     
     //（当 capacity 小于 capacity 时，
     // isConstantEmptyCache 函数内部的 emptyBucketsForCapacity 函数返回的都是:
@@ -1507,4 +1507,3 @@ extern kern_return_t task_restartable_ranges_synchronize(task_t task);
 + [方法查找流程 objc_msg_arm64.s](https://www.jianshu.com/p/a8668b81c5d6)
 + [OC 底层探索 09、objc_msgSend 流程 1-缓存查找](https://www.cnblogs.com/zhangzhang-y/p/13704597.html)
 + [汇编指令解读](https://blog.csdn.net/peeno/article/details/53068412)
-
