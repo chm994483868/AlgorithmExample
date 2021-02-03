@@ -17,7 +17,7 @@ objc_object::rootReleaseShouldDealloc()
 1. 对象的 `isa` 是优化的 `isa`。
 2. 对象不存在弱引用。
 3. 对象没有关联对象。
-4. 对象没有 `C++` 的析构的函数。
+4. 对象没有自定义的 `C++` 的析构函数。
 5. 对象的引用计数没有保存在 `SideTable` 中。
 
 ```c++
@@ -271,7 +271,7 @@ objc_object::sidetable_unlock()
 + 情况 1 `temp` 调用 `autorelease` 函数被放进自动释放池。当我们在外部调用 `returnInstanceValue` 函数获取一个 `CusPerson` 对象并且不做 `retain` 操作时，我们不需要在调用 `returnInstanceValue` 函数的地方主动去执行一次 `release` 操作，`CusPerson` 对象在 `AutoreleasePool` 执行 `pop` 时会被 `release` 一次后得到正确销毁。
 + 情况 2 `temp` 对象没有放进自动释放池，需要在调用 `returnInstanceValue` 后当不再需要返回的对象时，对象要主动调用一次 `release` 或 `autorelease` 保证对象能正确释放。
 + 如果我们需要一直持有函数返回的对象，那么我们可以主动调用 `retain` 函数或者用一个 `retain/strong` 修饰的属性来接收函数返回值，当我们不使用对象时需要在合适的地方调用 `release` 操作，保证对象能正常销毁防止内存泄漏。
-+ 成员变量默认是不持有赋值给它的对象，属性的话根据不同的修饰符来决定是否持有赋值给它的对象。（`strong/retain/weak/unsafe_unretain`）。
++ 成员变量默认是持有赋值给它的对象（默认是 \_\_strong 修饰的），属性的话根据不同的修饰符来决定是否持有赋值给它的对象。（`strong/retain/weak/unsafe_unretain`）。
 &emsp;`ARC` 下情况则大不相同，下面我们开始分析。
 
 ## rootAutorelease
@@ -335,16 +335,12 @@ enum ReturnDisposition : bool {
 #   define SUPPORT_DIRECT_THREAD_KEYS 1 // 支持在线程存储空间内保存数据
 
 // 这三个 key 暂时还没有见到在哪里使用
-#   define TLS_DIRECT_KEY        ((tls_key_t)__PTK_FRAMEWORK_OBJC_KEY0) 
-// #define __PTK_FRAMEWORK_OBJC_KEY0    40
-#   define SYNC_DATA_DIRECT_KEY  ((tls_key_t)__PTK_FRAMEWORK_OBJC_KEY1) 
-// #define __PTK_FRAMEWORK_OBJC_KEY1    41
-#   define SYNC_COUNT_DIRECT_KEY ((tls_key_t)__PTK_FRAMEWORK_OBJC_KEY2) 
-// #define __PTK_FRAMEWORK_OBJC_KEY2    42
+#   define TLS_DIRECT_KEY        ((tls_key_t)__PTK_FRAMEWORK_OBJC_KEY0) // #define __PTK_FRAMEWORK_OBJC_KEY0    40
+#   define SYNC_DATA_DIRECT_KEY  ((tls_key_t)__PTK_FRAMEWORK_OBJC_KEY1) // #define __PTK_FRAMEWORK_OBJC_KEY1    41
+#   define SYNC_COUNT_DIRECT_KEY ((tls_key_t)__PTK_FRAMEWORK_OBJC_KEY2) // #define __PTK_FRAMEWORK_OBJC_KEY2    42
 
 // 从 tls 中获取 hotPage 使用 
-#   define AUTORELEASE_POOL_KEY  ((tls_key_t)__PTK_FRAMEWORK_OBJC_KEY3) 
-// #define __PTK_FRAMEWORK_OBJC_KEY3    43
+#   define AUTORELEASE_POOL_KEY  ((tls_key_t)__PTK_FRAMEWORK_OBJC_KEY3) // #define __PTK_FRAMEWORK_OBJC_KEY3    43
 
 // 只要是非 TARGET_OS_WIN32 平台下都支持优化 autoreleased 返回值
 //（优化方案是把返回值放在 tls 中，避免加入到 autoreleasePool 中）
@@ -353,8 +349,7 @@ enum ReturnDisposition : bool {
 // 从 tls 中获取 disposition，
 // RETURN_DISPOSITION_KEY 对应的 value 是 ReturnDisposition 优化设置，
 // 表示优化时引用计数加 0 或者 加 1
-#   define RETURN_DISPOSITION_KEY ((tls_key_t)__PTK_FRAMEWORK_OBJC_KEY4)
-// #define __PTK_FRAMEWORK_OBJC_KEY4    44
+#   define RETURN_DISPOSITION_KEY ((tls_key_t)__PTK_FRAMEWORK_OBJC_KEY4) // #define __PTK_FRAMEWORK_OBJC_KEY4    44
 
 # endif
 
@@ -404,7 +399,7 @@ setReturnDisposition(ReturnDisposition disposition) {
   比如我们在函数1 内部调用了函数 2，开始时根据汇编指令一条一条执行函数1，当执行到需要调用函数 2 时，
   假如此时是用一个 `callq` 指令跳转到了函数 2 去执行，当函数 2 执行完毕后返回的地址是接着刚刚 `callq` 指令的地址的，
   然后从函数 2 返回的地址处接着一条一条继续执行函数 1 的指令。
-  （描述的用词可能很不恰当，对汇编实在是知之甚少，大概意思就是函数嵌套调用时，被嵌套调用的函数执行完毕后返回的地址就是接下来的要执行的指令的地址，（或者是一个固定的偏移位置，根据编译器不同情况不同））
+  （大概意思就是函数嵌套调用时，被嵌套调用的函数执行完毕后返回的地址就是接下来的要执行的指令的地址，（或者是一个固定的偏移位置，根据编译器不同情况不同））
 2. `gcc` 默认不支持 `__builtin_return_address(LEVEL)` 的参数为非 `0`。好像只支持参数为 `0`。
 3. `__builtin_return_address(0)` 的含义是，得到当前函数返回地址，即此函数被别的函数调用，然后此函数执行完毕后，返回，所谓返回地址就是那时候的地址。
 4. `__builtin_return_address(1)` 的含义是，得到当前函数的调用者的返回地址。注意是调用者的返回地址，而不是函数起始地址。
