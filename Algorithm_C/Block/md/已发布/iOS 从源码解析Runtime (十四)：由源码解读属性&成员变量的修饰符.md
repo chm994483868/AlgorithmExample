@@ -151,7 +151,7 @@ Lfunc_end4:
     .cfi_endproc
                                         ; -- End function
 ```
-&emsp;`objc_nonatomic_copy` 属性的 `getter` 函数内部看到最后 `b` 指令跳转到了 `objc_getProperty` 函数。下面我们来看一下 `objc_getProperty` 函数实现。如果属性不是 `atomic` 修饰的话不需要对读取过程加锁，`objc_getProperty` 函数的前半部分就已经 `return` 成员变量了，看到成员变量的依然是通过 `self` 指针偏移找到并返回。如果属性是 `atomic` 修饰的话，会通过 `PropertyLocks[slot]` 取得一把锁，而加锁的内容是 `id value = objc_retain(*slot)` 会对成员变量执行一次 `retain` 操作，引用计数 `+1`，然后为了性能，在解锁后才调用 `objc_autoreleaseReturnValue(value)` 把成员变量放进自动释放池，保证和刚刚的 `retain` 操作抵消，保证成员变量能正常释放销毁。 
+&emsp;`objc_nonatomic_copy` 属性的 `getter` 函数内部看到最后 `b` 指令跳转到了 `objc_getProperty` 函数。下面我们来看一下 `objc_getProperty` 函数实现。如果属性不是 `atomic` 修饰的话不需要对读取过程加锁，`objc_getProperty` 函数的前半部分就已经 `return` 成员变量了，看到成员变量的依然是通过 `self` 指针偏移找到并返回。如果属性是 `atomic` 修饰的话，会通过 `PropertyLocks[slot]` 取得一把锁，而加锁的内容是 `id value = objc_retain(*slot)` 会对成员变量执行一次 `retain` 操作（保证 getter 函数执行过程中对象不会被释放），引用计数 `+1`，然后为了性能，在解锁后才调用 `objc_autoreleaseReturnValue(value)` 把成员变量放进自动释放池，保证和刚刚的 `retain` 操作抵消，保证成员变量能正常释放销毁。 
 ```c++
 // ptrdiff_t offset
 // ptrdiff_t 是 C/C++ 标准库中定义的一个与机器相关的数据类型。
