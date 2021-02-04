@@ -108,7 +108,7 @@ objc: 0x6000039da810
 ```
 > &emsp;这里看一个题外话，看源码时经常遇到命名后缀有 _t/ref 的类型，如 spinlock_t、weak_table_t、weak_entry_t 等，后缀 t 是用来表示 struct 的，这是由于 C 中没有类的定义，它是面向过程的语言，在 C 语言中表示类型时是用结构体 struct，所以在后面加一个 _t 只是为了标识类型。[iOS多线程中的实际方案之一pthread](https://www.jianshu.com/p/cfc6e7d2316a)
 
-> &emsp;在混合开发时，如果在 C 和 OC 之间传递数据，需要使用 __bridge 进行桥接，桥接的目的就是为了告诉编译器如何管理内存，MRC 中不需要使用桥接；在 OC 中，如果是 ARC 开发，编译器会在编译时，根据代码结构，自动添加 retain/release/autorelease。但是，ARC 只负责管理 OC 部分的内存管理，而不负责 C 语言 代码的内存管理。因此，开发过程中，如果使用的 C 语言框架出现 retain/create/copy/new 等字样的函数，大多都需要 release，否则会出现内存泄漏，如上面的 CFBridgingRetain 和 CFBridgingRelease 配对使用。[iOS多线程中的实际方案之一pthread](https://www.jianshu.com/p/cfc6e7d2316a)
+> &emsp;在混合开发时，如果在 C 和 OC 之间传递数据，需要使用 \_\_bridge 进行桥接，桥接的目的就是为了告诉编译器如何管理内存，MRC 中不需要使用桥接；在 OC 中，如果是 ARC 开发，编译器会在编译时，根据代码结构，自动添加 retain/release/autorelease。但是，ARC 只负责管理 OC 部分的内存管理，而不负责 C 语言 代码的内存管理。因此，开发过程中，如果使用的 C 语言框架出现 retain/create/copy/new 等字样的函数，大多都需要 release，否则会出现内存泄漏，如上面的 CFBridgingRetain 和 CFBridgingRelease 配对使用。[iOS多线程中的实际方案之一pthread](https://www.jianshu.com/p/cfc6e7d2316a)
 
 ### pthread_t 定义
 &emsp;`pthread_t` 是一个指向线程的指针，在 iOS 它是: `__darwin_pthread_t`。下面看一下源码定义:
