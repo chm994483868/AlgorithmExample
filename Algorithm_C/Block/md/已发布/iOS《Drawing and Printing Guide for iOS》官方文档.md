@@ -413,17 +413,91 @@ UIBezierPath *aPath = [UIBezierPath bezierPath];
 &emsp;使用 closePath 方法不仅结束描述形状的子路径，还绘制了第一个点和最后一个点之间的线段。这是完成多边形而不必绘制最终线的便捷方法。
 
 ### Adding Arcs to Your Path（向路径添加弧）
-&emsp;UIBezierPath 类提供了对使用弧段初始化新路径对象的支持。bezierPathWith的参数弧心：半径：秒酒石角：endAngle：顺时针：方法定义包含所需圆弧的圆以及圆弧本身的起点和终点。图2-2显示了用于创建圆弧的组件，包括定义圆弧的圆和用于指定圆弧的角度测量。在这种情况下，按顺时针方向创建圆弧。（逆时针方向画弧将绘制圆的虚线部分。）创建此弧的代码如清单2-2所示。
+&emsp;UIBezierPath 类为使用弧段（arc segment）初始化新路径对象提供支持。`bezierPathWithArcCenter:radius:startAngle:endAngle:clockwise:` 方法的参数定义了包含所需圆弧以及圆弧本身的起点和终点的圆。图 2-2 显示了创建圆弧所需的组件，包括定义圆弧的圆和用于指定圆弧的角度测量值。在这种情况下，将沿顺时针方向创建弧。 （在逆时针方向上绘制弧将改为绘制圆的虚线部分。）清单 2-2 中显示了创建此弧的代码。
 
+&emsp;Figure 2-2  An arc in the default coordinate system（默认坐标系中的圆弧）
 
+![arc_layout](https://p9-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/dcded3d846fe40088577c81489fe88de~tplv-k3u1fbpfcp-watermark.image)
 
-
-
-
-
-
-
+&emsp;Listing 2-2  Creating a new arc path（创建一个新的弧线路径）
+```c++
+// pi is approximately equal to 3.14159265359.
+#define   DEGREES_TO_RADIANS(degrees)  ((pi * degrees)/ 180)
  
+- (UIBezierPath *)createArcPath {
+   UIBezierPath *aPath = [UIBezierPath bezierPathWithArcCenter:CGPointMake(150, 150)
+                           radius:75
+                           startAngle:0
+                           endAngle:DEGREES_TO_RADIANS(135)
+                           clockwise:YES];
+   return aPath;
+}
+```
+&emsp;如果要将弧段合并到路径的中间，则必须直接修改路径对象的 CGPathRef 数据类型。有关使用 Core Graphics 函数修改路径的详细信息，请参见  Modifying the Path Using Core Graphics Functions。
+
+### Adding Curves to Your Path（将曲线添加到路径）
+&emsp;UIBezierPath 类支持向路径添加三次和二次贝塞尔曲线。曲线段从当前点开始，到指定的点结束。曲线的形状是使用起点和终点之间的切线以及一个或多个控制点来定义的。图 2-3 显示了两种曲线的近似值以及控制点和曲线形状之间的关系。每个线段的精确曲率涉及到所有点之间复杂的数学关系，在网上和维基百科上都有很好的记录。
+
+&emsp;Figure 2-3  Curve segments in a path（路径中的曲线段）
+
+![curve_segments](https://p6-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/5f4376d6321d49d0a2049118587af65b~tplv-k3u1fbpfcp-watermark.image)
+
+&emsp;要将曲线添加到路径，请使用以下方法：
+
++ 三次曲线：addCurveToPoint:controlPoint1:controlPoint2:
++ 二次曲线：addQuadCurveToPoint:controlPoint:
+
+&emsp;因为曲线依赖于路径的当前点，所以在调用前面的方法之前必须设置当前点。完成曲线后，当前点将更新为指定的新端点。
+
+### Creating Oval and Rectangular Paths（创建椭圆形和矩形路径）
+&emsp;椭圆和矩形是使用曲线段和直线段组合构建的常见路径类型。UIBezierPath 类包括用于创建具有椭圆形或矩形形状的路径的 `bezierPathWithRect:` 和 `bezierPathWithOvalInRect:` 便捷方法。这两种方法都创建一个新的路径对象，并用指定的形状初始化它。你可以立即使用返回的路径对象，或者根据需要向其添加更多形状。
+
+&emsp;如果要向现有路径对象添加矩形，则必须使用 `moveToPoint:`、`addLineToPoint:`、`closePath` 方法，就像对任何其他多边形一样。对矩形的最后一侧使用 `closePath` 方法是添加路径的最后一条线以及标记矩形子路径的结束的一种便捷方法。
+ 
+&emsp;如果要在现有路径上添加椭圆形，最简单的方法是使用 Core Graphics。尽管可以使用 `addQuadCurveToPoint:controlPoint:` 近似椭圆表面，但 `CGPathAddEllipseInRect` 函数使用起来更简单，更准确。有关更多信息，请参见 Modifying the Path Using Core Graphics Functions。
+ 
+### Modifying the Path Using Core Graphics Functions（使用 Core Graphics 功能修改路径）
+&emsp;UIBezierPath 类实际上只是 CGPathRef 数据类型和与该路径关联的图形属性的包装器。尽管通常使用 UIBezierPath 类的方法添加直线段和曲线段，但该类还公开了一个 CGPath 属性，可用于直接修改基础路径数据类型。如果希望使用 Core Graphics 框架的功能构建路径，则可以使用此属性。
+
+&emsp;有两种方法可以修改与 UIBezierPath 对象关联的路径。可以完全使用 Core Graphics 函数修改路径，也可以混合使用 Core Graphics 函数和 UIBezierPath 方法。完全使用 Core Graphics 调用修改路径在某些方面更容易。创建一个可变的 CGPathRef 数据类型，并调用任何需要修改其路径信息的函数。完成后，将 path 对象指定给相应的 UIBezierPath 对象，如清单 2-3 所示。
+
+&emsp;Listing 2-3  Assigning a new CGPathRef to a UIBezierPath object（将新的 CGPathRef 分配给 UIBezierPath 对象）
+```c++
+// Create the path data.
+CGMutablePathRef cgPath = CGPathCreateMutable();
+CGPathAddEllipseInRect(cgPath, NULL, CGRectMake(0, 0, 300, 300));
+CGPathAddEllipseInRect(cgPath, NULL, CGRectMake(50, 50, 200, 200));
+ 
+// Now create the UIBezierPath object.
+UIBezierPath *aPath = [UIBezierPath bezierPath];
+aPath.CGPath = cgPath;
+aPath.usesEvenOddFillRule = YES;
+ 
+// After assigning it to the UIBezierPath object, you can release
+// your CGPathRef data type safely.
+CGPathRelease(cgPath);
+```
+&emsp;如果选择混合使用 Core Graphics 函数和 UIBezierPath 方法，则必须小心地在两者之间来回移动路径信息。因为 UIBezierPath 对象拥有其底层 CGPathRef 数据类型，所以不能简单地检索该类型并直接修改它。相反，你必须创建一个可变副本，修改副本，然后将副本赋回 CGPath 属性，如清单 2-4 所示。
+
+&emsp;Listing 2-4  Mixing Core Graphics and UIBezierPath calls（混合 Core Graphics 和 UIBezierPath 调用）
+```c++
+UIBezierPath *aPath = [UIBezierPath bezierPathWithOvalInRect:CGRectMake(0, 0, 300, 300)];
+ 
+// Get the CGPathRef and create a mutable version.
+CGPathRef cgPath = aPath.CGPath;
+CGMutablePathRef  mutablePath = CGPathCreateMutableCopy(cgPath);
+ 
+// Modify the path and assign it back to the UIBezierPath object.
+CGPathAddEllipseInRect(mutablePath, NULL, CGRectMake(50, 50, 200, 200));
+aPath.CGPath = mutablePath;
+ 
+// Release both the mutable copy of the path.
+CGPathRelease(mutablePath);
+```
+
+
+
+
 
 
 
