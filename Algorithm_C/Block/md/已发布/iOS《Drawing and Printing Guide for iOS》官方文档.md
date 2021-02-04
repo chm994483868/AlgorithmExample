@@ -314,9 +314,260 @@ CGContextRestoreGState(graphicsContext);
 
 ![flipped_coordinates-1](https://p6-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/f48ecd95cacf43a4b29863d46c909fc3~tplv-k3u1fbpfcp-watermark.image)
 
-&emsp;如果旋转对象（例如，通过调用 `CGContextRotateCTM`），可以观察到相同类型的镜像效果。如果使用引用ULO坐标系的核心图形调用旋转对象，则在UIKit中渲染时对象的方向将反转。必须考虑代码中不同的旋转方向；使用CGContextRotateCTM，可以通过反转角度参数的符号来实现这一点（例如，负值变为正值）。
+&emsp;如果旋转对象（例如，通过调用 `CGContextRotateCTM`），可以观察到相同类型的镜像效果。如果使用引用 ULO 坐标系的 Core Graphics 调用旋转对象，则在 UIKit 中渲染时对象的方向将反转。必须考虑代码中不同的旋转方向；使用 CGContextRotateCTM，可以通过反转角度参数的符号来实现这一点（例如，负值变为正值）。
 
-###### Shadows（）
+###### Shadows（阴影）
+&emsp;阴影从其对象落下的方向由偏移值指定，该偏移的含义是绘图框架的约定。在 UIKit 中，正的 x 和 y 偏移使阴影向下移动到对象的右侧。在 Core Graphics 中，正的 x 和 y 偏移使阴影向上和向右移动。翻转 CTM 使对象与 UIKit 的默认坐标系对齐不会影响对象的阴影，因此阴影不会正确跟踪其对象。要使其正确跟踪，必须为当前坐标系适当修改偏移值。
+
+> Note: 在 iOS 3.2 之前，Core Graphics 和 UIKit 对阴影方向有相同的约定：正偏移值使阴影向下并向右移动。
+
+### Applying Core Animation Effects（应用 Core Animation 效果）
+&emsp;Core Animation 是一个 Objective-C 框架，它为快速轻松地创建流畅的实时动画提供了基础设施。Core Animation 本身不是绘图技术，因为它不提供用于创建形状（shapes）、图像（images）或其他类型内容的原始例程。相反，它是一种用于处理和显示使用其他技术创建的内容的技术。
+
+&emsp;大多数应用程序都可以从 iOS 中以某种形式使用 Core Animation 中获益。动画向用户提供关于正在发生的事情的反馈。例如，当用户在 “设置” 应用程序中导航时，屏幕会根据用户是在 “首选项” 层次结构中进一步导航还是在根节点上进行备份而滑入或滑出视图。这种反馈很重要，它为用户提供上下文信息。它还增强了应用程序的视觉风格。
+
+&emsp;在大多数情况下，你可能可以通过很少的努力获得 Core Animation 的好处。例如，UIView 类的几个属性（包括视图的 frame、center、color 和 opacity 等）可以配置为在其值更改时触发动画。你必须做一些工作让 UIKit 知道你希望执行这些动画，但是动画本身是为你自动创建和运行的。有关如何触发内置视图动画的信息，请参见 UIView Class Reference 中的动画视图。
+
+&emsp;当你越过基本动画时，必须更直接地与 Core Animation 类和方法交互。以下部分提供有关 Core Animation 的信息，并向你展示如何使用其类和方法在 iOS 中创建典型动画。有关 Core Animation 以及如何使用它的其他信息，请参见 Core Animation Programming Guide。
+
+#### About Layers（关于图层）
+&emsp;Core Animation 的关键技术是层对象。图层是轻量级对象，本质上类似于视图，但实际上是模型对象（model objects），它封装了要显示的内容的几何图形、计时和视觉属性。内容本身通过以下三种方式之一提供：
+
++ 可以将 CGImageRef 指定给层对象的 contents 属性。
++ 可以将 delegate 指定给 layer，并让 delegate 处理绘图。
++ 可以将 CALayer 子类化并重写其中的 display 方法。
+
+&emsp;操纵图层对象的属性时，实际操纵的是模型级数据（model-level data），这些数据决定了关联内容的显示方式。该内容的实际呈现是与代码分开处理的，并且经过了大量优化以确保它的快速性。你所要做的就是设置层内容，配置动画属性，然后让 Core Animation 接管。
+
+&emsp;有关层及其使用方法的详细信息，请参见 Core Animation Programming Guide。
+
+#### About Animations（关于动画）
+&emsp;在设置层动画时，Core Animation 使用单独的动画对象来控制动画的计时和行为。CAAnimation 类及其子类提供了可以在代码中使用的不同类型的动画行为。可以创建将属性从一个值移植到另一个值的简单动画，也可以创建复杂的关键帧动画，通过提供的一组值和计时函数跟踪动画。
+
+&emsp;Core Animation 还允许你将多个动画组合到一个单元中，称为事务（transaction）。CATransaction 对象将动画组作为一个单元进行管理。也可以使用此类的方法设置动画的持续时间。
+
+&emsp;有关如何创建自定义动画的示例，请参见 Animation Types and Timing Programming Guide。
+
+#### Accounting for Scale Factors in Core Animation Layers（在 Core Animation 层中考虑比例因子）
+&emsp;直接使用 Core Animation 层提供内容的应用程序可能需要调整其绘图代码以考虑比例因子。通常，在视图的 `drawRect:` 方法或 `drawLayer:inContext:` 方法，系统自动调整图形上下文以考虑比例因子。但是，当视图执行以下操作之一时，可能仍然需要知道或更改该比例因子：
+
+&emsp;直接使用 Core Animation 图层提供内容的应用可能需要调整其绘图代码以考虑比例因子。通常，当你在视图的 `drawRect:` 方法或图层委托的 `drawLayer:inContext:` 方法中进行绘制时，系统会自动调整图形上下文以考虑比例因子。但是，当你的视图执行以下任一操作时，仍然需要了解或更改该比例因子：
+
++ 创建具有不同比例因子的其他 Core Animation 层，并将它们合成到自己的内容中
++ 直接设置 Core Animation 层的 contents 属性
+
+&emsp;Core Animation 的合成引擎查看每个层的 contentsScale 属性，以确定在合成过程中是否需要缩放该层的内容。如果应用程序创建的图层没有关联的视图，则每个新图层对象的比例因子最初设置为 1.0。如果不更改比例因子，并且随后在高分辨率屏幕上绘制图层，则图层内容将自动缩放以补偿比例因子的差异。如果不希望缩放内容，可以通过为 contentsScale 属性设置新值将层的缩放因子更改为 2.0，但如果不提供高分辨率内容而这样做，则现有内容可能会比预期的小。要解决此问题，需要为图层提供更高分辨率的内容。
+
+> Important: 层的 contentsGravity 属性在确定是否在高分辨率屏幕上缩放标准分辨率层内容时起作用。默认情况下，此属性设置为值 kCAGravityResize，这将导致缩放图层内容以适应图层的边界。将 “重力”（gravity）更改为“不调整大小”（nonresizing）选项可以消除否则会发生的自动缩放。在这种情况下，你可能需要相应地调整内容或比例因子。
+
+&emsp;直接设置图层的 contents 属性时，调整图层的内容以适应不同的比例因子是最合适的。Quartz images 没有比例因子的概念，因此直接处理像素。因此，在创建用于层内容的 CGImageRef 对象之前，请检查比例因子并相应地调整图像的大小。具体来说，从应用程序包中加载一个大小合适的图像，或者使用 UIGraphicsBeginImageContextWithOptions 函数创建一个比例因子与层比例因子匹配的图像。如果不创建高分辨率位图，则可以按前面讨论的方式缩放现有位图。
+
+&emsp;有关如何指定和加载高分辨率图像的信息，请参见 Loading Images into Your App。有关如何创建高分辨率图像的信息，请参见 Drawing to Bitmap Contexts and PDF Contexts。
+
+## Drawing Shapes Using Bézier Paths（使用贝塞尔曲线绘制形状）
+&emsp;在 iOS 3.2 及更高版本中，可以使用 UIBezierPath 类创建基于向量的路径。UIBezierPath 类是一个 Objective-C 包装器，用于 Core Graphics 框架中与路径相关的功能。可以使用此类定义简单的形状，例如椭圆和矩形，以及包含多个直线段和曲线段的复杂形状。
+
+&emsp;你可以使用路径对象在应用程序的用户界面中绘制形状。你可以绘制路径的轮廓、填充路径所包含的空间，或者两者兼而有之。还可以使用路径为当前图形上下文定义剪裁区域，然后可以使用该区域修改该上下文中的后续图形操作。
+
+### Bézier Path Basics（贝塞尔路径基础）
+&emsp;UIBezierPath 对象是 CGPathRef 数据类型的包装器。路径是使用直线和曲线段构建的基于向量的形状。可以使用直线段创建矩形和多边形，也可以使用曲线段创建圆弧、圆和复杂的曲线形状。每个线段由一个或多个点（在当前坐标系中）和一个定义如何解释这些点的图形命令组成。
+
+&emsp;每一组连接的直线段和曲线段形成一个子路径。子路径中一条直线或曲线段的终点定义下一条直线或曲线段的起点。一个 UIBezierPath 对象可以包含一个或多个定义整体路径的子路径，这些子路径由 `moveToPoint:` 命令分隔，该命令有效地抬起绘图笔并将其移动到新位置。
+
+&emsp;构建和使用路径对象的过程是分开的。构建路径是第一个过程，包括以下步骤：
+
+1. 创建路径对象。
+2. 设置 UIBezierPath 对象的任何相关图形属性，例如笔划路径的 lineWidth 或 lineJoinStyle 属性，或填充路径的 usesevenodFillRule 属性。这些绘图属性应用于整个路径。
+3. 使用 `moveToPoint:` 方法设置初始段的起点。
+4. 添加直线段和曲线段以定义子路径。
+5. （可选）通过调用 `closePath` 关闭子路径，它从最后一段的末尾到第一段的开头绘制一条直线段。
+6. （可选）重复步骤 3、4 和 5 以定义其他子路径。
+
+&emsp;构建路径时，应相对于原点（0，0）排列路径的点。这样做可以更容易地在以后移动路径。在绘制过程中，路径的点将按原样应用于当前图形上下文的坐标系。如果路径是相对于原点定向的，则要重新定位它，只需对当前图形上下文应用带有平移因子的仿射变换。修改图形上下文（与路径对象本身相反）的优点是，可以通过保存和恢复图形状态轻松撤消转换。
+
+&emsp;要绘制路径对象，请使用 stroke（笔划）和 fill （填充）方法。这些方法在当前图形上下文中渲染路径的直线段和曲线段。渲染过程涉及使用路径对象的属性光栅化直线段和曲线段。光栅化过程不会修改路径对象本身。因此，可以在当前上下文或其他上下文中多次渲染同一路径对象。
+
+### Adding Lines and Polygons to Your Path（在路径中添加线和面）
+&emsp;直线和多边形是使用 `moveToPoint:` 和 `addLineToPoint:` 方法逐点构建的简单形状。`moveToPoint:` 方法设置要创建的形状的起点。从这一点开始，使用 `addLineToPoint:` 方法创建形状的线。可以连续创建线，每条线在上一个点和指定的新点之间形成。
+
+&emsp;清单 2-1 显示了使用单个线段创建五边形所需的代码。（图 2-1 显示了使用适当的笔划和填充颜色设置绘制此形状的结果，如  Rendering the Contents of a Bézier Path Object 中所述。）此代码设置形状的初始点，然后添加四个连接的线段。第五段是通过对 `closePath` 方法的调用添加的，该方法连接最后一个点（0，40）和第一个点（100，0）。
+
+&emsp;Listing 2-1  Creating a pentagon shape（创建五边形形状）
+```c++
+UIBezierPath *aPath = [UIBezierPath bezierPath];
+ 
+// Set the starting point of the shape.
+[aPath moveToPoint:CGPointMake(100.0, 0.0)];
+ 
+// Draw the lines.
+[aPath addLineToPoint:CGPointMake(200.0, 40.0)];
+[aPath addLineToPoint:CGPointMake(160, 140)];
+[aPath addLineToPoint:CGPointMake(40.0, 140)];
+[aPath addLineToPoint:CGPointMake(0.0, 40.0)];
+[aPath closePath];
+```
+&emsp;Figure 2-1  Shape drawn with methods of the UIBezierPath class（使用 UIBezierPath 类的方法绘制的形状）
+
+![bezier_pentagon](https://p1-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/33366b5b7b1c44bc9697be4888eb20d0~tplv-k3u1fbpfcp-watermark.image)
+
+&emsp;使用 closePath 方法不仅结束描述形状的子路径，还绘制了第一个点和最后一个点之间的线段。这是完成多边形而不必绘制最终线的便捷方法。
+
+### Adding Arcs to Your Path（向路径添加弧）
+&emsp;UIBezierPath 类提供了对使用弧段初始化新路径对象的支持。bezierPathWith的参数弧心：半径：秒酒石角：endAngle：顺时针：方法定义包含所需圆弧的圆以及圆弧本身的起点和终点。图2-2显示了用于创建圆弧的组件，包括定义圆弧的圆和用于指定圆弧的角度测量。在这种情况下，按顺时针方向创建圆弧。（逆时针方向画弧将绘制圆的虚线部分。）创建此弧的代码如清单2-2所示。
+
+
+
+
+
+
+
+
+
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+## Drawing and Creating Images（绘制和创建图像）
+&emsp;大多数情况下，使用标准视图显示图像相当简单。但是，在两种情况下，你可能需要做额外的工作：
+
++ 如果要将图像显示为自定义视图的一部分，则必须在视图的 `drawRect:` 方法中自己绘制图像。Drawing Images 说明了如何做。
++ 如果要在屏幕外（offscreen）渲染图像（以便以后绘制或保存到文件中），则必须创建位图图像上下文。要了解更多信息，请参见 Creating New Images Using Bitmap Graphics Contexts。
+
+### Drawing Images（绘制图像）
+&emsp;为了获得最佳性能，如果使用 UIImageView 类可以满足图像绘制需要，则应使用此图像对象初始化 UIImageView 对象。但是，如果需要显式地绘制图像，则可以存储图像并稍后在视图的 `drawRect:` 方法中使用它。
+
+&emsp;下面的示例演示如何从应用程序 bundle 中加载图像。
+```c++
+NSString *imagePath = [[NSBundle mainBundle] pathForResource:@"myImage" ofType:@"png"];
+UIImage *myImageObj = [[UIImage alloc] initWithContentsOfFile:imagePath];
+ 
+// Store the image into a property of type UIImage *
+// for use later in the class's drawRect: method.
+self.anImage = myImageObj;
+```
+&emsp;要在视图的 `drawRect:` 方法中显式绘制结果图像，可以使用 UIImage 中可用的任何绘制方法。通过这些方法，可以指定要在视图中绘制图像的位置，因此无需在绘制之前创建和应用单独的变换。
+
+&emsp;下面的代码片段在视图中的点（10，10）处绘制上面加载的图像。
+```c++
+- (void)drawRect:(CGRect)rect
+{
+    ...
+ 
+    // Draw the image.
+    [self.anImage drawAtPoint:CGPointMake(10, 10)];
+}
+```
+> Important: 如果使用 CGContextDrawImage 函数直接绘制位图图像，则默认情况下图像数据沿 y 轴反转。这是因为 Quartz 图像假定一个坐标系，该坐标系具有左下角原点和从该点向上和向右延伸的正坐标轴。虽然可以在绘制之前应用变换，但绘制 Quartz 图像的更简单（也是推荐的）方法是将它们包装在 UIImage 对象中，这将自动补偿坐标空间中的这种差异。有关使用 Core Graphics 创建和绘制图像的更多信息，请参见 Quartz 2D Programming Guide。
+
+### Creating New Images Using Bitmap Graphics Contexts（使用位图图形上下文创建新图像）
+&emsp;大多数时候，当你绘图的时候，你的目标是在屏幕上显示一些东西。但是，有时将某些内容绘制到屏幕外缓冲区（offscreen buffer）是有用的。例如，你可能希望创建现有图像的缩略图，将其绘制到缓冲区以便将其保存到文件中，等等。为了支持这些需求，你可以创建位图图像上下文，使用 UIKit 框架或 Core Graphics 函数对其进行绘制，然后从上下文中获取图像对象。
+
+&emsp;在 UIKit 中，过程如下：
+
+1. 调用 `UIGraphicsBeginImageContextWithOptions` 创建位图上下文并将其推送到图形堆栈（graphics stack）上。
+  对于第一个参数（size），传递 CGSize 值以指定位图上下文的尺寸（以点为单位）。
+  对于第二个参数（opaque），如果图像包含透明度（alpha 通道），则传递 NO。否则，传递 YES 以最大限度地提高性能。
+  对于最终参数（scale），为位图传递 0.0，该位图针对设备的主屏幕进行了适当的缩放，或者传递你选择的缩放因子。
+  例如，下面的代码段创建了一个 200 x 200 像素的位图。（像素数通过图像大小乘以比例因子来确定。）
+  ```c++
+  UIGraphicsBeginImageContextWithOptions(CGSizeMake(100.0,100.0), NO, 2.0);
+  ```
+  > Note: 通常应避免调用名类似的 `UIGraphicsBeginImageContext` 函数（作为向后兼容的后备功能除外），因为它总是创建比例因子为 1.0 的图像。如果基础设备具有高分辨率屏幕，则使用 `UIGraphicsBeginImageContext` 创建的图像在渲染时可能会显得不平滑。
+2. 使用 UIKit 或 Core Graphics 例程将图像的内容绘制到新创建的图形上下文中。
+3. 调用 `UIGraphicsGetImageFromCurrentImageContext` 函数，根据绘制的内容生成并返回 UIImage 对象。如果需要，可以继续绘制并再次调用此方法以生成其他图像。
+4. 调用 `UIGraphicsEndImageContext` 从图形堆栈中弹出上下文。
+
+&emsp;清单 3-1 中的方法获取通过 Internet 下载的图像，并将其绘制到基于图像的上下文中，缩小到应用程序图标的大小。然后获取从位图数据创建的 UIImage 对象，并将其分配给实例变量。请注意，位图的大小（`UIGraphicsBeginImageContextWithOptions` 的第一个参数）和绘制内容的大小（imageRect 的大小）应该匹配。如果内容大于位图，部分内容将被剪裁，不会出现在结果图像中。
+
+&emsp;Listing 3-1  Drawing a scaled-down image to a bitmap context and obtaining the resulting image（将缩小的图像绘制到位图上下文并获得结果图像）
+```c++
+- (void)connectionDidFinishLoading:(NSURLConnection *)connection {
+    UIImage *image = [[UIImage alloc] initWithData:self.activeDownload];
+    if (image != nil && image.size.width != kAppIconHeight && image.size.height != kAppIconHeight) {
+        CGRect imageRect = CGRectMake(0.0, 0.0, kAppIconHeight, kAppIconHeight);
+        UIGraphicsBeginImageContextWithOptions(itemSize, NO, [UIScreen mainScreen].scale);
+        [image drawInRect:imageRect];
+        self.appRecord.appIcon = UIGraphicsGetImageFromCurrentImageContext();  // UIImage returned.
+        UIGraphicsEndImageContext();
+    } else {
+        self.appRecord.appIcon = image;
+    }
+    self.activeDownload = nil;
+    [image release];
+    self.imageConnection = nil;
+    [delegate appImageDidLoad:self.indexPathInTableView];
+}
+```
+&emsp;你还可以调用 Core Graphics 函数来绘制生成的位图图像的内容；清单 3-2 中的代码片段给出了一个示例，它绘制了 PDF 页面的缩小图像。请注意，在调用 `CGContextDrawPDFPage` 以将绘制的图像与 UIKit 的默认坐标系对齐之前，代码会翻转图形上下文。
+
+&emsp;Listing 3-2  Drawing to a bitmap context using Core Graphics functions（使用 Core Graphics 函数绘制到位图上下文）
+```c++
+// Other code precedes...
+ 
+CGRect pageRect = CGPDFPageGetBoxRect(page, kCGPDFMediaBox);
+pdfScale = self.frame.size.width/pageRect.size.width;
+pageRect.size = CGSizeMake(pageRect.size.width * pdfScale, pageRect.size.height * pdfScale);
+UIGraphicsBeginImageContextWithOptions(pageRect.size, YES, pdfScale);
+CGContextRef context = UIGraphicsGetCurrentContext();
+ 
+// First fill the background with white.
+CGContextSetRGBFillColor(context, 1.0,1.0,1.0,1.0);
+CGContextFillRect(context,pageRect);
+CGContextSaveGState(context);
+ 
+// Flip the context so that the PDF page is rendered right side up
+CGContextTranslateCTM(context, 0.0, pageRect.size.height);
+CGContextScaleCTM(context, 1.0, -1.0);
+ 
+// Scale the context so that the PDF page is rendered at the
+// correct size for the zoom level.
+CGContextScaleCTM(context, pdfScale,pdfScale);
+CGContextDrawPDFPage(context, page);
+CGContextRestoreGState(context);
+UIImage *backgroundImage = UIGraphicsGetImageFromCurrentImageContext();
+UIGraphicsEndImageContext();
+backgroundImageView = [[UIImageView alloc] initWithImage:backgroundImage];
+ 
+// Other code follows...
+```
+&emsp;如果你喜欢在位图图形上下文中完全使用 Core Graphics 进行绘制，则可以使用 `CGBitmapContextCreate` 函数来创建上下文并将图像内容绘制到其中。完成绘制后，调用 `CGBitmapContextCreateImage` 函数从位图上下文获取 CGImageRef 对象。你可以直接绘制 Core Graphics 图像，也可以使用它初始化 UIImage 对象。完成后，对图形上下文调用 `CGContextRelease` 函数。
+
+
+
+
 
 
 

@@ -108,7 +108,7 @@
 ```c++
 /*! @abstract The default value for an <code>OSSpinLock</code>. OSSpinLock 的默认值是 0（unlocked 状态）
     @discussion
-    The convention is that unlocked is zero, locked is nonzero. 惯例是: unlocked 时是零，locked 时时非零
+    The convention is that unlocked is zero, locked is nonzero. 惯例是: unlocked 时是零，locked 时是非零
  */
 #define    OS_SPINLOCK_INIT    0
 ```
@@ -575,7 +575,7 @@ os_unfair_lock_assert_not_owner(&self->_unfairL);
 ```c++
 PTHREAD_MUTEX_NORMAL // 缺省类型，也就是普通类型，当一个线程加锁后，其余请求锁的线程将形成一个队列，并在解锁后先进先出原则获得锁。
 PTHREAD_MUTEX_ERRORCHECK // 检错锁，如果同一个线程请求同一个锁，则返回 EDEADLK，否则与普通锁类型动作相同。这样就保证当不允许多次加锁时不会出现嵌套情况下的死锁
-PTHREAD_MUTEX_RECURSIVE //递归锁，允许同一个线程对同一锁成功获得多次，并通过多次 unlock 解锁。
+PTHREAD_MUTEX_RECURSIVE // 递归锁，允许同一个线程对同一锁成功获得多次，并通过多次 unlock 解锁。
 PTHREAD_MUTEX_DEFAULT // 适应锁，动作最简单的锁类型，仅等待解锁后重新竞争，没有等待队列。
 ```
 &emsp;`pthread_mutex_trylock` 和 `trylock` 不同，`trylock` 返回的是 `YES` 和 `NO`，`pthread_mutex_trylock` 加锁成功返回的是 `0`，失败返回的是错误提示码。
