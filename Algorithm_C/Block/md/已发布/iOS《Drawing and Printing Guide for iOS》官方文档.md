@@ -495,44 +495,90 @@ aPath.CGPath = mutablePath;
 CGPathRelease(mutablePath);
 ```
 
+### Rendering the Contents of a Bézier Path Object（渲染贝塞尔路径对象的内容）
+&emsp;创建 UIBezierPath 对象后，可以使用其笔划和填充方法在当前图形上下文中渲染它。不过，在调用这些方法之前，通常需要执行一些其他任务以确保正确绘制路径：
+
++ 使用 UIColor 类的方法设置所需的笔划和填充颜色。
++ 将形状放置在目标视图中所需的位置。
+  如果创建了相对于点（0，0）的路径，则可以对当前图形上下文应用适当的仿射变换。例如，要从点（10，10）开始绘制形状，可以调用 CGContextTranslateCTM  函数并为水平和垂直平移值指定10。最好调整图形上下文（而不是路径对象中的点），因为通过保存和恢复以前的图形状态，可以更轻松地撤消更改。
++ 更新路径对象的绘图属性。呈现路径时，UIBezierPath 实例的绘图属性将覆盖与图形上下文关联的值。
+
+&emsp;清单 2-5 展示了 `drawRect:` 方法的一个示例实现，该方法在自定义视图中绘制椭圆。椭圆形边框的左上角位于视图坐标系中的点（50，50）。因为填充操作直接绘制到路径边界，所以此方法在笔划路径之前填充路径。这样可以防止填充颜色遮挡笔划线的一半。
 
 
+&emsp;Listing 2-5  Drawing a path in a view（在视图中绘制路径）
+```c++
+- (void)drawRect:(CGRect)rect {
+    // Create an oval shape to draw.
+    UIBezierPath *aPath = [UIBezierPath bezierPathWithOvalInRect:
+                                CGRectMake(0, 0, 200, 100)];
+ 
+    // Set the render colors.
+    [[UIColor blackColor] setStroke];
+    [[UIColor redColor] setFill];
+ 
+    CGContextRef aRef = UIGraphicsGetCurrentContext();
+ 
+    // If you have content to draw after the shape,
+    // save the current state before changing the transform.
+    //CGContextSaveGState(aRef);
+ 
+    // Adjust the view's origin temporarily. The oval is
+    // now drawn relative to the new origin point.
+    CGContextTranslateCTM(aRef, 50, 50);
+ 
+    // Adjust the drawing options as needed.
+    aPath.lineWidth = 5;
+ 
+    // Fill the path before stroking it so that the fill
+    // color does not obscure the stroked line.
+    [aPath fill];
+    [aPath stroke];
+ 
+    // Restore the graphics state before drawing any other content.
+    //CGContextRestoreGState(aRef);
+}
+```
+### Doing Hit-Detection on a Path（在路径上进行命中检测）
+&emsp;要确定路径的填充部分上是否发生了触摸事件，可以使用 UIBezierPath 的 `containsPoint:` 方法。此方法针对路径对象中的所有闭合子路径测试指定点，如果指定点位于这些子路径中的任何一个子路径上或内部，则返回 YES。
+
+> Important: containsPoint: 方法和 Core Graphics 命中测试函数仅在封闭路径上运行。这些方法对于打开的子路径总是返回 NO。如果要在打开的子路径上执行命中检测，则必须创建路径对象的副本，并在测试点之前关闭打开的子路径。
+
+&emsp;如果要对路径的笔划部分（而不是填充区域）执行命中测试，则必须使用 Core Graphics。`CGContextPathContainsPoint` 函数允许你测试当前指定给图形上下文的路径的填充或笔划部分上的点。清单 2-6 显示了一个测试指定点是否与指定路径相交的方法。inFill 参数允许调用方指定是否应根据路径的填充部分或笔划部分测试点。调用者传入的路径必须包含一个或多个关闭的子路径，命中检测才能成功。
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+&emsp;Listing 2-6  Testing points against a path object（针对路径对象的测试点）
+```c++
+- (BOOL)containsPoint:(CGPoint)point onPath:(UIBezierPath *)path inFillArea:(BOOL)inFill {
+   CGContextRef context = UIGraphicsGetCurrentContext();
+   CGPathRef cgPath = path.CGPath;
+   BOOL    isHit = NO;
+ 
+   // Determine the drawing mode to use. Default to
+   // detecting hits on the stroked portion of the path.
+   CGPathDrawingMode mode = kCGPathStroke;
+   if (inFill)
+   {
+      // Look for hits in the fill area of the path instead.
+      if (path.usesEvenOddFillRule)
+         mode = kCGPathEOFill;
+      else
+         mode = kCGPathFill;
+   }
+ 
+   // Save the graphics state so that the path can be
+   // removed later.
+   CGContextSaveGState(context);
+   CGContextAddPath(context, cgPath);
+ 
+   // Do the hit detection.
+   isHit = CGContextPathContainsPoint(context, point, mode);
+ 
+   CGContextRestoreGState(context);
+ 
+   return isHit;
+}
+```
 
 ## Drawing and Creating Images（绘制和创建图像）
 &emsp;大多数情况下，使用标准视图显示图像相当简单。但是，在两种情况下，你可能需要做额外的工作：
@@ -638,36 +684,6 @@ backgroundImageView = [[UIImageView alloc] initWithImage:backgroundImage];
 // Other code follows...
 ```
 &emsp;如果你喜欢在位图图形上下文中完全使用 Core Graphics 进行绘制，则可以使用 `CGBitmapContextCreate` 函数来创建上下文并将图像内容绘制到其中。完成绘制后，调用 `CGBitmapContextCreateImage` 函数从位图上下文获取 CGImageRef 对象。你可以直接绘制 Core Graphics 图像，也可以使用它初始化 UIImage 对象。完成后，对图形上下文调用 `CGContextRelease` 函数。
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 ## 参考链接
 **参考链接:🔗**
