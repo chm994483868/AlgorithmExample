@@ -20,6 +20,7 @@ void SelectSort::selectSort(int nums[], int count) {
                 minIndex = j;
             }
         }
+        
         swap(&nums[i], &nums[minIndex]);
     }
     

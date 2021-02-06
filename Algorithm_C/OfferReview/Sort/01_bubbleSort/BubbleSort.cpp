@@ -12,6 +12,7 @@ void BubbleSort::bubbleSort(int nums[], int count) {
     if (nums == nullptr || count <= 0) {
         return;
     }
+    
     int k = count - 1;
     for (int i = 0; i < count - 1; ++i) {
         bool noExchange = true;
@@ -23,9 +24,11 @@ void BubbleSort::bubbleSort(int nums[], int count) {
                 n = j;
             }
         }
+        
         if (noExchange) {
             break;
         }
+        
         k = n;
     }
     

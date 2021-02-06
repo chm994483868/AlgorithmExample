@@ -13,11 +13,13 @@ void HeapSort::heapSort(int nums[], int count) {
         return;
     }
     
+    // 建堆
     int i = (count - 1 - 1) / 2;
     for (; i >= 0; --i) {
         maxHeapFixdown(nums, i, count);
     }
     
+    // 排序
     for (i = count - 1; i >= 1; --i) {
         swap(&nums[0], &nums[i]);
         maxHeapFixdown(nums, 0, i);
@@ -45,7 +47,7 @@ void HeapSort::maxHeapFixdown(int nums[], int i, int n) {
     int temp = nums[i];
     
     while (j < n) {
-        if (j + 1 < n && nums[j + 1] > nums[j]) {
+        if (j + 1 < n && nums[j + 1] < nums[j]) {
             ++j;
         }
         
