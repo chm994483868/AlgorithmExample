@@ -685,6 +685,22 @@ backgroundImageView = [[UIImageView alloc] initWithImage:backgroundImage];
 ```
 &emsp;如果你喜欢在位图图形上下文中完全使用 Core Graphics 进行绘制，则可以使用 `CGBitmapContextCreate` 函数来创建上下文并将图像内容绘制到其中。完成绘制后，调用 `CGBitmapContextCreateImage` 函数从位图上下文获取 CGImageRef 对象。你可以直接绘制 Core Graphics 图像，也可以使用它初始化 UIImage 对象。完成后，对图形上下文调用 `CGContextRelease` 函数。
 
+## Appendix A: Improving Drawing Performance（改善绘图性能）
+&emsp;在任何平台上绘图都是一个相对昂贵的操作，优化绘图代码应该始终是开发过程中的一个重要步骤。表 A-1 列出了确保绘图代码尽可能最佳的几个技巧。除了这些技巧之外，你还应该始终使用可用的性能工具来测试代码并删除热点（hotspots）和冗余（redundancies）。
+
+&emsp;Table A-1  Tips for improving drawing performance（改善绘图性能的技巧）
+
+| Tip | Action |
+| --- | --- |
+| Draw minimally（仅对需要的范围进行绘图） | 在每个更新周期中，应该只更新视图中实际更改的部分。如果使用 UIView 的 drawRect: 方法进行绘图，请使用传递给该方法的更新矩形来限制绘图的范围。对于 OpenGL 绘图，你必须自己跟踪更新。 |
+| Call setNeedsDisplay: judiciously（明断而审慎的调用 setNeedsDisplay: 函数） | 如果调用 setNeedsDisplay:，请始终花时间计算需要重绘的实际面积。不要只传递一个包含整个视图的矩形。另外，不要调用 setNeedsDisplay: 除非你确实需要重绘内容。如果内容实际上没有改变，就不要重绘。 |
+| Mark opaque views as such（可以这样标记不透明视图） | 合成内容不透明的视图比合成部分透明的视图所需的工作量少得多。若要使视图不透明，视图的内容不得包含任何透明度，并且视图的 opaque 属性必须设置为 YES。 |
+| Reuse table cells and views during scrolling（在滚动过程中重复使用 table cells 和 views） | 无论如何都应该避免在滚动期间创建新视图。花时间创建新视图会减少更新屏幕的可用时间，这会导致不均匀的滚动行为。 |
+| Reuse paths by modifying the current transformation matrix（通过修改当前 transformation 矩阵来重用路径） | 通过修改当前 transformation 矩阵，可以使用单个路径在屏幕的不同部分绘制内容。有关详细信息，请参见 Using Coordinate Transforms to Improve Drawing Performance。 |
+| Avoid clearing the previous content during scrolling（避免在滚动期间清除以前的内容） | 默认情况下，UIKit 会在调用视图的 drawRect: 方法来更新同一区域之前清除该视图的当前上下文缓冲区。如果你对视图中的滚动事件做出响应，则在滚动更新期间重复清除此区域可能会很昂贵。要禁用该行为，可以将 ClearContextBeforeDrawing 属性中的值更改为 NO。 |
+| Minimize graphics state changes while drawing（最小化绘图时的图形状态更改） | 更改图形状态需要底层图形子系统的工作。如果需要绘制使用类似状态信息的内容，请尝试将该内容绘制在一起，以减少所需的状态更改数量。 |
+| Use Instruments to debug your performance（使用 Instruments 调试性能） | Core Animation instrument 可以帮助你发现你的应用程序中的绘图性能问题。特别地：1. Flash 更新的区域可以很容易地看到视图的哪些部分实际上正在更新。 2. 颜色偏离的图像（Color Misaligned Images）可以帮助你看到对齐不好的图像，这会导致图像模糊和性能差。更多信息可参见：Measuring Graphics Performance in Your iOS Device 中的 Instruments User Guide 部分。 |
+
 ## 参考链接
 **参考链接:🔗**
 + [Drawing and Printing Guide for iOS](https://developer.apple.com/library/archive/documentation/2DDrawing/Conceptual/DrawingPrintingiOS/Introduction/Introduction.html#//apple_ref/doc/uid/TP40010156)
