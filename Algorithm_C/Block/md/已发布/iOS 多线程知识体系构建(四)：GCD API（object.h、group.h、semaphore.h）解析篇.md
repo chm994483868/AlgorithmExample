@@ -171,7 +171,7 @@ OS_OBJECT_DECL_IMPL(name, <OS_OBJECT_CLASS(super)>)
 ### OS_OBJECT_BRIDGE
 &emsp;如果是 `objc_arc` 环境，则 `OS_OBJECT_BRIDGE` 宏定义为 `__bridge`，在 ARC 下对象类型转为 `void *` 时，需要加 `__bridge`，MRC 下则不需要。
 
-&emsp;下面是一组在 Swift 中使用 ObjC 的宏，为了在 10.12 之前的 SDK 上向 Swift 中的 ObjC 对象提供向后部署，可以将 OS_object 类标记为 OS_OBJECT_OBJC_RUNTIME_VISIBLE。使用早于 OS X 10.12（iOS 10.0，tvOS 10.0，watchOS 3.0）的部署目标进行编译时，Swift编译器将仅在运行时（使用ObjC运行时）引用此类型。
+&emsp;下面是一组在 Swift 中使用 ObjC 的宏，为了在 10.12 之前的 SDK 上向 Swift 中的 ObjC 对象提供向后部署，可以将 OS_object 类标记为 OS_OBJECT_OBJC_RUNTIME_VISIBLE。使用早于 OS X 10.12（iOS 10.0，tvOS 10.0，watchOS 3.0）的部署目标进行编译时，Swift 编译器将仅在运行时（使用 ObjC 运行时）引用此类型。
 
 ### OS_OBJECT_DECL_CLASS
 &emsp;最重要的一条宏，涉及到不同语言环境下的定义，如开篇的 `OS_OBJECT_DECL_CLASS(dispatch_object)` 所示。
@@ -239,6 +239,7 @@ os_release(void *object);
 &emsp;<os/object.h> 文件到这里就全部结束了，下面我们接着看 <dispatch/object.h> 文件。
 
 &emsp;接下来是分别针对不同的情况（Swift/Objective-C/C++/C）定义了一些 DISPATCH 前缀开头的宏，而宏定义的内容其中 Swift/Objective-C 相关部分来自 <os/object.h> 中的宏，C++/C 部分是来自它们的语言环境。（例如 C++ 下的 `static_cast` 函数的调用、结构体的继承等，C 下的直接取地址强制转换、联合体的使用等）
+
 ## DISPATCH_DECL/DISPATCH_DECL_SUBCLASS/DISPATCH_GLOBAL_OBJECT
 &emsp;`DISPATCH_DECL` 默认使用 `dispatch_object` 作为继承的父类，`DISPATCH_DECL_SUBCLASS` 则是自行指定父类，并且针对不同的语言环境作了不同的定义。
 
