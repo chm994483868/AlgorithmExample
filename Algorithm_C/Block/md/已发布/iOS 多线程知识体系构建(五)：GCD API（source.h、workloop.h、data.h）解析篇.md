@@ -180,6 +180,7 @@ typedef unsigned long dispatch_source_mach_recv_flags_t;
 ```
 ### dispatch_source_memorypressure_flags_t
 &emsp;`dispatch_source_memorypressure` 标志的类型。
+
 + `DISPATCH_MEMORYPRESSURE_NORMAL` 系统内存压力状况已恢复正常。
 + `DISPATCH_MEMORYPRESSURE_WARN` 系统内存压力状况已更改为警告。
 + `DISPATCH_MEMORYPRESSURE_CRITICAL` 系统内存压力状况已变为严重。
@@ -194,6 +195,7 @@ typedef unsigned long dispatch_source_memorypressure_flags_t;
 ```
 ### dispatch_source_proc_flags_t
 &emsp;`dispatch_source_proc` 标志的类型。
+
 + `DISPATCH_PROC_EXIT` 该进程已经退出（也许是 cleanly，也许不是）。
 + `DISPATCH_PROC_FORK` 该进程已创建一个或多个子进程。
 + `DISPATCH_PROC_EXEC` 通过 `exec *()` 或 `posix_spawn *()`，该进程已成为另一个可执行映像（executable image）。
@@ -208,6 +210,7 @@ typedef unsigned long dispatch_source_proc_flags_t;
 ```
 ### dispatch_source_vnode_flags_t
 &emsp;`dispatch_source_vnode` 标志的类型。
+
 + `DISPATCH_VNODE_DELETE` filesystem 对象已从 namespace 中删除。
 + `DISPATCH_VNODE_WRITE` filesystem 对象数据已更改。
 + `DISPATCH_VNODE_EXTEND` filesystem 对象的大小已更改。

@@ -7,7 +7,7 @@
 &emsp;那么我们还由基础的数据结构定义开始，例如 `dispatch_object_t/s`、`dispatch_queue_t/s`、`dispatch_group_t/s`等等，是我们之前见的很多次的指针类型和结构体类型，这里首先要对它们做出区分，其中 `**_t` 一般都是用 typedef 所定义的指向 `**_s` 结构体的指针，例如: `typedef struct dispatch_group_s *dispatch_group_t`，其中 `dispatch_group_t` 是指向 `dispatch_group_s` 结构体的指针。（其中结尾处的 `t` 和 `s` 分别来自 `typedef` 和 `struct` 的首字母）
 
 &emsp;当然如果对前面的文章还有印象的话一定记得，其实它们的声明都来自 `DISPATCH_DECL` 宏:
-```c++
+```c++·
 #define DISPATCH_DECL(name) typedef struct name##_s *name##_t
 ```
 
@@ -124,7 +124,7 @@ struct dispatch_object_s {
 
         OS_OBJECT_STRUCT_HEADER(dispatch_##x); \ ⬅️ OS_OBJECT_STRUCT_HEADER 宏展开就是把“父类”-_os_object_s 的成员变量平铺展开放在“子类” dispatch_object_s 的头部位置
 
-        struct dispatch_##x##_s *volatile do_next; \ ⬅️ 下面的这一部分则是“子类”自己的成员变量
+        struct dispatch_##x##_s *volatile do_next; \ ⬅️ 下面的这一部分则是“子类”相对于父类新增的成员变量
         struct dispatch_queue_s *do_targetq; \
         void *do_ctxt; \
         void *do_finalizer
@@ -334,7 +334,7 @@ extern const struct dispatch_object_vtable_s _dispatch_object_vtable __asm__(".o
 &emsp;`dispatch_object_t` 结尾处的 `DISPATCH_TRANSPARENT_UNION` 表示它是一个透明联合体，即 `dispatch_object_t` 可以表示为指向联合体内部的任何一种类型的指针。
 ```c++
 typedef union {
-    struct _os_object_s *_os_obj; // GCD 的基基类
+    struct _os_object_s *_os_obj; // GCD 的根类
     struct dispatch_object_s *_do; // GCD 的基类，上面我们已经对它进行了详细分析
     struct dispatch_queue_s *_dq; // 队列（我们创建的队列都是这个类型，不管是串行队列还是并行队列）
     struct dispatch_queue_attr_s *_dqa; // 队列的属性，包含了队列里面的一些操作函数，可以表明这个队列是串行队列还是并发队列等等信息（下面会一一展开）
