@@ -16,7 +16,17 @@
 ### Organization of This Document（本文档的组织结构）
 &emsp;本文档分为以下章节：
 
-+ Quartz 2D Overview 描述了页面、绘图目标、Quartz 不透明数据类型、图形状态、坐标和内存管理，并介绍了Quartz如何 “under the hood” 工作
++ Quartz 2D Overview 描述了页面、绘图目标、Quartz 不透明数据类型、图形状态、坐标和内存管理，并介绍了 Quartz 如何 “under the hood” 工作（如何在引擎下工作）。
++ Graphics Contexts 描述了各种绘图目标，并提供了创建各种图形上下文的分步说明。
++ Paths 讨论构成路径的基本元素，演示如何创建和绘制路径，演示如何设置剪裁区域，并解释混合模式如何影响绘制。
++ Color and Color Spaces 讨论颜色值和透明度的 alpha 值，并描述如何创建颜色空间、设置颜色、创建颜色对象和设置渲染意图。
++ Transforms 描述当前变换矩阵并说明如何修改它，说明如何设置仿射变换，说明如何在用户和设备空间之间进行转换，并提供有关 Quartz 执行的数学运算的背景信息。
++ Patterns 定义了一个模式及其部分，告诉 Quartz 如何渲染它们，并展示了如何创建彩色和模版模式。
++ Shadows 描述了什么是阴影，解释了它们是如何工作的，并演示了如何使用它们进行绘制。
++ Gradients 讨论轴向和径向渐变，并演示如何创建和使用 CGShading 和 CGGradient 对象。
++ Transparency Layers 给出了透明层的外观示例，讨论了它们的工作方式，并提供了实现它们的逐步说明。
++ Data Management in Quartz 2D 讨论了如何将数据移入和移出 Quartz。
++ Bitmap Images and Image Masks 描述了构成位图图像定义的内容，并演示了如何将位图图像用作石英绘图原语。它还描述了可以在图像上使用的遮罩技术，并显示了在绘制图像时使用混合模式可以实现的各种效果。
 
 
 
@@ -25,17 +35,8 @@
 
 
 
-Overview of Quartz 2D describes the page, drawing destinations, Quartz opaque data types, graphics states, coordinates, and memory management, and it takes a look at how Quartz works “under the hood.”
-Graphics Contexts describes the kinds of drawing destinations and provides step-by-step instructions for creating all flavors of graphics contexts.
-Paths discusses the basic elements that make up paths, shows how to create and paint them, shows how to set up a clipping area, and explains how blend modes affect painting.
-Color and Color Spaces discusses color values and using alpha values for transparency, and it describes how to create a color space, set colors, create color objects, and set rendering intent.
-Transforms describes the current transformation matrix and explains how to modify it, shows how to set up affine transforms, shows how to convert between user and device space, and provides background information on the mathematical operations that Quartz performs.
-Patterns defines what a pattern and its parts are, tells how Quartz renders them, and shows how to create colored and stenciled patterns.
-Shadows describes what shadows are, explains how they work, and shows how to paint with them.
-Gradients discusses axial and radial gradients and shows how to create and use CGShading and CGGradient objects.
-Transparency Layers gives examples of what transparency layers look like, discusses how they work, and provides step-by-step instructions for implementing them.
-Data Management in Quartz 2D discusses how to move data into and out of Quartz.
 Bitmap Images and Image Masks describes what makes up a bitmap image definition and shows how to use a bitmap image as a Quartz drawing primitive. It also describes masking techniques you can use on images and shows the various effects you can achieve by using blend modes when drawing images.
+
 Core Graphics Layer Drawing describes how to create and use drawing layers to achieve high-performance patterned drawing or to draw offscreen.
 PDF Document Creation, Viewing, and Transforming shows how to open and view PDF documents, apply transforms to them, create a PDF file, access PDF metadata, add links, and add security features (such as password protection).
 PDF Document Parsing describes how to use CGPDFScanner and CGPDFContentStream objects to parse and inspect PDF documents.
