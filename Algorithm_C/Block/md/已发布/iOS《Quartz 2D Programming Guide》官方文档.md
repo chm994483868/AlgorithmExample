@@ -48,16 +48,32 @@
 &emsp;类似地，在 iOS 中，Quartz 2D 使用所有可用的图形和动画技术，如 Core Animation、OpenGL ES 和 UIKit 类。
 
 ### The Page
-&emsp;Quartz 2D 使用画家的模型进行成像。在画家的模型中，每次连续的绘图操作都会对输出“画布”（通常称为页面）应用一层“绘制”。可以通过附加的绘图操作覆盖更多的绘图来修改页面上的绘图。不能修改页面上绘制的对象，除非覆盖更多的绘制。此模型允许您从少量强大的原语构建极其复杂的图像。
+&emsp;Quartz 2D 使用 painter 的模型进行成像。在 painter 的模型中，每个连续的绘图操作都会对输出 "canvas"（通常称为 page）应用一层 "paint"。可以通过附加的绘图操作覆盖更多的绘图来修改 page 上的绘图。不能修改 page 上绘制的对象，除非覆盖更多的绘制。此模型允许你从少量强大的原语构建极其复杂的图像。
+
+&emsp;图 1-1 显示了 painter 模型的工作原理。为了获得图形顶部的图像，首先绘制左侧的形状，然后绘制实体形状。实心形状覆盖第一个形状，除了第一个形状的周长外，其他形状都被遮挡。图 1-1 底部按相反顺序绘制图形，首先绘制实体图形。正如你所见，在 painter 的模型中，绘画顺序很重要。
+
+![painters_model](https://p1-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/b5473fac8a0043799e793bfb04450a6c~tplv-k3u1fbpfcp-watermark.image)
+
+&emsp;page 可以是一张真正的纸（如果输出设备是打印机）；也可以是一张虚拟的纸（如果输出设备是 PDF 文件）；甚至可以是位图图像。page 的确切性质取决于你使用的特定图形上下文。
+
+### Drawing Destinations: The Graphics Context
+&emsp;图形上下文是一种不透明的数据类型（CGContextRef），它封装了 Quartz 用于将图像绘制到输出设备（如 PDF 文件、位图或显示器上的窗口）的信息。图形上下文中的信息包括图形绘图参数和 page 上的特定于设备的绘画表示。Quartz 中的所有对象都被绘制到或包含在图形上下文中。
+
+&emsp;
 
 
 
 
-The Page
 
-Quartz 2D uses the painter’s model for its imaging. In the painter’s model, each successive drawing operation applies a layer of “paint” to an output “canvas,” often called a page. The paint on the page can be modified by overlaying more paint through additional drawing operations. An object drawn on the page cannot be modified except by overlaying more paint. This model allows you to construct extremely sophisticated images from a small number of powerful primitives.
 
-Figure 1-1 shows how the painter’s model works. To get the image in the top part of the figure, the shape on the left was drawn first followed by the solid shape. The solid shape overlays the first shape, obscuring all but the perimeter of the first shape. The shapes are drawn in the opposite order in the bottom of the figure, with the solid shape drawn first. As you can see, in the painter’s model the drawing order is important.
+Drawing Destinations: The Graphics Context
+
+A graphics context is an opaque data type (CGContextRef) that encapsulates the information Quartz uses to draw images to an output device, such as a PDF file, a bitmap, or a window on a display. The information inside a graphics context includes graphics drawing parameters and a device-specific representation of the paint on the page. All objects in Quartz are drawn to, or contained by, a graphics context.
+
+You can think of a graphics context as a drawing destination, as shown in Figure 1-2. When you draw with Quartz, all device-specific characteristics are contained within the specific type of graphics context you use. In other words, you can draw the same image to a different device simply by providing a different graphics context to the same sequence of Quartz drawing routines. You do not need to perform any device-specific calculations; Quartz does it for you.
+
+Figure 1-2  Quartz drawing destinations
+
 
 
 
