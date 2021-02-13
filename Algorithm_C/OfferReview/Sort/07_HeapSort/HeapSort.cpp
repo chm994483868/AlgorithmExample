@@ -47,7 +47,7 @@ void HeapSort::maxHeapFixdown(int nums[], int i, int n) {
     int temp = nums[i];
     
     while (j < n) {
-        if (j + 1 < n && nums[j + 1] < nums[j]) {
+        if (j + 1 < n && nums[j + 1] > nums[j]) {
             ++j;
         }
         

@@ -31,7 +31,6 @@ void ShellSort::shellSort(int nums[], int count) {
         }
     }
     
-    
     //    if (nums == nullptr || count <= 0) {
     //        return;
     //    }
@@ -53,7 +52,6 @@ void ShellSort::shellSort(int nums[], int count) {
     //            }
     //        }
     //    }
-    
 }
 
 // 测试代码
