@@ -7,11 +7,11 @@
 ## dispatch_once
 &emsp;`dispatch_once` 保证任务只会被执行一次，即使同时多线程调用也是线程安全的。常用于创建单例、`swizzeld method` 等功能。
 
-&emsp;`dispatch_once` 函数调用函数的形式也类似 `dispatch_sync` 函数，内部也是直接调用后缀加 `_f` 的同名函数（即我们日常使用的 block 调用方式被直接转为函数形式）。
+&emsp;`dispatch_once` 函数调用函数的形式也类似 `dispatch_sync` 函数，内部也是直接调用后缀加 `_f` 的同名函数（我们日常使用的 block 调用方式被直接转为函数形式）。
 
 &emsp;`dispatch_once` 是同步函数，会阻塞当前线程，直到 block 执行完成后返回，才会执行接下的语句（我们日常写的函数本来就是同步顺序执行的，可能看 `dispatch_sync` 和 `dispatch_async` 函数看的有点魔怔了，看到这种函数参数里面有个 block 的函数形式时，总是首先想想它会不会阻塞，会不会立刻返回或者要等 block 执行完成才会返回）。
 
-&emsp;`dispatch_once` 不同于我们的日常的函数，它的 block 参数全局只能调用一次，即使在多线程的环境中也是全局只能执行一次，那么当多个线程同时调用 `dispatch_once` 时，系统时怎么加锁或者阻塞线程保证线程安全的呢？下面我们一起探究一下...
+&emsp;`dispatch_once` 不同于我们的日常的函数，它的 block 参数全局只能调用一次，即使在多线程的环境中也是全局只能执行一次，那么当多个线程同时调用 `dispatch_once` 时，系统是怎么加锁或者阻塞线程保证线程安全的呢？下面我们一起探究一下...
 ```c++
 #ifdef __BLOCKS__
 void
