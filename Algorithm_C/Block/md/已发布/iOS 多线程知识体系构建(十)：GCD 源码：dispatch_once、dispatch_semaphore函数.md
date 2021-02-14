@@ -94,6 +94,7 @@ dispatch_once_f(dispatch_once_t *val, void *ctxt, dispatch_function_t func)
 }
 ```
 &emsp;下面对 `dispatch_once_f` 函数中嵌套调用的函数进行分析。
+
 #### _dispatch_once_gate_tryenter
 &emsp;`_dispatch_once_gate_tryenter` 函数原子性的判断 `l`（`l->dgo_once`） 是否非零，非零表示 `dispatch_once_f` 提交的函数已经执行过了（或者正在执行），零的话还没有执行过。
 
@@ -111,6 +112,7 @@ _dispatch_once_gate_tryenter(dispatch_once_gate_t l)
     return os_atomic_cmpxchg(&l->dgo_once, DLOCK_ONCE_UNLOCKED, (uintptr_t)_dispatch_lock_value_for_self(), relaxed);
 }
 ```
+
 ##### os_atomic_cmpxchg
 &emsp;`p` 变量相当于 `atomic_t` 类型的 `ptr` 指针用于获取当前内存访问制约规则 `m` 的值，用于对比旧值 `e`，若相等就赋新值 `v`，若不相等则把 `p` 内存空间里的值赋值给 `e`。
 ```c++
@@ -119,6 +121,7 @@ _dispatch_once_gate_tryenter(dispatch_once_gate_t l)
         atomic_compare_exchange_strong_explicit(_os_atomic_c11_atomic(p), \
         &_r, v, memory_order_##m, memory_order_relaxed); })
 ```
+
 ##### _dispatch_lock_value_for_self
 &emsp;`_dispatch_lock_value_for_self` 取出当前线程的 ID，用于赋值给 `val`（`dgo_once` 成员变量）。（ `val` 在 `dispatch_once_f` 提交的函数执行完成之前会赋值为线程 ID，当提交的函数执行完成后会赋值为 `DLOCK_ONCE_DONE`，如我们为 `dispatch_once` 准备的 `static dispatch_once_t onceToken;`，在 `dispatch_once` 执行前打印 `onceToken` 值为 0，`onceToken` 初始值必须为 0，否则 `dispatch_once` 里的 block 不会执行，当 `dispatch_once` 执行完成后，打印 `onceToken`，它的值是 `-1`，如果我们手动把 `onceToken` 修改为 0，则可以再次执行 `dispatch_once` 提交的 block）。
 ```c++
@@ -130,6 +133,7 @@ _dispatch_lock_value_for_self(void)
     return _dispatch_lock_value_from_tid(_dispatch_tid_self());
 }
 ```
+
 ##### _dispatch_lock_value_from_tid
 &emsp;`_dispatch_lock_value_from_tid` 函数内部仅是一个与操作。
 ```c++
@@ -142,6 +146,7 @@ _dispatch_lock_value_from_tid(dispatch_tid tid)
 }
 ```
 &emsp;到这里与 `_dispatch_once_gate_tryenter` 相关的函数就看完了，根据 `_dispatch_once_gate_tryenter` 函数返回值，下面会有两个分支，一个是执行提交的函数，一个提交的函数已经执行过了，执行接下来的 `_dispatch_once_wait(l)`  阻塞线程（提交的函数正在执行）或者结束函数调用（提交的函数已经执行完成）。（多线程环境下的同时调用，恰巧处于提交的函数正在执行，另一个线程的调用也进来了，那么后来的线程会阻塞等待，在提交的函数执行完成后该阻塞的线程会被唤醒），下面我们先看一下首次执行 `dispatch_once` 函数的过程。
+
 #### _dispatch_once_callout
 &emsp;`_dispatch_once_callout` 函数做了两件事，一是调用提交的函数，二是发出广播唤醒阻塞等待的线程。
 ```c++
