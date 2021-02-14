@@ -94,14 +94,12 @@ dispatch_once_f(dispatch_once_t *val, void *ctxt, dispatch_function_t func)
 }
 ```
 &emsp;下面对 `dispatch_once_f` 函数中嵌套调用的函数进行分析。
-
 #### _dispatch_once_gate_tryenter
-&emsp;`_dispatch_once_gate_tryenter` 函数原子性的判断 `l`（`l->dgo_once`） 是否非零，非零表示 `dispatch_once_f` 提交的函数已经执行过了（或者正在执行），零的话还没有执行过。
+&emsp;`_dispatch_once_gate_tryenter` 函数原子性的判断 `l`（`l->dgo_once`）是否非零，非零表示 `dispatch_once_f` 提交的函数已经执行过了（或者正在执行），零的话还没有执行过。
 
-&emsp;如果 `l`（`l->dgo_once`） 是零的话，`_dispatch_once_gate_tryenter` 函数内部也会把 `l`（`l->dgo_once`） 赋值为当前线程的 ID（这里是一个临时赋值），在最后 `dispatch_once_f` 中提交的函数执行完成后 `_dispatch_once_gate_broadcast` 函数内部会把 `l`（`l->dgo_once`）赋值为 `DLOCK_ONCE_DONE`。（`_dispatch_lock_value_for_self` 函数是取出当前线程的 ID）
+&emsp;如果 `l`（`l->dgo_once`）是零的话，`_dispatch_once_gate_tryenter` 函数内部也会把 `l`（`l->dgo_once`） 赋值为当前线程的 ID（这里是一个临时赋值），在最后 `dispatch_once_f` 中提交的函数执行完成后 `_dispatch_once_gate_broadcast` 函数内部会把 `l`（`l->dgo_once`）赋值为 `DLOCK_ONCE_DONE`。（`_dispatch_lock_value_for_self` 函数是取出当前线程的 ID）
 
-&emsp;这里还藏有一个点，就是每次执行 `_dispatch_once_gate_tryenter` 函数时 `l`（`l->dgo_once`）被赋值为当前线程的 ID，它对应了下面 `_dispatch_once_gate_broadcast` 函数内的 `v == value_self` 的判断，如果是单线程的调用 `dispatch_once_f` 的话，则是不存在其它线程阻塞的，也就不需要线程唤醒的操作，而如果是多线程的环境下，`_dispatch_once_gate_tryenter` 函数会被调用多次，每次 `v` 都会被更新，而在 `_dispatch_once_gate_broadcast` 函数内部，`value_self` 是最初执行提交的函数的线程的 ID，而 `v` 是另外一条线程的 ID，且它正在阻塞等待提交的函数执行完成，所以此时在提交的的函数执行完成后，需要进行唤醒操作。
-
+&emsp;这里还藏有一个点，就是每次执行 `_dispatch_once_gate_tryenter` 函数时 `l`（`l->dgo_once`）被赋值为当前线程的 ID，它对应了下面 `_dispatch_once_gate_broadcast` 函数内的 `v == value_self` 的判断，如果是单线程的调用 `dispatch_once_f` 的话，则是不存在其它线程阻塞的，也就不需要线程唤醒的操作，而如果是多线程的环境下，`_dispatch_once_gate_tryenter` 函数会被调用多次，每次 `v` 都会被更新，而在 `_dispatch_once_gate_broadcast` 函数内部，`value_self` 是最初执行提交的函数的线程的 ID，而 `v` 是另外一条线程的 ID，且它正在阻塞等待提交的函数执行完成，所以此时再提交的的函数执行完成后，需要进行唤醒操作。
 ```c++
 DISPATCH_ALWAYS_INLINE
 static inline bool
@@ -112,7 +110,6 @@ _dispatch_once_gate_tryenter(dispatch_once_gate_t l)
     return os_atomic_cmpxchg(&l->dgo_once, DLOCK_ONCE_UNLOCKED, (uintptr_t)_dispatch_lock_value_for_self(), relaxed);
 }
 ```
-
 ##### os_atomic_cmpxchg
 &emsp;`p` 变量相当于 `atomic_t` 类型的 `ptr` 指针用于获取当前内存访问制约规则 `m` 的值，用于对比旧值 `e`，若相等就赋新值 `v`，若不相等则把 `p` 内存空间里的值赋值给 `e`。
 ```c++
@@ -121,7 +118,6 @@ _dispatch_once_gate_tryenter(dispatch_once_gate_t l)
         atomic_compare_exchange_strong_explicit(_os_atomic_c11_atomic(p), \
         &_r, v, memory_order_##m, memory_order_relaxed); })
 ```
-
 ##### _dispatch_lock_value_for_self
 &emsp;`_dispatch_lock_value_for_self` 取出当前线程的 ID，用于赋值给 `val`（`dgo_once` 成员变量）。（ `val` 在 `dispatch_once_f` 提交的函数执行完成之前会赋值为线程 ID，当提交的函数执行完成后会赋值为 `DLOCK_ONCE_DONE`，如我们为 `dispatch_once` 准备的 `static dispatch_once_t onceToken;`，在 `dispatch_once` 执行前打印 `onceToken` 值为 0，`onceToken` 初始值必须为 0，否则 `dispatch_once` 里的 block 不会执行，当 `dispatch_once` 执行完成后，打印 `onceToken`，它的值是 `-1`，如果我们手动把 `onceToken` 修改为 0，则可以再次执行 `dispatch_once` 提交的 block）。
 ```c++
@@ -133,7 +129,6 @@ _dispatch_lock_value_for_self(void)
     return _dispatch_lock_value_from_tid(_dispatch_tid_self());
 }
 ```
-
 ##### _dispatch_lock_value_from_tid
 &emsp;`_dispatch_lock_value_from_tid` 函数内部仅是一个与操作。
 ```c++
@@ -146,7 +141,6 @@ _dispatch_lock_value_from_tid(dispatch_tid tid)
 }
 ```
 &emsp;到这里与 `_dispatch_once_gate_tryenter` 相关的函数就看完了，根据 `_dispatch_once_gate_tryenter` 函数返回值，下面会有两个分支，一个是执行提交的函数，一个提交的函数已经执行过了，执行接下来的 `_dispatch_once_wait(l)`  阻塞线程（提交的函数正在执行）或者结束函数调用（提交的函数已经执行完成）。（多线程环境下的同时调用，恰巧处于提交的函数正在执行，另一个线程的调用也进来了，那么后来的线程会阻塞等待，在提交的函数执行完成后该阻塞的线程会被唤醒），下面我们先看一下首次执行 `dispatch_once` 函数的过程。
-
 #### _dispatch_once_callout
 &emsp;`_dispatch_once_callout` 函数做了两件事，一是调用提交的函数，二是发出广播唤醒阻塞等待的线程。
 ```c++
@@ -167,7 +161,7 @@ _dispatch_once_callout(dispatch_once_gate_t l, void *ctxt,
 ##### _dispatch_client_callout
 &emsp;执行 block，即调用 `f(ctxt)` 函数。
 
-&emsp;`Thread-specific data（TSD）`是线程私有的数据，包含 TSD 的一些函数用于向线程（thread）对象中存储和获取数据。如 `CFRunLoopGetMain()` 函数，调用`_CFRunLoopGet0()`，在其中即利用了 TSD 接口从 thread 中得到 runloop 对象。
+&emsp;`Thread-specific data（TSD）`是线程私有的数据，包含 TSD 的一些函数用于向线程（thread）对象中存储和获取数据。如 `CFRunLoopGetMain()` 函数，调用 `_CFRunLoopGet0()`，在其中即利用了 TSD 接口从 thread 中得到 runloop 对象。
 
 &emsp;这里的 `_dispatch_get_tsd_base()` 也获取线程的私有数据。而 `_dispatch_get_unwind_tsd`、`_dispatch_set_unwind_tsd` 和 `_dispatch_free_unwind_tsd` 看来就是用于确保 `f(ctxt)` 执行的线程安全。
 ```c++
