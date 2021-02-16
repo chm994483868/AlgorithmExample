@@ -612,6 +612,12 @@ _dispatch_semaphore_wait_slow(dispatch_semaphore_t dsema,
     return 0;
 }
 ```
+
+
+
+
+
+
 ##### _dispatch_sema4_create
 &emsp;`&dsema->dsema_sema` 如果为 NULL 的话则进行赋值。
 ```c++
