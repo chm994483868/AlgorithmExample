@@ -7,7 +7,7 @@
 ### dispatch_group_s
 &emsp;`dispatch_group_s` 定义和 `dispatch_semaphore_s` 定义都是放在 semaphore_internal.h 文件中，而且该文件中仅包含它俩的内容，其实文件这样布局也是有用意的，因为它俩的内部实现有一些相似性，dispatch_group 在内部也会维护一个值，当调用 `dispatch_group_enter` 函数进行进组操作时（`dg_bits` - `0x0000000000000004ULL`），当调用 `dispatch_group_leave` 函数进行出组操作时（`dg_state` + `0x0000000000000004ULL`）时对该值进行操作（这里可以把 `dg_bits` 和 `dg_state` 理解为一个值），当该值达到临界值 0 时会做一些后续操作（`_dispatch_group_wake` 唤醒异步执行 `dispatch_group_notify` 函数添加的所有回调通知），且在使用过程中一定要谨记进组（enter）和出组（leave）必须保持平衡。
 
-&emsp;上面使用了 “关联” 一词，这里需要特别强调一下，假设与 dispatch_group 关联的 GCD 任务是一个 block，dispatch_group 并不持有此 block，甚至 dispatch_group 与此 block 没有任何关系，dispatch_group 内部的那个值只是与 enter/leave 操作有关，GCD 任务只是借用了此值，例如在创建多个 GCD 异步任务之前调用多次 enter 操作，然后在每个 GCD 任务结束时调用 leave 操作，当这多个 GCD 异步任务都执行完毕，那么如果 dispatch_group 添加了回到通知，此时自会收到回调通知。即使我们使用 `dispatch_group_async` 创建多个 GCD 异步任务 block， 这些 GCD 任务 block 其实与 dispatch_group 也没有任何直接的关系。
+&emsp;上面使用了 “关联” 一词，这里需要特别强调一下，假设与 dispatch_group 关联的 GCD 任务是一个 block，dispatch_group 并不持有此 block，甚至 dispatch_group 与此 block 没有任何关系，dispatch_group 内部的那个值只是与 enter/leave 操作有关，GCD 任务只是借用了此值，例如在创建多个 GCD 异步任务之前调用多次 enter 操作，然后在每个 GCD 任务结束时调用 leave 操作，当这多个 GCD 异步任务都执行完毕，那么如果 dispatch_group 添加了回调通知，此时自会收到回调通知。即使我们使用 `dispatch_group_async` 创建多个 GCD 异步任务 block， 这些 GCD 任务 block 其实与 dispatch_group 也没有任何直接的关系。
 
 &emsp;那么与这些 GCD 异步任务相比的话，我们使用 `dispatch_group_notify` 函数添加的多个回调通知的 block 则是被 dispatch_group 所完全拥有的，这些回调通知 block 会链接成一个链表，而 dispatch_group 实例则直接拥有此链表的头节点和尾节点。
 
@@ -18,7 +18,8 @@
 DISPATCH_CLASS_DECL(group, OBJECT);
 struct dispatch_group_s {
     DISPATCH_OBJECT_HEADER(group);
-    DISPATCH_UNION_LE(uint64_t volatile dg_state,
+    DISPATCH_UNION_LE(
+            uint64_t volatile dg_state,
             uint32_t dg_bits,
             uint32_t dg_gen
     ) DISPATCH_ATOMIC64_ALIGN;
@@ -62,7 +63,7 @@ struct dispatch_group_s {
     void *do_ctxt;
     void *do_finalizer;
     
-    // 可看到上半部分和其它 GCD 对象都是相同的，毕竟大家都是继承自 dispatch_object_s，重点是下面的新内容
+    // 可看到上半部分和其它 GCD 对象都是相同的，毕竟大家都是继承自 dispatch_object_s，重点是下面的新内容 
     
     union { 
         uint64_t volatile dg_state;  // leave 时加 DISPATCH_GROUP_VALUE_INTERVAL
@@ -127,7 +128,7 @@ const struct dispatch_group_vtable_s OS_dispatch_group_class = {
 ### dispatch_group_create
 &emsp;`dispatch_group_create` 函数用于创建可与 block 关联的 `dispatch_group_s` 结构体实例，此 `dispatch_group_s` 结构体实例可用于等待与它关联的所有 block 的异步执行完成。（使用 `dispatch_release` 释放 group 对象内存）
 
-&emsp; GCD  任务 block 与 dispatch_group 关联的方式：
+&emsp; GCD  任务 block 与 dispatch_group 关联的方式：  
 + 调用 `dispatch_group_enter` 表示一个 block 与 dispatch_group 关联，同时 block 执行完后要调用 `dispatch_group_leave` 表示解除关联，否则 `dispatch_group_s` 会永远等下去。
 + 调用 `dispatch_group_async` 函数与 block  关联，其实它是在内部封装了一对 enter 和 leave 操作。
 
