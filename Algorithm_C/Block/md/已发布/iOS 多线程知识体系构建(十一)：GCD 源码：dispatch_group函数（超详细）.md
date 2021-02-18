@@ -277,7 +277,7 @@ dispatch_group_enter(dispatch_group_t dg)
         // 此时 dispatch_group 不能进行释放，想到前面的信号量，
         // 如果 dsema_value 小于 dsema_orig 表示信号量实例正在被使用，此时释放信号量实例的话也会导致 crash，
         // 整体思想和我们的 NSObject 的引用计数原理是相同的，不同之处是内存泄漏不一定会 crash，而这里则是立即 crash，
-        // 当然作为一名合格的开发绝对不能容许任何内存泄漏和崩溃 ！！！！）
+        // 当然作为一名合格的开发绝对不能容许任何内存泄漏和崩溃 ！！！）
         
         _dispatch_retain(dg); // <rdar://problem/22318411>
     }
