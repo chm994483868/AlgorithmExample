@@ -59,20 +59,9 @@
 ### Drawing Destinations: The Graphics Context
 &emsp;图形上下文是一种不透明的数据类型（CGContextRef），它封装了 Quartz 用于将图像绘制到输出设备（如 PDF 文件、位图或显示器上的窗口）的信息。图形上下文中的信息包括图形绘图参数和 page 上的特定于设备的绘画表示。Quartz 中的所有对象都被绘制到或包含在图形上下文中。
 
-&emsp;
+&emsp;可以将图形上下文视为绘图目标，如图 1-2 所示。使用 Quartz 绘制时，所有设备特定的特征都包含在所使用的特定类型的图形上下文中。换言之，你只需为同一序列的 Quartz 绘图例程提供不同的图形上下文，就可以将相同的图像绘制到不同的设备上。你不需要执行任何特定于设备的计算；Quartz 会为你执行。
 
-
-
-
-
-
-Drawing Destinations: The Graphics Context
-
-A graphics context is an opaque data type (CGContextRef) that encapsulates the information Quartz uses to draw images to an output device, such as a PDF file, a bitmap, or a window on a display. The information inside a graphics context includes graphics drawing parameters and a device-specific representation of the paint on the page. All objects in Quartz are drawn to, or contained by, a graphics context.
-
-You can think of a graphics context as a drawing destination, as shown in Figure 1-2. When you draw with Quartz, all device-specific characteristics are contained within the specific type of graphics context you use. In other words, you can draw the same image to a different device simply by providing a different graphics context to the same sequence of Quartz drawing routines. You do not need to perform any device-specific calculations; Quartz does it for you.
-
-Figure 1-2  Quartz drawing destinations
+&emsp;Figure 1-2  Quartz drawing destinations
 
 
 
