@@ -143,6 +143,10 @@
 		D2EA09ED25C3F6C50054B58A /* FindInPartiallySortedMatrix_2.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D2EA09EB25C3F6C50054B58A /* FindInPartiallySortedMatrix_2.cpp */; };
 		D2EA09F325C3FEA70054B58A /* ReplaceSpaces_2.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D2EA09F125C3FEA70054B58A /* ReplaceSpaces_2.cpp */; };
 		D2EA09FD25E252160054B58A /* PrintListInReversedOrder_2.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D2EA09FB25E252160054B58A /* PrintListInReversedOrder_2.cpp */; };
+		D2EA0A0025E25B2C0054B58A /* ConstructBinaryTree_2.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D2EA09FE25E25B2C0054B58A /* ConstructBinaryTree_2.cpp */; };
+		D2EA0A0325E262880054B58A /* NextNodeInBinaryTrees_2.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D2EA0A0125E262880054B58A /* NextNodeInBinaryTrees_2.cpp */; };
+		D2EA0A0625E266420054B58A /* QueueWithTwoStacks_2.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D2EA0A0425E266420054B58A /* QueueWithTwoStacks_2.cpp */; };
+		D2EA0A0925E26D280054B58A /* StackWithTwoQueues_2.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D2EA0A0725E26D280054B58A /* StackWithTwoQueues_2.cpp */; };
 		D2EB010024D912C6009EAFD6 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2EB00FF24D912C6009EAFD6 /* main.swift */; };
 		D2EB010924D9136D009EAFD6 /* BubbleSort.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2EB010824D9136D009EAFD6 /* BubbleSort.swift */; };
 		D2EB010C24D91F91009EAFD6 /* BubbleSort.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D2EB010A24D91F91009EAFD6 /* BubbleSort.cpp */; };
@@ -563,6 +567,14 @@
 		D2EA09F425CB930B0054B58A /* iOS《Animation Types and Timing Programming Guide》官方文档.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS《Animation Types and Timing Programming Guide》官方文档.md"; sourceTree = "<group>"; };
 		D2EA09FB25E252160054B58A /* PrintListInReversedOrder_2.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = PrintListInReversedOrder_2.cpp; sourceTree = "<group>"; };
 		D2EA09FC25E252160054B58A /* PrintListInReversedOrder_2.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = PrintListInReversedOrder_2.hpp; sourceTree = "<group>"; };
+		D2EA09FE25E25B2C0054B58A /* ConstructBinaryTree_2.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = ConstructBinaryTree_2.cpp; sourceTree = "<group>"; };
+		D2EA09FF25E25B2C0054B58A /* ConstructBinaryTree_2.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = ConstructBinaryTree_2.hpp; sourceTree = "<group>"; };
+		D2EA0A0125E262880054B58A /* NextNodeInBinaryTrees_2.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = NextNodeInBinaryTrees_2.cpp; sourceTree = "<group>"; };
+		D2EA0A0225E262880054B58A /* NextNodeInBinaryTrees_2.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = NextNodeInBinaryTrees_2.hpp; sourceTree = "<group>"; };
+		D2EA0A0425E266420054B58A /* QueueWithTwoStacks_2.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = QueueWithTwoStacks_2.cpp; sourceTree = "<group>"; };
+		D2EA0A0525E266420054B58A /* QueueWithTwoStacks_2.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = QueueWithTwoStacks_2.hpp; sourceTree = "<group>"; };
+		D2EA0A0725E26D280054B58A /* StackWithTwoQueues_2.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = StackWithTwoQueues_2.cpp; sourceTree = "<group>"; };
+		D2EA0A0825E26D280054B58A /* StackWithTwoQueues_2.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = StackWithTwoQueues_2.hpp; sourceTree = "<group>"; };
 		D2EB00FD24D912C6009EAFD6 /* Algorithm_Swift */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = Algorithm_Swift; sourceTree = BUILT_PRODUCTS_DIR; };
 		D2EB00FF24D912C6009EAFD6 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
 		D2EB010824D9136D009EAFD6 /* BubbleSort.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BubbleSort.swift; sourceTree = "<group>"; };
@@ -1018,6 +1030,8 @@
 				8EA593E324CF0B40002785EF /* ConstructBinaryTree.hpp */,
 				D202B25E254EA1B400D9BFBC /* ConstructBinaryTree_1.cpp */,
 				D202B25F254EA1B400D9BFBC /* ConstructBinaryTree_1.hpp */,
+				D2EA09FE25E25B2C0054B58A /* ConstructBinaryTree_2.cpp */,
+				D2EA09FF25E25B2C0054B58A /* ConstructBinaryTree_2.hpp */,
 			);
 			path = 07_ConstructBinaryTree;
 			sourceTree = "<group>";
@@ -1317,6 +1331,8 @@
 				D2090C0424CFA51E00FA4F51 /* NextNodeInBinaryTrees.hpp */,
 				D202B261254EAFA700D9BFBC /* NextNodeInBinaryTrees_1.cpp */,
 				D202B262254EAFA700D9BFBC /* NextNodeInBinaryTrees_1.hpp */,
+				D2EA0A0125E262880054B58A /* NextNodeInBinaryTrees_2.cpp */,
+				D2EA0A0225E262880054B58A /* NextNodeInBinaryTrees_2.hpp */,
 			);
 			path = 08_NextNodeInBinaryTrees;
 			sourceTree = "<group>";
@@ -1328,6 +1344,8 @@
 				D2090C0824CFAD4B00FA4F51 /* QueueWithTwoStacks.hpp */,
 				8E91955F254EE3280039A12E /* QueueWithTwoStacks_1.cpp */,
 				8E919560254EE3280039A12E /* QueueWithTwoStacks_1.hpp */,
+				D2EA0A0425E266420054B58A /* QueueWithTwoStacks_2.cpp */,
+				D2EA0A0525E266420054B58A /* QueueWithTwoStacks_2.hpp */,
 			);
 			path = 09_QueueWithTwoStacks;
 			sourceTree = "<group>";
@@ -1339,6 +1357,8 @@
 				D2090C0C24CFBCC600FA4F51 /* StackWithTwoQueues.hpp */,
 				8E919566254EEBA80039A12E /* StackWithTwoQueues_1.cpp */,
 				8E919567254EEBA80039A12E /* StackWithTwoQueues_1.hpp */,
+				D2EA0A0725E26D280054B58A /* StackWithTwoQueues_2.cpp */,
+				D2EA0A0825E26D280054B58A /* StackWithTwoQueues_2.hpp */,
 			);
 			path = 09_02_StackWithTwoQueues;
 			sourceTree = "<group>";
@@ -2555,6 +2575,7 @@
 				D202B254254E68D700D9BFBC /* FindDuplicationNoEdit_1.cpp in Sources */,
 				D227131424D126F2009B180D /* NumericStrings.cpp in Sources */,
 				D227131824D139B5009B180D /* ReorderArray.cpp in Sources */,
+				D2EA0A0025E25B2C0054B58A /* ConstructBinaryTree_2.cpp in Sources */,
 				8E919556254D57DA0039A12E /* AssignmentOperator_1.cpp in Sources */,
 				D2EA09ED25C3F6C50054B58A /* FindInPartiallySortedMatrix_2.cpp in Sources */,
 				D227132824D16CBB009B180D /* MergeSortedLists.cpp in Sources */,
@@ -2654,6 +2675,7 @@
 				D227130C24D11360009B180D /* DeleteDuplicatedNode.cpp in Sources */,
 				D202B2C42554FCF300D9BFBC /* ConvertBinarySearchTree_1.cpp in Sources */,
 				D2090C0D24CFBCC600FA4F51 /* StackWithTwoQueues.cpp in Sources */,
+				D2EA0A0925E26D280054B58A /* StackWithTwoQueues_2.cpp in Sources */,
 				D202B329255B962500D9BFBC /* LastNumberInCircle.cpp in Sources */,
 				D202B29C255280F800D9BFBC /* MergeSortedLists_1.cpp in Sources */,
 				D2EB012524D95A00009EAFD6 /* QuickSort.cpp in Sources */,
@@ -2668,6 +2690,7 @@
 				D202B29525526CBE00D9BFBC /* EntryNodeInListLoop_1.cpp in Sources */,
 				D237C64F24D27648001E0B21 /* PrintTreesInZigzag.cpp in Sources */,
 				D202B312255A9D4E00D9BFBC /* ReverseWordsInSentence.cpp in Sources */,
+				D2EA0A0325E262880054B58A /* NextNodeInBinaryTrees_2.cpp in Sources */,
 				D202B2D6255A340800D9BFBC /* FirstNotRepeatingChar.cpp in Sources */,
 				D21B43AF24CEC0CD0078EEF9 /* ReplaceSpaces.cpp in Sources */,
 				D2EB013024D96467009EAFD6 /* HeapSort.cpp in Sources */,
@@ -2692,6 +2715,7 @@
 				8E2572C824D1B45D0080F598 /* BinaryTree.cpp in Sources */,
 				8E919561254EE3280039A12E /* QueueWithTwoStacks_1.cpp in Sources */,
 				D202B2A72553D79400D9BFBC /* MirrorOfBinaryTree_1.cpp in Sources */,
+				D2EA0A0625E266420054B58A /* QueueWithTwoStacks_2.cpp in Sources */,
 				D239E78024D4012500DA0BE5 /* TranslateNumbersToStrings.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
