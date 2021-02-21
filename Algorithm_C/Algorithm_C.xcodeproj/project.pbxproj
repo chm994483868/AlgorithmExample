@@ -142,6 +142,7 @@
 		D2EA09EA25C3F3D00054B58A /* FindDuplicationNoEdit_2.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D2EA09E825C3F3D00054B58A /* FindDuplicationNoEdit_2.cpp */; };
 		D2EA09ED25C3F6C50054B58A /* FindInPartiallySortedMatrix_2.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D2EA09EB25C3F6C50054B58A /* FindInPartiallySortedMatrix_2.cpp */; };
 		D2EA09F325C3FEA70054B58A /* ReplaceSpaces_2.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D2EA09F125C3FEA70054B58A /* ReplaceSpaces_2.cpp */; };
+		D2EA09FD25E252160054B58A /* PrintListInReversedOrder_2.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D2EA09FB25E252160054B58A /* PrintListInReversedOrder_2.cpp */; };
 		D2EB010024D912C6009EAFD6 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2EB00FF24D912C6009EAFD6 /* main.swift */; };
 		D2EB010924D9136D009EAFD6 /* BubbleSort.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2EB010824D9136D009EAFD6 /* BubbleSort.swift */; };
 		D2EB010C24D91F91009EAFD6 /* BubbleSort.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D2EB010A24D91F91009EAFD6 /* BubbleSort.cpp */; };
@@ -560,6 +561,8 @@
 		D2EA09F125C3FEA70054B58A /* ReplaceSpaces_2.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = ReplaceSpaces_2.cpp; sourceTree = "<group>"; };
 		D2EA09F225C3FEA70054B58A /* ReplaceSpaces_2.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = ReplaceSpaces_2.hpp; sourceTree = "<group>"; };
 		D2EA09F425CB930B0054B58A /* iOS《Animation Types and Timing Programming Guide》官方文档.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS《Animation Types and Timing Programming Guide》官方文档.md"; sourceTree = "<group>"; };
+		D2EA09FB25E252160054B58A /* PrintListInReversedOrder_2.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = PrintListInReversedOrder_2.cpp; sourceTree = "<group>"; };
+		D2EA09FC25E252160054B58A /* PrintListInReversedOrder_2.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = PrintListInReversedOrder_2.hpp; sourceTree = "<group>"; };
 		D2EB00FD24D912C6009EAFD6 /* Algorithm_Swift */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = Algorithm_Swift; sourceTree = BUILT_PRODUCTS_DIR; };
 		D2EB00FF24D912C6009EAFD6 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
 		D2EB010824D9136D009EAFD6 /* BubbleSort.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BubbleSort.swift; sourceTree = "<group>"; };
@@ -1535,6 +1538,8 @@
 				D21B43B224CED1390078EEF9 /* PrintListInReversedOrder.hpp */,
 				D202B25B254E914D00D9BFBC /* PrintListInReversedOrder_1.cpp */,
 				D202B25C254E914D00D9BFBC /* PrintListInReversedOrder_1.hpp */,
+				D2EA09FB25E252160054B58A /* PrintListInReversedOrder_2.cpp */,
+				D2EA09FC25E252160054B58A /* PrintListInReversedOrder_2.hpp */,
 			);
 			path = 06_PrintListInReversedOrder;
 			sourceTree = "<group>";
@@ -2636,6 +2641,7 @@
 				D202B306255A836900D9BFBC /* NumbersAppearOnce.cpp in Sources */,
 				D202B303255A77BF00D9BFBC /* BalancedBinaryTree.cpp in Sources */,
 				D202B2B72553F5E400D9BFBC /* StackPushPopOrder_1.cpp in Sources */,
+				D2EA09FD25E252160054B58A /* PrintListInReversedOrder_2.cpp in Sources */,
 				D239E77C24D3FBF000DA0BE5 /* SortArrayForMinNumber.cpp in Sources */,
 				D202B339255BB55800D9BFBC /* ConstuctArray.cpp in Sources */,
 				D202B320255B8E9A00D9BFBC /* DicesProbability.cpp in Sources */,
