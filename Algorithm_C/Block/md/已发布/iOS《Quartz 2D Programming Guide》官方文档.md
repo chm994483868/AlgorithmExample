@@ -63,6 +63,61 @@
 
 &emsp;Figure 1-2  Quartz drawing destinations
 
+![draw_destinations](https://p9-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/0b76c444cb854fda9aa3e221e00bff86~tplv-k3u1fbpfcp-watermark.image)
+
+&emsp;这些图形上下文可用于你的应用程序：
++ （bitmap graphics context）位图图形上下文允许你在位图中绘制 RGB 颜色、CMYK 颜色或灰度。位图是像素的矩形阵列（或光栅），每个像素代表图像中的一个点。位图图像（Bitmap images）也称为采样图像（sampled images）。请参见 Creating a Bitmap Graphics Context。
+
++ （PDF graphics context）PDF 图形上下文允许你创建 PDF 文件。在 PDF 文件中，drawing 将作为命令序列保留。PDF 文件和位图之间存在一些显著的差异：
+  + 与位图不同，PDF文件可能包含多个 page。
+  + 从不同设备上的 PDF 文件绘制 page 时，生成的图像将针对该设备的显示特性进行优化。
+  + PDF 文件本质上是独立于分辨率的，在不牺牲图像细节的情况下，可以无限地增大或减小文件的大小。用户对位图图像的感知质量与要查看位图的分辨率有关。
+请参见 Creating a PDF Graphics Context。
+
++ （window graphics context）window 图形上下文是可用于绘制到窗口中的图形上下文。请注意，因为 Quartz 2D 是一个图形引擎，而不是一个窗口管理系统，所以你可以使用其中一个应用程序框架来获取窗口的图形上下文。有关详细信息，请参见 Creating a Window Graphics Context in Mac OS X 。
+
++ （layer context ）图层上下文（CGLayerRef）是与其他图形上下文关联的屏幕外图形目标。它的设计是为了在将层绘制到创建它的图形上下文时获得最佳性能。对于屏幕外绘制，图层上下文可能比位图图形上下文更好。请参见 Core Graphics Layer Drawing。
+
++ （PostScript graphics context）如果要在 Mac OS X 中打印，则将内容发送到由打印框架管理的 PostScript 图形上下文。有关详细信息，请参见 Obtaining a Graphics Context for Printing。
+
+### Quartz 2D Opaque Data Types
+&emsp;除了图形上下文之外，Quartz 2D API 还定义了各种不透明的数据类型。因为 API 是 Core Graphics 框架的一部分，所以对其进行操作的数据类型和例程使用 CG 前缀。
+
+&emsp;Quartz 2D 从不透明的数据类型创建对象，应用程序对这些数据类型进行操作以实现特定的图形输出。图 1-3 显示了将绘图操作应用于 Quartz 2D 提供的三个对象时可以获得的各种结果。例如：
+
++ 通过创建 PDF 页面对象，对图形上下文应用旋转操作，并要求 Quartz 2D 将页面绘制到图形上下文，可以旋转和显示 PDF 页面。
++ 可以通过创建图案对象、定义构成图案的形状，以及设置 Quartz 2D 以在图案绘制到图形上下文时将图案用作绘画来绘制图案。
++ 通过创建着色对象，提供确定着色中每个点的颜色的函数，然后要求 Quartz 2D 将着色用作填充颜色，可以使用轴向或径向着色填充区域。
+
+&emsp;Figure 1-3  Opaque data types are the basis of drawing primitives in Quartz 2D
+
+![drawing_primitives](https://p1-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/f2598ce6b52f4764aedf65690eb7302a~tplv-k3u1fbpfcp-watermark.image)
+
+
+
+
+
+
+
+
+The opaque data types available in Quartz 2D include the following:
+
+CGPathRef, used for vector graphics to create paths that you fill or stroke. See Paths.
+CGImageRef, used to represent bitmap images and bitmap image masks based on sample data that you supply. See Bitmap Images and Image Masks.
+CGLayerRef, used to represent a drawing layer that can be used for repeated drawing (such as for backgrounds or patterns) and for offscreen drawing. See Core Graphics Layer Drawing
+CGPatternRef, used for repeated drawing. See Patterns.
+CGShadingRef and CGGradientRef, used to paint gradients. See Gradients.
+CGFunctionRef, used to define callback functions that take an arbitrary number of floating-point arguments. You use this data type when you create gradients for a shading. See Gradients.
+CGColorRef and CGColorSpaceRef, used to inform Quartz how to interpret color. See Color and Color Spaces.
+CGImageSourceRef and CGImageDestinationRef, which you use to move data into and out of Quartz. See Data Management in Quartz 2D and Image I/O Programming Guide.
+CGFontRef, used to draw text. See Text.
+CGPDFDictionaryRef, CGPDFObjectRef, CGPDFPageRef, CGPDFStream, CGPDFStringRef, and CGPDFArrayRef, which provide access to PDF metadata. See PDF Document Creation, Viewing, and Transforming.
+CGPDFScannerRef and CGPDFContentStreamRef, which parse PDF metadata. See PDF Document Parsing.
+CGPSConverterRef, used to convert PostScript to PDF. It is not available in iOS. See PostScript Conversion.
+
+
+
+
 
 
 
