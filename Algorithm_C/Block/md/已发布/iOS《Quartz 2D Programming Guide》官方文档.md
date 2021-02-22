@@ -174,6 +174,87 @@
 + 如果从名称中不包含单词 “Create” 或 “Copy” 的函数中获取对象，则不拥有对该对象的引用，并且不能释放该对象。该对象将在将来某个时候由其所有者释放。
 + 如果你不拥有某个对象并且需要将其保留在周围，则必须保留该对象，并在处理完该对象后将其释放。可以使用特定于对象的 Quartz 2D 函数来保留和释放该对象。例如，如果收到对 CGColorspace 对象的引用，则可以使用函数 `CGColorSpaceRetain` 和 `CGColorSpaceRelease` 根据需要保留和释放该对象。你也可以使用 Core Foundation  础函数 `CFRetain` 和 `CFRelease`，但必须注意不要将 NULL 传递给这些函数。
 
+## Graphics Contexts
+&emsp;图形上下文表示绘图目标。它包含绘图参数和绘图系统执行任何后续绘图命令所需的所有设备特定信息。图形上下文定义基本绘图属性，例如绘制时要使用的颜色、剪裁区域、线宽和样式信息、字体信息、合成选项以及其他一些属性。
+
+&emsp;你可以通过使用 Quartz 上下文创建函数或使用 Mac OS X 框架或 iOS 中的 UIKit 框架提供的更高级函数来获取图形上下文。Quartz 为各种风格的 Quartz 图形上下文提供函数，包括位图和 PDF，你可以使用它们创建自定义内容。
+
+&emsp;本章介绍如何为各种绘图目标创建图形上下文。图形上下文在代码中由数据类型 CGContextRef 表示，CGContextRef 是一种不透明的数据类型。获取图形上下文后，可以使用 Quartz 2D 函数绘制到上下文，对上下文执行操作（如转换），并更改图形状态（graphics state）参数，如线宽和填充颜色。
+
+### Drawing to a View Graphics Context in iOS
+&emsp;要在 iOS 应用程序中绘制到屏幕，需要设置 UIView 对象并实现其 `drawRect:` 方法来执行绘制。当视图在屏幕上可见并且其内容需要更新时，将调用视图的 `drawRect:` 方法。在调用自定义 `drawRect:` 方法之前，视图对象会自动配置其绘图环境，以便代码可以立即开始绘图。作为此配置的一部分，UIView 对象为当前图形环境创建图形上下文（CGContextRef 不透明类型）。通过调用 UIKit 函数 `UIGraphicsGetCurrentContext`，可以在 `drawRect:` 方法中获得此图形上下文。
+
+&emsp;整个 UIKit 使用的默认坐标系与 Quartz 使用的坐标系不同。在 UIKit 中，原点位于左上角，正 y 值向下。UIView 对象通过将原点平移到视图的左上角并将 y 轴乘以 -1 来反转 y 轴，从而修改 Quartz 图形上下文的 CTM 以匹配 UIKit 约定。有关修改的坐标系以及绘图代码中的含义的详细信息，请参见 Quartz 2D Coordinate Systems。
+
+&emsp;UIView 对象的详细描述信息在 View Programming Guide for iOS 中。
+
+### Creating a Window Graphics Context in Mac OS X
+&emsp;在 Mac OS X 中绘图时，需要创建一个适合所用框架的 window 图形上下文。Quartz 2D API 本身不提供获取 windows 图形上下文的函数。相反，你可以使用 Cocoa 框架来获取在 Cocoa 中创建的窗口的上下文。
+
+&emsp;你可以使用以下代码从 Cocoa 应用程序的 `drawRect:` 例程中获取 Quartz 图形上下文：
+```c++
+CGContextRef myContext = [[NSGraphicsContext currentContext] graphicsPort];
+```
+&emsp;方法 `currentContext` 返回当前线程的 NSGraphicsContext 实例。`graphicsPort` 方法返回 receiver 表示的低级别、特定于平台的图形上下文，这是一个 Quartz 图形上下文。（不要被方法名搞混了，它们是历史的。）更多信息请参见 NSGraphicsContext Class Reference。
+
+&emsp;获取图形上下文后，可以在 Cocoa 应用程序中调用任何 Quartz 2D 绘图函数。你也可以将 Quartz 2D 调用与 Cocoa 绘图调用混合使用。如图 2-1 所示，你可以看到 Quartz 2D 绘制到 Cocoa 视图的示例。该图形由两个重叠的矩形组成，一个不透明的红色矩形和一个部分透明的蓝色矩形。你将了解有关颜色和颜色空间中透明度的更多信息。控制多少颜色可以 “透视” 颜色的能力是 Quartz 2D 的标志性功能之一。
+
+&emsp;Figure 2-1  A view in the Cocoa framework that contains Quartz drawing（Cocoa 框架中包含 Quartz 绘图的视图）
+
+![cocoa_draw](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/45338667aba140b6a47ba655b68786cb~tplv-k3u1fbpfcp-watermark.image)
+
+&emsp;要创建图 2-1 中的图形，首先创建一个 Cocoa 应用程序 Xcode 项目。在 Interface Builder 中，将自定义视图拖到窗口中并将其子类化。然后为子类视图编写一个实现，类似于清单 2-1 所示。对于本例，子类视图命名为 MyQuartzView。视图的 `drawRect:` 方法包含所有的 Quartz 绘图代码。下面列出了每一行代码的详细说明。
+
+> Note: 每次需要绘制视图时，都会自动调用 NSView 类的 `drawRect:` 方法。要了解有关重写 `drawRect:` 方法的更多信息，请参见 NSView Class Reference。
+
+&emsp;Listing 2-1  Drawing to a window graphics context
+```c++
+@implementation MyQuartzView
+ 
+- (id)initWithFrame:(NSRect)frameRect
+{
+    self = [super initWithFrame:frameRect];
+    return self;
+}
+ 
+- (void)drawRect:(NSRect)rect
+{
+    CGContextRef myContext = [[NSGraphicsContext // 1
+                                currentContext] graphicsPort];
+                                
+   // ********** Your drawing code here ********** // 2
+    CGContextSetRGBFillColor (myContext, 1, 0, 0, 1);// 3
+    CGContextFillRect (myContext, CGRectMake (0, 0, 200, 100 ));// 4
+    CGContextSetRGBFillColor (myContext, 0, 0, 1, .5);// 5
+    CGContextFillRect (myContext, CGRectMake (0, 0, 100, 200));// 6
+  }
+ 
+@end
+```
+&emsp;代码是这样的：
+1. 获取视图的图形上下文。
+2. 在这里插入绘图代码。接下来的四行代码是使用 Quartz 2D 函数的示例。
+3. 设置完全不透明的红色填充颜色。有关颜色和 Alpha（设置不透明度）的信息，请参见 Color and Color Spaces。
+4. 填充一个原点为（0, 0）且宽度为 200 且高度为 100 的矩形。有关绘制矩形的信息，请参见 Paths。
+5. 设置部分为透明的蓝色填充颜色。
+6. 填充一个原点为（0, 0）且宽度为 100 且高度为 200 的矩形。
+
+### Creating a PDF Graphics Context
+&emsp;
+
+
+When you create a PDF graphics context and draw to that context, Quartz records your drawing as a series of PDF drawing commands written to a file. You supply a location for the PDF output and a default media box—a rectangle that specifies bounds of the page. Figure 2-2 shows the result of drawing to a PDF graphics context and then opening the resulting PDF in Preview.
+
+Figure 2-2  A PDF created by using CGPDFContextCreateWithURL
+
+
+### Creating a Bitmap Graphics Context
+
+#### Supported Pixel Formats
+
+#### Anti-Aliasing
+
+### Obtaining a Graphics Context for Printing
 
 
 
