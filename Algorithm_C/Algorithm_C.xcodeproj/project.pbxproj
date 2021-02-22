@@ -147,6 +147,8 @@
 		D2EA0A0325E262880054B58A /* NextNodeInBinaryTrees_2.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D2EA0A0125E262880054B58A /* NextNodeInBinaryTrees_2.cpp */; };
 		D2EA0A0625E266420054B58A /* QueueWithTwoStacks_2.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D2EA0A0425E266420054B58A /* QueueWithTwoStacks_2.cpp */; };
 		D2EA0A0925E26D280054B58A /* StackWithTwoQueues_2.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D2EA0A0725E26D280054B58A /* StackWithTwoQueues_2.cpp */; };
+		D2EA0A0C25E359590054B58A /* Fibonacci_2.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D2EA0A0A25E359590054B58A /* Fibonacci_2.cpp */; };
+		D2EA0A0F25E35D500054B58A /* MinNumberInRotatedArray_2.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D2EA0A0D25E35D500054B58A /* MinNumberInRotatedArray_2.cpp */; };
 		D2EB010024D912C6009EAFD6 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2EB00FF24D912C6009EAFD6 /* main.swift */; };
 		D2EB010924D9136D009EAFD6 /* BubbleSort.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2EB010824D9136D009EAFD6 /* BubbleSort.swift */; };
 		D2EB010C24D91F91009EAFD6 /* BubbleSort.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D2EB010A24D91F91009EAFD6 /* BubbleSort.cpp */; };
@@ -575,6 +577,10 @@
 		D2EA0A0525E266420054B58A /* QueueWithTwoStacks_2.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = QueueWithTwoStacks_2.hpp; sourceTree = "<group>"; };
 		D2EA0A0725E26D280054B58A /* StackWithTwoQueues_2.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = StackWithTwoQueues_2.cpp; sourceTree = "<group>"; };
 		D2EA0A0825E26D280054B58A /* StackWithTwoQueues_2.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = StackWithTwoQueues_2.hpp; sourceTree = "<group>"; };
+		D2EA0A0A25E359590054B58A /* Fibonacci_2.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Fibonacci_2.cpp; sourceTree = "<group>"; };
+		D2EA0A0B25E359590054B58A /* Fibonacci_2.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = Fibonacci_2.hpp; sourceTree = "<group>"; };
+		D2EA0A0D25E35D500054B58A /* MinNumberInRotatedArray_2.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = MinNumberInRotatedArray_2.cpp; sourceTree = "<group>"; };
+		D2EA0A0E25E35D500054B58A /* MinNumberInRotatedArray_2.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = MinNumberInRotatedArray_2.hpp; sourceTree = "<group>"; };
 		D2EB00FD24D912C6009EAFD6 /* Algorithm_Swift */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = Algorithm_Swift; sourceTree = BUILT_PRODUCTS_DIR; };
 		D2EB00FF24D912C6009EAFD6 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
 		D2EB010824D9136D009EAFD6 /* BubbleSort.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BubbleSort.swift; sourceTree = "<group>"; };
@@ -1370,6 +1376,8 @@
 				D2090C1024CFCF3600FA4F51 /* Fibonacci.hpp */,
 				D202B264254FA14A00D9BFBC /* Fibonacci_1.cpp */,
 				D202B265254FA14A00D9BFBC /* Fibonacci_1.hpp */,
+				D2EA0A0A25E359590054B58A /* Fibonacci_2.cpp */,
+				D2EA0A0B25E359590054B58A /* Fibonacci_2.hpp */,
 			);
 			path = 10_Fibonacci;
 			sourceTree = "<group>";
@@ -1381,6 +1389,8 @@
 				D2090C1424CFF75E00FA4F51 /* MinNumberInRotatedArray.hpp */,
 				D202B267254FC8BF00D9BFBC /* MinNumberInRotatedArray_1.cpp */,
 				D202B268254FC8BF00D9BFBC /* MinNumberInRotatedArray_1.hpp */,
+				D2EA0A0D25E35D500054B58A /* MinNumberInRotatedArray_2.cpp */,
+				D2EA0A0E25E35D500054B58A /* MinNumberInRotatedArray_2.hpp */,
 			);
 			path = 11_MinNumberInRotatedArray;
 			sourceTree = "<group>";
@@ -2671,6 +2681,7 @@
 				D202B28225513CDF00D9BFBC /* DeleteNodeInList_1.cpp in Sources */,
 				D202B331255B9F9D00D9BFBC /* Accumulate.cpp in Sources */,
 				8EA593D924CDB969002785EF /* main.cpp in Sources */,
+				D2EA0A0C25E359590054B58A /* Fibonacci_2.cpp in Sources */,
 				D202B2BE2554ECB300D9BFBC /* PathInTree_1.cpp in Sources */,
 				D227130C24D11360009B180D /* DeleteDuplicatedNode.cpp in Sources */,
 				D202B2C42554FCF300D9BFBC /* ConvertBinarySearchTree_1.cpp in Sources */,
@@ -2703,6 +2714,7 @@
 				D239E71B24D39BCA00DA0BE5 /* StreamMedian.cpp in Sources */,
 				D237C64724D265B0001E0B21 /* PrintTreeFromTopToBottom.cpp in Sources */,
 				D227131024D11DB5009B180D /* RegularExpressions.cpp in Sources */,
+				D2EA0A0F25E35D500054B58A /* MinNumberInRotatedArray_2.cpp in Sources */,
 				8E91958025542D020039A12E /* PrintTreesInLines_1.cpp in Sources */,
 				D202B32D255B9B2C00D9BFBC /* MaximalProfit.cpp in Sources */,
 				D202B2F7255A6DD100D9BFBC /* MissingNumber.cpp in Sources */,

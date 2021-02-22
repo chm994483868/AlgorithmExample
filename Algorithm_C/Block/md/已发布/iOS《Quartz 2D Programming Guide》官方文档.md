@@ -93,27 +93,88 @@
 
 ![drawing_primitives](https://p1-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/f2598ce6b52f4764aedf65690eb7302a~tplv-k3u1fbpfcp-watermark.image)
 
+&emsp;Quartz 2D 中可用的不透明数据类型包括：
+
++ CGPathRef，用于矢量图形以创建填充或笔划的路径。请参见 Paths。
++ CGImageRef，用于根据你提供的示例数据表示位图图像和位图图像掩码。请参见 Bitmap Images and Image Masks。
++ CGLayerRef，用于表示可用于重复绘制（如背景或图案）和屏幕外绘制的绘图层。请参见 Core Graphics Layer Drawing。
++ CGPatternRef，用于重复绘制。请参见 Patterns。
++ CGShadingRef 和 CGGradientRef，用于绘制渐变。请参见 Gradients。
++ CGFunctionRef，用于定义接受任意数量浮点参数的回调函数。为着色（shading）创建渐变（gradients）时，将使用此数据类型。请参见 Gradients。
++ CGColorRef 和 CGColorSpaceRef，用来告诉 Quartz 如何解释颜色。请参见 Color and Color Spaces。
++ CGImageSourceRef 和 CGImageDestinationRef，用于将数据移入和移出 Quartz。请参见 Data Management in Quartz 2D 和 Image I/O Programming Guide。
++ CGFontRef，用于绘制文本。请参见 Text。
++ CGPDFDictionaryRef、CGPDFObjectRef、CGPDFPageRef、CGPDFStream、CGPDFStringRef 和 CGPDFArrayRef，提供对 PDF 元数据的访问。请参见 PDF Document Creation, Viewing, and Transforming。
++ CGPDFScannerRef 和 CGPDFContentStreamRef，用于解析 PDF 元数据。请参见 PDF Document Parsing。
++ CGPSConverterRef，用于将 PostScript 转换为 PDF。它在 iOS 中不可用。请参见 PostScript Conversion。
+
+### Graphics States
+&emsp;Quartz 根据当前 graphics state 中的参数修改绘图操作的结果。graphics state 包含参数，否则这些参数将作为绘图例程（drawing routines）的参数。绘制到图形上下文的例程参考 graphics state 以确定如何呈现其结果。例如，当你调用函数来设置填充颜色时，你正在修改存储在当前 graphics state 中的值。当前 graphics state 的其他常用元素包括线宽、当前位置和文本字体大小。
+
+&emsp;graphics context 包含一堆（a stack of） graphics states。（应该翻译为 “图形上下文包含一个图形状态堆栈”）当 Quartz 创建图形上下文时，堆栈为空。保存图形状态时，Quartz 会将当前图形状态的副本推入到堆栈上。恢复图形状态时，Quartz 会将图形状态从堆栈顶部弹出。弹出状态变为当前图形状态。
+
+&emsp;要保存当前图形状态，请使用函数 `CGContextSaveGState` 将当前图形状态的副本推入到堆栈上。要还原以前保存的图形状态，请使用函数 `CGContextRestoreGState` 将当前图形状态替换为堆栈顶部的图形状态。
+
+&emsp;请注意，并非当前绘图环境的所有 aspects 都是图形状态的元素。例如，当前路径不被视为图形状态的一部分，因此在调用函数 `CGContextSaveGState` 时不会保存。调用此函数时保存的图形状态参数如表 1-1 所示。
+
+&emsp;Table 1-1  Parameters that are associated with the graphics state（与图形状态关联的参数）
+| Parameters | Discussed in this chapter |
+| --- | --- |
+| Current transformation matrix (CTM) | Transforms |
+| Clipping area | Paths |
+| Line: width, join, cap, dash, miter limit | Paths |
+| Accuracy of curve estimation (flatness) | Paths |
+| Anti-aliasing setting | Graphics Contexts |
+| Color: fill and stroke settings | Color and Color Spaces |
+| Alpha value (transparency) | Color and Color Spaces |
+| Rendering intent | Color and Color Spaces |
+| Color space: fill and stroke settings | Color and Color Spaces |
+| Text: font, font size, character spacing, text drawing mode | Text |
+| Blend mode | Paths and Bitmap Images and Image Masks |
+
+### Quartz 2D Coordinate Systems
+&emsp;如图 1-4 所示，坐标系定义了用于表示要在页面上绘制的对象的位置和大小的位置范围。可以在用户空间坐标系或更简单的用户空间中指定图形的位置和大小。坐标被定义为浮点值。
+
+&emsp;Figure 1-4  The Quartz coordinate system
+
+![quartz_coordinates](https://p1-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/b454ea014df644feb3ca038f87927c5f~tplv-k3u1fbpfcp-watermark.image)
+
+&emsp;由于不同的设备具有不同的基本成像能力，因此必须以独立于设备的方式定义图形的位置和大小。例如，屏幕显示设备可以每英寸显示不超过 96 个像素，而打印机可以每英寸显示 300 个像素。如果在设备级别定义坐标系（在本例中为 96 像素或 300 像素），则在该空间中绘制的对象无法在其他设备上复制（reproduced 复制、重现、再版），而不会产生可见的失真。它们会显得太大或太小。
+
+&emsp;Quartz 通过使用 current transformation matrix（CTM）将单独的坐标系用户空间映射到输出设备空间的坐标系来实现设备独立性。矩阵是用来有效描述一组相关方程的数学结构。当前变换矩阵是一种特殊类型的矩阵，称为仿射变换，它通过应用平移、旋转和缩放操作（移动、旋转和调整坐标系大小的计算）将点从一个坐标空间映射到另一个坐标空间。
+
+&emsp;当前变换矩阵还有一个次要用途：它允许你变换对象的绘制方式。例如，要绘制旋转 45 度的长方体，请先旋转页面的坐标系（CTM），然后再绘制长方体。Quartz 使用旋转坐标系绘制到输出设备。
+
+&emsp;用户空间中的点由坐标对（x，y）表示，其中 x 表示沿水平轴（左和右）的位置，y 表示垂直轴（上和下）。用户坐标空间的原点是点（0,0）。原点位于页面的左下角，如图 1-4 所示。在 Quartz 的默认坐标系中，x 轴从页面的左侧向右侧移动时会增加。当 y 轴从页面底部向顶部移动时，其值会增加。
+
+&emsp;一些技术使用不同于 Quartz 使用的默认坐标系来设置图形上下文。相对于 Quartz，这种坐标系是一种修改后的坐标系，在执行某些 Quartz 绘图操作时必须进行补偿。最常见的修改坐标系将原点放置在上下文的左上角，并将 y 轴更改为指向页面底部。你可能会看到使用此特定坐标系的几个地方如下所示：
+
++ 在 Mac OS X中，NSView 的子类重写其 isFlipped 方法以返回 YES。
++ 在 iOS 中，UIView 返回的绘图上下文。
++ 在 iOS 中，通过调用 `UIGraphicsBeginImageContextWithOptions` 函数创建的图形上下文。
+
+&emsp;UIKit 返回具有修改坐标系的 Quartz 图形上下文的原因是 UIKit 使用不同的默认坐标约定；它将转换应用于它创建的 Quartz 上下文，以便它们与它的约定相匹配。如果应用程序希望使用相同的绘图例程绘制 UIView 对象和 PDF 图形上下文（由 Quartz 创建并使用默认坐标系），则需要应用变换，以便 PDF 图形上下文接收相同的修改坐标系。为此，应用一个转换，将原点转换到 PDF 上下文的左上角，并将 y 坐标缩放 -1（应该是乘以负 1）。
+
+&emsp;使用缩放变换来消除 y 坐标会改变 Quartz 绘图中的一些约定。例如，如果调用 `CGContextDrawImage` 将图像绘制到上下文中，则在将图像绘制到目标中时，转换会对图像进行修改。类似地，路径绘制例程接受指定在默认坐标系中是顺时针还是逆时针方向绘制圆弧的参数。如果修改了坐标系，结果也会被修改，就像图像在镜子中反射一样。在图 1-5 中，将相同的参数传递到 Quartz 会在默认坐标系中产生一个顺时针的弧，在 y 坐标被变换取反后产生一个逆时针的弧。
+
+&emsp;Figure 1-5  Modifying the coordinate system creates a mirrored image.（修改坐标系将创建一个镜像图像。）
+
+![flipped_coordinates](https://p9-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/c76ff5ca622143a9b28b038db19904c1~tplv-k3u1fbpfcp-watermark.image)
+
+&emsp;由你的应用程序来调整它对应用了转换的上下文所做的任何 Quartz 调用。例如，如果希望图像或 PDF 正确地绘制到图形上下文中，应用程序可能需要临时调整图形上下文的 CTM。在 iOS 中，如果使用 UIImage 对象包装创建的 CGImage 对象，则不需要修改 CTM。UIImage 对象自动补偿 UIKit 应用的修改后的坐标系。
+
+> Important: 如果你计划在 iOS 上直接针对 Quartz 编写应用程序，那么上面的讨论对于理解这一点非常重要，但这还不够。在 iOS 3.2 及更高版本上，当 UIKit 为应用程序创建图形上下文时，它还会对上下文进行其他更改，以匹配默认的 UIKit 约定。特别是，不受 CTM 影响的模式和阴影将分别进行调整，以便它们的约定与 UIKit 的坐标系匹配。在这种情况下，你的应用程序无法使用与 CTM 等效的机制来更改 Quartz 创建的上下文，以匹配 UIKit 提供的上下文的行为；你的应用程序必须识别它所引入的上下文类型，并调整其行为以匹配上下文的期望。
+
+### Memory Management: Object Ownership
+&emsp;Quartz 使用 Core Foundation 内存管理模型，其中对象是引用计数的。创建 Core Foundation 对象时，引用计数为 1。你可以通过调用函数来保留对象来增加引用计数，通过调用函数来释放对象来减少引用计数。当引用计数减少到 0 时，对象被释放。此模型允许对象安全地共享对其他对象的引用。
+
+&emsp;需要牢记一些简单的规则：
+
++ 如果你创建或复制一个对象，你就拥有它，因此你必须释放它。也就是说，一般来说，如果从名称中带有 “Create” 或 “Copy” 字样的函数中获取对象，则必须在处理完该对象后释放该对象。否则，会导致内存泄漏。
++ 如果从名称中不包含单词 “Create” 或 “Copy” 的函数中获取对象，则不拥有对该对象的引用，并且不能释放该对象。该对象将在将来某个时候由其所有者释放。
++ 如果你不拥有某个对象并且需要将其保留在周围，则必须保留该对象，并在处理完该对象后将其释放。可以使用特定于对象的 Quartz 2D 函数来保留和释放该对象。例如，如果收到对 CGColorspace 对象的引用，则可以使用函数 `CGColorSpaceRetain` 和 `CGColorSpaceRelease` 根据需要保留和释放该对象。你也可以使用 Core Foundation  础函数 `CFRetain` 和 `CFRelease`，但必须注意不要将 NULL 传递给这些函数。
 
 
-
-
-
-
-
-The opaque data types available in Quartz 2D include the following:
-
-CGPathRef, used for vector graphics to create paths that you fill or stroke. See Paths.
-CGImageRef, used to represent bitmap images and bitmap image masks based on sample data that you supply. See Bitmap Images and Image Masks.
-CGLayerRef, used to represent a drawing layer that can be used for repeated drawing (such as for backgrounds or patterns) and for offscreen drawing. See Core Graphics Layer Drawing
-CGPatternRef, used for repeated drawing. See Patterns.
-CGShadingRef and CGGradientRef, used to paint gradients. See Gradients.
-CGFunctionRef, used to define callback functions that take an arbitrary number of floating-point arguments. You use this data type when you create gradients for a shading. See Gradients.
-CGColorRef and CGColorSpaceRef, used to inform Quartz how to interpret color. See Color and Color Spaces.
-CGImageSourceRef and CGImageDestinationRef, which you use to move data into and out of Quartz. See Data Management in Quartz 2D and Image I/O Programming Guide.
-CGFontRef, used to draw text. See Text.
-CGPDFDictionaryRef, CGPDFObjectRef, CGPDFPageRef, CGPDFStream, CGPDFStringRef, and CGPDFArrayRef, which provide access to PDF metadata. See PDF Document Creation, Viewing, and Transforming.
-CGPDFScannerRef and CGPDFContentStreamRef, which parse PDF metadata. See PDF Document Parsing.
-CGPSConverterRef, used to convert PostScript to PDF. It is not available in iOS. See PostScript Conversion.
 
 
 
