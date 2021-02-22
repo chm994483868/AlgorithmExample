@@ -43,7 +43,8 @@ int main(int argc, char * argv[]) {
     return UIApplicationMain(argc, argv, nil, appDelegateClassName);
     // return 0;
     
-    // 把上面的 return UIApplicationMain(argc, argv, nil, appDelegateClassName); 语句拆开如下：
+    // 把上面的 return UIApplicationMain(argc, argv, nil, appDelegateClassName); 语句拆开如下两行：
+    
     // int result = UIApplicationMain(argc, argv, nil, appDelegateClassName);
     // return result; // ⬅️ 在此行打一个断点，执行程序会发现此断点是无效的，因为 main 函数根本不会执行到这里
 }
@@ -59,8 +60,8 @@ UIKIT_EXTERN int UIApplicationMain(int argc, char * _Nullable argv[_Nonnull], NS
 > &emsp;Even though an integer return type is specified, this function never returns. When users exits an iOS app by pressing the Home button, the application moves to the background.
 > &emsp;即使指定了整数返回类型，此函数也从不返回。当用户通过按 Home 键退出 iOS 应用时，该应用将移至后台。
 > &emsp;**Discussion**
-> &emsp;... It also sets up the main event loop, including the application’s run loop, and begins processing events. ... Despite the declared return type, this function never returns.
-> &emsp;... 它还设置 main event loop，包括应用程序的 run loop（main run loop），并开始处理事件。... 尽管声明了返回类型，但此函数从不返回。
+> &emsp;...It also sets up the main event loop, including the application’s run loop, and begins processing events. ... Despite the declared return type, this function never returns.
+> &emsp;...它还设置 main event loop，包括应用程序的 run loop（main run loop），并开始处理事件。... 尽管声明了返回类型，但此函数从不返回。
 
 &emsp;在开发者文档中查看 `UIApplicationMain` 函数，摘要告诉我们 `UIApplicationMain` 函数完成：**创建应用程序对象和应用程序代理并设置 event cycle**，看到 Return Value 一项 Apple 已经明确告诉我们 `UIApplicationMain` 函数是不会返回的，并且在 Discussion 中也告诉我们 `UIApplicationMain` 函数启动了 main run loop 并开始着手为我们处理事件。
 
@@ -162,11 +163,13 @@ entries =>
 common mode items = (null),
 modes = <CFBasicHash 0x2835b3360 [0x20e729430]>{type = mutable set, count = 1,
 entries =>
-    2 : <CFRunLoopMode 0x2800fca90 [0x20e729430]>{name = kCFRunLoopDefaultMode, port set = 0x9a03, queue = 0x2815f2880, source = 0x2815f3080 (not fired), timer port = 0x9803, 
+    2 : <CFRunLoopMode 0x2800fca90 [0x20e729430]>{name = kCFRunLoopDefaultMode, port set = 0x9a03, queue = 0x2815f2880, source = 0x2815f3080 (not fired), timer port = 0x9803,
+    
     sources0 = (null), // ⬅️ 空
     sources1 = (null), // ⬅️ 空
     observers = (null), // ⬅️ 空
     timers = (null), // ⬅️ 空
+    
     currently 629287011 (5987575088396) / soft deadline in: 7.68614087e+11 sec (@ -1) / hard deadline in: 7.68614087e+11 sec (@ -1)
 },
 
@@ -394,7 +397,7 @@ current mode = (none), // self.commonThread 线程的 run loop 已停止，self.
 
 &emsp;下面我们根据一些重要的知识点对上面的全部代码进行整体优化。
 
-&emsp;`performSelector:onThread:withObject:waitUntilDone:` 函数的最后一个参数 `wait` 传 `YES` 时必须保证 thread 线程参数存在并且该线程已开启 run loop，否则会直接 crash，这是因为线程不满足以上条件时无法执行 selector 参数传递的事件，`wait` 传递 `NO` 又非要等 `selector` 执行完成，这固然是完全是不可能的。所以，我们在所有的 `performSelector:onThread:withObject:waitUntilDone:` 函数执行前可以加一行 `if (!self.commonThread) return;` 判断，这里当然在 `self.commonThread` 线程创建完成后，若 `viewController` 不释放 `self.commonThread` 的引用，`self.commonThread` 都是不会为 `nil` 的（释放了也不会为 nil），但是这里我们在 `self.commonThread` 的 run loop 执行 `CFRunLoopStop` 停止函数后手动把 `self.commonThread` 置为 `nil`，毕竟失去活性的线程和已经为 `nil` 没什么两样。
+&emsp;`performSelector:onThread:withObject:waitUntilDone:` 函数的最后一个参数 `wait` 传 `YES` 时必须保证 thread 线程参数存在并且该线程已开启 run loop，否则会直接 crash，这是因为线程不满足以上条件时无法执行 selector 参数传递的事件，`wait` 传递 `YES` 又非要等 `selector` 执行完成，这固然是完全是不可能的。所以，我们在所有的 `performSelector:onThread:withObject:waitUntilDone:` 函数执行前可以加一行 `if (!self.commonThread) return;` 判断，这里当然在 `self.commonThread` 线程创建完成后，若 `viewController` 不释放 `self.commonThread` 的引用，`self.commonThread` 都是不会为 `nil` 的（释放了也不会为 nil，我们再访问则会发生访问野指针的 crash），但是这里我们在 `self.commonThread` 的 run loop 执行 `CFRunLoopStop` 停止函数后手动把 `self.commonThread` 置为 `nil`，毕竟失去活性的线程和已经为 `nil` 没什么两样。
 
 &emsp;因为我们在创建 `self.commonThread` 时就已经开启了该线程的 run loop，所以可以保证在向 `self.commonThread` 线程添加事件时它已经保持了活性。
 
@@ -728,7 +731,8 @@ NSRunLoopMode NSEventTrackingRunLoopMode;
 
 &emsp;具有相同目标 `aTarget` 的所有执行请求都将被取消。此方法仅在当前 run loop 中删除执行请求，而不是在所有 run loop 中删除。
 
-&emsp;以上便是 NSRunLoop.h 文件中所有内容的文档，
+&emsp;以上便是 NSRunLoop.h 文件中所有内容的文档。
+
 ## 参考链接
 **参考链接:🔗**
 + [runloop 源码](https://opensource.apple.com/tarballs/CF/)
