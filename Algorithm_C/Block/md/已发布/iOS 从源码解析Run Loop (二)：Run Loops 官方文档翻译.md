@@ -26,17 +26,17 @@
 
 &emsp;在代码中，你可以通过名称识别 modes。Cocoa 和 Core Foundation 都定义了默认模式和几种常用模式，以及用于在代码中指定这些 mode 的字符串。你可以通过简单地为 mode 名称指定自定义字符串来定义自定义 mode。尽管你分配给自​​定义 mode 的名称是任意的，但是这些 mode 的内容不是任意的。你必须确保将一个或多个 input sources，timers 或 run-loop observers 添加到你创建的任何 mode 中，以使其有用。
 
-&emsp;你可以使用模式从运行循环的特定遍历中过滤掉有害来源的事件。大多数时候，您将需要在系统定义的“默认”模式下运行运行循环。但是，模式面板可以在“模式”模式下运行。在这种模式下，只有与模式面板相关的源才将事件传递给线程。对于辅助线程，您可以使用自定义模式来防止低优先级源在时间紧迫的操作期间传递事件。
+&emsp;你可以使用模式从运行循环的特定遍历中过滤掉有害来源的事件。大多数时候，你将需要在系统定义的“默认”模式下运行运行循环。但是，模式面板可以在“模式”模式下运行。在这种模式下，只有与模式面板相关的源才将事件传递给线程。对于辅助线程，你可以使用自定义模式来防止低优先级源在时间紧迫的操作期间传递事件。
 
 &emsp;在 run loop 的特定传递过程中，可以使用 mode 从不需要的 sources 中筛选出事件。大多数情况下，你希望以系统定义的 "default" mode 运行 run loop。然而，modal panel 可能以 "modal" mode 运行，在这种 mode 下，只有与 modal panel 相关的 sources 才会向线程传递事件。对于子线程（secondary threads），可以使用自定义 mode 来防止低优先级源（low-priority sources）在时间关键型操作（time-critical operations）期间传递事件。
 
-&emsp;Note: Modes 的区别基于事件的 source，而不是事件的类型（type of the event）。例如，你不会使用 modes 仅匹配鼠标按下事件或仅匹配键盘事件。你可以使用 modes 来监听不同的端口集（set of ports），暂时挂起 timers，或者更改当前正在监视的 sources 和 run loop observers。
+> Note: Modes 的区别基于事件的 source，而不是事件的类型（type of the event）。例如，你不会使用 modes 仅匹配鼠标按下事件或仅匹配键盘事件。你可以使用 modes 来监听不同的端口集（set of ports），暂时挂起 timers，或者更改当前正在监视的 sources 和 run loop observers。
 
 &emsp;表 3-1 列出了 Cocoa 和 Core Foundation 定义的 standard modes，以及何时使用该 mode 的说明。 name 列列出了用于在代码中指定 mode 的实际常量。
 
 &emsp;表 3-1 预定义的 run loop modes
 | Mode | Name | Description |
-| - | - | - |
+| --- | --- | ---- |
 | Default | NSDefaultRunLoopMode (Cocoa) kCFRunLoopDefaultMode (Core Foundation) | 默认模式是用于大多数操作的模式。大多数时候，你应该使用此模式启动 run loop 并配置 input sources。 |
 | Connection | NSConnectionReplyMode (Cocoa) | Cocoa 将此模式与 NSConnection 对象结合使用来监视响应。你应该很少需要自己使用这种模式。 |
 | Modal | NSModalPanelRunLoopMode (Cocoa) | Cocoa 使用此模式来识别用于 modal panels 的事件。 |
@@ -92,6 +92,7 @@ cancelPreviousPerformRequestsWithTarget:selector:object: | 使你可以取消使
 &emsp;有关配置 timer sources 的更多信息，参考 Configuring Timer Sources。有关参考信息，可参见 NSTimer Coass Reference 或 CFRunLoopTimer Reference。
 ### Run Loop Observers
 &emsp;与在发生适当的异步或同步事件时触发的 sources 不同，run loop observers 在 run loop 本身执行期间在特殊位置激发。你可以使用 run loop observers 来准备线程来处理给定的事件，或者在线程进入休眠状态之前对其进行准备。可以将 run loop observers 与 run loop 中的以下事件关联：
+
 + run loop 进入入口。
 + run loop 将要处理 timer 时。
 + run loop 将要处理 input source 时。
@@ -136,6 +137,7 @@ cancelPreviousPerformRequestsWithTarget:selector:object: | 使你可以取消使
 &emsp;唯一需要显式运行 run loop 的时机是在为应用程序创建子线程时。应用程序主线程的 run loop 是基础架构的重要组成部分。因此，应用程序框架（app frameworks）提供了用于运行主应用程序循环（main application loop）并自动启动该循环的代码。 iOS 中 UIApplication 的 run 方法（或 OS X 中 NSApplication）的 run 方法将启动应用程序的主循环（application's main loop），这是正常启动顺序的一部分。如果使用 Xcode 模板项目创建应用程序，则永远不必显式调用这些例程。
 
 &emsp;对于子线程，你需要确定是否需要 run loop，如果需要，请自己配置并启动它。你不需要在所有情况下都启动线程的 run loop。例如，如果你使用一个线程来执行一些长期运行的预定任务，你可能可以避免启动 run loop。run loop 用于希望与线程进行更多交互的情况。例如，如果计划执行以下任一操作，则需要启动 run loop：
+
 + 使用端口（ports）或自定义输入源（custom input sources）与其他线程通信。
 + 在线程上使用 timer。
 + 在 Cocoa 应用程序中使用任何 `performSelector…` 方法。
@@ -143,15 +145,16 @@ cancelPreviousPerformRequestsWithTarget:selector:object: | 使你可以取消使
 
 &emsp;如果选择使用 run loop，则配置和设置很简单。不过，与所有线程编程一样，你应该有一个在适当情况下退出子线程的计划。通过让线程退出而干净地结束它总是比强制它终止要好。有关如何配置和退出运行循环的信息，请参考 Using Run Loop Objects。
 ## Using Run Loop Objects
-&emsp;运行循环对象提供了用于将输入源，计时器和运行循环观察器添加到您的运行循环然后运行它的主界面。每个线程都有一个与之关联的运行循环对象。在可可中，此对象是NSRunLoop类的实例。在低级应用程序中，它是指向CFRunLoopRef不透明类型的指针。
-
 &emsp;Run loop 对象提供主接口，用于向 run loop 添加 input sources、timers 和 run loop observers，然后运行它。每个线程都有一个与之关联的 run loop 对象。在 Cocoa 中，此对象是 NSRunLoop 类的实例。在低级应用程序中（low-level application），它是指向 CFRunLoopRef 不透明类型的指针。
+
 ### Getting a Run Loop Object
 &emsp;要获取当前线程的 run loop，请使用以下方法之一：
-+ 在 Cocoa 应用程序中，使用 NSRunLoop 的 currentRunLoop 类方法检索 NSRunLoop 对象。
+
++ 在 Cocoa 应用程序中，使用 NSRunLoop 的 `currentRunLoop` 类方法检索 NSRunLoop 对象。
 + 使用 `CFRunLoopGetCurrent` 函数。
 
 &emsp;尽管它们不是免费的桥接类型（not toll-free bridged types），但你可以在需要时从 NSRunLoop 对象获取 CFRunLoopRef 不透明类型。NSRunLoop 类定义一个 `getCFRunLoop` 方法，该方法返回可以传递给 Core Foundation 例程的 CFRunLoopRef 类型。因为这两个对象引用同一个 run loop，因此可以根据需要混合调用 NSRunLoop 对象和 CFRunLoopRef 不透明类型。
+
 ### Configuring the Run Loop
 &emsp;在子线程上运行 run loop 之前，必须至少向其添加一个 input source 或 timer。如果 run loop 没有任何要监视的 source，则当你尝试运行它时，它会立即退出。有关如何向 run loop 添加 sources 的示例，请参考 Configuring Run Loop Sources。
 
@@ -189,6 +192,7 @@ cancelPreviousPerformRequestsWithTarget:selector:object: | 使你可以取消使
 ### Starting the Run Loop
 &emsp;仅对于应用程序中的子线程，才需要启动运行循环。一个 run loop 必须至少具有一个要监视的 input source 或 timer。如果未附加的话，则 run loop 立即退出。
 &emsp;有几种启动 run loop 的方法，包括以下几种：
+
 + 无条件的（Unconditionally，run 函数）
 + 有固定的时间限制（runUntilDate: 函数）
 + 以特定的 mode（runMode:beforeDate: 函数）
@@ -249,6 +253,7 @@ cancelPreviousPerformRequestsWithTarget:selector:object: | 使你可以取消使
 &emsp;下面的部分展示了如何在 Cocoa 和 Core Foundation 中设置不同类型的 input sources 的示例。
 ### Defining a Custom Input Source
 &emsp;创建自定义输入源（custom input source）涉及定义以下内容：
+
 + 希望 input source 处理的信息。
 + 调度程序例程（scheduler routine），让感兴趣的 clients 知道如何联系你的 input source。
 + 处理程序例程（handler routine），用于执行任何 clients 发送的请求。
@@ -265,8 +270,6 @@ cancelPreviousPerformRequestsWithTarget:selector:object: | 使你可以取消使
 &emsp;以下部分将解释上图中自定义输入源的实现，并显示需要实现的关键代码。
 ### Defining the Input Source
 &emsp;定义自定义输入源需要使用 Core Foundation 例程来配置你的运行循环源并将其附加到运行循环。尽管基本处理程序是基于 C 的函数，但这并不妨碍你编写这些函数的包装程序并使用 Objective-C 或 C++ 来实现代码主体。
-
-&emsp;图3-2中引入的输入源使用一个Objective-C对象来管理命令缓冲区并与运行循环协调。清单3-3显示了此对象的定义。 RunLoopSource对象管理命令缓冲区，并使用该缓冲区从其他线程接收消息。此清单还显示了RunLoopContext对象的定义，该对象实际上只是一个容器对象，用于将RunLoopSource对象和运行循环引用传递给应用程序的主线程。
 
 &emsp;图 3-2 中引入的输入源使用 Objective-C 对象来管理命令缓冲区并与 run loop 协调。清单 3-3 显示了这个对象的定义。RunLoopSource 对象管理命令缓冲区，并使用该缓冲区从其它线程接收消息。这个清单还显示了 RunLoopContext 对象的定义，它实际上只是一个容器对象，用于传递 RunLoopSource 对象和对应用程序主线程的 run loop 引用。
 

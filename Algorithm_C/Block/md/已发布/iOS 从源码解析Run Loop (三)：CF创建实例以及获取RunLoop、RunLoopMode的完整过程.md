@@ -203,10 +203,10 @@ typedef struct __CFRuntimeClass {
     // 当 version 字段值和 _kCFRuntimeCustomRefCount 与操作为真时，指示应使用此字段。
     
     // 当 version 字段值和 _kCFRuntimeCustomRefCount 与操作为真时，此字段必须为非 NULL。
-    // - 如果回调在 'op' 中传递 1，则应增加 'cf' 的引用计数并返回0
+    // - 如果回调在 'op' 中传递 1，则应增加 'cf' 的引用计数并返回 0
     // - 如果回调在 'op' 中传递了 0，则应返回 'cf' 的引用计数，最多 32 位
     // - 如果回调在 'op' 中传递 -1，则应减少 'cf' 的引用计数；
-    // 如果现在为零，则应清理并释放'cf'（除非该进程在 GC 下运行，并且 CF 不会为你分配内存，否则不会调用上述 finalize 回调；如果在 GC 下运行，则 finalize 应该执行拆除对象并释放对象内存）；然后返回0
+    // 如果现在为零，则应清理并释放'cf'（除非该进程在 GC 下运行，并且 CF 不会为你分配内存，否则不会调用上述 finalize 回调；如果在 GC 下运行，则 finalize 应该执行拆除对象并释放对象内存）；然后返回 0
     // 记住要使用饱和算术逻辑并在 ref 计数达到 UINT32_MAX 时停止递增和递减，否则你将遇到安全漏洞
     // 请记住，引用计数的递增/递减必须线程安全/原子地完成
     // 类创建函数应使用自定义引用计数 1 创建/初始化对象
@@ -428,7 +428,7 @@ loop = (CFRunLoopRef)_CFRuntimeCreateInstance(kCFAllocatorSystemDefault, CFRunLo
 // extraBytes 是为实例分配的额外字节数（超出 CFRuntimeBase 所需的字节数）。
 // 如果指定的 CFTypeID 对于 CF 运行时是未知的，则此函数返回 NULL。
 // 除了基址头（CFRuntimeBase）之外，新内存的任何部分都没有初始化（例如，多余的字节不是零）。
-// 使用此函数创建的所有实例只能通过使用 CFRelease() 函数来销毁——不能直接使用 CFAllocatorDeallocate() 销毁实例，即使在类的初始化或创建函数中也是如此。 为 category 参数传递NULL。
+// 使用此函数创建的所有实例只能通过使用 CFRelease() 函数来销毁——不能直接使用 CFAllocatorDeallocate() 销毁实例，即使在类的初始化或创建函数中也是如此。 为 category 参数传递 NULL。
 
 CF_EXPORT CFTypeRef _CFRuntimeCreateInstance(CFAllocatorRef allocator, CFTypeID typeID, CFIndex extraBytes, unsigned char *category);
 ```
@@ -852,6 +852,7 @@ static CFRunLoopRef __CFRunLoopCreate(pthread_t t) {
 &emsp;`__CFRunLoopCreate` 函数整体看下来涉及的细节和函数调用还挺多的。首先是 `_CFRuntimeCreateInstance` 函数调用中的参数：`CFRunLoopGetTypeID()` 该函数内部使用全局只会进行一次的在 Core Foundation 运行时中为我们注册两个类 run loop（CFRunLoop）和 run loop mode（CFRunLoopMode），并返回 `__kCFRunLoopTypeID` 指定 `_CFRuntimeCreateInstance` 函数构建的是 CFRunLoop 的实例。
 
 &emsp;然后 run loop 的实例 loop 创建好以后是对 loop 的一些成员变量进行初始化。
+
 + 初始化 loop 的 `_perRunData`。
 + 初始化 loop 的 `pthread_mutex_t _lock`，`_lock` 的初始时属性用的 `PTHREAD_MUTEX_RECURSIVE`，即 `_lock` 为一个互斥递归锁。
 + 给 loop 的 `_wakeUpPort`（唤醒端口）赋初值（`__CFPortAllocate()`）。
@@ -859,6 +860,7 @@ static CFRunLoopRef __CFRunLoopCreate(pthread_t t) {
 + 初始化 loop 的 `_commonModes` 并把默认 mode 的字符串（"kCFRunLoopDefaultMode"）添加到 `_commonModes` 中，即把默认 mode 标记为 common。
 + 初始化 loop 的 `_modes`，并把构建好的 `CFRunLoopModeRef rlm` 添加到 `_modes` 中。
 + 把 `pthread_t t` 赋值给 loop 的 `_pthread` 成员变量。（`Windows` 下会获取当前线程的 ID 赋值给 loop 的 `_winthread`）
+
 ##### \__CFRunLoopPushPerRunData
 &emsp;`__CFRunLoopPushPerRunData` 初始化 run loop 的 `_perRunData`，并返回 `_perRunData` 的旧值。每次 run loop 运行会重置 `_perRunData`（重新为 \_perRunData 创建 \_per_run_data 实例）。`_perRunData->stopped` 表示是否停止的标记，停止则设置为 `0x53544F50`，运行则为 `0x0`。`_perRunData->ignoreWakeUps` 表示是否忽略唤醒的标记，忽略则设置为 `0x57414B45`，不忽略则为`0x0`。
 ```c++
