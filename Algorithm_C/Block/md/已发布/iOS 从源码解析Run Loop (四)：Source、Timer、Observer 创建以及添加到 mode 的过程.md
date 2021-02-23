@@ -196,7 +196,7 @@ typedef struct {
     Boolean (*equal)(const void *info1, const void *info2); // 判断 source 对象是否相等的函数
     CFHashCode (*hash)(const void *info); // 哈希函数
     
-    // 上面是 CFRunLoopSourceContext 和 CFRunLoopSourceContext1 的基础内容双方完成等同，
+    // 上面是 CFRunLoopSourceContext 和 CFRunLoopSourceContext1 的基础内容双方完全等同，
     // 两者的区别主要在下面，同时它们也表示了 source0 和 source1 的不同功能。
     
     void (*schedule)(void *info, CFRunLoopRef rl, CFStringRef mode); // 当 source0 加入到 run loop 时触发的回调函数（在下面的 CFRunLoopAddSource 函数中可看到其被调用了）
@@ -368,7 +368,7 @@ CF_INLINE void __CFSetValid(void *cf) {
 ((V) = ((V) & 0xffffffefUL) | 0x00000000UL) // 4⃣️
 // 因为最右面是和 0 做或操作可直接忽略
 ((CFRuntimeBase *)cf)->_cfinfo[0] = ((CFRuntimeBase *)cf)->_cfinfo[0] & 0xffffffefUL // 5⃣️
-// 前面学习 _CFRuntimeCreateInstance 函数z时，我们知道 _cfinfo 中间两个字节保存的是类型 ID（类在类表中的索引），
+// 前面学习 _CFRuntimeCreateInstance 函数时，我们知道 _cfinfo 中间两个字节保存的是类型 ID（类在类表中的索引），
 // 然后前一个字节和后一个字节是 0，那么 _cfinfo[0] 低 8 位是 1110 1111
 ```
 &emsp;`__CFRunLoopSourceUnsetSignaled(memory);` 调用内部同上 `__CFBitfieldSetValue(rls->_bits, 1, 1, 0);` 这里就不展开了。
@@ -505,7 +505,7 @@ void CFRunLoopAddSource(CFRunLoopRef rl, CFRunLoopSourceRef rls, CFStringRef mod
 
 &emsp;CFRunLoopSource 的创建和添加就看完了，下面我们看 CFRunLoopObserverRef。（关于 CFRunLoopSource 中的 source0 和 souce1 的区别以及 source1 中的 port 相关的内容我们在下一篇再展开分析）
 ## CFRunLoopObserverRef（struct \__CFRunLoopObserver *）
-&emsp;CFRunLoopObserverRef 是观察者，每个 observer 都包含了一个回调（函数指针），当 run loop 的状态发生变化时，观察者就能通过回调接受到这个变化。主要是用来向外界报告 run loop 当前的状态的更改。
+&emsp;CFRunLoopObserverRef 是观察者，每个 observer 都包含了一个回调（函数指针），当 run loop 的状态发生变化时，观察者就能通过回调接收到这个变化。主要是用来向外界报告 run loop 当前的状态的更改。
 ```c++
 typedef struct __CFRunLoopObserver * CFRunLoopObserverRef;
 

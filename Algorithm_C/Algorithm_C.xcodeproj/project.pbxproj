@@ -214,7 +214,7 @@
 		8E153AC925C64CA900C95D86 /* iOS《Core Image Programming Guide》官方文档.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS《Core Image Programming Guide》官方文档.md"; sourceTree = "<group>"; };
 		8E153ACA25C64DD300C95D86 /* iOS《OpenGL ES Programming Guide》官方文档.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS《OpenGL ES Programming Guide》官方文档.md"; sourceTree = "<group>"; };
 		8E153ACB25C64F4F00C95D86 /* iOS《Drawing and Printing Guide for iOS》官方文档.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS《Drawing and Printing Guide for iOS》官方文档.md"; sourceTree = "<group>"; };
-		8E153ACC25C64F8500C95D86 /* iOS《Quartz 2D Programming Guide》官方文档.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS《Quartz 2D Programming Guide》官方文档.md"; sourceTree = "<group>"; };
+		8E153ACC25C64F8500C95D86 /* iOS《Quartz 2D Programming Guide》官方文档-Graphics Contexts.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS《Quartz 2D Programming Guide》官方文档-Graphics Contexts.md"; sourceTree = "<group>"; };
 		8E15F1D424E423FE00660C93 /* iOS消息转发机制.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS消息转发机制.md"; sourceTree = "<group>"; };
 		8E189A782594D1910048E34F /* iOS 从源码解析Run Loop (七)：mach msg 解析.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 从源码解析Run Loop (七)：mach msg 解析.md"; sourceTree = "<group>"; };
 		8E2572BB24D062C90080F598 /* CPower.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = CPower.cpp; sourceTree = "<group>"; };
@@ -582,6 +582,7 @@
 		D2EA0A0D25E35D500054B58A /* MinNumberInRotatedArray_2.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = MinNumberInRotatedArray_2.cpp; sourceTree = "<group>"; };
 		D2EA0A0E25E35D500054B58A /* MinNumberInRotatedArray_2.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = MinNumberInRotatedArray_2.hpp; sourceTree = "<group>"; };
 		D2EA0A1025E4BA850054B58A /* iOS《Color Management Overview》官方文档.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS《Color Management Overview》官方文档.md"; sourceTree = "<group>"; };
+		D2EA0A1125E4ED310054B58A /* iOS《Quartz 2D Programming Guide》官方文档-Paths.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS《Quartz 2D Programming Guide》官方文档-Paths.md"; sourceTree = "<group>"; };
 		D2EB00FD24D912C6009EAFD6 /* Algorithm_Swift */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = Algorithm_Swift; sourceTree = BUILT_PRODUCTS_DIR; };
 		D2EB00FF24D912C6009EAFD6 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
 		D2EB010824D9136D009EAFD6 /* BubbleSort.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BubbleSort.swift; sourceTree = "<group>"; };
@@ -1496,7 +1497,8 @@
 				D2EA09DE25C2BC0F0054B58A /* iOS《Concurrency Programming Guide-Operation Queues》官方文档.md */,
 				D2EA09BB25B7B5000054B58A /* iOS《Core Animation Programming Guide》官方文档.md */,
 				D2EA09C925BEB8560054B58A /* iOS《View Programming Guide for iOS》官方文档.md */,
-				8E153ACC25C64F8500C95D86 /* iOS《Quartz 2D Programming Guide》官方文档.md */,
+				8E153ACC25C64F8500C95D86 /* iOS《Quartz 2D Programming Guide》官方文档-Graphics Contexts.md */,
+				D2EA0A1125E4ED310054B58A /* iOS《Quartz 2D Programming Guide》官方文档-Paths.md */,
 				8E153AC825C4EE0F00C95D86 /* iOS《View Controller Programming Guide for iOS》官方文档.md */,
 				8E153AC925C64CA900C95D86 /* iOS《Core Image Programming Guide》官方文档.md */,
 				8E153ACA25C64DD300C95D86 /* iOS《OpenGL ES Programming Guide》官方文档.md */,

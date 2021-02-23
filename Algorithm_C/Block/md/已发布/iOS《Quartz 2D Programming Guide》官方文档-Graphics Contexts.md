@@ -1,4 +1,4 @@
-# iOS《Quartz 2D Programming Guide》官方文档
+# iOS《Quartz 2D Programming Guide》官方文档-Graphics Contexts
 
 ## Introduction
 &emsp;Core Graphics，也被称为 Quartz 2D，是一个先进的二维绘图引擎，可用于 iOS、tvOS 和 macOS 应用程序开发。Quartz 2D 提供低级别、轻量级的 2D 渲染，无论显示或打印设备如何，都具有无与伦比的输出保真度。Quartz 2D 是分辨率和设备无关。
@@ -473,7 +473,7 @@ CGContextRef MyCreateBitmapContext (int pixelsWide, int pixelsHigh) {
 | Gray | 8 bpp, 8 bpc,kCGImageAlphaNone 没有 Alpha 通道 | Mac OS X, iOS |
 | Gray | 8 bpp, 8 bpc,kCGImageAlphaOnly 没有颜色数据，只有一个 Alpha 通道 | Mac OS X, iOS |
 | Gray | 16 bpp, 16 bpc, kCGImageAlphaNone 没有 Alpha 通道 | Mac OS X |
-| Gray | 32 bpp, 32 bpc, kCGImageAlphaNone|kCGBitmapFloatComponents 没有 Alpha 通道且位图的组成部分是浮点值 | Mac OS X |
+| Gray | 32 bpp, 32 bpc, kCGImageAlphaNone \| kCGBitmapFloatComponents 没有 Alpha 通道且位图的组成部分是浮点值 | Mac OS X |
 | RGB | 16 bpp, 5 bpc, kCGImageAlphaNoneSkipFirst 没有 Alpha 通道。如果像素的总大小大于颜色空间中颜色分量数量所需的空间，则忽略最高有效位 | Mac OS X, iOS |
 | RGB | 32 bpp, 8 bpc, kCGImageAlphaNoneSkipFirst 没有 Alpha 通道。如果像素的总大小大于颜色空间中颜色分量数量所需的空间，则忽略最高有效位 | Mac OS X, iOS |
 | RGB | 32 bpp, 8 bpc, kCGImageAlphaNoneSkipLast 没有 Alpha 通道 | Mac OS X, iOS |
@@ -481,11 +481,11 @@ CGContextRef MyCreateBitmapContext (int pixelsWide, int pixelsHigh) {
 | RGB | 32 bpp, 8 bpc, kCGImageAlphaPremultipliedLast Alpha 分量存储在每个像素的最低有效位中，并且颜色分量已经与该 Alpha 值相乘。例如，premultiplied RGBA | Mac OS X, iOS |
 | RGB | 64 bpp, 16 bpc, kCGImageAlphaPremultipliedLast Alpha 分量存储在每个像素的最低有效位中，并且颜色分量已经与该 Alpha 值相乘。例如，premultiplied RGBA | Mac OS X |
 | RGB | 64 bpp, 16 bpc, kCGImageAlphaNoneSkipLast 没有 Alpha 通道 | Mac OS X |
-| RGB | 128 bpp, 32 bpc, kCGImageAlphaNoneSkipLast |kCGBitmapFloatComponents | Mac OS X |
-| RGB | 128 bpp, 32 bpc, kCGImageAlphaPremultipliedLast |kCGBitmapFloatComponents | Mac OS X |
+| RGB | 128 bpp, 32 bpc, kCGImageAlphaNoneSkipLast \| kCGBitmapFloatComponents | Mac OS X |
+| RGB | 128 bpp, 32 bpc, kCGImageAlphaPremultipliedLast \| kCGBitmapFloatComponents | Mac OS X |
 | CMYK | 32 bpp, 8 bpc, kCGImageAlphaNone 没有 Alpha 通道 | Mac OS X |
 | CMYK | 64 bpp, 16 bpc, kCGImageAlphaNone 没有 Alpha 通道 | Mac OS X |
-| CMYK | 128 bpp, 32 bpc, kCGImageAlphaNone |kCGBitmapFloatComponents | Mac OS X |
+| CMYK | 128 bpp, 32 bpc, kCGImageAlphaNone \| kCGBitmapFloatComponents | Mac OS X |
 
 #### Anti-Aliasing
 &emsp;位图图形上下文支持抗锯齿（anti-aliasing），这是一种在绘制文本或形状时人为更正位图图像中有时出现的锯齿（jagged）（或锯齿）边的过程。当位图的分辨率明显低于眼睛的分辨率时，会出现这些锯齿状边缘。为了使对象在位图中看起来平滑，Quartz 对形状轮廓周围的像素使用不同的颜色。通过这种方式混合颜色，形状看起来很平滑。你可以在图 2-4 中看到使用抗锯齿的效果。通过调用函数 `CGContextSetShouldAntialias`，可以关闭特定位图图形上下文的抗锯齿。抗锯齿设置是图形状态（graphics state）的一部分。

@@ -1002,7 +1002,7 @@ static void __CFRunLoopDeallocate(CFTypeRef cf) {
     }
     
     // CF 下的 release
-    // rl 会持有 _commonModeItems、_commonModes、_modes，所以这里要进行一次释放
+    // rl 会持有 _commonModeItems、_commonModes、_modes 所以这里要进行一次释放
     if (NULL != rl->_commonModeItems) {
         CFRelease(rl->_commonModeItems);
     }
@@ -1061,6 +1061,7 @@ static CFStringRef __CFRunLoopCopyDescription(CFTypeRef cf) {
 }
 ```
 &emsp;看到这里 run loop 创建以及销毁的相关的内容就看完了，其中比较重要的 `__CFRunLoopFindMode` 函数，留在下 CFRunLoopModeRef 节再分析。
+
 ### CFRunLoopModeRef（struct \__CFRunLoopMode *）
 &emsp;每次 run loop 开始 run 的时候，都必须指定一个 mode，称为 run loop mode（运行循环模式）。mode 指定了在这次 run 中，run loop 可以处理的任务，对于不属于当前 mode 的任务，则需要切换 run loop 至对应 mode 下，再重新调用 run 方法，才能够被处理，这样也保证了不同 mode 的 source/timer/observer 互不影响，使不同 mode 下的数据做到相互隔离的。下面我们就从代码层面看下 mode 的数据结构、CFRunLoopMode 类对象及一些相关的函数。
 
@@ -1151,7 +1152,8 @@ struct __CFRunLoopMode {
     uint64_t _timerHardDeadline; /* TSR */
 };
 ```
-&emsp;看完了 run loop mode 的数据结构定义，那么我们分析下 `__CFRunLoopFindMode` 函数，正是通过它得到一个 run loop mode 对象。通常我们接触到的 run loop mode 只有 kCFRunLoopDefaultMode 和 UITrackingRunLoopMode，前面看到 run loop 创建时会通过 `__CFRunLoopFindMode` 函数取得一个默认 mode，并把它添加到 run loop 对象的 \_modes 中。
+&emsp;看完了 run loop mode 的数据结构定义，那么我们分析下 `__CFRunLoopFindMode` 函数，正是通过它得到一个 run loop mode 对象。通常我们接触到的 run loop mode 只有 kCFRunLoopDefaultMode 和 UITrackingRunLoopMode，前面看到 run loop 创建时会通过 `__CFRunLoopFindMode` 函数取得一个默认 mode（kCFRunLoopDefaultMode），并把它添加到 run loop 对象的 \_modes 中。
+
 #### \__CFRunLoopFindMode
 &emsp;`__CFRunLoopFindMode` 函数根据 modeName 从 rl 的 _modes 中找到其对应的 CFRunLoopModeRef，如果找到的话则加锁并返回。如果未找到，并且 create 为真的话，则新建 __CFRunLoopMode 加锁并返回，如果 create 为假的话，则返回 NULL。
 ```c++
@@ -1192,7 +1194,7 @@ static CFRunLoopModeRef __CFRunLoopFindMode(CFRunLoopRef rl, CFStringRef modeNam
     
     // 如果没有找到，并且 create 值为 false，则表示不进行创建，直接返回 NULL。
     if (!create) {
-    return NULL;
+        return NULL;
     }
     
     // 创建一个 CFRunLoopMode 对并返回其地址
@@ -1226,7 +1228,7 @@ static CFRunLoopModeRef __CFRunLoopFindMode(CFRunLoopRef rl, CFStringRef modeNam
     rlm->_timerHardDeadline = UINT64_MAX;
     
     // ret 是一个临时变量初始值是 KERN_SUCCESS，用来表示向 rlm->_portSet 中添加 port 时的结果，
-    // 如果添加失败的话，会直接 CRASH， 
+    // 如果添加失败的话，会直接 CRASH 
     kern_return_t ret = KERN_SUCCESS;
     
 #if USE_DISPATCH_SOURCE_FOR_TIMERS
@@ -1292,7 +1294,7 @@ static CFRunLoopModeRef __CFRunLoopFindMode(CFRunLoopRef rl, CFStringRef modeNam
     //（本质是把 rlm 添加到 _modes 哈希表中）
     CFSetAddValue(rl->_modes, rlm);
     
-    // 释放，rlm 被 rl->_modes 持有，并不会被销毁
+    // 释放，rlm 已被 rl->_modes 持有，并不会被销毁只是减少引用计数
     CFRelease(rlm);
     
     // 加锁，然后返回 rlm
