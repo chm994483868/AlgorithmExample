@@ -223,10 +223,10 @@ CGContextRef myContext = [[NSGraphicsContext currentContext] graphicsPort];
                                 currentContext] graphicsPort];
                                 
    // ********** Your drawing code here ********** // 2
-    CGContextSetRGBFillColor (myContext, 1, 0, 0, 1);// 3
-    CGContextFillRect (myContext, CGRectMake (0, 0, 200, 100 ));// 4
-    CGContextSetRGBFillColor (myContext, 0, 0, 1, .5);// 5
-    CGContextFillRect (myContext, CGRectMake (0, 0, 100, 200));// 6
+    CGContextSetRGBFillColor (myContext, 1, 0, 0, 1); // 3
+    CGContextFillRect (myContext, CGRectMake (0, 0, 200, 100 )); // 4
+    CGContextSetRGBFillColor (myContext, 0, 0, 1, .5); // 5
+    CGContextFillRect (myContext, CGRectMake (0, 0, 100, 200)); // 6
   }
  
 @end
@@ -240,31 +240,266 @@ CGContextRef myContext = [[NSGraphicsContext currentContext] graphicsPort];
 6. 填充一个原点为（0, 0）且宽度为 100 且高度为 200 的矩形。
 
 ### Creating a PDF Graphics Context
-&emsp;
+&emsp;创建 PDF 图形上下文并绘制到该上下文时，Quartz 会将图形记录为一系列写入文件的 PDF 绘图命令。你可以为 PDF 输出提供一个位置和一个默认的媒体框—一个指定页面边界的矩形。图 2-2 显示了绘制到 PDF 图形上下文，然后在预览中打开生成的 PDF 的结果。
 
+&emsp;Figure 2-2  A PDF created by using CGPDFContextCreateWithURL（使用 CGPDFContextCreateWithURL 创建的 PDF）
 
-When you create a PDF graphics context and draw to that context, Quartz records your drawing as a series of PDF drawing commands written to a file. You supply a location for the PDF output and a default media box—a rectangle that specifies bounds of the page. Figure 2-2 shows the result of drawing to a PDF graphics context and then opening the resulting PDF in Preview.
+![pdf_context_draw](https://p1-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/1b9c4ac6ffb4485dbf5803807eba7c07~tplv-k3u1fbpfcp-watermark.image)
 
-Figure 2-2  A PDF created by using CGPDFContextCreateWithURL
+&emsp;Quartz 2D API 提供了两个创建 PDF 图形上下文的函数：
 
++ `CGPDFContextCreateWithURL`，当你要将 PDF 输出的位置指定为 Core Foundation URL 时使用它。清单 2-2 展示了如何使用此函数创建 PDF 图形上下文。
++ `CGPDFContextCreate`，当你希望将 PDF 输出发送给数据使用者时使用它。（有关更多信息，请参见 Data Management in Quartz 2D）清单 2-3 显示了如何使用此函数创建 PDF 图形上下文。
+
+&emsp;每个清单后面都有对每行代码的详细解释。
+
+> iOS Note: iOS 中的 PDF 图形上下文使用 Quartz 提供的默认坐标系，而不应用 transform 来匹配 UIKit 坐标系。如果应用程序计划在 PDF 图形上下文和 UIView 对象提供的图形上下文之间共享图形代码，则应用程序应修改 PDF 图形上下文的 CTM 以修改坐标系。
+
+&emsp;Listing 2-2  Calling CGPDFContextCreateWithURL to create a PDF graphics context（调用 CGPDFContextCreateWithURL 创建 PDF 图形上下文）
+```c++
+CGContextRef MyPDFContextCreate (const CGRect *inMediaBox, CFStringRef path) {
+    CGContextRef myOutContext = NULL;
+    CFURLRef url;
+ 
+    url = CFURLCreateWithFileSystemPath (NULL, // 1
+                                path,
+                                kCFURLPOSIXPathStyle,
+                                false);
+    if (url != NULL) {
+        myOutContext = CGPDFContextCreateWithURL (url, // 2
+                                        inMediaBox,
+                                        NULL);
+        CFRelease(url); // 3
+    }
+    return myOutContext; // 4
+}
+```
+&emsp;代码是这样的：
+1. 调用 Core Foundation 函数，从提供给 `MyPDFContextCreate` 函数的 CFString 对象创建 CFURL 对象。传递 NULL 作为第一个参数以使用默认分配器。你还需要指定一个路径样式，在本例中是 POSIX 样式的路径名。
+2. 调用 Quartz 2D 函数，使用刚刚创建的 PDF 位置（作为 CFURL 对象）和指定 PDF 边界的矩形创建 PDF 图形上下文。矩形（CGRect）被传递给 `MyPDFContextCreate` 函数，是 PDF 的默认页面媒体边界框。
+3. 释放 CFURL 对象。
+4. 返回 PDF 图形上下文。当不再需要图形上下文时，调用者必须释放它。
+
+&emsp;Listing 2-3  Calling CGPDFContextCreate to create a PDF graphics context（调用 CGPDFContextCreate 创建 PDF 图形上下文）
+```c++
+CGContextRef MyPDFContextCreate (const CGRect *inMediaBox, CFStringRef path) {
+    CGContextRef        myOutContext = NULL;
+    CFURLRef            url;
+    CGDataConsumerRef   dataConsumer;
+ 
+    url = CFURLCreateWithFileSystemPath (NULL, // 1
+                                        path,
+                                        kCFURLPOSIXPathStyle,
+                                        false);
+ 
+    if (url != NULL) {
+        dataConsumer = CGDataConsumerCreateWithURL (url);// 2
+        if (dataConsumer != NULL) {
+            myOutContext = CGPDFContextCreate (dataConsumer, // 3
+                                        inMediaBox,
+                                        NULL);
+            CGDataConsumerRelease (dataConsumer);// 4
+        }
+        CFRelease(url);// 5
+    }
+    return myOutContext;// 6
+}
+```
+&emsp;代码是这样的：
+1. 调用 Core Foundation 函数，从提供给 `MyPDFContextCreate` 函数的 CFString 对象创建 CFURL 对象。传递 NULL 作为第一个参数以使用默认分配器。你还需要指定一个路径样式，在本例中是 POSIX 样式的路径名。
+2. 使用 CFURL 对象创建 Quartz dataConsumer 对象。如果你不想使用 CFURL 对象（例如，你希望将 PDF 数据放置在 CFURL 对象无法指定的位置），则可以从应用程序中实现的一组回调函数中创建 dataConsumer。有关更多信息，请参见 Data Management in Quartz 2D。
+3. 调用 Quartz 2D 函数创建 PDF 图形上下文，将 dataConsumer 和传递给 `MyPDFContextCreate` 函数的矩形（CGRect 类型）作为参数传递。此矩形是 PDF 的默认页面媒体边界框。
+4. 释放 dataConsumer。
+5. 释放 CFURL 对象。
+6. 返回 PDF 图形上下文。当不再需要图形上下文时，调用者必须释放它。
+
+&emsp;清单 2-4 展示了如何调用 MyPDFContextCreate 例程并绘制到它。下面列出了每一行代码的详细说明。
+
+&emsp;Listing 2-4  Drawing to a PDF graphics context
+```c++
+   CGRect mediaBox; // 1
+
+   mediaBox = CGRectMake (0, 0, myPageWidth, myPageHeight); // 2
+   myPDFContext = MyPDFContextCreate (&mediaBox, CFSTR("test.pdf")); // 3
+
+   CFStringRef myKeys[1]; // 4
+   CFTypeRef myValues[1];
+   myKeys[0] = kCGPDFContextMediaBox;
+   myValues[0] = (CFTypeRef)CFDataCreate(NULL, (const UInt8 *)&mediaBox, sizeof(CGRect));
+   CFDictionaryRef pageDictionary = CFDictionaryCreate(NULL, (const void **)myKeys,
+                                                       (const void **)myValues, 1,
+                                                       &kCFTypeDictionaryKeyCallBacks,
+                                                       &kCFTypeDictionaryValueCallBacks);
+   CGPDFContextBeginPage(myPDFContext, &pageDictionary); // 5 开始
+       // ********** Your drawing code here ********** // 6
+       CGContextSetRGBFillColor (myPDFContext, 1, 0, 0, 1);
+       CGContextFillRect (myPDFContext, CGRectMake (0, 0, 200, 100 ));
+       CGContextSetRGBFillColor (myPDFContext, 0, 0, 1, .5);
+       CGContextFillRect (myPDFContext, CGRectMake (0, 0, 100, 200 ));
+   CGPDFContextEndPage(myPDFContext); // 7 结束
+   CFRelease(pageDictionary); // 8
+   CFRelease(myValues[0]);
+   CGContextRelease(myPDFContext);
+```
+&emsp;代码是这样的：
+1. 声明用于定义 PDF 媒体框（mediaBox）的矩形的变量。
+2. 将媒体框（mediaBox）的原点设置为（0, 0），将宽度和高度设置为应用程序提供的变量。
+3. 调用函数 `MyPDFContextCreate`（参见清单 2-3）以获取 PDF 图形上下文，并提供媒体框（mediaBox）和路径名。宏 CFSTR 将字符串转换为 CFStringRef 数据类型。
+4. 使用页面选项设置 dictionary。在本例中，仅指定媒体框（kCGPDFContextMediaBox）。你不必传递用于设置 PDF 图形上下文的矩形。你在此处添加的媒体框将取代你传递的用于设置 PDF 图形上下文的矩形。
+5. 表示页面开始。此函数用于面向页面的图形，这就是 PDF 绘图。
+6. 调用 Quartz 2D 绘图函数。将此代码和以下四行代码替换为适合你的应用程序的图形代码。
+7. 指示 PDF 页面结束。
+8. 当不再需要 dictionary 和 PDF 图形上下文时，释放它们。
+
+&emsp;你可以将任何内容写入适合你的应用程序的 PDF 图像、文本、路径图，还可以添加链接和加密。有关更多信息，请参见 PDF Document Creation, Viewing, and Transforming。
 
 ### Creating a Bitmap Graphics Context
+&emsp;位图图形上下文接受指向包含位图存储空间的内存缓冲区的指针。在位图图形上下文中绘制时，缓冲区将更新。释放图形上下文后，将以指定的像素格式完全更新位图。
+
+> Note: 位图图形上下文有时用于在屏幕外绘制。在决定为此目的使用位图图形上下文之前，请参见 Core Graphics Layer Drawing。 CGLayer 对象（CGLayerRef）已针对屏幕外绘图进行了优化，因为 Quartz 尽可能在视频卡（GPU）上缓存图层。
+
+> iOS Note: iOS 应用程序应该使用 `UIGraphicsBeginImageContextWithOptions` 函数，而不是使用这里描述的低级 Quartz 函数。如果应用程序使用 Quartz 创建屏幕外位图，则位图图形上下文使用的坐标系是默认的 Quartz 坐标系。相反，如果应用程序通过调用函数 `UIGraphicsBeginImageContextWithOptions` 来创建图像上下文，则 UIKit 对上下文的坐标系应用与对 UIView 对象的图形上下文相同的转换。这样，应用程序就可以使用相同的绘图代码，而不必担心不同的坐标系。虽然应用程序可以手动调整坐标变换矩阵以获得正确的结果，但在实践中，这样做对性能没有好处。
+
+&emsp;使用函数 `CGBitmapContextCreate` 创建位图图形上下文。此函数采用以下参数：
+```c++
+CGContextRef CGBitmapContextCreate(void *data, size_t width, size_t height, size_t bitsPerComponent, size_t bytesPerRow, CGColorSpaceRef space, uint32_t bitmapInfo);
+```
++ data。提供指向内存中要渲染图形的目标的指针。此内存块的大小应至少为（bytesPerRow * height）字节。
++ width。指定位图的宽度（以像素为单位）。
++ height。指定位图的高度（以像素为单位）。
++ bitsPerComponent。指定要用于内存中像素的每个组件的位数。例如，对于 32 位像素格式和 RGB 颜色空间，可以为每个组件指定 8 位的值。请参见 Supported Pixel Formats。（RGB 24 RGBA 32）
++ bytesPerRow。指定位图的每一行要使用的内存字节数。
+
+> Tip: 创建位图图形上下文时，如果确保 data 和 bytesPerRow 是 16 字节对齐的，则会获得最佳性能。
+
++ colorspace。用于位图上下文的颜色空间。创建位图图形上下文时，可以提供 Gray、RGB、CMYK 或 NULL 颜色空间。有关颜色空间和颜色管理原则的详细信息，请参见 Color Management Overview。有关在 Quartz 中创建和使用颜色空间的信息，请参见 Color and Color Spaces。有关支持的颜色空间的信息，请参见 Bitmap Images and Image Masks 章中的 Color Spaces and Bitmap Layout。
++ bitmapInfo。位图布局信息，用 CGBitmapInfo 常量表示，指定位图是否应包含 alpha 分量、alpha 分量（如果有）在像素中的相对位置、alpha 分量是否是预乘的以及颜色分量是整数值还是浮点值。有关这些常量是什么、何时使用以及位图图形上下文和图像的 Quartz 支持的像素格式的详细信息，请参见 Bitmap Images and Image Masks 章中的 Color Spaces and Bitmap Layout。
+
+&emsp;清单 2-5 展示了如何创建位图图形上下文。在生成的位图图形上下文中绘图时，Quartz 会将绘图作为位图数据记录在指定的内存块中。下面列出了每一行代码的详细说明。
+
+&emsp;Listing 2-5  Creating a bitmap graphics context
+```c++
+CGContextRef MyCreateBitmapContext (int pixelsWide, int pixelsHigh) {
+    CGContextRef    context = NULL;
+    CGColorSpaceRef colorSpace;
+    void *          bitmapData;
+    int             bitmapByteCount;
+    int             bitmapBytesPerRow;
+ 
+    bitmapBytesPerRow   = (pixelsWide * 4);// 1
+    bitmapByteCount     = (bitmapBytesPerRow * pixelsHigh);
+ 
+    colorSpace = CGColorSpaceCreateWithName(kCGColorSpaceGenericRGB);// 2
+    bitmapData = calloc(bitmapByteCount, sizeof(uint8_t) );// 3
+    if (bitmapData == NULL)
+    {
+        fprintf (stderr, "Memory not allocated!");
+        return NULL;
+    }
+    context = CGBitmapContextCreate(bitmapData,// 4
+                                    pixelsWide,
+                                    pixelsHigh,
+                                    8,      // bits per component
+                                    bitmapBytesPerRow,
+                                    colorSpace,
+                                    kCGImageAlphaPremultipliedLast);
+    if (context== NULL)
+    {
+        free(bitmapData);// 5
+        fprintf(stderr, "Context not created!");
+        return NULL;
+    }
+    CGColorSpaceRelease(colorSpace);// 6
+ 
+    return context;// 7
+}
+```
+&emsp;代码是这样的：
+1. 声明一个变量以表示每行的字节数。本例中位图中的每个像素由 4 个字节表示；红、绿、蓝 和 alpha 各 8 位。
+2. 创建通用 RGB 颜色空间。也可以创建 CMYK 颜色空间。有关更多信息以及通用颜色空间与设备相关颜色空间的讨论，请参见 Color and Color Spaces。
+3. 调用 calloc 函数来创建并清除存储位图数据的内存块。本例创建一个 32 位 RGBA 位图（即，每像素 32 位的数组，每个像素包含 8 位的红、绿、蓝和 alpha 信息）。位图中的每个像素占用 4 字节的内存。在 Mac OS X 10.6 和 iOS 4 中，如果将 NULL 作为位图数据传递，则可以省略此步骤，Quartz 会自动为位图分配空间。
+4. 创建位图图形上下文，提供位图数据、位图的宽度和高度、每个组件的位数、每行的字节数、颜色空间以及指定位图是否应包含 alpha 通道及其在像素中的相对位置的常量。常数 kCGImageAlphaPremultipliedLast 表示 alpha 分量存储在每个像素的最后一个字节中，并且颜色分量已经与该 alpha 值相乘。有关预乘 alpha 的详细信息，请参见 The Alpha Value。
+5. 如果由于某种原因没有创建上下文（创建失败），请释放为位图数据分配的内存。
+6. 释放颜色空间。
+7. 返回位图图形上下文。当不再需要图形上下文时，调用者必须释放它。
+
+&emsp;清单 2-6 显示了调用 `MyCreateBitmapContext` 来创建位图图形上下文的代码，使用位图图形上下文来创建 CGImage 对象，然后将结果图像绘制到窗口图形上下文。图 2-3 显示了绘制到窗口的图像。下面列出了每一行代码的详细说明。
+
+&emsp;Listing 2-6  Drawing to a bitmap graphics context
+```c++
+   CGRect myBoundingBox; // 1
+
+   myBoundingBox = CGRectMake(0, 0, myWidth, myHeight); // 2
+   myBitmapContext = MyCreateBitmapContext(400, 300); // 3
+   
+   // ********** Your drawing code here ********** // 4
+   CGContextSetRGBFillColor(myBitmapContext, 1, 0, 0, 1);
+   CGContextFillRect(myBitmapContext, CGRectMake (0, 0, 200, 100));
+   CGContextSetRGBFillColor(myBitmapContext, 0, 0, 1, .5);
+   CGContextFillRect(myBitmapContext, CGRectMake (0, 0, 100, 200));
+   
+   myImage = CGBitmapContextCreateImage(myBitmapContext); // 5
+   CGContextDrawImage(myContext, myBoundingBox, myImage); // 6
+   
+   char *bitmapData = CGBitmapContextGetData(myBitmapContext); // 7
+   CGContextRelease(myBitmapContext); // 8
+   if (bitmapData) free(bitmapData); // 9
+   CGImageRelease(myImage); // 10
+```
+&emsp;代码是这样的：
+1. 声明一个变量以存储边界框的原点和尺寸，Quartz 将在其中绘制从位图图形上下文创建的图像。
+2. 将边界框的原点设置为（0, 0），将宽度和高度设置为先前声明的变量，但其声明在此代码中未显示。
+3. 调用应用程序提供的函数 `MyCreateBitmapContext`（参见清单 2-5）来创建一个宽 400 像素、高 300 像素的位图上下文。你可以使用适合你的应用程序的任何尺寸创建位图图形上下文。
+4. 调用 Quartz 2D 函数以绘制到位图图形上下文中。你将用适合你的应用程序的绘图代码替换此代码和接下来的四行代码。
+5. 从位图图形上下文创建 Quartz 2D 图像（CGImageRef）。
+6. 将图像绘制到窗口图形上下文中由边界框（myBoundingBox）指定的位置。边界框（myBoundingBox）指定在用户空间中绘制图像的位置和尺寸。
+7. 获取与位图图形上下文关联的位图数据。
+8. 在不再需要时释放位图图形上下文。
+9. 释放位图数据（如果存在）。
+10. 当不再需要时释放图像。
+
+&emsp;Figure 2-3  An image created from a bitmap graphics context and drawn to a window graphics context（从位图图形上下文创建并绘制到窗口图形上下文的图像）
+
+![cocoa_draw1](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/9aeefecb42c54274a8d4a581dda90f40~tplv-k3u1fbpfcp-watermark.image)
 
 #### Supported Pixel Formats
+&emsp;表 2-1 总结了位图图形上下文支持的像素格式、相关颜色空间（cs）以及该格式首次可用的 Mac OS X 版本。像素格式指定为每像素位（bits per pixel）（bpp）和每分量位（bits per component）（bpc）。该表还包括与该像素格式相关联的位图信息常量。有关每个位图信息格式常量表示什么的详细信息，请参见 CGImage Reference 。
+
+&emsp;Table 2-1  Pixel formats supported for bitmap graphics contexts（位图图形上下文支持的像素格式）
+
+| CS | Pixel format and bitmap information constant | Availability |
+| --- | --- | --- |
+| Null | 8 bpp, 8 bpc, kCGImageAlphaOnly 没有颜色数据，只有一个 Alpha 通道 | Mac OS X, iOS |
+| Gray | 8 bpp, 8 bpc,kCGImageAlphaNone 没有 Alpha 通道 | Mac OS X, iOS |
+| Gray | 8 bpp, 8 bpc,kCGImageAlphaOnly 没有颜色数据，只有一个 Alpha 通道 | Mac OS X, iOS |
+| Gray | 16 bpp, 16 bpc, kCGImageAlphaNone 没有 Alpha 通道 | Mac OS X |
+| Gray | 32 bpp, 32 bpc, kCGImageAlphaNone|kCGBitmapFloatComponents 没有 Alpha 通道且位图的组成部分是浮点值 | Mac OS X |
+| RGB | 16 bpp, 5 bpc, kCGImageAlphaNoneSkipFirst 没有 Alpha 通道。如果像素的总大小大于颜色空间中颜色分量数量所需的空间，则忽略最高有效位 | Mac OS X, iOS |
+| RGB | 32 bpp, 8 bpc, kCGImageAlphaNoneSkipFirst 没有 Alpha 通道。如果像素的总大小大于颜色空间中颜色分量数量所需的空间，则忽略最高有效位 | Mac OS X, iOS |
+| RGB | 32 bpp, 8 bpc, kCGImageAlphaNoneSkipLast 没有 Alpha 通道 | Mac OS X, iOS |
+| RGB | 32 bpp, 8 bpc, kCGImageAlphaPremultipliedFirst Alpha 分量存储在每个像素的最高有效位中，并且颜色分量已经乘以该 Alpha 值。例如，premultiplied ARGB | Mac OS X, iOS |
+| RGB | 32 bpp, 8 bpc, kCGImageAlphaPremultipliedLast Alpha 分量存储在每个像素的最低有效位中，并且颜色分量已经与该 Alpha 值相乘。例如，premultiplied RGBA | Mac OS X, iOS |
+| RGB | 64 bpp, 16 bpc, kCGImageAlphaPremultipliedLast Alpha 分量存储在每个像素的最低有效位中，并且颜色分量已经与该 Alpha 值相乘。例如，premultiplied RGBA | Mac OS X |
+| RGB | 64 bpp, 16 bpc, kCGImageAlphaNoneSkipLast 没有 Alpha 通道 | Mac OS X |
+| RGB | 128 bpp, 32 bpc, kCGImageAlphaNoneSkipLast |kCGBitmapFloatComponents | Mac OS X |
+| RGB | 128 bpp, 32 bpc, kCGImageAlphaPremultipliedLast |kCGBitmapFloatComponents | Mac OS X |
+| CMYK | 32 bpp, 8 bpc, kCGImageAlphaNone 没有 Alpha 通道 | Mac OS X |
+| CMYK | 64 bpp, 16 bpc, kCGImageAlphaNone 没有 Alpha 通道 | Mac OS X |
+| CMYK | 128 bpp, 32 bpc, kCGImageAlphaNone |kCGBitmapFloatComponents | Mac OS X |
 
 #### Anti-Aliasing
+&emsp;位图图形上下文支持抗锯齿（anti-aliasing），这是一种在绘制文本或形状时人为更正位图图像中有时出现的锯齿（jagged）（或锯齿）边的过程。当位图的分辨率明显低于眼睛的分辨率时，会出现这些锯齿状边缘。为了使对象在位图中看起来平滑，Quartz 对形状轮廓周围的像素使用不同的颜色。通过这种方式混合颜色，形状看起来很平滑。你可以在图 2-4 中看到使用抗锯齿的效果。通过调用函数 `CGContextSetShouldAntialias`，可以关闭特定位图图形上下文的抗锯齿。抗锯齿设置是图形状态（graphics state）的一部分。
+
+&emsp;通过使用函数 `CGContextSetAllowsAntialiasing`，可以控制是否允许对特定图形上下文进行抗锯齿。将 true 传递给此函数以允许抗锯齿，传递 false 则不允许抗锯齿。此设置不是图形状态（graphics state）的一部分。当上下文和图形状态设置置为 true 时，Quartz 执行抗锯齿。
+
+&emsp;Figure 2-4  A comparison of aliased and anti-aliasing drawing（锯齿和抗锯齿绘图的比较）
+
+![antialias](https://p9-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/c56d0c661402408b84dcda98bf163f95~tplv-k3u1fbpfcp-watermark.image)
 
 ### Obtaining a Graphics Context for Printing
+&emsp;Mac OS X 中的 Cocoa 应用程序通过自定义 NSView 子类实现打印。通过调用其 `print:` 方法通知视图进行打印。然后，视图创建一个图形上下文，该上下文以打印机为目标，并调用其 `drawRect:` 方法。应用程序使用与绘制到屏幕相同的绘图代码绘制到打印机。它还可以自定义 `drawRect:` 对打印机图像的调用，该图像与发送到屏幕的图像不同。
 
-
-
-
-
-
-
-
-
-
+&emsp;有关在 Cocoa 中进行打印的详细讨论，请参见 Printing Programming Guide for Mac。
 
 ## 参考链接
 **参考链接:🔗**

@@ -581,6 +581,7 @@
 		D2EA0A0B25E359590054B58A /* Fibonacci_2.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = Fibonacci_2.hpp; sourceTree = "<group>"; };
 		D2EA0A0D25E35D500054B58A /* MinNumberInRotatedArray_2.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = MinNumberInRotatedArray_2.cpp; sourceTree = "<group>"; };
 		D2EA0A0E25E35D500054B58A /* MinNumberInRotatedArray_2.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = MinNumberInRotatedArray_2.hpp; sourceTree = "<group>"; };
+		D2EA0A1025E4BA850054B58A /* iOS《Color Management Overview》官方文档.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS《Color Management Overview》官方文档.md"; sourceTree = "<group>"; };
 		D2EB00FD24D912C6009EAFD6 /* Algorithm_Swift */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = Algorithm_Swift; sourceTree = BUILT_PRODUCTS_DIR; };
 		D2EB00FF24D912C6009EAFD6 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
 		D2EB010824D9136D009EAFD6 /* BubbleSort.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BubbleSort.swift; sourceTree = "<group>"; };
@@ -1501,6 +1502,7 @@
 				8E153ACA25C64DD300C95D86 /* iOS《OpenGL ES Programming Guide》官方文档.md */,
 				8E153ACB25C64F4F00C95D86 /* iOS《Drawing and Printing Guide for iOS》官方文档.md */,
 				D2EA09F425CB930B0054B58A /* iOS《Animation Types and Timing Programming Guide》官方文档.md */,
+				D2EA0A1025E4BA850054B58A /* iOS《Color Management Overview》官方文档.md */,
 				D2EA09BD25B97C1C0054B58A /* iOS CALayer 官方文档.md */,
 				D2EA09BC25B972B90054B58A /* iOS NSCoding.md */,
 				D2EA09D425C2540B0054B58A /* iOS 渲染过程全解析.md */,
