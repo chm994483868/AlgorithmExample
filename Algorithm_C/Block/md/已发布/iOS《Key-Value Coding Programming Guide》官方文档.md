@@ -1,15 +1,15 @@
 # iOS KVC 官方文档《Key-Value Coding Programming Guide》中文翻译
 
-> &emsp;日常开发中我们可能已经非常习惯于使用 valueForKey: 和 setValue:forKey:，不过可能有一些细节我们未深入过，那么下面一起通过官方文档来全面的学习一下 KVC 吧！⛽️⛽️ 
+> &emsp;日常开发中我们可能已经非常习惯于使用 `valueForKey:` 和 `setValue:forKey:`，不过可能有一些细节我们未深入过，那么下面一起通过官方文档来全面的学习一下 KVC 吧！⛽️⛽️ 
 
 ## About Key-Value Coding
-&emsp;Key-value coding（键值编码）是由 NSKeyValueCoding 非正式协议启用的一种机制，对象采用这种机制来提供对其属性/成员变量的间接访问。当一个对象符合键值编码时，它的属性/成员变量可以通过一个简洁、统一的消息传递接口（setValue:forKey:）通过字符串参数寻址。这种间接访问机制补充了实例变量（自动生成的 \_属性名 ）及其相关访问器方法（getter 方法）提供的直接访问。
+&emsp;Key-value coding（键值编码）是由 NSKeyValueCoding 非正式协议启用的一种机制，对象采用这种机制来提供对其属性/成员变量的间接访问。当一个对象符合键值编码时，它的属性/成员变量可以通过一个简洁、统一的消息传递接口（`setValue:forKey:`）通过字符串参数寻址。这种间接访问机制补充了实例变量（自动生成的 \_属性名 ）及其相关访问器方法（getter 方法）提供的直接访问。
 
 &emsp;通常使用访问器方法来访问对象的属性。get 访问器（或 getter）返回属性的值。set 访问器（或 setter）设置属性的值。在 Objective-C 中，还可以直接访问属性的底层实例变量（由编译器生成的对应于属性的由 下划线和属性名拼接构成的实例变量）。以上述任何一种方式访问对象属性都是简单的，但需要调用特定于属性的方法或变量名。随着属性列表的增长或更改，访问这些属性的代码也必须随之增长或更改。相反，键值编码兼容对象提供了一个简单的消息传递接口，该接口在其所有属性中都是一致的。
 
 &emsp;键值编码（key-value coding）是许多其他 Cocoa 技术的基础，例如 key-value observing、Cocoa bindings、Core Data 和 AppleScript-ability。在某些情况下，键值编码（key-value coding）还可以帮助简化代码。
 
-&emsp;在上面提到 "Key-value coding（键值编码）是由 NSKeyValueCoding 非正式协议启用的一种机制"，话说 NSKeyValueCoding 是非正式协议，即它不同于我们常见的 NSCopying、NSCoding 等协议是通过 @protocol 直接来定义的，然后当哪些类要遵循此协议时在其类声明或者类延展后面添加 <NSCopying, NSCoding> 表示该类遵循此协议。而 NSKeyValueCoding 机制则是通过分类来实现的，在 Foundation 框架下有一个 NSKeyValueCoding.h 接口文件，其内部定义了多组分类接口，其中包括：@interface NSObject(NSKeyValueCoding)、@interface NSArray<ObjectType>(NSKeyValueCoding)、@interface NSDictionary<KeyType, ObjectType>(NSKeyValueCoding)、@interface NSMutableDictionary<KeyType, ObjectType>(NSKeyValueCoding)、@interface NSOrderedSet<ObjectType>(NSKeyValueCoding)、@interface NSSet<ObjectType>(NSKeyValueCoding)，其中 NSObject 基类已经实现了 NSKeyValueCoding 机制的所有接口，然后 NSArray、NSDictionary、NSMutableDictionary、NSOrderedSet、NSSet 这些子类则是对 setValue:forKey: 和 valueForKey: 函数进行重载。例如当对一个 NSArray 对象调用 setValue:forKey: 函数时，它内部是对数组中的每个元素调用 setValue:forKey: 函数。当对一个 NSArray 对象调用 valueForKey: 函数时，它返回一个数组，其中包含在数组的每个元素上调用 valueForKey: 的结果。返回的数组将包含 NSNull 元素，指代的是数组中某些元素调用 valueForKey: 函数返回 nil 的情况。
+&emsp;在上面提到 "Key-value coding（键值编码）是由 NSKeyValueCoding 非正式协议启用的一种机制"，话说 NSKeyValueCoding 是非正式协议，即它不同于我们常见的 NSCopying、NSCoding 等协议是通过 @protocol 直接来定义的，然后当哪些类要遵循此协议时在其类声明或者类延展后面添加 <NSCopying, NSCoding> 表示该类遵循此协议。而 NSKeyValueCoding 机制则是通过分类来实现的，在 Foundation 框架下有一个 NSKeyValueCoding.h 文件，其内部定义了多组分类接口，其中包括：@interface NSObject(NSKeyValueCoding)、@interface NSArray<ObjectType>(NSKeyValueCoding)、@interface NSDictionary<KeyType, ObjectType>(NSKeyValueCoding)、@interface NSMutableDictionary<KeyType, ObjectType>(NSKeyValueCoding)、@interface NSOrderedSet<ObjectType>(NSKeyValueCoding)、@interface NSSet<ObjectType>(NSKeyValueCoding)，其中 NSObject 基类已经实现了 NSKeyValueCoding 机制的所有接口，然后 NSArray、NSDictionary、NSMutableDictionary、NSOrderedSet、NSSet 这些子类则是对 setValue:forKey: 和 valueForKey: 函数进行重载。例如当对一个 NSArray 对象调用 `setValue:forKey:` 函数时，它内部是对数组中的每个元素调用 `setValue:forKey:` 函数。当对一个 NSArray 对象调用 `valueForKey:` 函数时，它返回一个数组，其中包含在数组的每个元素上调用 `valueForKey:` 的结果。返回的数组将包含 `NSNull` 元素，指代的是数组中某些元素调用 `valueForKey:` 函数返回 nil 的情况。
 
 &emsp;那么这里我们先看一下 NSKeyValueCoding 的文档内容，然后再接着看 Key-Value Coding Programming Guide 文档。
 
@@ -156,9 +156,9 @@ NSLog(@"🛂🛂🛂🛂🛂 valueForKey 新增后 %@", self.student.personArray
 
 &emsp;如果 key 标识了一对一关系，将 value 指定的对象与 receiver 相关联，如果存在，则取消先前相关的对象的关联。
 
-&emsp;给定一个集合对象（value）和一个标识多对多关系的 key，将集合中包含的对象与 receiver 关联，如果存在以前关联的对象，则取消关联。
+&emsp;给定一个集合对象（value）和一个标识一对多关系的 key，将集合中包含的对象与 receiver 关联，如果存在以前关联的对象，则取消关联。
 
-&emsp;Key-Value Coding Programming Guide 中的 Accessor Search Patterns 中描述了 setValue:forKey: 使用的搜索模式。
+&emsp;Key-Value Coding Programming Guide 中的 Accessor Search Patterns 中描述了 `setValue:forKey:` 使用的搜索模式。
 
 &emsp;在使用引用计数的环境中，如果直接访问实例变量，则将保留值。
 #### setValue:forKeyPath:
@@ -168,7 +168,7 @@ NSLog(@"🛂🛂🛂🛂🛂 valueForKey 新增后 %@", self.student.personArray
 ```
 &emsp;`value` 是 `keyPath` 标识的属性的值。`keyPath` 表示属性关系的路径（有一个或多个关系），例如 "department.name" 或 "department.manager.lastName"。（同 valueForKeyPath:）
 
-&emsp;此方法的默认实现使用 valueForKey: 获取每个关系的目标对象，并向最终对象发送 setValue:forKey: 消息。（即先读取最终对象然后为其赋值）
+&emsp;此方法的默认实现使用 `valueForKey:` 获取每个关系的目标对象，并向最终对象发送 `setValue:forKey:` 消息。（即先读取最终对象然后为其赋值）
 
 &emsp;如果使用此方法，并且目标对象未实现该 `value` 的访问器，默认行为是该对象保留 `value`，而不是复制或分配 `value`。
 
@@ -177,9 +177,10 @@ NSLog(@"🛂🛂🛂🛂🛂 valueForKey 新增后 %@", self.student.personArray
 ```c++
 - (void)setNilValueForKey:(NSString *)key;
 ```
-&emsp;子类可以重写此方法以其他方式处理请求，例如用 0 或前哨值（sentinel value）代替 nil 并再次调用 setValue:forKey: 或直接设置变量。默认实现是引发 NSInvalidArgumentException。
+&emsp;子类可以重写此方法以其他方式处理请求，例如用 0 或前哨值（sentinel value）代替 nil 并再次调用 `setValue:forKey:` 或直接设置变量。默认实现是引发 NSInvalidArgumentException。
 
 &emsp;这里是针对非对象类型的属性例如 int / float。例如上面 Student 类添加一个 int 类型的属性 `@property (nonatomic, assign) int mark;`，然后我们使用 `[self.student setValue:nil forKey:@"mark"];` 设置的话，会直接 crash，此时我们可以重写 Student 的 setNilValueForKey: 函数来处理此种情况或者防止 crash。而属性是对象类型的话 value 传 nil 不会 crash。
+
 #### setValuesForKeysWithDictionary:
 &emsp;使用给定字典中的 value 设置 receiver 的属性，使用 value 对应的 key 来标识 receiver 的属性。
 ```c++
@@ -228,10 +229,14 @@ NSLog(@"🛂🛂🛂🛂🛂 valueForKey 新增后 %@", self.student.personArray
 ### Using Key-Value Coding Compliant Objects（使用键值编码兼容对象）
 &emsp;对象通常在继承 NSObject（直接或间接）时也会拥有 key-value coding 能力，因为 NSObject 采用 NSKeyValueCoding 协议并为基本方法提供默认实现（在 NSObject + NSKeyValueCoding 分类中默认实现了 Key-Value Coding 使用的基本方法）。此类对象允许其他对象通过紧凑的消息传递接口执行以下操作：
 
-+ **访问对象属性。** 该协议指定方法，例如泛型 getter 函数：`valueForKey:` 和泛型 setter 函数：`setValue:forKey:`，用于通过名称或键（参数化为字符串）访问对象属性。这些方法和相关方法的默认实现使用键来定位基础数据并与之交互，如 **Accessing Object Properties** 中所述。
-+ **操作集合属性。** 访问方法的默认实现与对象的集合属性（例如 NSArray 对象）一起使用，就像其他任何属性一样。此外，如果对象为属性定义了集合访问器方法，则它将启用对集合内容的键值访问。这通常比直接访问更有效，并允许你通过标准化的接口处理自定义集合对象，如 **Accessing Collection Properties** 中所述。
-+ **在集合对象上调用集合运算符。** 访问 key-value coding 兼容对象中的集合属性时，可以将集合运算符插入键字符串，如 **Using Collection Operators** 中所述。集合运算符指示默认的 NSKeyValueCoding getter 实现对集合执行操作，然后返回新的、经过筛选的集合版本，或者返回表示集合某些特征的单个值（平均值、总和等）。
-+ **访问非对象属性。** 协议的默认实现检测非对象属性，包括标量（scalars，int/float 等）和结构（structures），并自动将它们包装和展开为对象，以便在协议接口上使用，如 **Representing Non-Object Values** 中所述。此外，该协议声明了一种方法（setNilValueForKey:），允许兼容对象在通过键值编码接口对非对象属性设置 nil 值时提供适当的操作。 
++ **访问对象属性。** 该协议指定方法，例如泛型 getter 函数：`valueForKey:` 和泛型 setter 函数：`setValue:forKey:`，用于通过名称或键（参数化为字符串）访问对象属性。这些方法和相关方法的默认实现使用键来定位基础数据并与之交互，如 Accessing Object Properties 中所述。
+
++ **操作集合属性。** 访问方法的默认实现与对象的集合属性（例如 NSArray 对象）一起使用，就像其他任何属性一样。此外，如果对象为属性定义了集合访问器方法，则它将启用对集合内容的键值访问。这通常比直接访问更有效，并允许你通过标准化的接口处理自定义集合对象，如 Accessing Collection Properties 中所述。
+
++ **在集合对象上调用集合运算符。** 访问 key-value coding 兼容对象中的集合属性时，可以将集合运算符插入键字符串，如 Using Collection Operators 中所述。集合运算符指示默认的 NSKeyValueCoding getter 实现对集合执行操作，然后返回新的、经过筛选的集合版本，或者返回表示集合某些特征的单个值（平均值、总和等）。
+
++ **访问非对象属性。** 协议的默认实现检测非对象属性，包括标量（scalars，int/float 等）和结构（structures），并自动将它们包装和展开为对象，以便在协议接口上使用，如 Representing Non-Object Values 中所述。此外，该协议声明了一种方法（`setNilValueForKey:`），允许兼容对象在通过键值编码接口对非对象属性设置 nil 值时提供适当的操作。
+
 + **通过键路径访问属性。** 当你具有与 key-value coding 兼容的对象的层次结构时，可以使用基于键路径的方法调用来通过单个调用在层次结构内深入（直到最终目标），获取或设置值。（即沿着 @"xxx.xx.x" 一路向下）
 
 ### Adopting Key-Value Coding for an Object（为对象采用键值编码）

@@ -34,7 +34,7 @@
 
 ![kvo_objects_add](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/f1914af9c83540b7b2359d6f307a1d16~tplv-k3u1fbpfcp-watermark.image)
 
-&emsp;为了从 Account 接收更改通知，Person 实现了所有观察者（all observers）都必需实现的 observeValueForKeyPath:ofObject:change:context: 方法。每当注册的建路径之一发生更改时，Account 就会将此消息发送给 Person。然后，Person 可以根据更改通知采取适当的措施。
+&emsp;为了从 Account 接收更改通知，Person 实现了所有观察者（all observers）都必需实现的 observeValueForKeyPath:ofObject:change:context: 方法。每当注册的键路径之一发生更改时，Account 就会将此消息发送给 Person。然后，Person 可以根据更改通知采取适当的措施。
 
 ![kvo_objects_observe](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/ffbf4bbac70a4691bc83d972b64dff0b~tplv-k3u1fbpfcp-watermark.image)
 
@@ -74,7 +74,7 @@
 
 + 对于任何类型的属性（属性，一对一关系，有序或无序一对多关系），NSKeyValueChangeSetting 指示观察到的对象已收到 -setValue:forKey: 消息，或者表示与键值编码兼容的 set 方法用于键已被调用，或者 -willChangeValueForKey:/-didChangeValueForKey: 对已被调用。
 + 对于一对多关系，NSKeyValueChangeInsertion、NSKeyValueChangeRemoval 和 NSKeyValueChangeReplacement 表示已将变异消息发送到由 -mutableArrayValueForKey: 消息发送给对象返回的数组，或发送到由 -mutableOrderedSetValueForKey: 消息返回的有序集合。发送到对象，或者已经调用了符合键值编码的数组或键的有序集合突变方法之一，或者 -willChange:valuesAtIndexes:forKey:/-didChange:valuesAtIndexes:forKey: 对具有否则被调用。
-+ 对于一对多关系（在 Mac OS 10.4中引入），NSKeyValueChangeInsertion、NSKeyValueChangeRemoval 和 NSKeyValueChangeReplacement 表示已将变异消息发送到由 -mutableSetValueForKey: 消息已发送至对象返回的集合，或该键之一已调用了符合键值的 -value 编码的设置突变方法，或者已另外调用了-willChangeValueForKey:withSetMutation:usingObjects:/-ddChangeValueForKey:withSetMutation:usingObjects:对。
++ 对于一对多关系（在 Mac OS 10.4 中引入），NSKeyValueChangeInsertion、NSKeyValueChangeRemoval 和 NSKeyValueChangeReplacement 表示已将变异消息发送到由 -mutableSetValueForKey: 消息已发送至对象返回的集合，或该键之一已调用了符合键值的 -value 编码的设置突变方法，或者已另外调用了-willChangeValueForKey:withSetMutation:usingObjects:/-ddChangeValueForKey:withSetMutation:usingObjects:对。
 
 &emsp;对于任何类型的属性，如果在观察者注册时指定了 NSKeyValueObservingOptionNew，则更改字典将包含一个 NSKeyValueChangeNewKey 条目，这是正确的更改，并且这不是事先通知。如果指定了 NSKeyValueObservingOptionOld，则更改字典包含一个 NSKeyValueChangeOldKey，这是正确的更改。有关这些条目的值，请参见 NSKeyValueObserverNotification 非正式协议方法的注释。
 
@@ -152,7 +152,7 @@
 + 如果存在 NSKeyValueChangeNewKey 条目（仅适用于 NSKeyValueChangeInsertion 和 NSKeyValueChangeReplacement），则在调用 -didChangeValueForKey:valuesAtIndexes:forKey: 的瞬间，该数组将包含由 -valueForKey: 返回的数组中的索引对象。
 
 #### willChange:valuesAtIndexes:forKey:
-&emsp;通知被观察者对象，对于指定的有序一多对关系，将在给定的索引处执行指定的更改。
+&emsp;通知被观察者对象，对于指定的有序一对多关系，将在给定的索引处执行指定的更改。
 ```c++
 - (void)willChange:(NSKeyValueChange)changeKind valuesAtIndexes:(NSIndexSet *)indexes forKey:(NSString *)key;
 ```
@@ -163,6 +163,7 @@
 > &emsp;Important: 更改值后，必须使用相同的参数调用相应的 didChange:valuesAtIndexes:forKey:。
 
 &emsp;**你很少需要在子类中重写此方法，但是如果这样做，请确保调用 super。**
+
 #### didChange:valuesAtIndexes:forKey:
 &emsp;通知被观察者对象，指定的一对多关系在索引上发生了指定的更改。
 ```c++
@@ -199,6 +200,7 @@
 > &emsp;Important: 更改值后，必须使用相同的参数调用相应的 didChangeValueForKey:withSetMutation:usingObjects:。
 
 &emsp;**你很少需要在子类中重写此方法，但是如果这样做，请确保调用 super。**
+
 #### didChangeValueForKey:withSetMutation:usingObjects:
 &emsp;通知被观察者对象对指定的无序对一对多关系进行了指定的更改。
 ```c++
@@ -209,6 +211,7 @@
 &emsp;手动实现键值观察合规性时，请使用此方法。对该方法的调用始终与对  willChangeValueForKey:withSetMutation:usingObjects: 的调用配对。
 
 &emsp;**你很少需要在子类中重写此方法，但是如果这样做，请务必调用 super。**
+
 #### automaticallyNotifiesObserversForKey:
 &emsp;返回一个布尔值，该值指示被观察者对象是否支持给定键的自动键值观察。
 ```c++
@@ -234,6 +237,7 @@
 &emsp;当某个属性的 getter 方法使用其他属性的值（包括按键路径定位的属性）计算要返回的值时，可以重写此方法。重写通常应该调用 super 并返回一个集合，该集合包含执行该操作所产生的集合中的任何成员（以免干扰超类中此方法的重写）。
 
 > &emsp;Note: 使用 category 将计算的属性添加到现有类时，请勿覆盖此方法，不支持覆盖 category 中的方法。在这种情况下，请实现匹配的 +keyPathsForValuesAffecting<Key> 以利用此机制。
+
 #### setKeys:triggerChangeNotificationsForDependentKey:
 &emsp;如果给定数组中指定的任何属性发生更改，则将被观察者对象配置为发布给定属性的更改通知。
 
@@ -252,6 +256,7 @@
     [self setKeys:@[@"firstName", @"lastName"] triggerChangeNotificationsForDependentKey:@"fullName"];
 }
 ```
+
 #### observationInfo
 &emsp;返回一个指针，该指针标识有关向被观察者对象注册的所有观察者的信息。
 ```c++
@@ -353,6 +358,7 @@ typedef NS_ENUM(NSUInteger, NSKeyValueSetMutationKind) {
 + 使用 removeObserver:forKeyPath: 方法注销 observer 当它不再应该接收消息时。至少，在 observer 从内存中释放之前调用此方法。
 
 > &emsp;Important: 并非所有类的所有属性都符合 KVO。你可以按照 KVO Compliance 中所述的步骤，确保自己的类符合 KVO。通常，Apple 提供的框架中的属性只有在有文档记录的情况下才符合 KVO。
+
 ### Registering as an Observer（注册为观察者）
 &emsp;观察者对象（observing object）首先通过发送 addObserver:forKeyPath:options:context: 消息向被观察者对象（observed object）注册自己，将其自身作为观察者（observer）和要观察的属性的关键路径传递。观察者（observer）还指定了一个 options 参数和一个 context 指针来管理通知的各个方面。
 #### Options（观察选项）
