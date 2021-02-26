@@ -257,6 +257,7 @@ void cache_t::bad_cache(id receiver, SEL sel, Class isa)
 }
 ```
 &emsp;到这里 `bucket_t` 和 `cache_t` 定义的内容就全部看完了。接下来我们分析 `objc-cache.h` 中的内容。（`objc-cache.h` 文件定义系统库中，并不在 `objc4-781` 中。）
+
 ## objc-cache.h
 ```c++
 // objc-cache.h 文件的全部内容
@@ -290,7 +291,7 @@ __END_DECLS
 // #if TARGET_OS_SIMULATOR || defined(__i386__) || defined(__arm__) || !TARGET_OS_MAC
 // #   define HAVE_TASK_RESTARTABLE_RANGES 0
 // #else
-//     看到我们的 x86_64 和 arm64 平台下都是 1
+// 看到我们的 x86_64 和 arm64 平台下都是 1
 // #   define HAVE_TASK_RESTARTABLE_RANGES 1
 // #endif
 

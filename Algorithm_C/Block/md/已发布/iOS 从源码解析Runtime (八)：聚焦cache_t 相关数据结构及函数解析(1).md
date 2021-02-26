@@ -68,7 +68,7 @@ collecting_in_critical() to flush out cache readers.
 
 The cacheUpdateLock is also used to protect the custom allocator used for large method cache blocks.
 Cache readers (PC-checked by collecting_in_critical())
-cacheUpdateLock 还用于保护用于大型方法缓存块的自定义分配器。缓存读取器（由collecting_in_critical() 进行 PC 检查）
+cacheUpdateLock 还用于保护用于大型方法缓存块的自定义分配器。缓存读取器（由 collecting_in_critical() 进行 PC 检查）
 
 objc_msgSend
 cache_getImp
@@ -466,7 +466,7 @@ struct bucket_t *cache_t::emptyBuckets()
 #### buckets
 &emsp;散列数组的起始地址。
 ```c++
-// CACHE_MASK_STORAGE_OUTLINED
+// CACHE_MASK_STORAGE_OUTLINED 下
 // 没有任何嗦头，原子加载 _buckets 并返回
 struct bucket_t *cache_t::buckets() 
 {
@@ -474,17 +474,18 @@ struct bucket_t *cache_t::buckets()
     return _buckets.load(memory_order::memory_order_relaxed);
 }
 
-// CACHE_MASK_STORAGE_HIGH_16 
+// CACHE_MASK_STORAGE_HIGH_16 下
 // 也是没有任何嗦头，原子加载 _maskAndBuckets，然后与 bucketsMask 掩码与操作并把结果返回
 struct bucket_t *cache_t::buckets()
 {
     // 原子加载 _maskAndBuckets
     uintptr_t maskAndBuckets = _maskAndBuckets.load(memory_order::memory_order_relaxed);
     // 然后与 bucketsMask 做与操作并返回结果。
-    //（bucketsMask 的值是 低 44 位是 1，其它位全部是 0，与操作取出 maskAndBuckets 低 44 位的值）
+    //（bucketsMask 的值是低 44 位是 1，其它位全部是 0，与操作取出 maskAndBuckets 低 44 位的值）
     return (bucket_t *)(maskAndBuckets & bucketsMask);
 }
 ```
+
 #### mask
 &emsp;`_buckets` 的数组长度 -1（容量的临界值）。
 ```c++
@@ -1085,7 +1086,7 @@ void cache_t::reallocate(mask_t oldCapacity, mask_t newCapacity, bool freeOld)
     setBucketsAndMask(newBuckets, newCapacity - 1);
     
     if (freeOld) {
-        // 这里不是立即释放旧的 bukckts，而是将旧的 buckets 添加到存放旧散列表的列表中，以便稍后释放，注意这里是稍后释放。
+        // 这里不是立即释放旧的 buckets，而是将旧的 buckets 添加到存放旧散列表的列表中，以便稍后释放，注意这里是稍后释放。
         cache_collect_free(oldBuckets, oldCapacity);
     }
 }
@@ -1218,7 +1219,7 @@ static size_t garbage_max = 0;
 // capacity of initial garbage_refs
 // 初始 garbage_refs 的容量。
 enum {
-    INIT_GARBAGE_COUNT = 128
+    INIT_GARBAGE_COUNT = 128 // 8 个 bucket_t
 };
 
 static void _garbage_make_room(void)
@@ -1274,9 +1275,9 @@ void cache_collect(bool collectALot)
 
     // Done if the garbage is not full
     // 如果 garbage 未满，则返回
-    // 32*1024
+    // 32 * 1024
     // 未达到释放阀值，且 collectALot 为 false
-    if (garbage_byte_size < garbage_threshold  &&  !collectALot) {
+    if (garbage_byte_size < garbage_threshold && !collectALot) {
         return;
     }
 
@@ -1299,8 +1300,7 @@ void cache_collect(bool collectALot)
     else {
         // No excuses.
         // 一直循环直到 _collecting_in_critical 为 false.
-        while (_collecting_in_critical()) 
-            ;
+        while (_collecting_in_critical());
     }
 
     // No cache readers in progress - garbage is now deletable.
