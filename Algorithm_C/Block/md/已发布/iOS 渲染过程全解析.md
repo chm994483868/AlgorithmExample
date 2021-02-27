@@ -23,10 +23,11 @@
 
 
 
-
 ## 参考链接
 **参考链接:🔗**
 + [iOS Rendering 渲染全解析](https://github.com/RickeyBoy/Rickey-iOS-Notes/blob/master/笔记/iOS%20Rendering.md)
 + [iOS视觉(三) -- 离屏渲染详解](https://juejin.cn/post/6850418109845766151)
 + [iOS图像渲染及卡顿问题优化](https://juejin.cn/post/6874046143160909838)
 + [Drawing and Printing Guide for iOS](https://developer.apple.com/library/archive/documentation/2DDrawing/Conceptual/DrawingPrintingiOS/Introduction/Introduction.html#//apple_ref/doc/uid/TP40010156-CH1-SW1)
+
+17310047859
