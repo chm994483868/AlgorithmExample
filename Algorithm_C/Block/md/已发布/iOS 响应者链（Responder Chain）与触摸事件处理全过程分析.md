@@ -76,6 +76,7 @@ entries =>
     frame #16: 0x00007fff5227ec25 libdyld.dylib`start + 1
 (lldb) 
 ```
+
 &emsp;其中的 [UIApplication sendEvent:] 开始进行 UIEvent 事件在 App 中的分发，看到随后并分发到了 UIWindow 中。下面涉及到第一响应者的寻找以及响应者链执行事件，下面我们继续分章节进行学习。
 ## [UIApplication sendEvent:]
 &emsp;将事件调度到应用程序中的相应响应者对象。
