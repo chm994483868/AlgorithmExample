@@ -499,6 +499,7 @@ void dynamicMethodIMP(id self, SEL _cmd) {
 @end
 ```
 &emsp;转发方法（如 Message Forwarding 中所述）和动态方法解析在很大程度上是正交的。类有机会在转发机制启动之前动态解析方法。如果调用了 `respondsToSelector:` 或 `instancesRespondToSelector:`，则动态方法解析器将有机会首先为选择器提供 IMP。如果你实现 `resolveInstanceMethod:` 但希望特定的选择器实际通过转发机制转发，那么你需要为这些选择器返回 NO。
+
 ### Dynamic Loading
 &emsp;
 &emsp;Objective-C 程序可以在运行时加载和链接新的类和类别。新的代码被合并到程序中，并与一开始加载的类和类别进行相同的处理。动态加载可以用来做很多不同的事情。例如，系统偏好设置应用程序中的各个模块是动态加载的。
