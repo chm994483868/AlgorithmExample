@@ -113,14 +113,13 @@
 2. 更改属性的值。
 
 &emsp;你可以在 UIView 对象上设置动画的属性包括：
-
-frame - 使用此动画为 view 设置位置和大小变化。（CALayer 类的 frame 不支持动画，可使用 bounds 和 position 属性来达到同样的效果）
-bounds - 使用此动画可对 view 大小进行动画处理。
-center - 使用它可以动画化 view 的位置。
-transform - 使用它旋转或缩放 view。
-alpha - 使用它可以更改 view 的透明度。
-backgroundColor - 使用它可以更改 view 的背景色。
-contentStretch - 使用它来更改 view 内容的拉伸方式。
++ frame - 使用此动画为 view 设置位置和大小变化。（CALayer 类的 frame 不支持动画，可使用 bounds 和 position 属性来达到同样的效果）
++ bounds - 使用此动画可对 view 大小进行动画处理。
++ center - 使用它可以动画化 view 的位置。
++ transform - 使用它旋转或缩放 view。
++ alpha - 使用它可以更改 view 的透明度。
++ backgroundColor - 使用它可以更改 view 的背景色。
++ contentStretch - 使用它来更改 view 内容的拉伸方式。
 
 &emsp;从一组 views 转换到另一组 views 时，动画非常重要。通常，使用 view controller 来管理与用户界面各部分之间的主要更改相关联的动画。例如，对于涉及从较高级别信息 navigating 到较低级别信息的界面，通常使用 navigation controller 来管理显示每个连续级别数据的 view 之间的转换。但是，也可以使用动画而不是 view controller 在两组 views 之间创建 transitions。在标准视图控制器动画（standard view-controller animations）不能产生所需结果的地方，可以这样做。
 
@@ -842,7 +841,6 @@ self.window = [[[UIWindow alloc] initWithFrame:[[UIScreen mainScreen] bounds]] a
 &emsp;如果需要在 view-based 的动画和 layer-based 的动画之间进行精确计时，则建议您使用 Core Animation 创建所有动画。你可能会发现，无论如何，使用 Core Animation 更容易执行某些动画。例如，清单 4-9 中的 view-based 的旋转需要多步序列才能旋转 180 度以上，而 Core Animation 部分使用的旋转值函数从开始到结束一直旋转到中间值。
 
 &emsp;有关如何使用 Core Animation 创建和配置动画的详细信息，请参见 Core Animation Programming Guide 和 Core Animation Cookbook。
-
 
 
 ## Views
