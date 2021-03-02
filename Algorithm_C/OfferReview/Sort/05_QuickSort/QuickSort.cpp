@@ -18,6 +18,7 @@ void QuickSort::quickSort(int nums[], int l, int r) {
     }
     
     int i = l, j = r, x = nums[l];
+    
     while (i < j) {
         while (i < j && nums[j] >= x) {
             --j;
@@ -35,7 +36,6 @@ void QuickSort::quickSort(int nums[], int l, int r) {
     }
     
     nums[i] = x;
-    
     quickSort(nums, l, i - 1);
     quickSort(nums, i + 1, r);
     

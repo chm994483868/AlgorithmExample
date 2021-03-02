@@ -18,12 +18,10 @@ void MergeSort::mergeSort(int nums[], int first, int last, int temp[]) {
         return;
     }
     
-    // 递归拆
     int mid = ((last - first) >> 1) + first;
     mergeSort(nums, first, mid, temp);
     mergeSort(nums, mid + 1, last, temp);
     
-    // 合并
     mergeArray(nums, first, mid, last, temp);
     
     //if (first >= last) {
