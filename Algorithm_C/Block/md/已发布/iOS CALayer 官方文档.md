@@ -98,7 +98,7 @@ CFTimeInterval CACurrentMediaTime(void);
  */
 @property(copy) CAMediaTimingFillMode fillMode;
 ```
-&emsp;定义 timed object 在其活动持续时间之外的行为。本地时间可以固定在活动持续时间的任一端，或者可以从 presentation 中删除该元素。合法值是 backwards、forwards、both、和 removed。默认为 removed。
+&emsp;定义 timed object 在其活动持续时间之外的行为。本地时间可以固定在活动持续时间的任一端，或者可以从 presentation 中删除该元素。合法值是 backwards、forwards、both 和 removed。默认为 removed。
 #### Fill Modes
 &emsp;这些常数确定了 timed object 的活动持续时间完成后的行为。它们与 fillMode 属性一起使用。
 ```c++
@@ -117,7 +117,7 @@ CA_EXTERN CAMediaTimingFillMode const kCAFillModeRemoved    API_AVAILABLE(macos(
 + kCAFillModeRemoved: 动画完成后，receiver 将从 presentation 中删除。
 
 ## CAAction
-&emsp;允许对象响应由 CALayer 更改触发的 actions 的接口。(仅有一个代理方法的 protocol，CAAnimation 类遵循此协议)
+&emsp;允许对象响应由 CALayer 更改触发的 actions 的接口。(CAAction 是一个仅有一个代理方法的 protocol。CAAnimation 类遵循 CAAction 协议。)
 
 &emsp;当使用 action 标识符（key path、外部 action 名称或预定义 action 标识符）查询时，CALayer 返回相应的 action 对象（必须实现 CAAction 协议），并向其发送 `runActionForKey:object:arguments:` 消息。
 
