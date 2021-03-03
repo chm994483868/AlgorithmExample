@@ -531,6 +531,7 @@
 		D2407F3D24BD626B0018D876 /* LearnedList.strings */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; path = LearnedList.strings; sourceTree = "<group>"; };
 		D24C822225120D1400E3BF5E /* iOS 从源码解析Runtime (五)：聚焦objc_object(retain、release、retaincount).md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 从源码解析Runtime (五)：聚焦objc_object(retain、release、retaincount).md"; sourceTree = "<group>"; };
 		D24C82232512140800E3BF5E /* iOS 从源码解析Runtime (三)：引用计数表内部数据结构DenseMap.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 从源码解析Runtime (三)：引用计数表内部数据结构DenseMap.md"; sourceTree = "<group>"; };
+		D2B75F9125EF8A1B00F85C05 /* 临时题纲.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "临时题纲.md"; sourceTree = "<group>"; };
 		D2C74CF5253046AE0051B89F /* iOS 从源码解析Runtime (十二)：聚焦objc_class(class_rw_t 内容篇).md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 从源码解析Runtime (十二)：聚焦objc_class(class_rw_t 内容篇).md"; sourceTree = "<group>"; };
 		D2C74CF62531A79C0051B89F /* iOS 从源码解析Runtime (十三)：聚焦 objc_class(objc_class函数内容篇).md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 从源码解析Runtime (十三)：聚焦 objc_class(objc_class函数内容篇).md"; sourceTree = "<group>"; };
 		D2C74CF7253457C10051B89F /* iOS 从源码解析Runtime (十四)：由源码解读属性&成员变量的修饰符.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 从源码解析Runtime (十四)：由源码解读属性&成员变量的修饰符.md"; sourceTree = "<group>"; };
@@ -1508,6 +1509,7 @@
 				D2EA0A1025E4BA850054B58A /* iOS《Color Management Overview》官方文档.md */,
 				D2EA09BC25B972B90054B58A /* iOS NSCoding.md */,
 				D2EA09D425C2540B0054B58A /* iOS 渲染过程全解析.md */,
+				D2B75F9125EF8A1B00F85C05 /* 临时题纲.md */,
 				D2EA09D325C241A30054B58A /* iOS 2021 面试前的准备（精简各知识点方便面试前快速复习使用）.md */,
 			);
 			path = "已发布";
