@@ -82,6 +82,7 @@
 
 ### OSSpinLockDeprecated.h 文件内容
 &emsp;下面直接查看 `OSSpinLockDeprecated.h` 中的代码内容。
+
 &emsp;上面示例代码中每一行与 `OSSpinLock` 相关的代码都会有这样一行警告 ⚠️⚠️ `'OSSpinLock' is deprecated: first deprecated in iOS 10.0 - Use os_unfair_lock() from <os/lock.h> instead` 。正是由下面的 `OSSPINLOCK_DEPRECATED` 所提示，在 4 大系统中都提示我们都不要再用 `OSSpinLock` 了。
 ```c++
 #ifndef OSSPINLOCK_DEPRECATED
@@ -432,6 +433,7 @@ __API_AVAILABLE(macos(10.12), ios(10.0), tvos(10.0), watchos(3.0))
 3. 锁里面包含线程所有权信息来解决优先级反转问题。
 4. 不能通过共享或多重映射内存从多个进程或线程访问此锁，锁的实现依赖于锁值的地址和所属进程。
 5. 必须使用 `OS_UNFAIR_LOCK_INIT` 进行初始化。
+
 &emsp;`os_unfair_lock_s` 结构，typedef 定义别名，`os_unfair_lock` 是一个 `os_unfair_lock_s` 结构体，`os_unfair_lock_t` 是一个 `os_unfair_lock_s` 指针，该结构体内部就一个 `uint32_t _os_unfair_lock_opaque` 成员变量。
 ```c++
 OS_UNFAIR_LOCK_AVAILABILITY
@@ -754,7 +756,7 @@ static int count = 3;
 
 #pragma mark - dealloc
 - (void)dealloc {
-    NSLog(@"🧑‍🎤🧑‍🎤🧑‍🎤 dealloc 同时释放🔒...");
+    NSLog(@"🧑‍🎤🧑‍🎤🧑‍🎤 dealloc 同时销毁🔒...");
     pthread_mutex_destroy(&self->_recursivelock);
 }
 
@@ -773,7 +775,7 @@ static int count = 3;
 😓😓😓 count = 1
 😓😓😓 count = 0
 
-🧑‍🎤🧑‍🎤🧑‍🎤 dealloc 同时释放🔒...
+🧑‍🎤🧑‍🎤🧑‍🎤 dealloc 同时销毁🔒...
 ```
 #### 条件锁
 &emsp;首先设定以下场景，两条线程 `A` 和 `B`，`A` 线程中执行删除数组元素，`B` 线程中执行添加数组元素，由于不知道哪个线程会先执行，所以需要加锁实现，只有在添加之后才能执行删除操作，为互斥锁添加条件可以实现。通过此方法可以实现线程依赖。
@@ -919,6 +921,7 @@ static int count = 3;
 5. 在主线程没有获取 `Lock` 的情况下和在获取 `Lock` 的情况下，连续两次 ` [self.lock unlock]` 都不会发生异常。（其他的锁可能连续解锁的情况下会导致 `crash`，还没有来的及测试）
 6. 在子线程连续 `[self.lock lock]` 会导致死锁，同时别的子线获取 `self.lock` 则会一直等待下去。
 7. 同时子线程死锁会导致 `ViewController` 不释放。
+
 ### NSLock 使用
 ```c++
 @interface ViewController ()
@@ -1020,9 +1023,8 @@ dispatch_async(global_queue, ^{
 &emsp;`[self.lock lockBeforeDate: [NSDate dateWithTimeIntervalSinceNow:1]]`，lockBeforeDate: 方法会在指定 Date 之前尝试加锁，且这个过程是会阻塞线程 2 的，如果在指定时间之前都不能加锁，则返回 false，在指定时间之前能加锁，则返回 true。
 _priv 和 name，检测各个阶段，_priv 一直是 NULL。name 是用来标识的，用来输出的时候作为 lock 的名称。如果是三个线程，那么一个线程在加锁的时候，其余请求锁的的线程将形成一个等待队列，按先进先出原则，这个结果可以通过修改线程优先级进行测试得出。
 
-
 ## NSRecursiveLock
-> &emsp;  NSRecursiveLock 是递归锁，和 NSLock 的区别在于，它可以在同一个线程中重复加锁也不会导致死锁。NSRecursiveLock 会记录加锁和解锁的次数，当二者次数相等时，此线程才会释放锁，其它线程才可以上锁成功。
+> &emsp;NSRecursiveLock 是递归锁，和 NSLock 的区别在于，它可以在同一个线程中重复加锁也不会导致死锁。NSRecursiveLock 会记录加锁和解锁的次数，当二者次数相等时，此线程才会释放锁，其它线程才可以上锁成功。
 
 1. 同 `NSLock` 一样，也是基于 `mutex` 的封装，不过是基于 `mutex` 递归锁的封装，所以这是一个递归锁。
 2. 遵守 `NSLocking` 协议，`NSLocking` 协议中仅有两个方法 `-(void)lock` 和 `-(void)unlock`。
@@ -1034,6 +1036,7 @@ _priv 和 name，检测各个阶段，_priv 一直是 NULL。name 是用来标�
   5. `-(BOOL)lockBeforeDate:(NSDate *)limit;` 在某一个时间点之前等待加锁。
 4. 递归锁是可以在同一线程连续调用 `lock` 不会直接导致阻塞死锁，但是依然要执行相等次数的 `unlock`。不然异步线程再获取该递归锁会导致该异步线程阻塞死锁。
 5. 递归锁允许同一线程多次加锁，不同线程进入加锁入口会处于等待状态，需要等待上一个线程解锁完成才能进入加锁状态。
+
 ### NSRecursiveLock 使用
 &emsp;其实是实现上面 `pthread_mutex_t` 和 `PTHREAD_MUTEX_RECURSIVE` 完成的递归锁场景，只是这里使用 `NSRecursiveLock` `API` 更加精简，使用起来更加简单方便。
 ```c++
@@ -1292,7 +1295,7 @@ dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
 🧑‍🎤🧑‍🎤🧑‍🎤 dealloc 同时释放🔒...
 ```
 ## NSConditionLock
-> &emsp;  NSConditionLock 和 NSLock 类似，同样是继承自 NSObject 和遵循 NSLocking 协议，加解锁 try 等方法都类似，只是多了一个 condition 属性，以及每个操作都多了一个关于 condition 属性的方法，例如 tryLock 和 tryLockWhenCondition:，NSConditionLock 可以称为条件锁。只有 condition 参数与初始化的时候相等或者上次解锁后设置的 condition 相等，lock 才能正确的进行加锁操作。unlockWithCondition: 并不是当 condition 符合条件时才解锁，而是解锁之后，修改 condition 的值为入参，当使用 unlock 解锁时， condition 的值保持不变。如果初始化用 init，则 condition 默认值为 0。lockWhenCondition: 和 lock 方法类似，加锁失败会阻塞当前线程，一直等下去，直到能加锁成功。tryLockWhenCondition: 和 tryLock 类似，表示尝试加锁，即使加锁失败也不会阻塞当前线程，但是同时满足 lock 是空闲状态并且 condition 符合条件才能尝试加锁成功。从上面看出，NSConditionLock 还可以实现任务之间的依赖。
+> &emsp;NSConditionLock 和 NSLock 类似，同样是继承自 NSObject 和遵循 NSLocking 协议，加解锁 try 等方法都类似，只是多了一个 condition 属性，以及每个操作都多了一个关于 condition 属性的方法，例如 tryLock 和 tryLockWhenCondition:，NSConditionLock 可以称为条件锁。只有 condition 参数与初始化的时候相等或者上次解锁后设置的 condition 相等，lock 才能正确的进行加锁操作。unlockWithCondition: 并不是当 condition 符合条件时才解锁，而是解锁之后，修改 condition 的值为入参，当使用 unlock 解锁时， condition 的值保持不变。如果初始化用 init，则 condition 默认值为 0。lockWhenCondition: 和 lock 方法类似，加锁失败会阻塞当前线程，一直等下去，直到能加锁成功。tryLockWhenCondition: 和 tryLock 类似，表示尝试加锁，即使加锁失败也不会阻塞当前线程，但是同时满足 lock 是空闲状态并且 condition 符合条件才能尝试加锁成功。从上面看出，NSConditionLock 还可以实现任务之间的依赖。
 
 1. 基于 `NSCondition` 的进一步封装，可以更加高级的设置条件值。
   > &emsp;假设有这样的场景，三个线程 A B C，执行完 A  线程后才能执行 B，执行完 B 线程后执行 C，就是为线程之间的执行添加依赖，`NSConditionLock` 可以方便的完成这个功能。
@@ -1305,6 +1308,7 @@ dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
   5. `-(void)unlockWithCondition:(NSInteger)condition;` 解锁, 并设定 `condition` 的值为入参。
   6. `-(BOOL)tryLock;` 尝试加锁。
   7. `-(BOOL)lockBeforeDate:(NSDate *)limit;` 在某一个时间点之前等待加锁。
+  
 ### NSConditionLock 使用
 ```c++
 #import "ViewController.h"
@@ -1693,6 +1697,7 @@ dispatch_semaphore 和 NSCondition 类似，都是一种基于信号的同步方
   1. 初始化 `dispatch_semaphore_create()` 传入的值为最大并发数量，设置为 `1` 则达到加锁效果。
   2. 判断信号量的值 `dispatch_semaphore_wait()` 如果大于 `0`，则可以继续往下执行（同时信号量的值减去 `1`），如果信号量的值为 `0`，则线程进入休眠状态等待（此方法的第二个参数就是设置要等多久，一般是使用永久 `DISPATCH_TIME_FOREVER`）。
   3. 释放信号量 `dispatch_semaphore_signal()` 同时使信号量的值加上 `1`。
+  
 ### dispatch_semaphore 使用
 ```c++
 #import "ViewController.h"
@@ -1931,7 +1936,7 @@ dispatch_semaphore 和 NSCondition 类似，都是一种基于信号的同步方
 
 @end
 
-// 打印结果: 从打印时间可以看出，write 操作是依序进行的，每次间隔 1 秒，而 read 操作几乎都是同时进行 3 次
+// 打印结果: 从打印时间可以看出，write 操作是依序进行的，每次间隔 1 秒，而 read 操作则是 3 条线程同时进行读操作
 2020-08-23 22:25:14.144265+0800 algorithm_OC[17695:604062] barrier Write Action <NSThread: 0x6000012a0180>{number = 5, name = (null)}
 2020-08-23 22:25:15.148017+0800 algorithm_OC[17695:604062] barrier Write Action <NSThread: 0x6000012a0180>{number = 5, name = (null)}
 2020-08-23 22:25:16.151869+0800 algorithm_OC[17695:604062] barrier Write Action <NSThread: 0x6000012a0180>{number = 5, name = (null)}
@@ -1969,7 +1974,7 @@ dispatch_semaphore 和 NSCondition 类似，都是一种基于信号的同步方
 + 临界区（加锁解锁之间的部分）有 I/O 操作
 
 **其它:**
-加锁和解锁的实现一定要配对出现，不然就会出现阻塞死锁的现象。
+加锁和解锁的实现一定要配对出现，不然当前线程就会一直阻塞下去。
 
 ## 参考链接
 **参考链接:🔗**
