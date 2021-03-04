@@ -240,6 +240,7 @@ typedef NSObject<OS_dispatch_queue_serial> * dispatch_queue_serial_t;
 &emsp;串行队列可以相互定位（`dispatch_set_target_queue`）（串行队列可以彼此作为目标）。队列层次结构底部的串行队列提供了一个排除上下文：在任何给定的时间，提交给这种层次结构中的任何队列的最多一个工作项将运行。这样的层次结构提供了一个自然的结构来组织应用程序子系统。
 
 &emsp;通过将派生自 `DISPATCH_QUEUE_SERIAL` 的调度队列属性传递给 `dispatch_queue_create_with_target` 来创建串行队列。（串行队列的创建过程后续会通过源码来进行解读）
+
 #### dispatch_queue_main_t
 ```c++
 DISPATCH_DECL_SUBCLASS(dispatch_queue_main, dispatch_queue_serial);
@@ -282,6 +283,7 @@ typedef NSObject<OS_dispatch_queue_concurrent> * dispatch_queue_concurrent_t;
 &emsp;通过将派生自 `DISPATCH_QUEUE_CONCURRENT` 的调度队列属性传递给 `dispatch_queue_create_with_target` 来创建并发队列。
 
 &emsp;注意事项：当调用优先级较低的常规工作项（readers）时，此时调度并发队列不会实现优先级反转避免，并且会阻止调用优先级较高的屏障（writer）。
+
 #### dispatch_block_t
 &emsp;日常使用 GCD 向队列提交的工作项都是这种名字是 `dispatch_block_t` 参数和返回值都是 `void` 的 Block。
 ```c++
@@ -328,6 +330,7 @@ dispatch_async(dispatch_queue_t queue, dispatch_block_t block);
 &emsp;`queue`：block 提交到的目标调度队列。系统将在目标队列上保留引用，直到该 block 调用完成为止。在此参数中传递 `NULL` 的结果是不确定的。
 
 &emsp;`block`：提交到目标调度队列的 block。该函数代表调用者执行 `Block_copy()` 和 `Block_release()` 函数。在此参数中传递 `NULL` 的结果是不确定的。
+
 #### dispatch_function_t
 &emsp;`dispatch_function_t` 是一个返回值是 void 参数是 void *（可空）的函数指针。
 ```c++
@@ -448,6 +451,7 @@ dispatch_async_and_wait_f(dispatch_queue_t queue,
 &emsp;当提交一个 block 进行并行调用时，将此常量作为队列参数传递，将自动使用与调用方的服务质量最匹配的全局并发队列。(即 `dispatch_apply` 和 `dispatch_apply_f` 函数的第二个参数: `dispatch_queue_t queue` 使用 `DISPATCH_APPLY_AUTO`)
 
 &emsp;注意事项：不应假设将实际使用哪个全局并发队列。使用此常量将向后部署到 macOS 10.9，iOS 7.0 和任何 tvOS 或 watchOS 版本。
+
 #### dispatch_apply
 &emsp;`dispatch_apply` 将一个 block 提交给调度队列以进行并行调用。(快速迭代)
 ```c++
@@ -499,6 +503,7 @@ dispatch_get_current_queue(void);
 &emsp;在主线程上调用 `dispatch_get_current_queue()` 时，它可能会返回与 `dispatch_get_main_queue()` 相同的值，也可能不返回相同的值。比较两者并不是测试代码是否在主线程上执行的有效方法（参见 `dispatch_assert_queue` 和 `dispatch_assert_queue_not`）。
 
 &emsp;返回当前队列。此功能已弃用，在以后的版本中将被删除。
+
 #### dispatch_get_main_queue
 &emsp;`dispatch_get_main_queue` 返回绑定到主线程的默认队列。(_dispatch_main_q 一个全局变量，程序启动时会自动构建主线程和主队列)
 ```c++
@@ -526,6 +531,7 @@ dispatch_get_main_queue(void)
 &emsp;由于主队列的行为不完全像常规串行队列，因此在非 UI 应用程序（守护程序）的进程中使用时，主队列可能会产生有害的副作用。对于此类过程，应避免使用主队列。
 
 &emsp;返回主队列。在调用 `main()` 之前，该队列代表主线程自动创建。（`_dispatch_main_q`）
+
 #### dispatch_queue_priority_t
 &emsp;`dispatch_queue_priority` 的类型，表示队列的优先级。
 ```c++
@@ -543,6 +549,7 @@ typedef long dispatch_queue_priority_t;
 &emsp;`DISPATCH_QUEUE_PRIORITY_LOW`：调度到队列的项目将以低优先级运行，即，在所有默认优先级和高优先级队列都已调度之后，将调度该队列执行。
 
 &emsp;`DISPATCH_QUEUE_PRIORITY_BACKGROUND`：调度到队列的项目将在后台优先级下运行，即在所有较高优先级的队列都已调度之后，将调度该队列执行，并且系统将在线程上以 `setpriority(2)` 的后台状态运行该队列上的项目（即磁盘 I/O 受到限制，线程的调度优先级设置为最低值）。
+
 #### dispatch_get_global_queue
 &emsp;`dispatch_get_global_queue` 返回给定服务质量（qos_class_t）（或者 dispatch_queue_priority_t 定义的优先级）类的众所周知的全局并发队列。
 ```c++
@@ -568,6 +575,7 @@ dispatch_get_global_queue(long identifier, unsigned long flags);
 &emsp;`flags`：保留以备将来使用。传递除零以外的任何值可能会导致返回 `NULL`，所以日常统一传 0 就好了。
 
 &emsp;`result`：返回请求的全局队列，如果请求的全局队列不存在，则返回 `NULL`。
+
 #### dispatch_queue_attr_t
 &emsp;调度队列的属性。
 ```c++
@@ -581,6 +589,7 @@ DISPATCH_DECL(dispatch_queue_attr);
 typedef NSObject<OS_dispatch_queue_attr> * dispatch_queue_attr_t;
 ```
 &emsp;`OS_dispatch_queue_attr` 是继承自 `OS_dispatch_object` 协议的协议，并且为遵循该协议的 `NSObject` 实例对象类型的指针定义了一个 `dispatch_queue_attr_t` 的别名。（`dispatch_queue_attr_t` 具体是不是 NSObject 后面待确认）
+
 #### dispatch_queue_attr_make_initially_inactive
 &emsp;`dispatch_queue_attr_make_initially_inactive` 返回一个属性值，该值可提供给 `dispatch_queue_create` 或 `dispatch_queue_create_with_target`，以便使创建的队列最初处于非活动状态。
 ```c++
@@ -599,20 +608,23 @@ dispatch_queue_attr_make_initially_inactive(
 &emsp;`attr`：队列属性值要与最初不活动的属性组合。
 
 &emsp;`return`：返回可以提供给 `dispatch_queue_create` 和 `dispatch_queue_create_with_target` 的属性值。新值将 “attr” 参数指定的属性与最初处于非活动状态的属性结合在一起。
+
 #### DISPATCH_QUEUE_SERIAL
 &emsp;`DISPATCH_QUEUE_SERIAL` 宏定义，仅是一个 `NULL`，`dispatch_queue_t serialQueue = dispatch_queue_create("com.com", DISPATCH_QUEUE_SERIAL);` 日常创建串行队列必使用的一个宏，其实是 `NULL`。
 ```c++
 #define DISPATCH_QUEUE_SERIAL NULL
 ```
 &emsp;可用于创建以 FIFO 顺序串行调用块的调度队列的属性。(`dispatch_queue_serial_t`)
+
 #### DISPATCH_QUEUE_SERIAL_INACTIVE
 ```c++
 #define DISPATCH_QUEUE_SERIAL_INACTIVE \
         dispatch_queue_attr_make_initially_inactive(DISPATCH_QUEUE_SERIAL)
 ```
 &emsp;可用于创建以 FIFO 顺序，顺序调用块的调度队列的属性，该属性最初是不活动的。
+
 #### DISPATCH_QUEUE_CONCURRENT
-&emsp;可用于创建调度队列的属性，该调度队列可同时调用块并支持通过调度屏障API提交的屏障块。(常规 block 和 barrier 的 block 任务块)
+&emsp;可用于创建调度队列的属性，该调度队列可同时调用块并支持通过调度屏障 API 提交的屏障块。(常规 block 和 barrier 的 block 任务块)
 ```c++
 #define DISPATCH_GLOBAL_OBJECT(type, object) ((OS_OBJECT_BRIDGE type)&(object))
 
@@ -624,6 +636,7 @@ DISPATCH_EXPORT
 struct dispatch_queue_attr_s _dispatch_queue_attr_concurrent; // 这里有一个 dispatch_queue_attr_s 结构体类型的全局变量。
 ```
 &emsp;同上面类似，`DISPATCH_QUEUE_CONCURRENT` 宏定义是把全局变量 `_dispatch_queue_attr_concurrent` 强制转化为了 `dispatch_queue_attr_t`。
+
 #### DISPATCH_QUEUE_CONCURRENT_INACTIVE
 &emsp;可用于创建调度队列的属性，该属性可以同时调用块并支持通过调度屏障 API （`dispatch_barrier_async`）提交的屏障块，并且该属性最初是不活动的。
 ```c++
@@ -651,6 +664,7 @@ DISPATCH_ENUM(dispatch_autorelease_frequency, unsigned long,
 &emsp;`DISPATCH_AUTORELEASE_FREQUENCY_WORK_ITEM`：具有这种自动释放频率（autorelease frequency）的调度队列在异步提交给它的每个块的执行周围 push 和 pop 一个自动释放池。参考 `dispatch_queue_attr_make_with_autorelease_frequency()`。
 
 &emsp;`DISPATCH_AUTORELEASE_FREQUENCY_NEVER`：具有这种自动释放频率（autorelease frequency）的调度队列永远不会围绕异步执行提交给它的块的执行设置单个自动释放池，这是全局并发队列的行为。
+
 #### dispatch_queue_attr_make_with_autorelease_frequency
 &emsp;`dispatch_queue_attr_make_with_autorelease_frequency` 返回自动释放频率（autorelease frequency）设置为指定值的调度队列属性值。
 ```c++
@@ -676,6 +690,7 @@ dispatch_queue_attr_make_with_autorelease_frequency(
 &emsp;`frequency`：请求的自动释放频率。
 
 &emsp;`return`：返回可以提供给 `dispatch_queue_create` 的属性值，如果请求的自动释放频率无效，则为 `NULL`。这个新值结合了 `attr` 参数指定的属性和所选的自动释放频率。
+
 #### DISPATCH_QUEUE_SERIAL_WITH_AUTORELEASE_POOL
 &emsp;`DISPATCH_QUEUE_SERIAL_WITH_AUTORELEASE_POOL` 使用此属性创建的调度队列按 FIFO 顺序串行调用块，并用相当于单个 Objective-C @autoreleasepool 作用域来包围异步提交给它的任何块的执行。
 ```c++
@@ -788,6 +803,7 @@ queue = dispatch_queue_create("com.example.myqueue", attr);
 &emsp;`relative_priority`：QOS 类中的相对优先级。该值是给定类别与最大支持的调度程序优先级的负偏移量，传递大于零或小于 `QOS_MIN_RELATIVE_PRIORITY`（-15）的值将导致返回 `NULL`。
 
 &emsp;`return`：返回可以提供给 `dispatch_queue_create` 和 `dispatch_queue_create_with_target` 的属性值；如果请求了无效的 `QOS` 类，则返回 `NULL`。新值结合了 `attr` 参数指定的属性，新的 `QOS` 类（形参：qos_class）和相对优先级（形参：relative_priority）。
+
 #### DISPATCH_TARGET_QUEUE_DEFAULT
 &emsp;`DISPATCH_TARGET_QUEUE_DEFAULT` 传递给 `dispatch_queue_create_with_target`、`dispatch_set_target_queue` 和 `dispatch_source_create` 函数的常量，以指示应使用相关对象类型的默认目标队列。
 ```c++
@@ -958,8 +974,11 @@ dispatch_after_f(dispatch_time_t when, dispatch_queue_t queue,
 &emsp;可参考 `dispatch_after` 函数，只是把 block 换成了函数。 
 #### Dispatch Barrier API
 &emsp;Dispatch barrier API 是一种机制，用于将屏障块（barrier blocks）提交给调度队列，类似于 dispatch_async/dispatch_sync API。它可以实现有效的读取器/写入器方案。
+
 &emsp;屏障块仅在​​提交给使用 `DISPATCH_QUEUE_CONCURRENT` 属性创建的队列时才表现出特殊的行为。在这样的队列上，屏障块将不会运行，直到更早提交给队列的所有块都已完成，并且屏障块之后提交给队列的任何块都将不会运行，直到屏障块已完成。
+
 &emsp;当提交到**全局队列**或未使用 `DISPATCH_QUEUE_CONCURRENT` 属性创建的队列时，屏障块的行为与使用 dispatch_async/dispatch_sync API 提交的块相同。（如果使用 `dispatch_async` 和 `dispatch_barrier_async` 提交到 `dispatch_get_global_queue` 取得的 queue，则并发执行，失去屏障的功能。）
+
 #### dispatch_barrier_async
 &emsp;`dispatch_barrier_async` 提交 barrier block 以在调度队列上异步执行。（同 `dispatch_async` 不会阻塞当前线程，直接返回执行接下来的语句，但是后添加的 block 则是等到 barrier block 执行完成后才会开始执行。）
 ```c++
@@ -975,6 +994,7 @@ dispatch_barrier_async(dispatch_queue_t queue, dispatch_block_t block);
 &emsp;`queue`：块提交到的目标调度队列。系统将在目标队列上保留引用，直到该块完成为止。在此参数中传递 `NULL` 的结果是不确定的。
 
 &emsp;`block`：提交到目标调度队列的块。该函数代表调用者执行 `Block_copy` 和 `Block_release`。在此参数中传递 `NULL` 的结果是不确定的。
+
 #### dispatch_barrier_async_f
 &emsp;`dispatch_barrier_async_f` 同上，只是把 `block` 换成了函数。
 ```c++
@@ -984,6 +1004,7 @@ void
 dispatch_barrier_async_f(dispatch_queue_t queue,
         void *_Nullable context, dispatch_function_t work);
 ```
+
 #### dispatch_barrier_sync
 &emsp;`dispatch_barrier_sync` 提交屏障块（barrier block）以在调度队列上**同步执行**（会阻塞当前线程，直到 barrier block 执行完成才会返回）。
 ```c++
@@ -1000,6 +1021,7 @@ dispatch_barrier_sync(dispatch_queue_t queue,
 &emsp;`queue`：块提交到的目标调度队列。在此参数中传递 `NULL` 的结果是不确定的。
 
 &emsp;`block`：在目标调度队列上要调用的块。在此参数中传递 `NULL` 的结果是不确定的。
+
 #### dispatch_barrier_sync_f
 &emsp;同 `dispatch_barrier_sync`，仅是把 block 替换为了函数。
 ```c++
@@ -1021,6 +1043,7 @@ dispatch_barrier_async_and_wait(dispatch_queue_t queue,
 #endif
 ```
 &emsp;将一个块提交到诸如 `dispatch_async_and_wait` 之类的调度队列中，但将该块标记为屏障（barrier）（仅与 `DISPATCH_QUEUE_CONCURRENT` 队列相关）。
+
 #### dispatch_barrier_async_and_wait_f
 &emsp;同 `dispatch_barrier_async_and_wait`，仅是把 block 替换为了函数。 
 ```c++
@@ -1032,6 +1055,7 @@ dispatch_barrier_async_and_wait_f(dispatch_queue_t queue,
 ```
 #### Dispatch queue-specific contexts
 &emsp;这个API允许不同的子系统将上下文与共享队列关联起来，而不会有冲突的风险，并且可以从目标队列层次结构中该队列或其任何子队列上执行的块检索上下文。
+
 #### dispatch_queue_set_specific
 &emsp;`dispatch_queue_set_specific` 将子系统特定的上下文与调度队列相关联，以获得子系统特有的 key（这里 key 参数类型是 `const void *` （指针指向可以变，但是指向的内容不能通过该指针修改））。
 ```c++
@@ -1050,6 +1074,7 @@ dispatch_queue_set_specific(dispatch_queue_t queue, const void *key,
 &emsp;`context`：对象的新的特定于子系统的上下文。这可能为 `NULL`。
 
 &emsp;`destructor`：析构函数的指针。这可以为 `NULL`，如果 `context` 为 `NULL`，则将其忽略。
+
 #### dispatch_queue_get_specific
 &emsp;`dispatch_queue_get_specific` 返回与调度队列相关联的子系统特定上下文，用于子系统唯一的键。
 ```c++
@@ -1064,6 +1089,7 @@ dispatch_queue_get_specific(dispatch_queue_t queue, const void *key);
 &emsp;`key`：获取上下文的键，通常是指向特定于子系统的静态变量的指针。key 仅作为指针进行比较，而不会取消引用，不建议直接传递字符串常量。
 
 &emsp;`result`：指定键的上下文；如果未找到上下文，则为 `NULL`。
+
 #### dispatch_get_specific
 &emsp;`dispatch_get_specific` 返回子系统唯一的 key 的当前特定于子系统的上下文。
 ```c++
@@ -1077,8 +1103,10 @@ dispatch_get_specific(const void *key);
 &emsp;`key`：获取上下文的键，通常是指向特定于子系统的静态变量的指针。key 仅作为指针进行比较，而不会取消引用，不建议直接传递字符串常量。
 
 &emsp;`result`: 指定 key 的上下文；如果未找到上下文，则为 `NULL`。
+
 #### Dispatch assertion API
 &emsp;Dispatch assertion API 在运行时断言代码正在给定队列的上下文中执行（或从其执行）。它可用于从保护资源的适当队列中检查访问资源的块是否这样做。它还可以用于验证如果在给定队列上运行可能导致死锁的块永远不会在该队列上执行。
+
 #### dispatch_assert_queue
 &emsp;`dispatch_assert_queue` 验证当前块是否在给定的调度队列上执行。
 ```c++

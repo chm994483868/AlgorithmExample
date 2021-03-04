@@ -130,6 +130,7 @@ struct __darwin_pthread_handler_rec {
 };
 ```
 &emsp;通过上面的代码一层一层递进：`pthread_t` 其实是 `_opaque_pthread_t` 结构体指针。
+
 ### pthread_create 线程创建
 &emsp;`pthread_create` 是类 Unix 操作系统（Unix、Linux、Mac OS X等）的创建线程的函数。它的功能是创建线程（实际上就是确定调用该线程函数的入口点），在线程创建以后，就开始运行相关的线程函数。
 `pthread_create` 的返回值: 若成功，返回 0；若出错，返回出错编号，并且 `pthread_t * __restrict` 中的内容未定义。下面看一下它的函数声明：
@@ -155,6 +156,7 @@ int pthread_create(pthread_t * __restrict,
 2. 第二个参数用来设置线程属性，可传递 `NULL`。
 3. 第三个参数是线程运行函数的起始地址。（即需要在新线程中执行的任务。该函数有一个返回值 `void *`，这个返回值可以通过 `pthread_join()` 接口获得）
 4. 第四个参数是运行函数的参数，可传递 `NULL`。
+
 ### pthread_join 线程合并
 &emsp;上面创建线程的内容我们大致已经清晰了，这里再回到我们的实例代码，首先打开关于 `pthread_join` 的注释，并把 `pthread_detach` 添加注释。运行程序可得到如下打印:
 ```c++
@@ -223,6 +225,7 @@ int pthread_attr_destroy(pthread_attr_t *);
 + 堆栈地址
 + 调度属性（包括算法、调度优先级、继承权）
 &emsp;下面来分别详细介绍这些属性。
+
 #### 分离属性
 &emsp;首先在 pthread.h 文件中能看到两个与分离属性相关的设置和读取接口: `pthread_attr_setdetachstate`、`pthread_attr_getdetachstate`。
 ```c++
@@ -262,6 +265,7 @@ int pthread_attr_getscope(const pthread_attr_t * __restrict, int * __restrict); 
 ```
 
 &emsp;由于目前该属性的理解有限，这边就先把 Linux 大佬的原文摘录贴出了。
+
 > &emsp;说到这个绑定属性，就不得不提起另外一个概念：轻进程（ Light Weight Process，简称 LWP）。轻进程和 Linux 系统的内核线程拥有相同的概念，属于内核的调度实体。一个轻进程可以控制一个或多个线程。默认情况下，对于一个拥有 n 个线程的程序，启动多少轻进程，由哪些轻进程来控制哪些线程由操作系统来控制，这种状态被称为非绑定的。那么绑定的含义就很好理解了，只要指定了某个线程 “绑” 在某个轻进程上，就可以称之为绑定的了。被绑定的线程具有较高的响应速度，因为操作系统的调度主体是轻进程，绑定线程可以保证在需要的时候它总有一个轻进程可用。绑定属性就是干这个用的。
 设置绑定属性的接口是 pthread_attr_setscope()，它的完整定义是：int pthread_attr_setscope(pthread_attr_t *attr, int scope);
 它有两个参数，第一个就是线程属性对象的指针，第二个就是绑定类型，拥有两个取值：PTHREAD_SCOPE_SYSTEM（绑定的）和 PTHREAD_SCOPE_PROCESS（非绑定的）。
@@ -269,6 +273,7 @@ int pthread_attr_getscope(const pthread_attr_t * __restrict, int * __restrict); 
 既然 Linux 并不支持线程的非绑定，为什么还要提供这个接口呢？答案就是兼容！因为 Linux 的 NTPL 是号称 POSIX 标准兼容的，而绑定属性正是 POSIX 标准所要求的，所以提供了这个接口。如果读者们只是在 Linux 下编写多线程程序，可以完全忽略这个属性。如果哪天你遇到了支持这种特性的系统，别忘了我曾经跟你说起过这玩意儿：）[在Linux中使用线程](https://blog.csdn.net/jiajun2001/article/details/12624923)
 
 > &emsp;设置线程 __scope 属性。scope 属性表示线程间竞争 CPU 的范围，也就是说线程优先级的有效范围。POSIX 的标准中定义了两个值： PTHREAD_SCOPE_SYSTEM 和 PTHREAD_SCOPE_PROCESS ，前者表示与系统中所有线程一起竞争 CPU 时间，后者表示仅与同进程中的线程竞争 CPU。默认为 PTHREAD_SCOPE_PROCESS。 目前 Linux Threads 仅实现了 PTHREAD_SCOPE_SYSTEM 一值。[线程属性pthread_attr_t简介](https://blog.csdn.net/hudashi/article/details/7709413)
+
 #### 堆栈大小属性
 &emsp;在 pthread.h 文件中与堆栈大小属性相关的 API 如下:
 ```c++
@@ -279,6 +284,7 @@ __API_AVAILABLE(macos(10.4), ios(2.0))
 int pthread_attr_getstacksize(const pthread_attr_t * __restrict, size_t * __restrict);
 ```
 &emsp;从前面的这些例子中可以了解到，子线程的主函数与主线程的 `viewDidLoad` 函数有一个很相似的特性，那就是可以拥有局部变量。虽然同一个进程的线程之间是共享内存空间的，但是它的局部变量确并不共享。原因就是局部变量存储在堆栈中，而不同的线程拥有不同的堆栈。Linux 系统为每个线程默认分配了 8 MB 的堆栈空间，如果觉得这个空间不够用，可以通过修改线程的堆栈大小属性进行扩容。修改线程堆栈大小属性的接口是 `pthread_attr_setstacksize`，它的第二个参数就是堆栈大小了，以字节为单位。需要注意的是，线程堆栈不能小于 16 KB，而且尽量按 4 KB（32 位系统）或 2 MB（64 位系统）的整数倍分配，也就是内存页面大小的整数倍。此外，修改线程堆栈大小是有风险的，如果你不清楚你在做什么，最好别动它。
+
 #### 满栈警戒区属性
 &emsp;在 pthread.h 文件中与满栈警戒区属性相关的 API 如下:
 ```c++
@@ -292,6 +298,7 @@ int pthread_attr_getguardsize(const pthread_attr_t * __restrict, size_t * __rest
 
 &emsp;虽然满栈警戒区可以起到安全作用，但是也有弊病，就是会白白浪费掉内存空间，对于内存紧张的系统会使系统变得很慢。所有就有了关闭这个警戒区的需求。同时，如果我们修改了线程堆栈的大小，那么系统会认为我们会自己管理堆栈，也会将警戒区取消掉，如果有需要就要开启它。
 修改满栈警戒区属性的接口是 `pthread_attr_setguardsize`，它的第二个参数就是警戒区大小了，以字节为单位。与设置线程堆栈大小属性相仿，应该尽量按照 4KB 或 2MB 的整数倍来分配。当设置警戒区大小为 0 时，就关闭了这个警戒区。虽然栈满警戒区需要浪费掉一点内存，但是能够极大的提高安全性，所以这点损失是值得的。而且一旦修改了线程堆栈的大小，一定要记得同时设置这个警戒区。
+
 #### 调度属性（包括算法、调度优先级、继承权）
 &emsp;在 pthread.h/pthread_impl.h 文件中与调度属性（包括算法、调度优先级、继承权）相关的 API 和宏定义 如下:
 ```c++
@@ -343,13 +350,14 @@ Linux 的**线程优先级**与**进程的优先级**不一样，进程优先级
 &emsp;设置线程继承权的接口是 `pthread_attr_setinheritsched`，它的第二个参数有两个取值：`PTHREAD_INHERIT_SCHED`（拥有继承权）和 `PTHREAD_EXPLICIT_SCHED`（放弃继承权），新线程在默认情况下是拥有继承权。
 
 &emsp;好了，线程属性先介绍到这里，由于没有找到 iOS/macOS 的材料，这里借用了 Linux 下 POSIX 线程标准，尽管平台不同，但是基本理解和处理方式都是相同的，所以并不妨碍我们对线程属性进行理解和学习。下面我们继续学习 pthread.h 文件中的其它接口。
+
 ### pthread_kill 向指定线程发送一个信号
 &emsp;`pthread_kill` 用于向指定的 thread 发送信号。在创建的线程中使用 signal(SIGKILL, sig_handler) 处理信号，如果给一个线程发送了 SIGQUIT，但线程却没有实现 signal 处理函数，则整个进程退出。函数声明如下:
 ```c++
 __API_AVAILABLE(macos(10.4), ios(2.0))
 int pthread_kill(pthread_t, int);
 ```
-&emsp;参数一是指定的要向它发送信号的线程，参数二表示传递的 signal 参数,一般都是大于 0 的，这时系统默认或者自定义的都是有相应的处理程序。常用信号量宏可以在 #import <signal.h> 查看，signal 为 0 时，是一个被保留的信号，一般用这个保留的信号测试线程是否存在。
+&emsp;参数一是指定的要向它发送信号的线程，参数二表示传递的 signal 参数，一般都是大于 0 的，这时系统默认或者自定义的都是有相应的处理程序。常用信号量宏可以在 #import <signal.h> 查看，signal 为 0 时，是一个被保留的信号，一般用这个保留的信号测试线程是否存在。
 
 &emsp;`pthread_kill` 函数返回值：
 + 0: 调用成功
@@ -358,6 +366,7 @@ int pthread_kill(pthread_t, int);
 + 测试线程是否存在/终止的方法
 
 &emsp;如果线程内不对信号进行处理，则调用默认的处理程式，如 SIGQUIT 信号会退出终止线程，SIGKILL会杀死线程等等。可以调用 `signal(SIGQUIT, sig_process_routine)` 来自定义信号的处理程序。
+
 ### pthread_cancel 中断指定线程的运行
 &emsp;`pthread_cancel` 发送终止信号给指定的 thread 线程，如果成功则返回 0，否则为非 0 值，发送成功并不意味着 thread 会终止。函数声明如下:
 ```c++
@@ -365,6 +374,7 @@ __API_AVAILABLE(macos(10.4), ios(2.0))
 int pthread_cancel(pthread_t) __DARWIN_ALIAS(pthread_cancel);
 ```
 &emsp;若是在整个程序退出时，要终止各个线程，应该在成功发送 CANCEL 指令后，使用 pthread_join 函数，等待指定的线程已经完全退出以后，再继续执行，否则，很容易产生 “段错误”。
+
 ### pthread_setcancelstate 设置本线程对 Cancel 信号的反应
 ```c++
 #define PTHREAD_CANCEL_ENABLE        0x01  /* Cancel takes place at next cancellation point // Cancel 发生在下一个取消点 */ 
@@ -391,6 +401,7 @@ int pthread_setcanceltype(int type, int * _Nullable oldtype)
 &emsp;设置本线程取消动作的执行时机，type 有两种取值：`PTHREAD_CANCEL_DEFERRED` 和 `PTHREAD_CANCEL_ASYNCHRONOUS`，仅当 Cancel 状态为 Enable 时有效，分别表示收到信号后继续运行至下一个取消点再退出 （推荐做法，因为在终止线程之前必须要处理好内存回收防止内存泄漏，而手动设置取消点这种方式就可以让我们很自由的处理内存回收时机）和立即执行取消动作（退出）（不推荐这样操作,可能造成内存泄漏等问题）；oldtype 如果不为 NULL 则存入原来的取消动作类型值。
 
 &emsp;此函数应该在线程开始时执行，若线程内部有任何资源申请等操作，应该选择 `PTHREAD_CANCEL_DEFERRED` 的设定，然后在退出点（`pthread_testcancel` 用于定义退出点）进行线程退出。
+
 ### pthread_testcancel 
 ```c++
 __API_AVAILABLE(macos(10.4), ios(2.0))
@@ -401,6 +412,7 @@ void pthread_testcancel(void) __DARWIN_ALIAS(pthread_testcancel);
 &emsp;线程取消的方法是向目标线程发 Cancel 信号，但如何处理 Cancel 信号则由目标线程自己决定，或者忽略、或者立即终止、或者继续运行至 Cancelation-point（取消点），由不同的 Cancelation 状态决定。
 
 &emsp;线程接收到 CANCEL 信号的缺省处理（即 `pthread_create` 创建线程的缺省状态）是继续运行至取消点，也就是说设置一个 CANCELED 状态，线程继续运行，只有运行至 Cancelation-point 的时候才会退出。
+
 ### pthread_self 获取当前线程本身
 ```c++
 __API_AVAILABLE(macos(10.4), ios(2.0))
@@ -589,6 +601,7 @@ void* _Nullable pthread_getspecific(pthread_key_t);
 &emsp;返回值如果应用程序是多线程，则为 YES，否则为 NO。
 
 &emsp;官方文档的解释是：如果使用 `detachNewThreadSelector:toTarget:withObject:` 或 `start` 从主线程分离了线程，则认为该应用程序是多线程的。如果使用非 Cocoa API（例如 POSIX 或 Multiprocessing Services API ）在应用程序中分离了线程，则此方法仍可能返回 NO。分离的线程不必当前正在运行，应用程序才被认为是多线程的--此方法仅指示是否已产生单个线程。
+
 #### threadDictionary
 ```c++
 @property (readonly, retain) NSMutableDictionary *threadDictionary;
@@ -733,6 +746,7 @@ NSLog(@"🏃‍♀️ %@", [[NSThread currentThread] threadDictionary]);
 &emsp;你永远不要直接调用此方法。你应该始终通过调用 `start` 方法来启动线程。
 
 &emsp;至此，我们的 NSThread 类的所有代码就看完了，还是挺清晰的哦。
+
 ### NSObject + NSThreadPerformAdditions
 &emsp;下面是 NSObject 的一个分类，同时也是 `NSThread.h` 文件的最后一部分。其中的几个在主线程、指定线程和后台线程执行任务，还挺重要的，一起来看看吧！⛽️⛽️
 #### performSelectorOnMainThread:withObject:waitUntilDone:modes: 
