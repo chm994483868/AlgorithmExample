@@ -532,6 +532,7 @@
 		D24C822225120D1400E3BF5E /* iOS 从源码解析Runtime (五)：聚焦objc_object(retain、release、retaincount).md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 从源码解析Runtime (五)：聚焦objc_object(retain、release、retaincount).md"; sourceTree = "<group>"; };
 		D24C82232512140800E3BF5E /* iOS 从源码解析Runtime (三)：引用计数表内部数据结构DenseMap.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 从源码解析Runtime (三)：引用计数表内部数据结构DenseMap.md"; sourceTree = "<group>"; };
 		D2B75F9125EF8A1B00F85C05 /* 临时题纲.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "临时题纲.md"; sourceTree = "<group>"; };
+		D2B75F9225F07AEE00F85C05 /* iOS 2021 面试前的准备（总结各知识点方便面试前快速复习使用）（二）.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 2021 面试前的准备（总结各知识点方便面试前快速复习使用）（二）.md"; sourceTree = "<group>"; };
 		D2C74CF5253046AE0051B89F /* iOS 从源码解析Runtime (十二)：聚焦objc_class(class_rw_t 内容篇).md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 从源码解析Runtime (十二)：聚焦objc_class(class_rw_t 内容篇).md"; sourceTree = "<group>"; };
 		D2C74CF62531A79C0051B89F /* iOS 从源码解析Runtime (十三)：聚焦 objc_class(objc_class函数内容篇).md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 从源码解析Runtime (十三)：聚焦 objc_class(objc_class函数内容篇).md"; sourceTree = "<group>"; };
 		D2C74CF7253457C10051B89F /* iOS 从源码解析Runtime (十四)：由源码解读属性&成员变量的修饰符.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 从源码解析Runtime (十四)：由源码解读属性&成员变量的修饰符.md"; sourceTree = "<group>"; };
@@ -556,7 +557,7 @@
 		D2EA09BE25B982200054B58A /* AssignmentOperator_2.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = AssignmentOperator_2.cpp; sourceTree = "<group>"; };
 		D2EA09BF25B982200054B58A /* AssignmentOperator_2.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = AssignmentOperator_2.hpp; sourceTree = "<group>"; };
 		D2EA09C925BEB8560054B58A /* iOS《View Programming Guide for iOS》官方文档.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS《View Programming Guide for iOS》官方文档.md"; sourceTree = "<group>"; };
-		D2EA09D325C241A30054B58A /* iOS 2021 面试前的准备（精简各知识点方便面试前快速复习使用）.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 2021 面试前的准备（精简各知识点方便面试前快速复习使用）.md"; sourceTree = "<group>"; };
+		D2EA09D325C241A30054B58A /* iOS 2021 面试前的准备（总结各知识点方便面试前快速复习使用）（一）.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 2021 面试前的准备（总结各知识点方便面试前快速复习使用）（一）.md"; sourceTree = "<group>"; };
 		D2EA09D425C2540B0054B58A /* iOS 渲染过程全解析.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 渲染过程全解析.md"; sourceTree = "<group>"; };
 		D2EA09DE25C2BC0F0054B58A /* iOS《Concurrency Programming Guide-Operation Queues》官方文档.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS《Concurrency Programming Guide-Operation Queues》官方文档.md"; sourceTree = "<group>"; };
 		D2EA09E225C3EDC00054B58A /* FindDuplication_2.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = FindDuplication_2.cpp; sourceTree = "<group>"; };
@@ -1510,7 +1511,8 @@
 				D2EA09BC25B972B90054B58A /* iOS NSCoding.md */,
 				D2EA09D425C2540B0054B58A /* iOS 渲染过程全解析.md */,
 				D2B75F9125EF8A1B00F85C05 /* 临时题纲.md */,
-				D2EA09D325C241A30054B58A /* iOS 2021 面试前的准备（精简各知识点方便面试前快速复习使用）.md */,
+				D2EA09D325C241A30054B58A /* iOS 2021 面试前的准备（总结各知识点方便面试前快速复习使用）（一）.md */,
+				D2B75F9225F07AEE00F85C05 /* iOS 2021 面试前的准备（总结各知识点方便面试前快速复习使用）（二）.md */,
 			);
 			path = "已发布";
 			sourceTree = "<group>";

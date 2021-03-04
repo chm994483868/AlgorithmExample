@@ -850,7 +850,7 @@ layer.backgroundFilters = [NSArray arrayWithObject:filter];
 ```c++
 @property CGFloat rasterizationScale;
 ```
-&emsp;当 shouldRasterize 属性中的值为 YES时，图层将使用此属性来确定是否缩放栅格化的内容（以及缩放多少）。此属性的默认值为 1.0，这表示应以当前大小对其进行栅格化。较大的值将放大内容，较小的值将缩小内容。
+&emsp;当 shouldRasterize 属性中的值为 YES 时，图层将使用此属性来确定是否缩放栅格化的内容（以及缩放多少）。此属性的默认值为 1.0，这表示应以当前大小对其进行栅格化。较大的值将放大内容，较小的值将缩小内容。
 #### contentsFormat
 &emsp;有关所需的图层内容存储格式的提示。
 ```c++
@@ -1158,7 +1158,7 @@ layer.backgroundFilters = [NSArray arrayWithObject:filter];
 
 &emsp;数组的顺序与将动画应用于图层的顺序匹配。
 
-&emsp;可看到 layout 和 display 的一组方法的使用方式和命名方式基本相同。`- setNeedsDisplay/- setNeedsLayout` 标记在下一个周期需要进行 display/layout，`- displayIfNeeded/- layoutIfNeeded` 如果需要则执行 display/layout，`- needsDisplay/- needsLayout` 返回是否需要 display/layout，`- display/- layoutSublayers` 更新执行 display/layout。
+&emsp;可看到 layout 和 display 的一组方法的使用方式和命名方式基本相同。`- setNeedsDisplay/- setNeedsLayout` 标记在下一个周期需要进行 display/layout，`- displayIfNeeded/- layoutIfNeeded` 如果需要则立即执行 display/layout，`- needsDisplay/- needsLayout` 返回是否需要 display/layout，`- display/- layoutSublayers` 更新执行 display/layout。
 
 ### Managing Layer Resizing and Layout（管理图层调整大小和布局）
 #### layoutManager
@@ -1563,6 +1563,7 @@ CA_EXTERN CALayerCornerCurve const kCACornerCurveContinuous API_AVAILABLE(macos(
 ```c++
 + (CGFloat)cornerCurveExpansionFactor:(CALayerCornerCurve)curveAPI_AVAILABLE(macos(10.15), ios(13.0), watchos(6.0), tvos(13.0));
 ```
+
 ## 参考链接
 **参考链接:🔗**
 + [CALayer](https://developer.apple.com/documentation/quartzcore/calayer?language=objc)
