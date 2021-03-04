@@ -320,6 +320,7 @@ dispatch_release(dispatch_object_t object);
 &emsp;一旦释放了所有引用（即引用计数变为零），就会异步释放 dispatch object。系统不保证给定的客户端（client）是对给定对象的最后或唯一引用。
 
 &emsp;`object` 要释放的对象。在此参数中传递 `NULL` 的结果是未定义的。
+
 ## dispatch_get_context
 &emsp;`dispatch_get_context` 返回应用程序定义的对象的上下文。
 ```c++
@@ -506,6 +507,7 @@ dispatch_debug(dispatch_object_t object, const char *message, ...);
 &emsp;不建议使用此功能，以后的版本中将删除该功能。 Objective-C 调用者可以改用 `debugDescription`。
 
 &emsp;<dispatch/object.h> 文件到这里就全部看完了。下面接着看另一个较简单的文件 <dispatch/group.h>。
+
 ## <dispatch/group.h>
 &emsp;<dispatch/group.h> 文件的内容不多，仅仅包含几个与 `dispatch_group_t` 相关的函数，下面一起看一下吧。
 ### dispatch_group_t
