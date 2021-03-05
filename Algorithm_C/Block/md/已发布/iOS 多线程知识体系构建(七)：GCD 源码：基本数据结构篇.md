@@ -17,7 +17,7 @@
 
 &emsp;那么“继承关系”呢，这里是首先定义了基类的结构体，然后需要继承时，则是把基类结构体的成员变量直接放在子类结构体头部平铺展开，为了“易读和不显臃肿”，apple 定义了大量的宏，需要继承谁时直接在子类结构的头部放一个基类结构体的宏，在阅读时我们则需要把这些宏全部展开，前面 .h 中的内容仅是一些 `**_t` 的宏定义的展开就看的焦头烂额了，这下 `**_s` 的宏展开才是真正的告诉我们什么叫焦头烂额...
 ## _os_object_s
-&emsp;`_os_object_s` 结构体内部的内容不多，它是作为 GCD 的基类存在的，它正是 `dispatch_object_s` 结构体的“父类”，下面看下它都包含哪些内容。
+&emsp;`_os_object_s` 结构体内部的内容不多，它是作为 GCD 的基类存在的，它正是 `dispatch_object_s` 结构体的 “父类”，下面看下它都包含哪些内容。
 ```c++
 typedef struct _os_object_s {
     _OS_OBJECT_HEADER(
@@ -68,6 +68,7 @@ typedef struct _os_object_vtable_s {
 ```
 
 &emsp;把 `const _os_object_vtable_s *os_obj_isa` 展开，在 arm64/x86_64 下，os_obj_isa 是一个指向长度是 5 元素是 void * 的指针。
+
 ## dispatch_object_s
 &emsp;`dispatch_object_s` 是 GCD 的基础结构体，它是继承自 `_os_object_s` 结构体的，且其中涉及到连续的多个宏定义（看连续的宏定义真的好烦呀），下面一起来看一下。
 
@@ -79,7 +80,7 @@ typedef struct _os_object_vtable_s {
 
 &ensp;上面 `_os_object_vtable_s` 结构体定义内仅有的 `_OS_OBJECT_CLASS_HEADER` 宏定义包裹的是 `_os_object_s` 结构体指针做参数的一组函数指针，然后 `_os_object_s` 结构体的第一个成员变量 `os_obj_isa` 是一个指向 `_os_object_vtable_s` 的指针。
 
-&emsp;这样看下来，结构体的成员变量有了，然后结构体做参数所能执行的一些函数调用也有了，这不就是完整的“类”定义吗。
+&emsp;这样看下来，结构体的成员变量有了，然后结构体做参数所能执行的一些函数调用也有了，这不就是完整的 “类” 定义吗。
 
 &emsp;如果在全局搜 `DISPATCH_OBJECT_HEADER` 会发现有多个结构体的定义第一行都是 `DISPATCH_OBJECT_HEADER`，正表明了它们都是继承自 `dispatch_object_s`，如下面的队列组结构体、信号量结构体、io 结构体等。看到这里我们就真的明白为啥结构体定义的内部总是仅有一个 `_HEADER` 做后缀的宏定义了，都是为了接下来的“继承”做准备的。
 ```c++
@@ -189,6 +190,7 @@ struct dispatch_object_s {
 &emsp;在 `dispatch_object_s` 结构体第一个成员变量是 `const struct dispatch_object_vtable_s *do_vtable`，这里的 `dispatch_object_vtable_s` 结构体和 `_os_object_s` 结构体中的 `_os_object_vtable_s` 结构体内容有何不同呢，下面一起来看一下。
 
 &emsp;这里 `dispatch_object_vtable_s` 不是直接定义的，它涉及到另外一个宏定义 `OS_OBJECT_CLASS_DECL`，`dispatch_object_vtable_s` 结构体定义是放在 `OS_OBJECT_CLASS_DECL` 宏定义里面的（真的快看吐了...），宏定义名也表明了 `dispatch_object_s` 是继承自 `_os_object_s` 的。同时宏名里面也有 `_CLASS` 这也对应了上面 `_OS_OBJECT_CLASS_HEADER` 宏，有 `_CLASS` 的宏都是用来表明继承时的函数继承的，如这里的 `OS_OBJECT_CLASS_DECL` 宏主要是用来让 `dispatch_object_s` 结构体继承 `_os_object_s` 结构体的操作函数用的，下面来看一下吧。
+
 ### DISPATCH_CLASS_DECL_BARE
 ```c++
 #define DISPATCH_CLASS_DECL_BARE(name, cluster) \
@@ -320,6 +322,7 @@ extern const struct dispatch_object_vtable_s _dispatch_object_vtable __asm__(".o
 &emsp;emmm...看到这里我们就把 `dispatch_object_s` 结构定义相关的内容全部看完了，真的是宏定义一层套一层，然后还在宏定义里面再套完整的结构体定义。（还有结构体定义里面的函数指针的具体作用和实现待后续再展开讲解，本篇只关注数据结构。）
 
 &emsp;下面我们看一下指向 `dispatch_object_s` 结构体的指针类型 `dispatch_object_t`，在此之前我们要扩展一个知识点：**透明联合类型**。
+
 ## DISPATCH_TRANSPARENT_UNION
 &emsp;`DISPATCH_TRANSPARENT_UNION` 是用于添加 `transparent_union` 属性的宏定义。
 ```c++
@@ -330,6 +333,7 @@ extern const struct dispatch_object_vtable_s _dispatch_object_vtable __asm__(".o
 #endif
 ```
 &emsp;透明联合类型削弱了 C 语言的类型检测机制，或者，换言之，它起到了类似强制类型转换的效果。考虑到在底层，类型实质上是不存在的，因此所谓的透明联合类型，也就是在一定程度上打破了类型对我们的束缚，使数据以一种更底层的角度呈现在我们面前。不过这样也弱化了 C 语言对类型的检测，由此也可能带来一些很严重的错误。详细可参考：[透明联合类型](http://nanjingabcdefg.is-programmer.com/posts/23951.html)。
+
 ## dispatch_object_t
 &emsp;`dispatch_object_t` 结尾处的 `DISPATCH_TRANSPARENT_UNION` 表示它是一个透明联合体，即 `dispatch_object_t` 可以表示为指向联合体内部的任何一种类型的指针。
 ```c++
@@ -378,6 +382,7 @@ struct dispatch_queue_s {
 } DISPATCH_ATOMIC64_ALIGN;
 ```
 &emsp;看到 `dispatch_queue_s` 内部仅使用了一行宏定义: `DISPATCH_QUEUE_CLASS_HEADER`，与上面的 `dispatch_object_s` 结构体内部仅有的一行的宏定义：`_DISPATCH_OBJECT_HEADER(object)` 相比，`DISPATCH_QUEUE_CLASS_HEADER` 的宏名里面多了 `CLASS`。
+
 ### DISPATCH_QUEUE_CLASS_HEADER
 &emsp;这宏定义看的真是吐🩸，一层套一层...
 ```c++
@@ -415,6 +420,7 @@ DISPATCH_UNION_LE(uint64_t volatile dq_state, \
         uint32_t dq_state_bits \
 )
 ```
+
 ### DISPATCH_OBJECT_HEADER
 ```c++
 #define DISPATCH_OBJECT_HEADER(x) \
@@ -422,6 +428,7 @@ DISPATCH_UNION_LE(uint64_t volatile dq_state, \
     _DISPATCH_OBJECT_HEADER(x) // 这里对应上面 dispatch_object_s 结构体内部唯一的一行宏定义: "_DISPATCH_OBJECT_HEADER(object);" 这里则是："_DISPATCH_OBJECT_HEADER(queue);" 仅入参发生变化
 ```
 &emsp;看到这里，`dispatch_queue_s` 结构体的前面几个成员变量的布局用到的宏定义展开和上面 `dispatch_object_s` 结构体内部用到的是一样的，即等下 `dispatch_queue_s` 结构体展开其前面几个成员变量时是和 `dispatch_object_s` 如出一辙的，这样就模拟了继承机制，如可以理解为 `dispatch_queue_s` 前面的几个成员变量继承自 `dispatch_object_s`。
+
 ### DISPATCH_UNION_LE
 &emsp;`DISPATCH_UNION_LE` 宏定义包含的内容有两层，首先是进行一个断言，然后是生成一个联合体，断言和下面的联合体内部转换几乎是相同的，都是使用相同的宏定义内容，而断言的内容也仅是判断联合体中两部分的内存空间占用是否相等。可能描述的不太清楚，不知道怎么描述，看下面的展开的具体内容，一定能一眼看通的！
 
@@ -594,6 +601,7 @@ struct dispatch_queue_attr_s {
 };
 ```
 &emsp;看到了熟悉的三个成员变量（类似 `_os_object_s` 结构体的前三个成员变量）。看到这里可能会迷惑，不是说好的 `dispatch_queue_attr_s` 是描述队列属性的数据结构吗，怎么内部就只有 “继承” 自 `_os_object_s` 的三个成员变量。实际描述队列的属性的结构体其实是 `dispatch_queue_attr_info_t`（是 `dispatch_queue_attr_info_s` 结构体的别名）。
+
 ### dispatch_queue_attr_info_t
 &emsp;看到 `dispatch_queue_attr_info_s` 内部使用了位域来表示不同的值，来节省内存占用。
 ```c++
@@ -713,6 +721,7 @@ typedef enum {
         DISPATCH_QUEUE_ATTR_INACTIVE_COUNT )
 ```
 &emsp;计算可得 `DISPATCH_QUEUE_ATTR_COUNT = 3456(3 * 3 * 6 * 16 * 2 * 2)`。
+
 ### _dispatch_queue_attrs
 &emsp;然后是一个全局变量 `_dispatch_queue_attrs`，一个长度是  3456 的 `dispatch_queue_attr_s` 数组。
 ```c++
@@ -824,6 +833,7 @@ typedef struct dispatch_continuation_s {
 } *dispatch_continuation_t;
 ```
 &emsp;同以前一样，结构体中定义也是仅有一行宏定义。
+
 ### DISPATCH_CONTINUATION_HEADER
 &emsp;仅看 `__LP64__` 下的情况。
 ```c++

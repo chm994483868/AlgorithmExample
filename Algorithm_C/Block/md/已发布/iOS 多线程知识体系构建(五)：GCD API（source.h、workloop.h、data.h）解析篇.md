@@ -293,6 +293,7 @@ dispatch_source_set_event_handler_f(dispatch_source_t source,
     dispatch_function_t _Nullable handler);
 ```
 &emsp;`handler`：事件处理程序函数提交到源的目标队列。传递给事件处理程序（函数）的 context 参数是设置事件处理程序时当前调度源的上下文。
+
 ### dispatch_source_set_cancel_handler
 &emsp;为给定的调度源设置取消处理程序块（cancellation handler block）。
 ```c++
@@ -631,6 +632,7 @@ dispatch_once(dispatch_once_t *predicate,
 
 #### DISPATCH_EXPECT/dispatch_compiler_barrier
 &emsp;`__builtin_expect` 这个指令是 GCC 引入的，作用是允许程序员将最有可能执行的分支告诉编译器，这个指令的写法为：`__builtin_expect(EXP, N)`，意思是：`EXP == N` 的概率很大，然后 CPU 会预取该分支的指令，这样 CPU 流水线就会很大概率减少了 CPU 等待取指令的耗时，从而提高 CPU 的效率。
+
 &emsp;`dispatch_compiler_barrier` 内存屏障。
 ```c++
 #if __GNUC__
@@ -686,6 +688,7 @@ _dispatch_once(dispatch_once_t *predicate,
 &emsp;<dispatch/once.h> 文件到这里就全部看完了。下面接着看另一个文件 <dispatch/data.h>。
 ## <dispatch/data.h>
 &emsp;调度数据对象（dispatch data objects）描述了可以由系统或应用程序管理的内存的连续或稀疏区域。调度数据对象（Dispatch data objects）是不可变的，任何直接访问由调度对象表示的内存区域都不得修改该内存。
+
 ### dispatch_data_t
 &emsp;代表内存区域（memory regions）的调度对象（dispatch object）。
 ```c++

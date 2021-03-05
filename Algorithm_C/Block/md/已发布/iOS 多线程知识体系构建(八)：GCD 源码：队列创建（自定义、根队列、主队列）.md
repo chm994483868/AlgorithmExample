@@ -3,6 +3,7 @@
 > &emsp;上篇主要看了源码中基础的数据结构以及和队列相关的一些内容，那么本篇就从创建自定义队列作为主线，过程中遇到新的数据结构时再展开作为支线来学习，那么开始吧！⛽️⛽️
 
 &emsp;在 GCD 中使用最多的三种队列：主队列（`dispatch_get_main_queue()`）、全局并发队列（`dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0)`）、自定义队列（`dispatch_queue_create`），那么我们就先由创建自定义队列开始学习。
+
 ## dispatch_queue_create（创建自定义队列）
 &emsp;下面就沿着源码一路看队列的创建过程。
 ```c++
@@ -11,6 +12,7 @@ dispatch_queue_t concurrentQueue = dispatch_queue_create("com.concurrent", DISPA
 // 创建一个串行队列
 dispatch_queue_t serialQueue = dispatch_queue_create("com.serial", DISPATCH_QUEUE_SERIAL);
 ```
+
 ### DISPATCH_QUEUE_SERIAL 
 &emsp;用于创建以 FIFO 顺序串行调用块的调度队列（串行队列）的属性，值是 `NULL`。
 ```c++
@@ -37,6 +39,7 @@ dispatch_queue_create(const char *label, dispatch_queue_attr_t attr) {
 }
 ```
 &emsp;`dispatch_queue_create` 函数内部调用了一个中间函数 `_dispatch_lane_create_with_target`，其中用了一个 `DISPATCH_TARGET_QUEUE_DEFAULT` 作为默认参数。
+
 ### DISPATCH_TARGET_QUEUE_DEFAULT
 &emsp;`DISPATCH_TARGET_QUEUE_DEFAULT` 是传递给 `dispatch_queue_create_with_target`、`dispatch_set_target_queue` 和 `dispatch_source_create` 函数的常量，以指示应使用（相关对象类型的）默认目标队列，它的实际值是 `NULL`。
 ```c++
@@ -116,6 +119,7 @@ typedef struct dispatch_lane_s {
 } DISPATCH_ATOMIC64_ALIGN *dispatch_lane_t;
 ```
 &emsp;可看到 `dispatch_lane_s` 是继承自 `dispatch_queue_s` 的“子类”，且 `_dispatch_lane_create_with_target` 函数返回的正是 `dispatch_lane_s` 而不是 `dispatch_queue_s` 类型。
+
 ### DISPATCH_QUEUE_WIDTH_MAX
 ```c++
 #define DISPATCH_QUEUE_WIDTH_FULL            0x1000ull //（4096）为创建全局队列时候所使用的
@@ -167,6 +171,7 @@ _dispatch_lane_create_with_target(const char *label, dispatch_queue_attr_t dqa,
 
     // 取出是否允许 "过量使用（超过物理上的核心数）"
     _dispatch_queue_attr_overcommit_t overcommit = dqai.dqai_overcommit;
+    
     if (overcommit != _dispatch_queue_attr_overcommit_unspecified && tq) {
         // 如果 overcommit 不等于 "未指定 overcommit" 并且 tq 不为空
         //（已知上面 dispatch_queue_create 函数调用默认入参 DISPATCH_TARGET_QUEUE_DEFAULT 是 NULL）
@@ -330,6 +335,7 @@ _dispatch_lane_create_with_target(const char *label, dispatch_queue_attr_t dqa,
 }
 ```
 &emsp;`_dispatch_lane_create_with_target` 函数的执行流程如注释所示，下面我们摘录其中的较关键点再进行分析。
+
 ## _dispatch_get_root_queue
 &emsp;当 `tq` 不存在时，会调用 `_dispatch_get_root_queue` 返回一个 `dispatch_queue_global_t` 赋值给 `tq`。在 `dispatch_queue_create` 函数调用中 `tq` 传了一个默认值：`DISPATCH_TARGET_QUEUE_DEFAULT`（它的实际值是 `NULL`），所以当我们创建串行队列或者并发队列的时候都会调用 `_dispatch_get_root_queue` 函数来获取一个目标队列。
 ```c++
@@ -556,6 +562,7 @@ _DISPATCH_ROOT_QUEUE_ENTRY(USER_INTERACTIVE, 0,
 }
 ```
 &emsp;看到是根据入参构建一个结构体实例。
+
 ## _dispatch_queue_init
 &emsp;`dispatch_lane_s` 结构体实例创建完成后，调用了 `_dispatch_queue_init` 函数进行初始化操作。
 ```c++
@@ -576,6 +583,7 @@ _dispatch_queue_init(dq, dqf, dqai.dqai_concurrent ?
         (dqai.dqai_inactive ? DISPATCH_QUEUE_INACTIVE : 0));
 ...
 ```
+
 ### dispatch_queue_class_t
 &emsp;`dispatch_queue_class_t` 是一个透明联合类型，且每个成员变量都是指向 `dispatch_queue_s` 结构体的子类的指针。
 ```c++

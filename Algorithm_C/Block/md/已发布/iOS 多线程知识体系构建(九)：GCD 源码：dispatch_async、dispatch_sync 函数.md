@@ -260,6 +260,7 @@ _dispatch_continuation_init_f(dispatch_continuation_t dc,
 }
 ```
 &emsp;到这里任务（`dispatch_continuation_s`）的封装就完成了，下面看一下 `_dispatch_continuation_async` 函数的内容。
+
 ## _dispatch_continuation_async
 &emsp;`dispatch_async` 函数内部把 `dispatch_continuation_s` 结构体变量准备好后调用 `_dispatch_continuation_async(dq, dc, qos, dc->dc_flags)`。
 ```c++
@@ -288,6 +289,7 @@ void (*const dq_push)(dispatch_queue_class_t, dispatch_object_t, dispatch_qos_t)
 &emsp;`_dispatch_continuation_async` 函数内部使用了一个宏定义：`dx_push`，宏定义的内容是调用 `dqu`（`dispatch_queue_class_t`）的 vtable 的 `dq_push`（dq_push 是一个函数指针，是作为 vtable 的属性存在的，那么它是何时进行赋值的呢？）。
 
 &emsp;全局搜索 `dq_push` 发现存在多处不同的队列进行赋值，例如根队列（`.dq_push = _dispatch_root_queue_push`）、主队列（`.dq_push = _dispatch_main_queue_push`）、并发队列（`.dq_push = _dispatch_lane_concurrent_push`）、串行队列（`.dq_push = _dispatch_lane_push`）等等，由于我们的自定义队列都是以根队列作为目标队列（任务大都是在根队列执行的），所以我们这里以 `_dispatch_root_queue_push` 为例进行学习。
+
 ### _dispatch_root_queue_push
 &emsp;`_dispatch_root_queue_push` 函数内部最终调用了 `_dispatch_root_queue_push_inline(rq, dou, dou, 1)` 函数。
 ```c++
@@ -336,7 +338,7 @@ _dispatch_root_queue_push(dispatch_queue_global_t rq, dispatch_object_t dou,
 }
 ```
 ### _dispatch_root_queue_push_inline
-&emsp;`_dispatch_root_queue_push_inline`内部则是调用 `_dispatch_root_queue_poke` 函数。
+&emsp;`_dispatch_root_queue_push_inline` 内部则是调用 `_dispatch_root_queue_poke` 函数。
 ```c++
 DISPATCH_ALWAYS_INLINE
 static inline void
@@ -390,8 +392,10 @@ _dispatch_root_queue_poke_slow(dispatch_queue_global_t dq, int n, int floor)
 
     // 注册回调（内部调用了 dispatch_once_f，全局只会只会执行一次）
     _dispatch_root_queues_init();
+    
     // DEGBUG 模式时的打印 __func__ 函数执行
     _dispatch_debug_root_queue(dq, __func__);
+    
     // hook
     _dispatch_trace_runtime_event(worker_request, dq, (uint64_t)n);
 
@@ -473,6 +477,7 @@ _dispatch_root_queue_poke_slow(dispatch_queue_global_t dq, int n, int floor)
             }
             _dispatch_temporary_resource_shortage();
         }
+        
     } while (--remaining);
 #else // defined(_WIN32)
 #if DISPATCH_USE_MGR_THREAD && DISPATCH_USE_PTHREAD_ROOT_QUEUES
@@ -540,6 +545,7 @@ _dispatch_sync_f(dispatch_queue_t dq, void *ctxt, dispatch_function_t func, uint
 ```
 ### _dispatch_sync_f_inline
 &emsp;`_dispatch_sync_f_inline` 函数实现中开局是一个 `dq->dq_width == 1` 的判断，上篇队列创建中我们知道串行队列的 `dq_width` 值为 1，自定义的并发队列的 `dq_width` 值为 `0xffeull`，根队列的 `dq_width` 值是 `0xfffull`，即如果 `dq` 参数是串行队列的话会执行 `_dispatch_barrier_sync_f(dq, ctxt, func, dc_flags)`，如果 `dq` 参数是并发队列的话，会执行接下来的函数。
+
 ```c++
 DISPATCH_ALWAYS_INLINE
 static inline void
@@ -547,6 +553,7 @@ _dispatch_sync_f_inline(dispatch_queue_t dq, void *ctxt,
         dispatch_function_t func, uintptr_t dc_flags)
 {
     // 学习上篇时我们知道串行队列的 dq_width 值为 1
+    
     if (likely(dq->dq_width == 1)) {
         return _dispatch_barrier_sync_f(dq, ctxt, func, dc_flags);
     }
@@ -560,7 +567,9 @@ _dispatch_sync_f_inline(dispatch_queue_t dq, void *ctxt,
     }
     
     dispatch_lane_t dl = upcast(dq)._dl;
+    
     // Global concurrent queues and queues bound to non-dispatch threads always fall into the slow case, see DISPATCH_ROOT_QUEUE_STATE_INIT_VALUE
+    
     // 绑定到非调度线程（non-dispatch threads）的全局并发队列（global concurrent queues）和队列始终属于缓慢情况（slow case）
     if (unlikely(!_dispatch_queue_try_reserve_sync_width(dl))) {
         return _dispatch_sync_f_slow(dl, ctxt, func, 0, dl, dc_flags);
@@ -569,6 +578,7 @@ _dispatch_sync_f_inline(dispatch_queue_t dq, void *ctxt,
     if (unlikely(dq->do_targetq->do_targetq)) {
         return _dispatch_sync_recurse(dl, ctxt, func, dc_flags);
     }
+    
     _dispatch_introspection_sync_begin(dl);
     
     _dispatch_sync_invoke_and_complete(dl, ctxt, func DISPATCH_TRACE_ARG(
@@ -585,6 +595,7 @@ upcast(dispatch_object_t dou)
     return dou;
 }
 ```
+
 #### _dispatch_barrier_sync_f
 &emsp;`_dispatch_barrier_sync_f` 函数内部也是仅调用了 `_dispatch_barrier_sync_f_inline` 函数。
 ```c++
@@ -596,6 +607,7 @@ _dispatch_barrier_sync_f(dispatch_queue_t dq, void *ctxt,
     _dispatch_barrier_sync_f_inline(dq, ctxt, func, dc_flags);
 }
 ```
+
 ##### _dispatch_barrier_sync_f_inline
 ```c++
 DISPATCH_ALWAYS_INLINE
@@ -611,6 +623,7 @@ _dispatch_barrier_sync_f_inline(dispatch_queue_t dq, void *ctxt,
     }
 
     dispatch_lane_t dl = upcast(dq)._dl;
+    
     // The more correct thing to do would be to merge the qos of the
     // thread that just acquired the barrier lock into the queue state.
     // （更加正确的做法是将刚获得屏障锁的线程的质量合并到队列状态。）
@@ -644,7 +657,7 @@ _dispatch_barrier_sync_f_inline(dispatch_queue_t dq, void *ctxt,
                     dq, ctxt, func, dc_flags | DC_FLAG_BARRIER)));
 }
 ```
-&emsp;在日常开发中我们知道如果当前是串行队列然后调用 `dispatch_sync` 函数把一个任务添加到当前的串行队列则必然会发生死锁，而发生死锁的原因正存放在 `_dispatch_queue_try_acquire_barrier_sync(dl, tid)` 函数调用中。
+&emsp;在日常开发中我们知道如果当前是串行队列然后调用 `dispatch_sync` 函数把一个任务添加到当前的串行队列则必然会发生死锁（同步函数中如果当前正在执行的队列和等待的是同一个队列，形成相互等待的局面，则会造成死锁），而发生死锁的原因正存放在 `_dispatch_queue_try_acquire_barrier_sync(dl, tid)` 函数调用中。
 
 &emsp;当我们在 `viewDidLoad` 中写下如下函数:
 ```c++
@@ -664,6 +677,7 @@ _dispatch_queue_try_acquire_barrier_sync(dispatch_queue_class_t dq, uint32_t tid
 }
 ```
 &emsp;直接调用了 `_dispatch_queue_try_acquire_barrier_sync_and_suspend` 函数。
+
 ##### _dispatch_queue_try_acquire_barrier_sync_and_suspend
 &emsp;`_dispatch_queue_try_acquire_barrier_sync_and_suspend`函数通过 `os_atomic_rmw_loop2o` 函数回调，从 OS 底层获取到了状态信息，并返回。
 ```c++
