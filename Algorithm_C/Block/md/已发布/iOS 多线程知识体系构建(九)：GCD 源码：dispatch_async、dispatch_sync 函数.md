@@ -667,7 +667,7 @@ dispatch_sync(mainQueue, ^{
 ```
 &emsp;运行后必然发生崩溃，左侧的函数调用栈可看到: `0 __DISPATCH_WAIT_FOR_QUEUE__` ⬅️ `1 _dispatch_sync_f_slow` ⬅️ `2 -[ViewController viewDidLoad]`..., 可看到是 `__DISPATCH_WAIT_FOR_QUEUE__` 函数发生了 crash。
 
-&emsp;下面沿着 `_dispatch_queue_try_acquire_barrier_sync` 函数到调用看下去。
+&emsp;下面沿着 `_dispatch_queue_try_acquire_barrier_sync` 函数的调用看下去。
 ```c++
 DISPATCH_ALWAYS_INLINE DISPATCH_WARN_RESULT
 static inline bool
@@ -679,7 +679,7 @@ _dispatch_queue_try_acquire_barrier_sync(dispatch_queue_class_t dq, uint32_t tid
 &emsp;直接调用了 `_dispatch_queue_try_acquire_barrier_sync_and_suspend` 函数。
 
 ##### _dispatch_queue_try_acquire_barrier_sync_and_suspend
-&emsp;`_dispatch_queue_try_acquire_barrier_sync_and_suspend`函数通过 `os_atomic_rmw_loop2o` 函数回调，从 OS 底层获取到了状态信息，并返回。
+&emsp;`_dispatch_queue_try_acquire_barrier_sync_and_suspend` 函数通过 `os_atomic_rmw_loop2o` 函数回调，从 OS 底层获取到了状态信息，并返回。
 ```c++
 /* Used by _dispatch_barrier_{try,} sync
  *
@@ -737,10 +737,11 @@ _dispatch_lock_value_from_tid(dispatch_tid tid)
 }
 ```
 &emsp;在 `_dispatch_barrier_sync_f_inline` 函数中，如果执行 `_dispatch_sync_f_slow` 的话，下面看一下 `_dispatch_sync_f_slow` 函数的内容。
+
 ##### _dispatch_sync_f_slow
 &emsp;`_dispatch_sync_f_slow` 函数内部看到了 `__DISPATCH_WAIT_FOR_QUEUE__(&dsc, dq)` 函数的身影。
 
-&emsp;`_dispatch_sync_f_slow` 函数中生成了一些任务的信息，然后通过 `_dispatch_trace_item_push` 来进行压栈操作，从而存放在我们的同步队列中（FIFO）,从而实现函数的执行。
+&emsp;`_dispatch_sync_f_slow` 函数中生成了一些任务的信息，然后通过 `_dispatch_trace_item_push` 来进行压栈操作，从而存放在我们的同步队列中（FIFO），从而实现函数的执行。
 ```c++
 DISPATCH_NOINLINE
 static void
@@ -901,9 +902,36 @@ _dispatch_client_callout(void *ctxt, dispatch_function_t f)
     }
 }
 ```
-&emsp;看到这里 `dispatch_sync` 的 block 得到了执行。
+&emsp;看到这里当队列是串行队列时 `dispatch_sync` 的 block 得到了执行。
 
 &emsp;当 `dispatch_sync` 把任务提交到串行队列时，完整的函数调用栈大概精简如下：`dispatch_sync` ➡️ `_dispatch_sync_f` ➡️ `_dispatch_sync_f_inline` ➡️ `_dispatch_barrier_sync_f` ➡️ `_dispatch_barrier_sync_f_inline` ➡️ `_dispatch_lane_barrier_sync_invoke_and_complete` ➡️ `_dispatch_sync_function_invoke_inline` ➡️ `_dispatch_client_callout` ➡️ `f(ctxt)`。
+
+&emsp;下面我们看一下当提交到并行队列时 `dispatch_sync` 的  `_dispatch_sync_invoke_and_complete` 执行分支。
+```c++
+DISPATCH_NOINLINE
+static void
+_dispatch_sync_invoke_and_complete(dispatch_lane_t dq, void *ctxt,
+        dispatch_function_t func DISPATCH_TRACE_ARG(void *dc))
+{
+    _dispatch_sync_function_invoke_inline(dq, ctxt, func);
+    _dispatch_trace_item_complete(dc);
+    _dispatch_lane_non_barrier_complete(dq, 0);
+}
+```
+&emsp;`_dispatch_sync_function_invoke_inline` 函数定义其中 `_dispatch_client_callout(ctxt, func);` 执行 block 任务：
+```c++
+DISPATCH_ALWAYS_INLINE
+static inline void
+_dispatch_sync_function_invoke_inline(dispatch_queue_class_t dq, void *ctxt,
+        dispatch_function_t func)
+{
+    dispatch_thread_frame_s dtf;
+    _dispatch_thread_frame_push(&dtf, dq);
+    _dispatch_client_callout(ctxt, func); // 执行
+    _dispatch_perfmon_workitem_inc();
+    _dispatch_thread_frame_pop(&dtf);
+}
+```
 
 &emsp;当 `dispatch_sync` 把任务提交到并发队列时，完整的函数调用栈大概精简如下：`dispatch_sync` ➡️ `_dispatch_sync_f` ➡️ `_dispatch_sync_f_inline` ➡️ `_dispatch_sync_invoke_and_complete` ➡️ `_dispatch_sync_function_invoke_inline` ➡️ `_dispatch_client_callout` ➡️ `f(ctxt)`。
 

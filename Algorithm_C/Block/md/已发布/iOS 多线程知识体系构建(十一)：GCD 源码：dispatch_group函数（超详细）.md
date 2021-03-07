@@ -4,6 +4,7 @@
 
 ## dispatch_group
 &emsp;dispatch_group 可以将一组 GCD 任务关联到一起，可以监听这一组所有任务的执行情况，当组内所有任务异步执行完毕后我们可以得到一个或多个回调通知（使用 `dispatch_group_notify` 添加几个就能执行几个回调通知）。
+
 ### dispatch_group_s
 &emsp;`dispatch_group_s` 定义和 `dispatch_semaphore_s` 定义都是放在 semaphore_internal.h 文件中，而且该文件中仅包含它俩的内容，其实文件这样布局也是有用意的，因为它俩的内部实现有一些相似性，dispatch_group 在内部也会维护一个值，当调用 `dispatch_group_enter` 函数进行进组操作时（`dg_bits` - `0x0000000000000004ULL`），当调用 `dispatch_group_leave` 函数进行出组操作时（`dg_state` + `0x0000000000000004ULL`）时对该值进行操作（这里可以把 `dg_bits` 和 `dg_state` 理解为一个值），当该值达到临界值 0 时会做一些后续操作（`_dispatch_group_wake` 唤醒异步执行 `dispatch_group_notify` 函数添加的所有回调通知），且在使用过程中一定要谨记进组（enter）和出组（leave）必须保持平衡。
 

@@ -44,12 +44,14 @@ typedef struct dispatch_once_gate_s {
     };
 } dispatch_once_gate_s, *dispatch_once_gate_t;
 ```
+
 ### DLOCK_ONCE_DONE/DLOCK_ONCE_UNLOCKED
 &emsp;`DLOCK_ONCE_UNLOCKED` 与 `DLOCK_ONCE_DONE` 对应，分别代表 `dispatch_once` 执行前后的标记状态。`DLOCK_ONCE_UNLOCKED` 用于标记 `dispatch_once` 还没有执行过，`DLOCK_ONCE_DONE` 用于标记 `dispatch_once` 已经执行完了。
 ```c++
 #define DLOCK_ONCE_UNLOCKED   ((uintptr_t)0)
 #define DLOCK_ONCE_DONE   (~(uintptr_t)0)
 ```
+
 ### dispatch_once_f
 &emsp;根据 `val`（`dgo_once` 成员变量） 的值非零与否来判断是否执行 `dispatch_once_f` 提交的函数。
 ```c++
@@ -63,10 +65,12 @@ dispatch_once_f(dispatch_once_t *val, void *ctxt, dispatch_function_t func)
 #if !DISPATCH_ONCE_INLINE_FASTPATH || DISPATCH_ONCE_USE_QUIESCENT_COUNTER
     // 原子性获取 l->dgo_once 的值
     uintptr_t v = os_atomic_load(&l->dgo_once, acquire);
+    
     // 判断 v 的值是否是 DLOCK_ONCE_DONE（大概率是，表示 val 已经被赋值 DLOCK_ONCE_DONE 和 func 已经执行过了），是则直接返回
     if (likely(v == DLOCK_ONCE_DONE)) {
         return;
     }
+    
 #if DISPATCH_ONCE_USE_QUIESCENT_COUNTER
     // 不同的判定形式
     // 判断 v 是否还存在锁，如果存在就返回
@@ -74,6 +78,7 @@ dispatch_once_f(dispatch_once_t *val, void *ctxt, dispatch_function_t func)
         return _dispatch_once_mark_done_if_quiesced(l, v);
     }
 #endif
+
 #endif
 
     // 原子判断 l（l->dgo_once）是否非零，
@@ -94,12 +99,14 @@ dispatch_once_f(dispatch_once_t *val, void *ctxt, dispatch_function_t func)
 }
 ```
 &emsp;下面对 `dispatch_once_f` 函数中嵌套调用的函数进行分析。
+
 #### _dispatch_once_gate_tryenter
 &emsp;`_dispatch_once_gate_tryenter` 函数原子性的判断 `l`（`l->dgo_once`）是否非零，非零表示 `dispatch_once_f` 提交的函数已经执行过了（或者正在执行），零的话还没有执行过。
 
 &emsp;如果 `l`（`l->dgo_once`）是零的话，`_dispatch_once_gate_tryenter` 函数内部也会把 `l`（`l->dgo_once`） 赋值为当前线程的 ID（这里是一个临时赋值），在最后 `dispatch_once_f` 中提交的函数执行完成后 `_dispatch_once_gate_broadcast` 函数内部会把 `l`（`l->dgo_once`）赋值为 `DLOCK_ONCE_DONE`。（`_dispatch_lock_value_for_self` 函数是取出当前线程的 ID）
 
-&emsp;这里还藏有一个点，就是每次执行 `_dispatch_once_gate_tryenter` 函数时 `l`（`l->dgo_once`）被赋值为当前线程的 ID，它对应了下面 `_dispatch_once_gate_broadcast` 函数内的 `v == value_self` 的判断，如果是单线程的调用 `dispatch_once_f` 的话，则是不存在其它线程阻塞的，也就不需要线程唤醒的操作，而如果是多线程的环境下，`_dispatch_once_gate_tryenter` 函数会被调用多次，每次 `v` 都会被更新，而在 `_dispatch_once_gate_broadcast` 函数内部，`value_self` 是最初执行提交的函数的线程的 ID，而 `v` 是另外一条线程的 ID，且它正在阻塞等待提交的函数执行完成，所以此时再提交的的函数执行完成后，需要进行唤醒操作。
+&emsp;这里藏一个点，就是每次执行 `_dispatch_once_gate_tryenter` 函数时 `l`（`l->dgo_once`）被赋值为当前线程的 ID，它对应了下面 `_dispatch_once_gate_broadcast` 函数内的 `v == value_self` 的判断，如果是单线程的调用 `dispatch_once_f` 的话，则是不存在其它线程被阻塞等待的，也就不需要线程唤醒的操作，而如果是多线程的环境下，`_dispatch_once_gate_tryenter` 函数会被不同线程调用，每次 `v` 都会被更新当前调用线程的 ID，而在 `_dispatch_once_gate_broadcast` 函数内部，`value_self` 的值是最初调用 `dispatch_once_f` 函数的线程的 ID，而 `v` 则是最后面调用 `dispatch_once_f` 函数的线程的 ID，且它们这些线程正在阻塞等待 `dispatch_once_f` 函数提交的函数执行完成，所以当 `dispatch_once_f` 提交的的函数执行完成后，需要对阻塞等待的线程进行唤醒操作。
+
 ```c++
 DISPATCH_ALWAYS_INLINE
 static inline bool
@@ -140,7 +147,8 @@ _dispatch_lock_value_from_tid(dispatch_tid tid)
     return tid & DLOCK_OWNER_MASK;
 }
 ```
-&emsp;到这里与 `_dispatch_once_gate_tryenter` 相关的函数就看完了，根据 `_dispatch_once_gate_tryenter` 函数返回值，下面会有两个分支，一个是执行提交的函数，一个提交的函数已经执行过了，执行接下来的 `_dispatch_once_wait(l)`  阻塞线程（提交的函数正在执行）或者结束函数调用（提交的函数已经执行完成）。（多线程环境下的同时调用，恰巧处于提交的函数正在执行，另一个线程的调用也进来了，那么后来的线程会阻塞等待，在提交的函数执行完成后该阻塞的线程会被唤醒），下面我们先看一下首次执行 `dispatch_once` 函数的过程。
+&emsp;到这里与 `_dispatch_once_gate_tryenter` 相关的函数就看完了，根据 `_dispatch_once_gate_tryenter` 函数返回值，下面会有两个分支，一个是执行提交的函数，一个是提交的函数已经执行过了，执行接下来的 `_dispatch_once_wait(l)`  阻塞线程（提交的函数正在执行）或者结束函数调用（提交的函数已经执行完成）。（多线程环境下的同时调用，恰巧处于提交的函数正在执行，另一个线程的调用也进来了，那么后来的线程会阻塞等待，在提交的函数执行完成后该阻塞的线程会被唤醒），下面我们先看一下首次执行 `dispatch_once` 函数的过程。
+
 #### _dispatch_once_callout
 &emsp;`_dispatch_once_callout` 函数做了两件事，一是调用提交的函数，二是发出广播唤醒阻塞等待的线程。
 ```c++
@@ -257,6 +265,7 @@ _dlock_wake(uint32_t *uaddr, uint32_t flags)
 }
 ```
 &emsp;到这里单线程第一次执行 `dispatch_once_f` 的流程就看完了，下面看一下另一个也超级重要的分支 `_dispatch_once_wait(l)`。
+
 #### _dispatch_once_wait
 &emsp;`_dispatch_once_wait` 函数中，`os_atomic_rmw_loop` 用于从操作系统底层获取状态，使用 `os_atomic_rmw_loop_give_up` 来执行返回操作，即不停查询 `&dgo->dgo_once` 的值，若变为 `DLOCK_ONCE_DONE` 则调用 `os_atomic_rmw_loop_give_up(return)` 退出等待。
 ```c++
@@ -324,8 +333,10 @@ _dispatch_once_wait(dispatch_once_gate_t dgo)
 })
 ```
 &emsp;看到这里 `dispatch_once` 的内容已经看完了，`_dispatch_once_wait` 函数内部是用了一个 do while 循环来阻塞等待 `&dgo->dgo_once` 的值被置为 `DLOCK_ONCE_DONE`，看到一些文章中说是用 `_dispatch_thread_semaphore_wait` 来阻塞线程，这里已经发生更新。
+
 ## dispatch_semaphore
 &emsp;dispatch_semaphore 是 GCD 中最常见的操作，通常用于保证资源的多线程安全性和控制任务的并发数量。其本质实际上是基于 mach 内核的信号量接口来实现的。
+
 ### dispatch_semaphore_s
 &emsp;`dispatch_semaphore_t` 是指向 `dispatch_semaphore_s` 结构体的指针。首先看一下基础的数据结构。
 ```c++
@@ -419,25 +430,35 @@ const struct dispatch_semaphore_vtable_s OS_dispatch_semaphore_class = {
 }
 ```
 &emsp;`dispatch_semaphore_s` 结构体中：`dsema_orig` 是信号量的初始值，`dsema_value` 是信号量的当前值，信号量的相关 API 正是通过操作 `dsema_value` 来实现其功能的，`_dispatch_sema4_t` 是信号量的结构。
+
 #### _dispatch_sema4_t/_DSEMA4_POLICY_FIFO
 &emsp;在不同的平台和环境下 `_dispatch_sema4_t` 使用了不同的类型。（具体类型在 libdispatch 源码中未找到）
 
 &emsp;`_DSEMA4_POLICY_FIFO` 在下面的 `_dispatch_sema4_init` 函数调用中会用到。
 ```c++
 #if USE_MACH_SEM
+
   typedef semaphore_t _dispatch_sema4_t;
   #define _DSEMA4_POLICY_FIFO  SYNC_POLICY_FIFO
+  
 #elif USE_POSIX_SEM
+
   typedef sem_t _dispatch_sema4_t;
   #define _DSEMA4_POLICY_FIFO 0
+  
 #elif USE_WIN32_SEM
+
   typedef HANDLE _dispatch_sema4_t;
   #define _DSEMA4_POLICY_FIFO 0
+  
 #else
+
 #error "port has to implement _dispatch_sema4_t"
+
 #endif
 ```
 &emsp;下面看一下 `dispatch_semaphore_s` 相关 API 的源码实现。
+
 ### dispatch_semaphore_create
 &emsp;`dispatch_semaphore_create` 用初始值（`long value`）创建新的计数信号量。
 
@@ -496,6 +517,7 @@ dispatch_semaphore_create(long value)
         _dispatch_root_queues[DISPATCH_ROOT_QUEUE_IDX_DEFAULT_QOS + \
                 !!(overcommit)]._as_dq
 ```
+
 #### _dispatch_object_alloc
 &emsp;为 GCD 对象申请空间并初始化。
 ```c++
@@ -514,6 +536,7 @@ _dispatch_object_alloc(const void *vtable, size_t size)
 }
 ```
 &emsp;内部调用了 `_os_object_alloc_realized` 函数，下面看一下它的定义。
+
 ##### _os_object_alloc_realized
 &emsp;核心在 `calloc` 函数申请空间，并赋值。
 ```c++
@@ -551,6 +574,7 @@ dispatch_semaphore_wait(dispatch_semaphore_t dsema, dispatch_time_t timeout)
 }
 ```
 &emsp;减少计数信号量，如果结果值小于零，此函数将等待信号出现，然后返回。（可以使总信号量减 1，信号总量小于 0 时就会一直等待（阻塞所在线程），否则就可以正常执行。）`dsema`：信号量，在此参数中传递 `NULL` 的结果是未定义的。`timeout`：何时超时（dispatch_time），为方便起见，有 `DISPATCH_TIME_NOW` 和 `DISPATCH_TIME_FOREVER` 常量。函数返回值 `result`，成功返回零，如果发生超时则返回非零（`_DSEMA4_TIMEOUT`）。
+
 #### os_atomic_dec2o
 &emsp;`os_atomic_dec2o` 是对原子操作 -1 的封装。
 ```c++
@@ -588,6 +612,7 @@ _dispatch_semaphore_wait_slow(dispatch_semaphore_t dsema,
             break;
         }
         // Fall through and try to undo what the fast path did to dsema->dsema_value
+        
     // 如果 timeout 参数是 DISPATCH_TIME_NOW
     case DISPATCH_TIME_NOW:
         orig = dsema->dsema_value;
@@ -612,6 +637,7 @@ _dispatch_semaphore_wait_slow(dispatch_semaphore_t dsema,
     return 0;
 }
 ```
+
 ##### _dispatch_sema4_create
 &emsp;`&dsema->dsema_sema` 如果为 NULL 的话则进行赋值。
 ```c++
@@ -712,6 +738,7 @@ _dispatch_sema4_timedwait(_dispatch_sema4_t *sema, dispatch_time_t timeout)
 }
 ```
 &emsp;其中调用了 mach 内核的信号量接口 `semaphore_wait` 和 `semaphore_timedwait` 进行 wait 操作。所以，GCD 的信号量实际上是基于 mach 内核的信号量接口来实现。`semaphore_timedwait` 函数即可以指定超时时间。
+
 ### dispatch_semaphore_signal
 &emsp;`dispatch_semaphore_signal` 发信号（增加）信号量。如果先前的值小于零，则此函数在返回之前唤醒等待的线程。如果线程被唤醒，此函数将返回非零值。否则，返回零。
 ```c++
@@ -793,6 +820,7 @@ _dispatch_sema4_signal(_dispatch_sema4_t *sema, long count)
 }
 ```
 &emsp;下面看一下 semaphore.c 文件中与信号量有关的最后一个函数。
+
 ### _dispatch_semaphore_dispose
 &emsp;信号量的销毁函数。
 ```c++
