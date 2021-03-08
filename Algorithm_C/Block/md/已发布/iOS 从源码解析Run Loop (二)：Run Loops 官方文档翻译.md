@@ -5,12 +5,13 @@
 &emsp;Run loop 管理不是完全自动的。你仍然必须设计 thread 的代码以在适当的时候启动 run loop 并响应传入的事件。Cocoa 和 Core Foundation 都提供 run loop 类和结构（NSRunLoop 和 \__CFRunLoop），以帮助你配置和管理 thread 的 run loop。你的应用程序不需要显式创建这些对象；每个 thread，包括应用程序的 main thread，都有一个与之关联的 run loop 对象。但是，只有子线程需要显式地运行其 run loop。在应用程序启动过程中，应用程序框架会自动在 main thread 上设置并运行其 run loop。
 
 &emsp;以下各节提供有关 run loop 以及如何为应用程序配置 run loop 的更多信息。
+
 ## Anatomy of a Run Loop（剖析 Run Loop）
 &emsp;run loop 和它的名字听起来很像。它是 thread 进入并用于运行事件处理程序以响应传入事件的循环。你的代码提供了用于实现 run loop 的实际循环部分的控制语句—换句话说，你的代码提供了驱动 run loop 的 while 或 for 循环。在循环内部，你可以使用 run loop 对象来 "run"（运行） 事件处理代码，以接收事件并调用已安装的处理程序（installed handlers）。
 
 &emsp;Run loop 从两种不同类型的 sources 来接收事件。 Input sources 传递异步事件，通常是来自另一个 thread 或其它应用程序的消息。Timer sources（计时器源 NSTimer）传递同步事件，这些事件在计划的时间点或重复的时间间隔发生。两种类型的 source  在事件到达时都使用特定于应用程序的处理程序例程（application-specific handler routine）来处理事件。（Input sources 和 Timer sources）
 
-&emsp;图3-1显示了 run loop 和各种 sources 的概念结构。Input sources 将异步事件（asynchronous events）传递给相应的处理程序，并使 `runUntilDate:` 方法（在 thread 关联的 NSRunLoop 对象上调用）退出（这里是不是有问题：`runMode:beforeDate:` 是使 run loop 运行一次，在 run loop 处理了第一个 input source 后会退出，`runUntilDate:` 则是通过重复调用 `runMode:beforeDate:` 一直处理 input source 直到指定的到期日期后 run loop 退出）。Timer sources 将事件传递到其处理程序例程（handler routines），但不会导致 run loop 退出。
+&emsp;图 3-1 显示了 run loop 和各种 sources 的概念结构。Input sources 将异步事件（asynchronous events）传递给相应的处理程序，并使 `runUntilDate:` 方法（在 thread 关联的 NSRunLoop 对象上调用）退出（这里是不是有问题：`runMode:beforeDate:` 是使 run loop 运行一次，在 run loop 处理了第一个 input source 后会退出，`runUntilDate:` 则是通过重复调用 `runMode:beforeDate:` 一直处理 input source 直到指定的到期日期后 run loop 退出）。Timer sources 将事件传递到其处理程序例程（handler routines），但不会导致 run loop 退出。
 
 &emsp;图3-1 run loop 的结构及其 sources
 
@@ -49,18 +50,21 @@
 &emsp;创建 input source 时，可以将其分配给 run loop 的一种或多种 modes。Modes 会影响在任何给定时刻监视哪些 input sources。大多数情况下，你会在默认模式下运行 run loop，但也可以指定自定义模式（custom modes）。如果 input sources 不在当前监视的 mode 下，则它生成的任何事件都将保留，直到 run loop 以对应（correct）的 mode 运行。
 
 &emsp;以下各节描述了一些 input sources。
+
 #### Port-Based Sources（基于端口的 source）
 &emsp;Cocoa 和 Core Foundation 为使用端口相关（port-related）的对象和函数创建基于端口的输入源（port-based input sources）提供了内置支持（provide built-in support）。例如，在 Cocoa 中，你根本不需要直接创建 input source。你只需创建一个端口对象（NSPort object），然后使用 NSPort 的方法将该端口添加到 run loop 中即可。port object 为你处理所需 input source 的创建和配置。
 
 &emsp;在 Core Foundation 中，你必须手动创建端口及其运行循环源（run loop source）。在这两种情况下，都可以使用与端口不透明类型（CFMachPortRef、CFMessagePortRef 或 CFSocketRef）关联的函数来创建适当的对象。
 
 &emsp;有关如何设置和配置基于端口的定制源的示例，参考下文 Configuring a Port-Based Input Source。
+
 #### Custom Input Sources（定制输入源）
 &emsp;要创建自定义输入源，必须使用与 Core Foundation 中的 CFRunLoopSourceRef 不透明类型关联的函数。你可以使用几个回调函数（callback functions）配置一个自定义输入源（custom input source ）。Core Foundation 在不同的点调用这些函数来配置 source，处理任何传入事件，并在 source 从 run loop 中移除后时将其销毁。
 
 &emsp;除了定义（defining）事件到达（event arrives）时自定义源（custom source）的行为（behavior）外，还必须定义事件传递机制（event delivery mechanism）。这部分 source（this part of the source）运行在一个单独的线程上，负责向输入源（input source）提供其数据，并在数据准备好进行处理时发出信号。事件传递机制（event delivery mechanism）由你决定，但不必过于复杂。
 
 &emsp;有关如何创建自定义输入源的示例，请参阅 Defining a Custom Input Source。有关自定义输入源的参考信息，请参考 CFRunLoopSource Reference。
+
 #### Cocoa Perform Selector Sources
 &emsp;除了基于端口的源（port-based sources）外，Cocoa 还定义了一个自定义输入源（custom input source），允许你在任何线程上执行 selector。与基于端口的源（port-based source）一样，perform selector 请求在目标线程上序列化（serialized），从而减轻了在一个线程上运行多个方法时可能出现的许多同步问题。与基于端口的源不同，执行选择器源（perform selector source）在执行其 selector 后将自身从 run loop 中移除。
 

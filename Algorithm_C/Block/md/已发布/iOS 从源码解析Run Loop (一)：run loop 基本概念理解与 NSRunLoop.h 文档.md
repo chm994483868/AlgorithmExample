@@ -413,6 +413,7 @@ dispatch_async(globalQueue_DEFAULT, ^{
     // 保证在下面的执行过程中 self 不会被释放，执行结束后 self 会执行一次 release。
     
     // 在 ARC 下，这里看似前面的 __wek 和这里的 __strong 相互抵消了，
+    // 这里的 self 是被 block 截获的 self，
     // 这里 __strong 的 self，在出了下面的右边花括号时，会执行一次 release 操作。 
     // 且只有此 block 执行的时候 _self 有值那么此处的 __strong self 才会有值，
     // 否则下面的 if 判断就直接 return 了。
@@ -429,6 +430,7 @@ dispatch_async(globalQueue_DEFAULT, ^{
     });
 });
 ```
+
 &emsp;下面是对应上面的解释结果的所有代码。
 ```c+
 #import "ViewController.h"
@@ -512,6 +514,7 @@ dispatch_async(globalQueue_DEFAULT, ^{
 &emsp;...🎬 
 
 &emsp;看到这里我们应该对 run loop 和线程的关系有个大概的认知了，当然 run loop 的作用绝不仅仅是线程保活，还有许多其他各方面的应用，那么下面我们先以 Apple 提供的 NSRunLoop 类来为起点来学习 run loop。
+
 ## NSRunLoop
 &emsp;The programmatic interface to objects that manage input sources. 管理输入源的对象的编程接口。（以面向对象的编程接口来管理输入源）
 ```c++
@@ -530,6 +533,7 @@ dispatch_async(globalQueue_DEFAULT, ^{
 &emsp;你的应用程序既不创建也不显式管理 NSRunLoop 对象。每个 NSThread 对象（包括应用程序的主线程）都有一个根据需要自动为其创建的 NSRunLoop 对象。如果你需要访问当前线程的 run loop，应使用类方法 currentRunLoop 进行访问。请注意，从 NSRunLoop 的角度来看，NSTimer  对象不是 "input"—而是一种特殊类型，这意味着它们在触发时不会导致 run loop 返回。（如前面的示例代码中，没有被 while 循环包裹的 runMode:beforeDate: 函数，在我们点击一次屏幕后，使其接到一个事件后，run loop 就会退出，而如果只是添加 timer 的话，run loop 则可以一直接收 timer 的回调，并不会退出。）
 
 &emsp;NSRunLoop 类通常不被认为是线程安全的，其方法只能在当前线程的上下文中调用。永远不要尝试调用在其他线程中运行的 NSRunLoop 对象的方法，因为这样做可能会导致意外结果。
+
 ### currentRunLoop
 &emsp;`currentRunLoop` 返回当前线程的 run loop，返回值是当前线程的 NSRunLoop 对象。如果该线程还没有 run loop，则会为其创建并返回一个 run loop。
 ```c++
@@ -541,6 +545,7 @@ dispatch_async(globalQueue_DEFAULT, ^{
 @property (nullable, readonly, copy) NSRunLoopMode currentMode;
 ```
 &emsp;接收者的当前 run loop mode，该方法仅在接收者运行时返回当前运行模式，否则，返回 nil。current mode 由运行 run loop 的方法设置，例如 `acceptInputForMode:beforeDate:` 和 `runMode:beforeDate:`。
+
 ### limitDateForMode:
 &emsp;`limitDateForMode:` 在指定模式下通过 run loop 执行一次遍历，并返回计划下一个 timer 触发的日期。
 ```c++
@@ -551,6 +556,7 @@ dispatch_async(globalQueue_DEFAULT, ^{
 &emsp;返回值是下一个 timer 计划触发的日期；如果没有此模式的  input sources，则为 nil。
 
 &emsp;进入 run loop 时立即超时，因此如果没有需要处理的 input sources，则 run loop 不会阻塞，等待输入。
+
 ### mainRunLoop
 &emsp;`mainRunLoop` 返回主线程的 run loop。返回值是代表主线程的 run loop 对象。
 ```c++
@@ -610,18 +616,21 @@ NSRunLoopMode NSEventTrackingRunLoopMode;
 &emsp;你可以将 timer 添加到多个 input modes。在指定 mode 下运行时，接收者（NSRunLoop 实例对象）会使 timer 在预定的触发日期时触发或之后触发（“之后触发” 即我们常说的由于 run loop 本次的延期导致的 NSTimer 的延后不准时）。在触发时，计时器调用其关联的处理程序例程（handler routine NSTimer 的 selector），该例程是指定对象（NSTimer 对象）上的选择器（selector）。
 
 &emsp;接收者 retain timer，即 NSRunLoop 实例对象会持有 NSTimer 对象。要从安装了 timer 的所有 run loop modes 中删除 timer，请向 timer 发送 invalidate 消息。
+
 ### addPort:forMode:
 &emsp;`addPort:forMode:` 将 port 作为 input source 添加到 run loop 的指定 mode。
 ```c++
 - (void)addPort:(NSPort *)aPort forMode:(NSRunLoopMode)mode;
 ```
 &emsp;此方法 schedules 接收者（NSRunLoop 实例对象）的 port。你可以将一个 port 添加到多种 input modes。接收者（NSRunLoop 实例对象）在指定 mode 下运行时，它将发往该 port 的消息分发到该 port 的指定处理程序例程（handler routine）。
+
 ### removePort:forMode:
 &emsp;`removePort:forMode:` 从 run loop 的指定 run loop mode 中删除 port。
 ```c++
 - (void)removePort:(NSPort *)aPort forMode:(NSRunLoopMode)mode;
 ```
 &emsp;如果将 port 添加到多种 run loop modes，则必须分别将其从每种 mode 中删除。
+
 ### runMode:beforeDate:
 &emsp;`runMode:beforeDate:` 运行 run loop 一次，在指定的日期之前 blocking（阻塞）以指定 mode 输入。
 ```c++
@@ -632,12 +641,14 @@ NSRunLoopMode NSEventTrackingRunLoopMode;
 &emsp;如果没有 input sources 或 timers 附加到 run loop，则此方法立即退出并返回 NO；否则，它将在处理第一个 input source 或达到 limitDate 之后返回。从 run loop 中手动删除所有已知的 input sources 和 timers 并不保证 run loop 将立即退出。macOS 可以根据需要安装和删除（install and remove）附加的 input sources，以处理针对接收方（NSRunLoop 实例对象）线程的请求。因此，这些 sources 可以阻止 run loop 退出。
 
 &emsp;提示：timer 不被视为 input source，在等待此方法返回时可能会触发多次。（即我们使用 addTimer:forMode: 向 NSRunLoop 对象添加一个 timer，而且此 NSRunLoop 对象 仅此一个 timer，然后不使用 while 循环仅使用 runMode:beforeDate: 启动该 run loop，则 timer 的 selector 将一直执行，timer 的执行并不能像 input source 一样仅输入一次就能导致 runMode:beforeDate: 函数返回）
+
 ### runUntilDate:
 &emsp;`runUntilDate:` run loop 运行直到指定的日期，在此期间它将处理来自所有附加 input sources 的数据。
 ```c++
 - (void)runUntilDate:(NSDate *)limitDate;
 ```
 &emsp;如果没有 input sources 或 timers 附加到 run loop，此方法将立即退出；否则，它通过重复调用 runMode:beforeDate: 直到指定的到期日期，在 NSDefaultRunLoopMode 中运行接收者（NSRunLoop 实例对象）。从 run loop 中手动删除所有已知的 input sources 和 timers 并不保证 run loop 将立即退出。macOS 可以根据需要安装和删除（install and remove）附加的 input sources，以处理针对接收方（NSRunLoop 实例对象）线程的请求。因此，这些 sources 可以阻止 run loop 退出。
+
 ### acceptInputForMode:beforeDate:
 &emsp;`acceptInputForMode:beforeDate:` 运行 run loop 一次或直到指定的日期，仅接受指定 mode 的输入。
 ```c++
@@ -648,18 +659,21 @@ NSRunLoopMode NSEventTrackingRunLoopMode;
 &emsp;提示：timer 不被视为 input source，在等待此方法返回时可能会触发多次。
 
 &emsp;从 run loop 中手动删除所有已知的 input sources 和 timers 并不保证 run loop 将立即退出。macOS 可以根据需要安装和删除（install and remove）附加的 input sources，以处理针对接收方（NSRunLoop 实例对象）线程的请求。因此，这些 sources 可以阻止 run loop 退出。
+
 ### performInModes:block:
 &emsp;`performInModes:block:` 在给定 modes 下调度目标 run loop 上 block 的执行。
 ```c++
 - (void)performInModes:(NSArray<NSRunLoopMode> *)modes block:(void (^)(void))block API_AVAILABLE(macosx(10.12), ios(10.0), watchos(3.0), tvos(10.0));
 ```
 &emsp;`modes`：可以对其执行 block 的运行循环模式的数组。
+
 ### performBlock:
 &emsp;`performBlock:` schedules 在目标 run loop 上执行 block。
 ```c++
 - (void)performBlock:(void (^)(void))block API_AVAILABLE(macosx(10.12), ios(10.0), watchos(3.0), tvos(10.0));
 ```
 ### NSRunLoop+NSOrderedPerform
+
 ### performSelector:target:argument:order:modes:
 &emsp;安排在接收方（NSRunLoop 实例对象）上发送消息。
 ```c++
@@ -680,18 +694,21 @@ NSRunLoopMode NSEventTrackingRunLoopMode;
 &emsp;发送 aSelector 消息之前，此方法返回。接收器会保留目标和 anArgument 对象，直到选择器的 timer 触发，然后将其释放作为清理的一部分。
 
 &emsp;如果要在处理当前事件后发送多个消息，并且要确保这些消息按特定顺序发送，请使用此方法。
+
 ### cancelPerformSelector:target:argument:
 &emsp;`cancelPerformSelector:target:argument:` 取消发送先前安排的消息。
 ```c++
 - (void)cancelPerformSelector:(SEL)aSelector target:(id)target argument:(nullable id)arg;
 ```
 &emsp;你可以使用此方法取消以前使用 `performSelector:target:argument:order:modes:` scheduled 的方法。这些参数标识你要取消的消息，并且必须与计划选择器时最初指定的消息匹配。此方法从 run loop 的所有模式中删除 perform 请求。
+
 ### cancelPerformSelectorsWithTarget:
 &emsp;`cancelPerformSelectorsWithTarget:` 取消预定给定目标的所有未完成的有序 performs。
 ```c++
 - (void)cancelPerformSelectorsWithTarget:(id)target;
 ```
 &emsp;此方法取消与 target 关联的先前 scheduled 的消息，而忽略 scheduled 的操作的选择器和参数。这与 `cancelPerformSelector:target:argument:` 相反，后者要求你匹配 selector 和 argument 以及 target。此方法从 run loop 的所有模式中删除对对象的执行请求（perform requests）。
+
 ### NSObject+NSDelayedPerforming
 ### performSelector:withObject:afterDelay:inModes:
 &emsp;`performSelector:withObject:afterDelay:inModes:` 在延迟之后使用指定的模式在当前线程上调用接收器（NSObject 及其子类对象）的方法。
@@ -711,6 +728,7 @@ NSRunLoopMode NSEventTrackingRunLoopMode;
 &emsp;如果希望在 run loop 处于默认模式以外的模式时使消息出列，请使用 `performSelector:withObject:afterDelay:inModes:` 方法。如果不确定当前线程是否为主线程，可以使用 `performSelectorOnMainThread:withObject:waitUntilDone:` 或 `performSelectorOnMainThread:withObject:waitUntilDone:modes:` 方法来确保选择器在主线程上执行。要取消排队的消息，请使用 `cancelPreviousPerformRequestsWithTarget:` 或 `cancelPreviousPerformRequestsWithTarget:selector:object:` 方法。
 
 &emsp;此方法向其当前上下文的 runloop 注册，并依赖于定期运行的 runloop 才能正确执行。一个常见的上下文是当调度队列调用时，你可能调用此方法并最终注册到一个不自动定期运行的 runloop。如果在调度队列上运行时需要此类功能，则应使用 dispatch_after 和相关方法来获得所需的行为。（类似的还有 NSTimer 不准时时，也可以使用 dispatch_source 来替代）
+
 ### performSelector:withObject:afterDelay:
 &emsp;`performSelector:withObject:afterDelay:` 同上，使用 default mode。
 ```c++
