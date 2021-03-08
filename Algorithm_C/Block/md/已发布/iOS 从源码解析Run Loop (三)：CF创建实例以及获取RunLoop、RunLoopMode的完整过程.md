@@ -52,6 +52,7 @@
 #endif
 #endif
 ```
+
 ```c++
 #ifndef CF_IMPLICIT_BRIDGING_DISABLED
 #if __has_feature(arc_cf_code_audited)
@@ -70,6 +71,7 @@
 #endif
 ```
 &emsp;然后看到几个重要的 typedef 声明。Core Founction 中 run loop 相关的数据结构有：CFRunLoopRef、CFRunLoopSourceRef、CFRunLoopObserverRef、CFRunLoopTimerRef 等等。
+
 ### CFRunLoopRef（struct \__CFRunLoop *）
 &emsp;在 Core Foundation 下 \__CFRunLoop 结构是 Run Loop 对应的数据结构，对应 Cocoa 中的 NSRunLoop 类。CFRunLoopRef 则是指向 \__CFRunLoop 结构体的指针。
 ```c++
@@ -169,6 +171,7 @@ struct _block_item {
 &emsp;下面我们需要从 Cocoa Foundation 的 runtime 的角度来理解 Core Foundation 中的 "类" 和 "对象" 是如何构建的。
 
 &emsp;首先在 Core Foundation 中所有的 "类对象" 都是一个静态全局 const 变量，然后所有的 "类对象" 会动态注册在 Core Foundation 的一个全局 "类表" 中，同时每个 "类" 还有一个对应的静态全局变量的索引，当 "类" 注册完成时会为其赋值，以后都用其从 "类表" 中读取 "类对象"，然后我们可以使用 "类对象" 构建对应的 "类的对象（类的实例）"。
+
 ### CFRuntimeClass
 &emsp;CFRuntimeClass 是 Core Foundation 的 "基类"。`version` 字段表示不同的版本，系统有固定的 4 个枚举值。下面先看 CFRuntimeClass 的声明，然后我们再看 Core Foundation 中的 CFRunLoop 类对象，会以 CFRunLoop 类注册为例进行验证。
 ```c++

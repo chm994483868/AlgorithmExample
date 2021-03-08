@@ -86,6 +86,7 @@ performSelector:withObject:afterDelay:inModes: | 在下一个 run loop 周期中
 cancelPreviousPerformRequestsWithTarget:selector:object: | 使你可以取消使用 performSelector:withObject:afterDelay: 或 performSelector:withObject:afterDelay:inModes: 方法发送到当前线程的消息。 |
 
 &emsp;有关每种方法的详细信息，可参考 NSObject Class Reference。
+
 ### Timer Sources
 &emsp;Timer sources 在将来的预设时间将事件同步传递到你的线程。Timers 是线程通知自己执行某事的一种方式。例如，搜索字段可以使用 timer 在用户连续按键之间经过一定时间后启动自动搜索，使用这个延迟时间，用户就有机会在开始搜索之前键入尽可能多的所需搜索字符串。
 
@@ -109,6 +110,7 @@ cancelPreviousPerformRequestsWithTarget:selector:object: | 使你可以取消使
 &emsp;与 timers 类似， run loop observers 可以使用一次或重复使用。一次性 observer 在激发后从 run loop 中移除自己，而重复 observer 保持连接。你可以指定在创建 observer 时是运行一次还是重复运行。
 
 &emsp;有关如何创建 run loop observer 的示例，请参见 Configuring the Run Loop。有关参考信息，请参见 CFRunLoopObserver Reference。
+
 ### The Run Loop Sequence of Events
 &emsp;每次运行它时，线程的 run loop 都会处理待办事件（pending events），并为所有附加的 observers 生成通知。它执行此操作的顺序非常 具体/明确，如下所示：
 
@@ -137,6 +139,7 @@ cancelPreviousPerformRequestsWithTarget:selector:object: | 使你可以取消使
 &emsp;因为 timers 和其他周期性事件是在运行 run loop 时传递的，因此绕过该循环会中断这些事件的传递。这种行为的典型示例是，每当你通过进入循环并从应用程序反复请求事件来实现鼠标跟踪例程（mouse-tracking routine）时，都会发生这种行为。因为你的 code 直接撷取事件，而不是让应用程序正常 dispatch 这些事件，所以在你的鼠标跟踪例程（mouse-tracking routine）退出并将控制权传回应用程序之前，活动 timer 将无法触发（unable to fire）。
 
 &emsp;可以使用 run loop 对象显式地唤醒 run loop。其他事件也可能导致 run loop 被唤醒。例如，添加另一个非基于端口的输入源（non-port-based input source）会唤醒 run loop，以便可以立即处理该输入源，而不是等待其他事件发生。
+
 ## When Would You Use a Run Loop?
 &emsp;唯一需要显式运行 run loop 的时机是在为应用程序创建子线程时。应用程序主线程的 run loop 是基础架构的重要组成部分。因此，应用程序框架（app frameworks）提供了用于运行主应用程序循环（main application loop）并自动启动该循环的代码。 iOS 中 UIApplication 的 run 方法（或 OS X 中 NSApplication）的 run 方法将启动应用程序的主循环（application's main loop），这是正常启动顺序的一部分。如果使用 Xcode 模板项目创建应用程序，则永远不必显式调用这些例程。
 
@@ -148,6 +151,7 @@ cancelPreviousPerformRequestsWithTarget:selector:object: | 使你可以取消使
 + 保持线程执行定期任务（periodic tasks）。
 
 &emsp;如果选择使用 run loop，则配置和设置很简单。不过，与所有线程编程一样，你应该有一个在适当情况下退出子线程的计划。通过让线程退出而干净地结束它总是比强制它终止要好。有关如何配置和退出运行循环的信息，请参考 Using Run Loop Objects。
+
 ## Using Run Loop Objects
 &emsp;Run loop 对象提供主接口，用于向 run loop 添加 input sources、timers 和 run loop observers，然后运行它。每个线程都有一个与之关联的 run loop 对象。在 Cocoa 中，此对象是 NSRunLoop 类的实例。在低级应用程序中（low-level application），它是指向 CFRunLoopRef 不透明类型的指针。
 
@@ -193,6 +197,7 @@ cancelPreviousPerformRequestsWithTarget:selector:object: | 使你可以取消使
 }
 ```
 &emsp;在为长生存期线程（long-lived thread）配置运行循环时，最好至少添加一个 input source 来接收消息。虽然你可以在只附加 timer 的情况下进入运行 run loop，但一旦 timer 触发，它通常会失效，这将导致 run loop 退出。附加一个重复 timer 可以使 run loop 在较长的时间内运行，但需要定期启动 timer 以唤醒线程，这实际上是另一种轮询形式。相比之下，input source 等待事件发生，让线程一直处于休眠状态。
+
 ### Starting the Run Loop
 &emsp;仅对于应用程序中的子线程，才需要启动运行循环。一个 run loop 必须至少具有一个要监视的 input source 或 timer。如果未附加的话，则 run loop 立即退出。
 &emsp;有几种启动 run loop 的方法，包括以下几种：
@@ -239,8 +244,10 @@ cancelPreviousPerformRequestsWithTarget:selector:object: | 使你可以取消使
 ```
 
 &emsp;可以递归地运行 run loop。换句话说，可以调用 `CFRunLoopRun`、`CFRunLoopRunInMode` 或任何 NSRunLoop 方法，以便从 input source 或 timer 的处理程序例程中启动 run loop。执行此操作时，可以使用任何要运行嵌套 run loop 的 Mode，包括外部 run loop 使用的 mode。
+
 ### Exiting the Run Loop
 &emsp;在处理事件之前，有两种方法可以使 run loop 退出：
+
 + 配置 run loop 以使用超时值运行。
 + 告诉运行循环停止。
 
@@ -249,12 +256,15 @@ cancelPreviousPerformRequestsWithTarget:selector:object: | 使你可以取消使
 &emsp;使用 `CFRunLoopStop` 函数显式停止 run loop 会产生类似超时的结果。run loop 发送任何剩余的 run loop 通知，然后退出。不同之处在于，你可以在无条件启动的运行循环中使用此技术。
 
 &emsp;尽管删除 run loop 的 input sources 和 timers 也可能导致 run loop 退出，但这不是停止 run loop 的可靠方法。一些系统例程将 input sources 添加到 run loop 以处理所需的事件。因为你的 code 可能不知道这些 input source，所以无法移除它们，这会阻止 run loop 退出。
+
 ### Thread Safety and Run Loop Objects
 &emsp;线程安全性因使用哪个 API 来操作 run loop 而不同。Core Foundation 中的函数通常是线程安全的，可以从任何线程调用。但是，如果执行的操作更改了 run loop 的配置，那么只要可能，最好从拥有 run loop 的线程中进行更改。
 
 &emsp;Cocoa NSRunLoop 类不像它的 Core Foundation 中对应类那样本质上是线程安全的。如果使用 NSRunLoop 类来修改运行循环，则应仅从拥有该 run loop 的同一线程进行修改。将 input sources 或 timers 添加到属于不同线程的 run loop 中可能会导致代码崩溃或行为异常。
+
 ## Configuring Run Loop Sources
 &emsp;下面的部分展示了如何在 Cocoa 和 Core Foundation 中设置不同类型的 input sources 的示例。
+
 ### Defining a Custom Input Source
 &emsp;创建自定义输入源（custom input source）涉及定义以下内容：
 
@@ -272,6 +282,7 @@ cancelPreviousPerformRequestsWithTarget:selector:object: | 使你可以取消使
 ![Operating a custom input source](https://p6-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/7b8018f5ca19411ebc14d21f36b18d57~tplv-k3u1fbpfcp-watermark.image)
 
 &emsp;以下部分将解释上图中自定义输入源的实现，并显示需要实现的关键代码。
+
 ### Defining the Input Source
 &emsp;定义自定义输入源需要使用 Core Foundation 例程来配置你的运行循环源并将其附加到运行循环。尽管基本处理程序是基于 C 的函数，但这并不妨碍你编写这些函数的包装程序并使用 Objective-C 或 C++ 来实现代码主体。
 
@@ -349,6 +360,7 @@ void RunLoopSourceCancelRoutine (void *info, CFRunLoopRef rl, CFStringRef mode) 
 }
 ```
 &emsp;注意：应用程序委托的 `registerSource:` 和 `removeSource:` 方法的代码显示在 Coordinating with Clients of the Input Source。（与输入源的 Clients 协调）
+
 ### Installing the Input Source on the Run Loop
 &emsp;清单 3-7 显示了 RunLoopSource 类的 `init` 和 `addToCurrentRunLoop` 方法。 `init` 方法创建 CFRunLoopSourceRef 不透明类型，该类型必须实际附加到 run loop。它会将 RunLoopSource 对象本身作为上下文信息传递，以便回调例程具有指向该对象的指针。在工作线程调用 `addToCurrentRunLoop` 方法之前，不会安装输入源，此时将调用 `RunLoopSourceScheduleRoutine` 回调函数。将输入源添加到 run loop 后，线程可以运行其 run loop 以等待它。
 
@@ -371,6 +383,7 @@ void RunLoopSourceCancelRoutine (void *info, CFRunLoopRef rl, CFStringRef mode) 
     CFRunLoopAddSource(runLoop, runLoopSource, kCFRunLoopDefaultMode);
 }
 ```
+
 ### Coordinating with Clients of the Input Source
 &emsp;为了使你的输入源有用，你需要对其进行操作并从另一个线程发出信号。输入源的全部意义是将其关联的线程进入休眠状态，直到有事情要做。这一事实使得你的应用程序中的其它线程必须了解输入源并有一种与之通信的方法。
 
@@ -397,6 +410,7 @@ void RunLoopSourceCancelRoutine (void *info, CFRunLoopRef rl, CFStringRef mode) 
 }
 ```
 &emsp;Note：调用前面清单中方法的回调函数如清单 3-4 和清单 3-6 所示。
+
 ### Signaling the Input Source
 &emsp;在将数据传递给输入源之后，client 必须向源发送信号并唤醒其运行循环。发信号给源让运行循环知道源已经准备好被处理。因为当信号发生时线程可能处于休眠状态，所以应该始终显式地唤醒运行循环。否则，可能会导致处理输入源的延迟。
 
@@ -410,10 +424,12 @@ void RunLoopSourceCancelRoutine (void *info, CFRunLoopRef rl, CFStringRef mode) 
 }
 ```
 &emsp;Note：你不应该试图通过消息传递自定义输入源来处理 SIGHUP 或其他类型的进程级信号。用于唤醒运行循环的 Core Foundation 函数不是信号安全的，因此不应在应用程序的信号处理程序例程中使用。有关信号处理程序例程的更多信息，请参见 sigaction 手册页。
+
 ## Configuring Timer Sources
 &emsp;要创建一个 timer source，你所要做的就是创建一个 timer 对象并在 run loop 中调度它。在 Cocoa 中，使用 NSTimer 类创建新的 timer 对象，在 Core Foundation 中使用 CFRunLoopTimerRef 不透明类型。在内部，NSTimer 类只是 Core Foundation 的一个扩展，提供了一些便利功能，例如可以使用相同的方法创建和调度 timer。
 
 &emsp;在 Cocoa 中，你可以使用以下两种方法之一同时创建和安排 timer：
+
 + `scheduledTimerWithTimeInterval:target:selector:userInfo:repeats:`
 + `scheduledTimerWithTimeInterval:invocation:repeats:`
 
@@ -453,8 +469,10 @@ CFRunLoopAddTimer(runLoop, timer, kCFRunLoopCommonModes);
 ```
 ## Configuring a Port-Based Input Source
 &emsp;Cocoa 和 Core Foundation 都提供了基于端口的对象，用于在线程之间或进程之间进行通信。以下各节说明如何使用几种不同类型的端口来设置端口通信。
+
 ### Configuring an NSMachPort Object
 &emsp;要与 NSMachPort 对象建立本地连接，需要创建端口对象并将其添加到主线程的运行循环中。启动子线程时，将同一对象传递给线程的入口点函数。子线程可以使用相同的对象将消息发送回主线程。
+
 #### Implementing the Main Thread Code
 &emsp;清单 3-12 显示了启动辅助（子）工作线程的主线程代码。因为 Cocoa 框架执行许多配置端口和运行循环的中间步骤，`launchThread` 方法明显比它的 Core Foundation 等效方法短（清单 3-17）；但是，两者的行为几乎相同。一个不同之处在于，这个方法直接发送 NSPort 对象，而不是将本地端口的名称发送给工作线程。
 
@@ -499,6 +517,7 @@ CFRunLoopAddTimer(runLoop, timer, kCFRunLoopCommonModes);
     }
 }
 ```
+
 #### Implementing the Secondary Thread Code
 &emsp;对于辅助工作线程，你必须配置线程并使用指定的端口将信息传递回主线程。
 
