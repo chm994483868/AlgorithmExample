@@ -12,9 +12,12 @@
     
     dispatch_queue_t concurrentQueue = dispatch_queue_create("com.concurrent", DISPATCH_QUEUE_CONCURRENT);
     NSLog(@"🔞 START: %@", [NSThread currentThread]);
+    
     dispatch_async(concurrentQueue, ^{ sleep(3); NSLog(@"🏃‍♀️ %@", [NSThread currentThread]);}); // ⬅️ 任务一
     dispatch_async(concurrentQueue, ^{ sleep(4); NSLog(@"🏃‍♀️🏃‍♀️ %@", [NSThread currentThread]);});// ⬅️ 任务二
+    
     dispatch_barrier_async(concurrentQueue, ^{ sleep(3); NSLog(@"🚥🚥 %@", [NSThread currentThread]);}); // ⬅️ Barrie 任务
+    
     dispatch_async(concurrentQueue, ^{ sleep(3); NSLog(@"🏃‍♀️🏃‍♀️🏃‍♀️ %@", [NSThread currentThread]);}); // ⬅️ 任务三
     dispatch_async(concurrentQueue, ^{ sleep(2); NSLog(@"🏃‍♀️🏃‍♀️🏃‍♀️🏃‍♀️ %@", [NSThread currentThread]);}); // ⬅️ 任务四
     NSLog(@"🔞 END: %@", [NSThread currentThread]);
@@ -55,6 +58,7 @@ dispatch_barrier_async(dispatch_queue_t dq, dispatch_block_t work)
 &emsp;看到 `dispatch_barrier_async` 函数内部和 `dispatch_async` 相比在 `dc_flags` 赋值时添加了 `DC_FLAG_BARRIER` 标记，而此标记正是告知 `dispatch_continuation_s` 结构体中封装的 block 是一个 barrier block，其它的内容则和 `dispatch_async` 如出一辙。
 
 &emsp;`_dispatch_continuation_alloc` 函数返回值是一个 `dispatch_continuation_s` 结构体指针。它会首先去当前线程的 TSD 空间中根据一个全局 KEY（`dispatch_cache_key`）去取一个 `dispatch_continuation_t`，如果取得的话会把它直接返回，并且会更新 TSD 中 `dispatch_cache_key` 的 value，而这个 value 用的正是取到的 `dispatch_continuation_s` 结构体的 `do_next` 成员变量，这样就线程中的 `dispatch_continuation_t` 构成一个链表了。如果开始未取到的话则是调用在堆区创建一个 `dispatch_continuation_s`。
+
 ### _dispatch_continuation_async
 &emsp;`_dispatch_continuation_async` 函数是把封装好的任务 `dispatch_continuation_s` 添加到指定的队列中进行异步调用。
 ```c++
@@ -81,6 +85,7 @@ _dispatch_continuation_async(dispatch_queue_class_t dqu,
 return (&(dqu._dq)->do_vtable->_os_obj_vtable)->dq_push(dqu._dq, dc, qos);
 ```
 &emsp;`dx_push` 宏定义的全部展开的话看到是调用 `dispatch_queue_s` 的 `_os_obj_vtable`（ dispatch_queue_s 的操作函数列表）中的 `dq_push` 函数。全局搜索 `dq_push`，看到 init.c 文件中，queue_pthread_root  根队列的 `.dq_push = _dispatch_root_queue_push`，即根队列的 `dq_push` 函数指针指向了 `_dispatch_root_queue_push` 函数，下面一起看看 `_dispatch_root_queue_push` 函数的实现。
+
 ### _dispatch_root_queue_push
 &emsp;`_dispatch_root_queue_push` 函数内部是调用一个内联函数 `_dispatch_root_queue_push_inline`。
 ```c++
@@ -187,6 +192,7 @@ typedef struct dispatch_lane_s {
 } DISPATCH_ATOMIC64_ALIGN *dispatch_lane_t;
 ```
 &emsp;那么到这里看到我们的任务的 block 已经追加到队列中，那么它们从哪里开始执行的呢？是下面的 `_dispatch_root_queue_poke` 函数。
+
 ### _dispatch_root_queue_poke
 &emsp;`_dispatch_root_queue_poke` 函数前面都是一些判断容错，如判断 `dq_items_tail` 是否为空即判断入参队列中是否添加了任务等等，然后函数最后调用了 `_dispatch_root_queue_poke_slow` 函数。
 ```c++
@@ -324,6 +330,7 @@ _dispatch_root_queue_poke_slow(dispatch_queue_global_t dq, int n, int floor)
 }
 ```
 &emsp;根据代码可以知道，系统会获取线程池总数量和可以创建的数量，然后通过两个 `do while` 来进行动态的开辟线程。
+
 ### _dispatch_root_queues_init
 
 &emsp;(这里的代码真的看不懂了，暂时只是把其中的一些点记录下来)。
@@ -341,6 +348,7 @@ _dispatch_root_queue_init_pthread_pool(&_dispatch_root_queues[i], 0, _dispatch_r
 &emsp;看到内部是调用 `semaphore_create`。
 
 &emsp;下面看一下 `_dispatch_worker_thread2` 函数，已经被添加到队列中的 dc 是如何执行的。
+
 ### _dispatch_worker_thread2
 &emsp;`_dispatch_worker_thread2` 函数内部根据优先级从根队列数组中取出一个队列，原子减 1 队列的 `dgq_pending`，关键点在于调用 `_dispatch_root_queue_drain` 函数。
 ```c++

@@ -517,7 +517,7 @@ _dispatch_continuation_async(dispatch_queue_class_t dqu,
     (void)dc_flags;
 #endif
 
-    // 调用队列的 dq_push 函数，并示把任务放入到指定的队列中
+    // 调用队列的 dx_push 函数，并示把任务放入到指定的队列中
     return dx_push(dqu._dq, dc, qos);
 }
 
@@ -594,6 +594,7 @@ _dispatch_continuation_with_group_invoke(dispatch_continuation_t dc)
 }
 ```
 &emsp;至此 `dispatch_group_async` 函数就看完了，和我们自己手动调用 enter、leave、dispatch_async 相比轻松了不少，可以让我们更专注于 GCD 任务的编写。
+
 ### dispatch_group_notify
 &emsp;`dispatch_group_notify` 函数，当与 dispatch_group 相关联的所有 block 都已完成时，计划将 `db` 提交到队列 `dq`（即当与 dispatch_group 相关联的所有 block 都已完成时，notify 添加的回调通知将得到执行）。如果没有 block 与 dispatch_group 相关联，则通知块 `db` 将立即提交。如下代码中通知块 `db` 将立即被调用。
 ```c++
@@ -900,6 +901,7 @@ _dispatch_group_wait_slow(dispatch_group_t dg, uint32_t gen,
 }
 ```
 &emsp;下面我们学习上面 `dispatch_group_leave` 和 `dispatch_group_notify` 函数中都曾使用过的 `_dispatch_group_wake` 函数，正是它完成了唤醒，并把所有的 notify 回调函数提交到指定的队列中异步执行。
+
 ### _dispatch_group_wake
 &emsp;`_dispatch_group_wake` 把  notify 回调函数链表中的所有的函数提交到指定的队列中异步执行，`needs_release` 表示是否需要释放所有关联 block 异步执行完成、所有的 notify 回调函数执行完成的 dispatch_group 对象。`dg_state` 则是 dispatch_group 的状态，包含目前的关联的 block 数量等信息。
 ```c++

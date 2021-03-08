@@ -27,6 +27,7 @@ typedef CF_OPTIONS(CFOptionFlags, CFRunLoopActivity) {
 &emsp;看到这里我们大概也明白了 run loop 和线程大概是个怎么回事了，其实这里最想搞明白的是：run loop 是如何进行状态切换的，例如它是怎么进入休眠怎样被唤醒的？还有它和线程之间是怎么进行信息传递的？怎么让线程保持活性的？等等，搜集到的资料看到是 run loop 内部是基于内核基于 mach port 进行工作的，涉及的太深奥了，这里暂时先进行上层的学习，等我们把基础应用以及一些源码实现搞明白了再深入学习它的底层内容。⛽️⛽️
 
 &emsp;下面我们开始从代码层面对 run loop 进行学习，而学习的主线则是 run loop 是如何作用于线程使其保持活性的？
+
 ### main run loop 启动
 &emsp;前面我们学习线程时，多次提到主线程主队列都是在 app 启动时默认创建的，而恰恰主线程的 main run loop 也是在 app 启动时默认跟着创建并启动的，那么我们从 main.m 文件中找出一些端倪，使用 Xcode 创建一个 OC 语言的 Single View App 时会自动生成如下的 main.m 文件：
 ```c++
@@ -277,6 +278,7 @@ while(1) {
 > &emsp;（这里发现一个点，连续点击屏幕，点击几次 `rocket` 函数就能执行几次，即使在 `performSelector:onThread:withObject:waitUntilDone:` 函数的最后参数传递 `YES` 时，`touchesBegan:withEvent:` 函数本次没有执行完成的时候，我们就点击屏幕，系统依然会记录我们点击过屏幕的次数，然后 `rocket` 函数就会执行对应的次数。把 thread 参数使用主线程 `[NSThread mainThread]`，依然会执行对应的点击次数，不过子线程和主线程还是有些许区别的，感兴趣的话可以自行测试一下。（其实是我真的不知道怎么描述这个区别）） 
 
 &emsp;然后我们再进行一个测试，把 `self.commonThread` 线程任务中的 run loop 代码注释的话，则触摸屏幕是不会执行 `rocket` 函数的，如果把 `performSelector:onThread:withObject:waitUntilDone:` 函数最后一个参数传 `YES` 的话，则会直接 crash，之前 `commonThread` 线程是一个局部变量的时候我们能看到它会退出并且被销毁了，此时虽然我们修改为了 `ViewController` 的一个属性被强引用，但是当不主动启动 `self.commonThread` 线程的 run loop 的话，它依然是没有活性的。
+
 #### 停止已启动 run loop 线程的 run loop
 &emsp;下面学习如何停止 run loop，首先我们在 `ViewController` 上添加一个停止按钮并添加点击事件，添加如下代码:
 ```c++
