@@ -547,6 +547,7 @@ typedef int NSSocketNativeHandle;
 @interface NSConnection : NSObject
 ```
 &emsp;Connection 对象构成了分布式对象机制的骨干，通常在后台运行。在将对象 vending 给其他应用程序时，通过代理访问此类 vended 对象以及更改默认通信参数时，可以显式使用 NSConnection 的方法。在其他时候，你只需与 vended 对象或其代理进行交互。单个连接对象可以由多个线程共享，并用于访问 vended 对象。
+
 ## Thread Local Data
 &emsp;在前面 pthreads 的学习过程中我们有学到两个比较特殊的 API：
 ```c++
