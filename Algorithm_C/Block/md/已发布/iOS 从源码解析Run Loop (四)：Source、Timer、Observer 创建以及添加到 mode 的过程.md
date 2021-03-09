@@ -315,6 +315,7 @@ CFRunLoopSourceRef CFRunLoopSourceCreate(CFAllocatorRef allocator, CFIndex order
 }
 ```
 &emsp;基本就是申请空间，然后进行一些字段进行初始化。下面看一下 source 是如何添加到 mode 中的（先看一下 `__CFSetValid` 函数的实现）。
+
 #### __CFSetValid
 &emsp;`__CFSetValid` 函数用来设置 CFRuntimeBase 的 `_cfinfo` 的值。
 ```c++
@@ -372,6 +373,7 @@ CF_INLINE void __CFSetValid(void *cf) {
 // 然后前一个字节和后一个字节是 0，那么 _cfinfo[0] 低 8 位是 1110 1111
 ```
 &emsp;`__CFRunLoopSourceUnsetSignaled(memory);` 调用内部同上 `__CFBitfieldSetValue(rls->_bits, 1, 1, 0);` 这里就不展开了。
+
 ### CFRunLoopAddSource
 &emsp;`CFRunLoopAddSource` 函数是把 source 添加到 mode 中，不出意外，mode 参数是一个字符串。
 ```c++
@@ -504,6 +506,7 @@ void CFRunLoopAddSource(CFRunLoopRef rl, CFRunLoopSourceRef rls, CFStringRef mod
 &emsp;`CFRunLoopAddSource` 函数虽长但思路清晰，也都能和我们之前的结论对上，特别是当 source 添加到的 mode 是 common mode 时，会自动把 souce 同步到每个 common mode 中去。（注释已经极其清晰了，这里就不再总结了）
 
 &emsp;CFRunLoopSource 的创建和添加就看完了，下面我们看 CFRunLoopObserverRef。（关于 CFRunLoopSource 中的 source0 和 souce1 的区别以及 source1 中的 port 相关的内容我们在下一篇再展开分析）
+
 ## CFRunLoopObserverRef（struct \__CFRunLoopObserver *）
 &emsp;CFRunLoopObserverRef 是观察者，每个 observer 都包含了一个回调（函数指针），当 run loop 的状态发生变化时，观察者就能通过回调接收到这个变化。主要是用来向外界报告 run loop 当前的状态的更改。
 ```c++
@@ -677,6 +680,7 @@ CFRunLoopObserverRef CFRunLoopObserverCreate(CFAllocatorRef allocator,
 }
 ```
 &emsp;运行循环观察器不会自动添加到运行循环中。要将观察者添加到运行循环中，使用 CFRunLoopAddObserver。观察者只能注册到一个运行循环，尽管可以将其添加到该运行循环中的多个运行循环模式。
+
 ### CFRunLoopAddObserver
 ```c++
 void CFRunLoopAddObserver(CFRunLoopRef rl, CFRunLoopObserverRef rlo, CFStringRef modeName) {
@@ -856,6 +860,7 @@ static const CFRuntimeClass __CFRunLoopTimerClass = {
 };
 ```
 &emsp;好了，下面看 run loop timer 的创建函数。
+
 ### CFRunLoopTimerCreate
 &emsp;`CFRunLoopTimerCreate` 用函数回调创建一个新的 CFRunLoopTimer 对象，有 7 个参数，我们首先看一下各个参数的含义。
 
@@ -977,6 +982,7 @@ CFRunLoopTimerRef CFRunLoopTimerCreate(CFAllocatorRef allocator,
 }
 ```
 &emsp;计时器需要先添加到运行循环模式，然后才能启动。要将计时器添加到运行循环中，使用 CFRunLoopAddTimer  函数。计时器一次只能注册到一个运行循环中，尽管它可以在该运行循环中处于多种模式。
+
 ### CFRunLoopAddTimer
 &emsp;`CFRunLoopAddTimer` 将 CFRunLoopTimer 对象添加到 run loop mode。`modeName` 是要将计时器添加到的 rl 的运行循环模式。使用常数 kCFRunLoopCommonModes 将计时器添加到所有 common mode 监视的对象集中。
 

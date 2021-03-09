@@ -373,6 +373,7 @@ struct __CFAllocator {
     CFAllocatorContext _context; // 上下文
 };
 ```
+
 #### kCFAllocatorSystemDefault
 &emsp;kCFAllocatorSystemDefault 是一个全局的系统默认的分配器，内部各个函数指针类型的成员变量都有具体的函数来赋值。看到 CF 还准备了另外两个分配器 __kCFAllocatorMalloc 和 __kCFAllocatorMallocZone。下面我们看一下  kCFAllocatorSystemDefault 的各个成员变量的初值都是什么。
 ```c++
@@ -586,6 +587,7 @@ CFTypeRef _CFRuntimeCreateInstance(CFAllocatorRef allocator, CFTypeID typeID, CF
 &emsp;至此以 CFRunLoop 类为例，CF 下创建实例的过程就全部结束了，下面我们开始看怎么获取线程的 run loop 对象。（`static const CFRuntimeClass __CFRunLoopModeClass` 是 CFRunLoopMode 的类对象，等下我们再学习。）
 
 &emsp;下面看两个超级重要的函数（其实是一个函数），获取主线程的 run loop 和获取当前线程（子线程）的 run loop。
+
 ## CFRunLoopGetMain/CFRunLoopGetCurrent 获取 Run Loop
 &emsp;`CFRunLoopGetMain/CFRunLoopGetCurrent` 函数可分别用于获取主线程的 run loop 和获取当前线程（子线程）的 run loop。main run loop 使用一个静态变量 \__main 存储，子线程的 run loop 会保存在当前线程的 TSD 中。两者在第一次获取 run loop 时都会调用 \_CFRunLoopGet0 函数根据线程的 pthread_t 对象从静态全局变量 \__CFRunLoops（static CFMutableDictionaryRef）中获取，如果获取不到的话则新建 run loop 对象，并根据线程的 pthread_t 保存在静态全局变量 \__CFRunLoops（static CFMutableDictionaryRef）中，方便后续读取。
 ```c++
@@ -1158,7 +1160,7 @@ struct __CFRunLoopMode {
 &emsp;看完了 run loop mode 的数据结构定义，那么我们分析下 `__CFRunLoopFindMode` 函数，正是通过它得到一个 run loop mode 对象。通常我们接触到的 run loop mode 只有 kCFRunLoopDefaultMode 和 UITrackingRunLoopMode，前面看到 run loop 创建时会通过 `__CFRunLoopFindMode` 函数取得一个默认 mode（kCFRunLoopDefaultMode），并把它添加到 run loop 对象的 \_modes 中。
 
 #### \__CFRunLoopFindMode
-&emsp;`__CFRunLoopFindMode` 函数根据 modeName 从 rl 的 _modes 中找到其对应的 CFRunLoopModeRef，如果找到的话则加锁并返回。如果未找到，并且 create 为真的话，则新建 __CFRunLoopMode 加锁并返回，如果 create 为假的话，则返回 NULL。
+&emsp;`__CFRunLoopFindMode` 函数根据 modeName 从 rl 的 _modes 中找到其对应的 CFRunLoopModeRef，如果找到的话则加锁并返回。如果未找到，并且 create 为真的话，则新建 \_\_CFRunLoopMode 加锁并返回，如果 create 为假的话，则返回 NULL。
 ```c++
 static CFRunLoopModeRef __CFRunLoopFindMode(CFRunLoopRef rl, CFStringRef modeName, Boolean create) {
     // 用于检查给定的进程是否被分叉

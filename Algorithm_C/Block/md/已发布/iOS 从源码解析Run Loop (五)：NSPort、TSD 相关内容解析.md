@@ -3,6 +3,7 @@
 > &emsp;Port 相关的内容不知道如何入手学习，那么就从 NSPort 开始吧。Port 相关的内容是极其重要的，source1（port-based input sources） 以及 run loop 的唤醒相关的内容都是通过端口来实现的，不要焦虑不要浮躁静下心来，死磕下去！！⛽️⛽️
 
 &emsp; Cocoa Foundation 为 iOS 线程间通信提供 2 种方式，1 种是 performSelector，另 1 种是 Port。performSelector 在前面文章我们已经详细学习过，这里只看第二种：NSMachPort 方式。NSPort 有 3 个子类，NSSocketPort、NSMessagePort、NSMachPort，但在 iOS 下只有 NSMachPort 可用。使用的方式为接收线程中注册 NSMachPort，在另外的线程中使用此 port 发送消息，则被注册线程会收到相应消息，然后最终在主线程里调用某个回调函数（handleMachMessage:/handlePortMessage:）。可以看到，使用 NSMachPort 的结果为调用了其它线程的 1 个函数，而这也正是 performSelector 所做的事情。
+
 ## NSMachPort 使用
 &emsp;下面看一段 NSMachPort 的实例代码：（也可以先看下面的 NSPort 相关的文档然后再回过头来看此处的使用示例）
 ```c++
@@ -86,6 +87,7 @@
 ✉️✉️ RECEIVE: <NSThread: 0x28331ed40>{number = 5, name = (null)}
 ```
 &emsp;看大佬的文章时学到一个新知识点，就是上面的示例代码中，虽然是在主线程中添加的观察者，但是如果在子线程中发出通知，那么就在该子线程中处理通知所关联的方法。[Delivering Notifications To Particular Threads](https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/Notifications/Articles/Threading.html#//apple_ref/doc/uid/20001289-CEGJFDFG)
+
 ## NSPort（官方文档翻译）
 &emsp;`NSPort` 表示通信通道（communication channel）的抽象类。
 ```c++
@@ -111,6 +113,7 @@
 &emsp;`zone`：要在其中分配新对象的内存区域。
 
 &emsp;为了 Mach 上的向后兼容性，`allocWithZone:` 在发送到 NSPort 类时返回 NSMachPort 类的实例。否则，它将返回一个具体子类的实例，该实例可用于本地计算机上的线程或进程之间的消息传递，或者在 NSSocketPort 的情况下，在不同计算机上的进程之间进行消息传递。
+
 ### port
 &emsp;创建并返回一个可以发送和接收消息的新 NSPort 对象。
 ```c++
@@ -145,6 +148,7 @@
 - (void)scheduleInRunLoop:(NSRunLoop *)runLoop forMode:(NSRunLoopMode)mode;
 ```
 &emsp;不应直接调用此方法。
+
 ### removeFromRunLoop:forMode:
 &emsp;这个方法应该由一个子类来实现，当在给定的 input mode（NSRunLoopMode）下从给定的 run loop 中删除时，停止对端口的监视。
 ```c++
@@ -173,6 +177,7 @@
 &emsp;`headerSpaceReserved`：为 header 保留的字节数。
 
 &emsp;NSConnection 在适当的时间调用此方法。不应直接调用此方法。此方法可能引发 NSInvalidSendPortException、NSInvalidReceivePortException 或 NSPortSendException，具体取决于发送端口的类型和错误的类型。
+
 ### sendBeforeDate:msgid:components:from:reserved:
 &emsp;此方法是为具有自定义 NSPort 类型的子类提供的。（NSConnection）
 ```c++
@@ -187,6 +192,7 @@
 &emsp;NSConnection 在适当的时间调用此方法。不应直接调用此方法。此方法可能引发 NSInvalidSendPortException、NSInvalidReceivePortException 或 NSPortSendException，具体取决于发送端口的类型和错误的类型。
 
 &emsp;`components` 数组由一系列 NSData 子类的实例和一些NSPort子类的实例组成。由于 NSPort 的一个子类不一定知道如何传输 NSPort 的另一个子类的实例（即使知道另一个子类也可以做到），因此，`components` 数组中的所有 NSPort 实例和 `receivePort` 参数必须属于接收此消息的 NSPort 的同一子类。如果在同一程序中使用了多个 DO transports，则需要格外小心。
+
 ### NSPortDidBecomeInvalidNotification
 &emsp;从 `invalidate` 方法发布，当解除分配 NSPort 或它发现其通信通道已损坏时调用该方法。通知对象是无效的 NSPort 对象。此通知不包含 userInfo 字典。
 ```c++
@@ -195,8 +201,10 @@ FOUNDATION_EXPORT NSNotificationName const NSPortDidBecomeInvalidNotification;
 &emsp;NSSocketPort 对象无法检测到其与远程端口的连接何时丢失，即使远程端口位于同一台计算机上。因此，它不能使自己失效并发布此通知。相反，你必须在发送下一条消息时检测超时错误。
 
 &emsp;发布此通知的 NSPort 对象不再有用，因此所有接收者都应该注销自己的任何涉及 NSPort 的通知。接收此通知的方法应在尝试执行任何操作之前检查哪个端口无效。特别是，接收所有 NSPortDidBecomeInvalidNotification 消息的观察者应该知道，与 window server 的通信是通过 NSPort 处理的。如果此端口无效，drawing operations 将导致致命错误。
+
 ## NSPortDelegate
 &emsp;用于处理传入消息的接口。NSPortDelegate 协议定义了由 NSPort 对象的 delegates 实现的可选方法。
+
 ### handlePortMessage:
 &emsp;处理端口上的给定传入消息。
 ```c++
@@ -210,8 +218,10 @@ FOUNDATION_EXPORT NSNotificationName const NSPortDidBecomeInvalidNotification;
 @end
 ```
 &emsp;delegate 应实现 `handlePortMessage:` 或 NSMachPortDelegate 协议方法 `handleMachMessage:`。你不能同时实现两个委托方法。
+
 ## NSMachPortDelegate
 &emsp;用于处理传入的 Mach 消息的接口。NSMachPort 对象的可以选择遵循此协议。
+
 ### handleMachMessage:
 &emsp;处理传入的 Mach 消息。
 ```c++
@@ -228,6 +238,7 @@ FOUNDATION_EXPORT NSNotificationName const NSPortDidBecomeInvalidNotification;
 &emsp;delegate 应将此数据解释为指向以 msg_header_t 结构开头的 Mach 消息的指针，并应适当地处理该消息。
 
 &emsp;delegate 应实现 `handleMachMessage:` 或 NSPortDelegate 协议方法 `handlePortMessage:`。
+
 ## NSMachPort
 &emsp;可以用作分布式对象连接（distributed object connections）（或原始消息传递）端点的端口。
 ```c++
@@ -244,6 +255,7 @@ FOUNDATION_EXPORT NSNotificationName const NSPortDidBecomeInvalidNotification;
 &emsp;要有效地使用 NSMachPort，你应该熟悉 Mach 端口、端口访问权限和 Mach 消息。有关更多信息，可参阅 Mach OS 文档。
 
 &emsp;NSMachPort 符合 NSCoding 协议，但只支持 NSPortCoder 进行编码。NSPort 及其子类不支持 archiving。
+
 ### portWithMachPort:
 &emsp;创建并返回一个用给定 Mach 端口配置的端口对象。
 ```c++
