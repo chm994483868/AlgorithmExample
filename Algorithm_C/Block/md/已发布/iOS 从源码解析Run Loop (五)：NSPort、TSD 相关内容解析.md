@@ -564,6 +564,7 @@ void* _Nullable pthread_getspecific(pthread_key_t);
 &emsp;在前面的学习中我们多次用到 TSD 技术，例如自动释放池、autorelease 优化等等，在 run loop 的学习过程中我们又与 TSD 再次相遇。在 `CFRunLoopGetMain` 和 `CFRunLoopGetCurrent` 两个函数学习过程中，看到线程对应的 run loop 会被 “直接” 保存在线程的 TSD 中。在 CFPlatform.c 文件中我们直接翻看其源码，看到 run loop 中使用 TSD 时又进行了一次 “封装”，emmm...大概可以理解为又包装了一下，前面我们使用到 TSD 时都是直接类似以 Key-Value 的形式存储数据，这里则又提供了一个中间数据结构 struct __CFTSDTable，构建一个  \__CFTSDTable 实例然后以 CF_TSD_KEY 为 Key 把 \__CFTSDTable 实例 保存在 TSD 中，然后在 \__CFTSDTable 实例以数组形式保存数据，如 run loop 对象、run loop 对象的销毁函数等等数据，下面我们先看一下源码然后再看在 run loop 中的应用。
 
 &emsp;（CFPlatform.c 文件 Thread Local Data 块中包含 WINDOWS、MACOSX、LINUX 平台的代码，这里我们只看 MACOSX 下的实现。）
+
 ### CF_TSD_MAX_SLOTS
 &emsp;由于 run loop 对象要保存在线程 TSD 中的数据不多，所以这里直接限制了 \__CFTSDTable 结构体内部数组长度为 70。
 ```c++
@@ -571,6 +572,7 @@ void* _Nullable pthread_getspecific(pthread_key_t);
 // 如果线程数据已被删除，则这些功能应在 CF_TSD_BAD_PTR + slot 地址上崩溃。
 #define CF_TSD_MAX_SLOTS 70
 ```
+
 ### CF_TSD_KEY
 &emsp;\__CFTSDTable 实例在 TSD 中保存时的 pthread_key_t，一条线程中只会创建一个 \__CFTSDTable 实例。
 ```c++
@@ -578,10 +580,12 @@ void* _Nullable pthread_getspecific(pthread_key_t);
 static const unsigned long CF_TSD_KEY = __PTK_FRAMEWORK_COREFOUNDATION_KEY5;
 #endif
 ```
+
 ### CF_TSD_BAD_PTR
 ```c++
 #define CF_TSD_BAD_PTR ((void *)0x1000)
 ```
+
 ### \__CFTSDTable
 &emsp;在 `__CFTSDTable` 结构体中保存数据以及每条数据对应的析构函数。
 ```c++
@@ -594,6 +598,7 @@ typedef struct __CFTSDTable {
     tsdDestructor destructors[CF_TSD_MAX_SLOTS]; // 长度为 70 的 tsdDestructor 数组，tsdDestructor 是 data 对应的析构函数指针
 } __CFTSDTable;
 ```
+
 ### \__CFTSDSetSpecific/ \__CFTSDGetSpecific
 &emsp;`__CFTSDSetSpecific` 函数的 `arg` 参数是 `__CFTSDTable` 实例以 CF_TSD_KEY 为 pthread_key_t 保存在线程的 TSD 中，`__CFTSDGetSpecific` 函数则是以 CF_TSD_KEY 为 pthread_key_t 从线程的 TSD 中读取 `__CFTSDTable` 实例。
 ```c++
@@ -604,6 +609,7 @@ static void *__CFTSDGetSpecific() {
     return _pthread_getspecific_direct(CF_TSD_KEY); // 从线程的 TSD 中读取 CF_TSD_KEY 对应的数据
 }
 ```
+
 ### \__CFTSDFinalize
 &esmp;TSD 的销毁函数。
 ```c++
@@ -665,6 +671,7 @@ static void __CFTSDFinalize(void *arg) {
     }
 }
 ```
+
 ### \__CFTSDGetTable
 &emsp;从 TSD 中读取 \__CFTSDTable 实例，如果不存在则进行创建。 
 ```c++
@@ -768,6 +775,7 @@ CF_EXPORT void *_CFSetTSD(uint32_t slot, void *newVal, tsdDestructor destructor)
 }
 ```
 &emsp;上面是 run loop 使用 TSD 时涉及的所有源码，下面我们看一下具体的应用。
+
 ## Run Loop 对象保存在 TSD 中
 &emsp;在初次获取线程的 run loop 对象时，会把创建好的线程的 run loop 对象放进当前线程的 TSD 中：
 ```c++

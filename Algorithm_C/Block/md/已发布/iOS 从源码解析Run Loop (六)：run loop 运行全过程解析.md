@@ -3,6 +3,7 @@
 > &emsp;前面几篇算是把 run loop 相关的数据结构都看完了，也算是把 run loop 开启运行的前期数据都准备好了，下面我们开始正式进入 run loop 的整个的运行过程的探索和学习。⛽️⛽️
 
 &emsp;查看 CFRunLoop.h 文件，看到涉及 run loop 运行的函数有两个 `CFRunLoopRun` 和 `CFRunLoopRunInMode` 下面我们跟着源码学习一下这两个函数。
+
 ## CFRunLoopRun/CFRunLoopRunInMode
 &emsp;`CFRunLoopRun` 函数同 NSRunLoop 的 `- (void)run;` 函数，无限期地以其默认模式运行当前线程的 CFRunLoop 对象。当前线程的运行循环将以默认模式运行，直到使用 `CFRunLoopStop` 停止 run loop 或将所有 Sources 和 Timers 从默认运行循环模式中移除为止。run loop 可以递归运行，你可以从任何 run loop 调用中调用 `CFRunLoopRun` 函数，并在当前线程的调用堆栈上创建嵌套的 run loop 激活。
 
@@ -58,6 +59,7 @@ SInt32 CFRunLoopRunInMode(CFStringRef modeName,
 &emsp;看到 `CFRunLoopRun` 函数是内部是一个 do while 循环，内部调用了 `CFRunLoopRunSpecific` 函数当其返回值是 `kCFRunLoopRunTimedOut` 或 `kCFRunLoopRunHandledSource` 时一直持续进行 do while 循环。（根据之前的文章记得只有当前 run loop mode 没有 sources0/sources1/timers/block 时当前线程的 NSRunLoop 对象调用 `-(void)run;` 函数，run loop 会启动失败或者说是启动后就立即退出了，其他情况就是一直无限循环，所以想这里的 do while 结束循环的条件不是应该只有 `kCFRunLoopRunFinished != result` 吗，即使是调用了 `CFRunLoopStop` 函数，结束的也只是本次 run loop 并不会导致 do while 退出...但是现在则是多了 `kCFRunLoopRunStopped != result`）
 
 &emsp;看到 `CFRunLoopRun` 和 `CFRunLoopRunInMode` 函数内部都是调用了 `CFRunLoopRunSpecific` 函数，第一个参数都是直接使用 `CFRunLoopGetCurrent` 函数获取当前线程的 run loop，然后是第二个参数 `CFStringRef modeName` 则是传入 run loop mode 的名字，而非直接传入 CFRunLoopMode 实例，第三个参数则是 `CFTimeInterval seconds` 指示 run loop 需要运行多久。
+
 ### CFRunLoopRunSpecific
 &emsp;`CFRunLoopRunSpecific` 函数内部会调用 `__CFRunLoopRun` 函数，然后可以把 `result = __CFRunLoopRun(rl, currentMode, seconds, returnAfterSourceHandled, previousMode);` 此行的调用看作一个分界线。行前是，则是首先判断 `rl` 是否被标记为正在销毁，如果是的话则直接返回 kCFRunLoopRunFinished，否则继续往下执行，会根据 `modeName` 从 `rl` 的 `_modes` 中找到其对应的 `CFRunLoopModeRef`，如果未找到或者 `CFRunLoopModeRef` 的 sources0/sources1/timers/block 为空，则也是直接返回  kCFRunLoopRunFinished。然后是修改 `rl` 的 `_perRunData` 和 `_currentMode` 同时还会记录之前的旧值，此时一切准备就绪，在调用之前会根据 `rl` 的 `_currentMode` 的 `_observerMask` 判断是否需要回调 run loop observer 观察者来告诉它们 run loop 要进入 kCFRunLoopEntry 状态了，然后调用 `__CFRunLoopRun` 函数正式启动 run loop。
 
@@ -145,6 +147,7 @@ SInt32 CFRunLoopRunSpecific(CFRunLoopRef rl,
 }
 ```
 &emsp;这里需要注意的一个点是 `CFRunLoopRunSpecific` 函数最后又把之前的 `previousPerRun` 和 `previousMode` 重新赋值给 run loop 的 `_perRunData` 和 `_currentMode`，它们正是用来处理 run loop 的嵌套运行的。下面看一下 `CFRunLoopRunSpecific` 函数内部调用的一些函数。
+
 #### \__CFRunLoopIsDeallocating
 &emsp;`__CFRunLoopIsDeallocating` 函数用于判断 `rl` 是否被标记为正在销毁。该值记录在 `_cfinfo` 字段中。
 ```c++
@@ -152,6 +155,7 @@ CF_INLINE Boolean __CFRunLoopIsDeallocating(CFRunLoopRef rl) {
     return (Boolean)__CFBitfieldGetValue(((const CFRuntimeBase *)rl)->_cfinfo[CF_INFO_BITS], 2, 2);
 }
 ```
+
 #### \__CFRunLoopModeIsEmpty
 &emsp;`__CFRunLoopModeIsEmpty` 函数用于判断 `rlm` 中是否没有 sources0/sources1/timers/block，在 `CFRunLoopRunSpecific` 函数内部调用 `__CFRunLoopModeIsEmpty` 函数时这里的三个参数要区分一下：`rl` 是 run loop 对象指针，然后 `rlm` 是 `rl` 即将要用此 `rlm` 启动，然后 `previousMode` 则是 `rl` 当前的 `_currentMode` 字段的值。（其中 rl 的 block 链表在一轮循环中，block 执行结束后会被移除并释放，那么下一轮 run loop 循环进来，再去判断 block 链就是空的了，那么这次 run loop 是不是会以 kCFRunLoopRunFinished 原因而退出）
 ```c++
@@ -234,6 +238,7 @@ static Boolean __CFRunLoopModeIsEmpty(CFRunLoopRef rl, CFRunLoopModeRef rlm, CFR
 &emsp;`__CFRunLoopModeIsEmpty` 函数内部主要用于判断 souces0/source1/timers 是否为空，同时还有判断 rl  的 block 链表中包含的 block 是否能在指定的 rlm 下执行。（其中 block 链表的知识点我们后面会详细接触分析）
 
 &emsp;`__CFRunLoopPushPerRunData` 和 `__CFRunLoopPopPerRunData` 函数我们前面已经看过了，这里不再重复展开了。
+
 ##### pthread_main_np()
 &emsp;`pthread_main_np` 是一个宏定义，它最终是调用 `_NS_pthread_main_np` 函数，判断当前线程是否是主线程。（主线程全局只有一条，应该是一个全局变量）
 ```c++
@@ -387,6 +392,7 @@ static void __CFRUNLOOP_IS_CALLING_OUT_TO_AN_OBSERVER_CALLBACK_FUNCTION__(CFRunL
 &emsp;`__CFRunLoopDoObservers` 函数至此就分析完毕了，注释已经极其清晰了，这里就不总结了。
 
 &emsp;现在 `CFRunLoopRunSpecific` 函数内部调用的其它函数就只剩下 `__CFRunLoopRun` 函数了...超长...!
+
 ### \__CFRunLoopRun
 &emsp;`__CFRunLoopRun` 函数是 run loop 真正的运行函数，超长（并且里面包含了一些在 windows 平台下的代码）。因为其是 run loop 最最核心的函数，下面我们就一行一行看一下吧，耐心看完后相信会对 run loop 能有一个全面彻底的认识。
 ```c++
