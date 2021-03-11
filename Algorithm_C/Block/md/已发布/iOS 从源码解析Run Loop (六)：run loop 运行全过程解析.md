@@ -421,7 +421,7 @@ static int32_t __CFRunLoopRun(CFRunLoopRef rl,
     
     // 如果 rl 是 stop 标记，则把它置为未设置 stop 标记，然后返回 kCFRunLoopRunStopped，
     // 如果 rlm 是 stop 标记，则把它置为未设置 stop 标记，然后返回 kCFRunLoopRunStopped。
-    //（这里把 rl 和 rlm 的 stop 标记都纷纷置为未设置状态，应该是一个伏笔...）
+    //（这里把当前是停止状态的 rl 和 rlm 的 stop 标记都置为未设置状态，然后返回 kCFRunLoopRunStopped 是一个伏笔...）
     
     if (__CFRunLoopIsStopped(rl)) {
         // 设置 rl->_perRunData->stopped = 0x0 表示未设置停止标记的状态，即表示 rl 是非停止状态。
@@ -437,9 +437,11 @@ static int32_t __CFRunLoopRun(CFRunLoopRef rl,
         return kCFRunLoopRunStopped;
     }
     
-    // 声明一个 mach_port_name_t 类型的局部变量 dispatchPort，用于记录主队列的端口，只有当前处于主线程时下面才会被赋值为主队列的端口。
+    // 声明一个 mach_port_name_t 类型的局部变量 dispatchPort，
+    // 用于记录主队列的端口，只有当前处于主线程时下面才会被赋值为主队列的端口。
     // unsigned int
     // #define MACH_PORT_NULL   0
+    // dispatchPort 初始为 0
     mach_port_name_t dispatchPort = MACH_PORT_NULL;
     
     // #define HANDLE_DISPATCH_ON_BASE_INVOCATION_ONLY 0
@@ -457,8 +459,8 @@ static int32_t __CFRunLoopRun(CFRunLoopRef rl,
         // _dispatch_get_main_queue_port_4CF 用于获取主线程主队列的端口号，然后赋值给 dispatchPort
         dispatchPort = _dispatch_get_main_queue_port_4CF();
    
+// 在 rlm 中使用 dispatch_source 构建的 timer
 #if USE_DISPATCH_SOURCE_FOR_TIMERS
-    // 在 rlm 中使用 dispatch_source 构建的 timer
     mach_port_name_t modeQueuePort = MACH_PORT_NULL;
     
     // run loop mode 创建时，会对 _queue 字段赋初值
@@ -474,6 +476,7 @@ static int32_t __CFRunLoopRun(CFRunLoopRef rl,
         }
     }
 #endif
+
     // GCD timer 是依赖于内核的，所以非常精准，不受 run loop 影响。
     
     // 由 dispatch_suorce 构建计时器
@@ -1073,6 +1076,7 @@ static int32_t __CFRunLoopRun(CFRunLoopRef rl,
     return retVal;
 }
 ```
+
 #### \__CFRunLoopTimeout
 &emsp;`__CFRunLoopTimeout` 函数是 `__CFRunLoopRun` 函数内部构建的一个局部计时器变量（`dispatch_source_t timeout_timer = NULL;`）的回调函数，且全局搜索 `__CFRunLoopTimeout` 仅用于此处，意思就是 `__CFRunLoopTimeout` 函数仅提供给 `__CFRunLoopRun` 函数内部来使用的。（是一个专一的好函数！）
 ```c++
@@ -1173,6 +1177,7 @@ static uint32_t __CFSendTrivialMachMessage(mach_port_t port, uint32_t msg_id, CF
 }
 ```
 &emsp;`mach_msg` 根据 `mach_msg_header_t header` 中的 `msgh_remote_port` 来唤醒 run loop。
+
 #### \__CFRunLoopTimeoutCancel
 &emsp;`__CFRunLoopTimeoutCancel` 函数是 `__CFRunLoopRun` 函数内部构建的一个局部计时器变量（`dispatch_source_t timeout_timer = NULL;`）取消时的回调函数，且全局搜索 `__CFRunLoopTimeoutCancel` 仅用于此处，意思就是 `__CFRunLoopTimeoutCancel` 函数仅提供给 `__CFRunLoopRun` 函数内部来使用的。（是一个专一的好函数！）
 ```c++
@@ -1203,6 +1208,7 @@ static void __CFRunLoopTimeoutCancel(void *arg) {
 }
 ```
 &emsp;`__CFRunLoopTimeoutCancel` 函数较简单，就是用来做释放操作。
+
 #### \__CFRunLoopDoBlocks
 &emsp;`__CFRunLoopDoBlocks` 函数内部是遍历 run loop 的 block 的链表，在指定的 rlm 下执行 block，执行完节点的 block 以后会把该节点从链表中移除，最后更新链表的头节点和尾节点。
 ```c++
@@ -1326,7 +1332,7 @@ static void __CFRUNLOOP_IS_CALLING_OUT_TO_A_BLOCK__(void (^block)(void)) {
 }
 ```
 #### \__CFRunLoopDoSources0
-&emsp;`__CFRunLoopDoSources0` 函数是遍历收集 rlm 的 _source0 把 Valid、Signaled 的 CFRunLoopSourceRef 收集起来，然后执行以 source0 的 info 为参数执行 source0 的 perform 函数，且会把 CFRunLoopSourceRef 置为 UnsetSignaled，防止再次执行。
+&emsp;`__CFRunLoopDoSources0` 函数是遍历收集 rlm 的 \_source0 把 Valid、Signaled 的 CFRunLoopSourceRef 收集起来，然后执行以 source0 的 info 为参数执行 source0 的 perform 函数，且会把 CFRunLoopSourceRef 置为 UnsetSignaled，等待被再次标记并执行。
 ```c++
 /* rl is locked, rlm is locked on entrance and exit */
 

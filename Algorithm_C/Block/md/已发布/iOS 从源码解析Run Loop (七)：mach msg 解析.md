@@ -52,6 +52,7 @@ typedef struct{
 + 消息原语（message primitives）不解释 msgh_id 字段。它通常携带指定消息格式或含义的信息。
 
 &emsp;一条 Mach 消息实际上就是一个二进制数据包 (BLOB)，其头部定义了当前端口 local_port 和目标端口 remote_port，发送和接受消息是通过同一个 API（mach_msg） 进行的，其 option 标记了消息传递的方向。
+
 ## mach_msg
 &emsp;首先看一下 mach_msg 函数声明:
 ```c++
@@ -104,6 +105,7 @@ extern mach_msg_return_t mach_msg(mach_msg_header_t *msg,
 &emsp;mach_msg 内部实际上是调用了 mach_msg_trap  系统调用。陷阱（trap）是操作系统层面的基本概念，用于操作系统状态的更改，如触发内核态与用户态的切换操作。trap 通常由异常条件触发，如断点、除 0 操作、无效内存访问等。
 
 &emsp;当 run loop 休眠时，通过 mach port 消息可以唤醒 run loop，那么从 run loop 创建开始到现在我们在代码层面的学习过程中遇到过哪些 mach port 呢？下面我们就一起回顾一下。最典型的应该当数 \__CFRunLoop 中的 \_wakeUpPort 和 \__CFRunLoopMode 中的 \_timerPort。
+
 ## \__CFRunLoop-\_wakeUpPort
 &emsp;struct \__CFRunLoop 结构体的成员变量 \__CFPort \_wakeUpPort 应该是我们在 run loop 里见到的第一个 mach port 了，创建 run loop 对象时即会同时创建一个 mach_port_t 实例为 \_wakeUpPort 赋值。\_wakeUpPort 被用于在 CFRunLoopWakeUp 函数中调用 \__CFSendTrivialMachMessage 函数时作为其参数来唤醒 run loop。\_wakeUpPort 声明类型是 \__CFPort，实际类型是 mach_port_t。
 ```c++
@@ -137,6 +139,7 @@ static void __CFRunLoopDeallocate(CFTypeRef cf) {
 }
 ```
 &emsp;全局搜索 \_wakeUpPort 看到相关的结果仅有：创建、释放、被插入到 run loop mode 的 \_portSet 和 CFRunLoopWakeUp 函数唤醒 run loop 时使用，下面我们看一下以 run loop 对象的 \_wakeUpPort 端口为参调用 \__CFSendTrivialMachMessage 函数来唤醒 run loop 的过程。
+
 ### CFRunLoopWakeUp
 &emsp;`CFRunLoopWakeUp` 函数是用来唤醒 run loop 的，唤醒的方式是以 run loop 对象的 \_wakeUpPort 端口为参数调用 `__CFSendTrivialMachMessage` 函数
 ```c++
@@ -204,6 +207,7 @@ static uint32_t __CFSendTrivialMachMessage(mach_port_t port, uint32_t msg_id, CF
 }
 ```
 &emsp;可看到 `CFRunLoopWakeUp` 函数的功能就是调用 mach_msg 函数向 run loop 的 \_wakeUpPort 端口发送消息来唤醒 run loop。
+
 ## \__CFRunLoopMode-\_timerPort
 &emsp;\_timerPort 是 \__CFRunLoopMode 的一个成员变量。在 macOS 下同时支持 dispatch_source 和 mk 构建 timer，在 iOS 下则只支持使用 mk。这里我们只关注 \_timerPort。我们在 Cocoa Foundation 层会通过手动创建并添加计时器 NSTimer 到  run loop 的指定 run loop mode 下，同样在 Core Foundation 层会通过创建 CFRunLoopTimerRef 实例并把它添加到 run loop 的指定 run loop mode 下，内部实现是则是把 CFRunLoopTimerRef 实例添加到 run loop mode 的 \_timers 集合中，当 \_timers 集合中的计时器需要执行时则正是通过 \_timerPort 来唤醒 run loop，且 run loop mode 的 \_timers 集合中的所有计时器共用这一个 \_timerPort。
 
