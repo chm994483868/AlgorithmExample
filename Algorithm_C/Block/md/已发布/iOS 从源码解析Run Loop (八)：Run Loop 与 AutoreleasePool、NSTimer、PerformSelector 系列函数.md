@@ -55,6 +55,7 @@ typedef struct {
 
 2. CFRunLoopTimerRef 是基于时间的触发器，它和 NSTimer 是 toll-free bridged 的，可以混用。其包含一个时间长度和一个回调（函数指针）。当其加入到 run loop 时，run loop 会注册对应的时间点，当时间点到时，run loop会被唤醒以执行那个回调。
 3. CFRunLoopObserverRef 是观察者，每个 Observer 都包含了一个回调（函数指针），当 run loop 的状态发生变化时，观察者就能通过这个回调接收到。
+
 ## 观察 run loop 的状态变化/观察 run loop mode 的切换
 &emsp;下面是观察主线程 run loop 的状态变化以及当前 run loop mode 切换（kCFRunLoopDefaultMode 和 UITrackingRunLoopMode 的切换）的部分示例代码，其中在 ViewController 上添加一个能滚动的 tableView 的代码可自行添加:
 ```c++
@@ -82,7 +83,7 @@ int count = 0; // 定义全局变量来计算一个 mode 中状态切换的统�
 void mainRunLoopActivitie(CFRunLoopObserverRef observer, CFRunLoopActivity activity, void *info) {
     // observer：上面 viewDidLoad 函数中添加到 main run loop 的 CFRunLoopObserverRef 实例
     // activity：本次的状态变化：kCFRunLoopEntry、kCFRunLoopBeforeTimers、kCFRunLoopBeforeSources、kCFRunLoopBeforeWaiting、kCFRunLoopAfterWaiting、kCFRunLoopExit、（kCFRunLoopAllActivities）
-    // info： 上面 viewDidLoad 函数中 CFRunLoopObserverContext 实例的 info 成员变量，上面是 (__bridge void *)(self)
+    // info：上面 viewDidLoad 函数中 CFRunLoopObserverContext 实例的 info 成员变量，上面是 (__bridge void *)(self)
     
     ++count;
     switch (activity) {
@@ -144,6 +145,7 @@ void mainRunLoopActivitie(CFRunLoopObserverRef observer, CFRunLoopActivity activ
  🤫 - 4 kCFRunLoopBeforeTimers 即将处理 timers
  🤫 - 5 kCFRunLoopBeforeSources 即将处理 sources
  🤫 - 0 kCFRunLoopBeforeWaiting 即将进入休眠 // run loop 4⃣️ 组循环结束
+ 
  // 下面则是固定的循环两次后 App 进入静止状态。
  
  🤫 - 1 kCFRunLoopAfterWaiting 即将从休眠中醒来
@@ -162,10 +164,12 @@ void mainRunLoopActivitie(CFRunLoopObserverRef observer, CFRunLoopActivity activ
 &emsp;状态切换的话是，从程序静止状态时，点击屏幕空白区域，则是固定的 `AfterWaiting -> BeforeTimers -> BeforeSources` 然后进入休眠 `BeforeWaiting`，然后是再来一次 `AfterWaiting -> BeforeTimers -> BeforeSources` 后才会执行 `touchesBegan:withEvent:` 回调，即 run loop 唤醒之后不是立马处理 touch 事件的，而是看看 timer 有没有事情，然后是 sources（这里是一个 source0），且第一轮是不执行 touch 事件回调，第二轮才会执行 touch 事件回调，然后是固定循环两轮后程序进入长久休眠状态。
 
 &emsp;当 main run loop 的状态发生变化时会调用 mainRunLoopActivitie 函数，我们可以在其中根据 activity 做想要的处理。具体详细的 CFRunLoopObserverCreate 和 CFRunLoopAddObserver 函数的实现过程在前面都已经分析过，可以参考前面 [iOS 从源码解析Run Loop (四)：Source、Timer、Observer 创建以及添加到 mode 的过程](https://juejin.cn/post/6908639874857828366)
+
 ## 线程保活
 &emsp;线程为什么需要保活？性能其实很大的瓶颈是在于空间的申请和释放，当我们执行一个任务的时候创建了一个线程，任务结束就释放该线程，如果任务频率比较高，那么一个一直活跃的线程来执行我们的任务就省去申请和释放空间的时间和性能。前面已经讲过了 run loop 需要有 source0/source1/timer/block（\__CFRunLoopModeIsEmpty 函数前面详细分析过） 才能不退出，总不可能直接让他执行 while(1) 吧，这种方法明显不对的，由源码得知，当有监测端口（mach port）的时候（即有 source1 时），也不会退出，也不会影响性能，所以在线程初始化的时候可以使用 `[[NSRunLoop currentRunLoop] addPort:[NSPort port] forMode:NSRunLoopCommonModes];` 来保证 run loop 启动后保活。（CFRunLoopRunSpecific 函数内调用 \__CFRunLoopModeIsEmpty 函数返回 ture 的话，会直接返回 kCFRunLoopRunFinished）
 
 &emsp;如果想让子线程永久保持活性那么就在子线程内调用其 run loop 实例的 run 函数，如果想自由控制线程 run loop 结束时机的话则使用一个变量控制 do while 循环，在循环内部调用子线程的 run loop 实例的 runMode: beforeDate: 函数，当需要停止子线程的 run loop 时则在子线程内调用 `CFRunLoopStop(CFRunLoopGetCurrent());` 并结束 do while 循环，详细内容可参考前面 [iOS 从源码解析Run Loop (一)：run loop 基本概念理解与 NSRunLoop 文档](https://juejin.cn/post/6904921175546298375)
+
 ## 控制自动释放池的 push 和 pop
 &emsp;自动释放池什么时候执行 pop 操作把池中的对象的都执行一次 release  呢？这里要分两种情况：
 + 一种是我们手动以 `@autoreleasepool {...}`  的形式添加的自动释放池，使用 clang -rewrite-objc 转换为 C++ 后其实是
@@ -184,7 +188,7 @@ struct __AtAutoreleasePool {
     // ...
 }
 ```
-&emsp;可看到 `__autoreleasepool` 是被包裹在对 `{}` 之中的，当出了右边花括号时自动释放池便会执行 pop 操作，也可理解为如下代码:
+&emsp;可看到 `__autoreleasepool` 是被包裹在一对 `{}` 之中的，当出了右边花括号时自动释放池便会执行 pop 操作，也可理解为如下代码:
 ```c++
 void *pool = objc_autoreleasePoolPush();
 // {}中的代码
@@ -209,21 +213,18 @@ int main(int argc, char * argv[]) {
 ...
 ```
 + 一种是由 run loop 创建的自动释放池。ibireme 大佬如是说:
-> &emsp;App 启动后，苹果在主线程 RunLoop 里注册了两个 Observer，其回调都是 _wrapRunLoopWithAutoreleasePoolHandler()。
-> &emsp;第一个 Observer 监视的事件是 Entry(即将进入Loop)，其回调内会调用 _objc_autoreleasePoolPush() 创建自动释放池。其 order 是-2147483647，优先级最高，保证创建释放池发生在其他所有回调之前。
-> &emsp;第二个 Observer 监视了两个事件： BeforeWaiting(准备进入休眠) 时调用_objc_autoreleasePoolPop() 和 _objc_autoreleasePoolPush() 释放旧的池并创建新池；Exit(即将退出Loop) 时调用 _objc_autoreleasePoolPop() 来释放自动释放池。这个 Observer 的 order 是 2147483647，优先级最低，保证其释放池子发生在其他所有回调之后。
-> &emsp;在主线程执行的代码，通常是写在诸如事件回调、Timer回调内的。这些回调会被 RunLoop 创建好的 AutoreleasePool 环绕着，所以不会出现内存泄漏，开发者也不必显示创建 Pool 了。[深入理解RunLoop](https://blog.ibireme.com/2015/05/18/runloop/)
-> &emsp;关于自动释放池的知识点可以参考前面的文章: [iOS 从源码解析Runtime (六)：AutoreleasePool实现原理解读](https://juejin.cn/post/6877085831647985677)
+> &emsp;App 启动后，苹果在主线程 RunLoop 里注册了两个 Observer，其回调都是 \_wrapRunLoopWithAutoreleasePoolHandler()。
+> &emsp;第一个 Observer 监视的事件是 Entry(即将进入Loop)，其回调内会调用 \_objc_autoreleasePoolPush() 创建自动释放池。其 order 是-2147483647，优先级最高，保证创建释放池发生在其他所有回调之前。
+> &emsp;第二个 Observer 监视了两个事件： BeforeWaiting(准备进入休眠) 时调用 \_objc_autoreleasePoolPop() 和 \_objc_autoreleasePoolPush() 释放旧的池并创建新池；Exit(即将退出Loop) 时调用 \_objc_autoreleasePoolPop() 来释放自动释放池。这个 Observer 的 order 是 2147483647，优先级最低，保证其释放池子发生在其他所有回调之后。
+> &emsp;在主线程执行的代码，通常是写在诸如事件回调、Timer 回调内的。这些回调会被 RunLoop 创建好的 AutoreleasePool 环绕着，所以不会出现内存泄漏，开发者也不必显示创建 Pool 了。[深入理解RunLoop](https://blog.ibireme.com/2015/05/18/runloop/)
 
-&emsp;下面我们试着验证一下上面的结论，在 application:didFinishLaunchingWithOptions: 函数中添加一个断点，在控制台打印 po [NSRunLoop mainRunLoop]，可看到当前 main run loop 在 kCFRunLoopDefaultMode 模式下运行，然后在 kCFRunLoopDefaultMode 模式有 6 个 observers，这里我们只看其中大佬提到的最高优先级和最低优先级的 CFRunLoopObserver:
+&emsp;下面我们试着验证一下上面的结论，在 application:didFinishLaunchingWithOptions: 函数中添加一个断点，在控制台打印 po [NSRunLoop mainRunLoop]，可看到在 main run loop 的 kCFRunLoopDefaultMode 和 UITrackingRunLoopMode 模式下的 observers 中均有如下两个 CFRunLoopObserver。
 ```c++
-    observers = (
-    "<CFRunLoopObserver 0x282638640 [0x20e729430]>{valid = Yes, activities = 0x1, repeats = Yes, order = -2147483647, callout = <redacted> (0x20af662ec), context = <CFArray 0x28197def0 [0x20e729430]>{type = mutable-small, count = 1, values = (\n\t0 : <0x1006ec048>\n)}}",
-    ...
-    "<CFRunLoopObserver 0x2826385a0 [0x20e729430]>{valid = Yes, activities = 0xa0, repeats = Yes, order = 2147483647, callout = <redacted> (0x20af662ec), context = <CFArray 0x28197def0 [0x20e729430]>{type = mutable-small, count = 1, values = (\n\t0 : <0x1006ec048>\n)}}"
-)
+"<CFRunLoopObserver 0x600001c30320 [0x7fff80617cb0]>{valid = Yes, activities = 0x1, repeats = Yes, order = -2147483647, callout = _wrapRunLoopWithAutoreleasePoolHandler (0x7fff4808bf54), context = <CFArray 0x60000235dc20 [0x7fff80617cb0]>{type = mutable-small, count = 0, values = ()}}"
+
+"<CFRunLoopObserver 0x600001c30280 [0x7fff80617cb0]>{valid = Yes, activities = 0xa0, repeats = Yes, order = 2147483647, callout = _wrapRunLoopWithAutoreleasePoolHandler (0x7fff4808bf54), context = <CFArray 0x60000235dc20 [0x7fff80617cb0]>{type = mutable-small, count = 0, values = ()}}"
 ```
-&emsp;order 是 -2147483647 的 CFRunLoopObserver 优先级最高，会在其它所有 CFRunLoopObserver 之前回调，然后它的 activities 是 0x1，对应 kCFRunLoopEntry = (1UL << 0)，即只观察 kCFRunLoopEntry 状态，回调函数的话只能看到地址 callout = <redacted> (0x20af662ec)，添加一个 `_wrapRunLoopWithAutoreleasePoolHandler` 符号断点，添加一个 `objc_autoreleasePoolPush` 符号断点，运行程序，并在控制台 bt 打印函数堆栈，确实能看到如下的函数调用：
+&emsp;order 是 -2147483647 的 CFRunLoopObserver 优先级最高，会在其它所有 CFRunLoopObserver 之前回调，然后它的 activities 是 0x1，对应 kCFRunLoopEntry = (1UL << 0)，即只观察 kCFRunLoopEntry 状态，回调函数是 \_wrapRunLoopWithAutoreleasePoolHandler，添加一个 \_wrapRunLoopWithAutoreleasePoolHandler 符号断点，添加一个 objc_autoreleasePoolPush 符号断点，运行程序，并在控制台 bt 打印函数堆栈，确实能看到如下的函数调用：
 ```c++
 (lldb) bt
 * thread #1, queue = 'com.apple.main-thread', stop reason = breakpoint 3.1
@@ -241,7 +242,7 @@ int main(int argc, char * argv[]) {
 ```
 &emsp;在主线程中确实看到了 `__CFRUNLOOP_IS_CALLING_OUT_TO_AN_OBSERVER_CALLBACK_FUNCTION__` 执行 CFRunLoopObserver 的回调函数调用了 `_wrapRunLoopWithAutoreleasePoolHandler` 函数接着调用了 `objc_autoreleasePoolPush` 创建自动释放池。
 
-&emsp;order 是 2147483647 的 CFRunLoopObserver 优先级最低，会在其它所有 CFRunLoopObserver 之后回调，然后它的 activities 是 0xa0（0b10100000），对应 kCFRunLoopBeforeWaiting = (1UL << 5) 和 kCFRunLoopExit = (1UL << 7)，即观察 run loop 的即将进入休眠和 run loop 退出的两个状态变化，回调函数的话只能看到地址 callout = <redacted> (0x20af662ec)，我们再添加一个 `objc_autoreleasePoolPop` 符号断点，此时需要我们添加一些测试代码，我们添加一个 main run loop 的观察者，然后再添加一个主线程的 main run loop 的计时器，程序启动后我们可看到控制台如下循环打印:
+&emsp;order 是 2147483647 的 CFRunLoopObserver 优先级最低，会在其它所有 CFRunLoopObserver 之后回调，然后它的 activities 是 0xa0（0b10100000），对应 kCFRunLoopBeforeWaiting = (1UL << 5) 和 kCFRunLoopExit = (1UL << 7)，即观察 run loop 的即将进入休眠和 run loop 退出的两个状态变化，回调函数的话也是 \_wrapRunLoopWithAutoreleasePoolHandler，我们再添加一个 objc_autoreleasePoolPop 符号断点，此时需要我们添加一些测试代码，我们添加一个 main run loop 的观察者，然后再添加一个主线程的 main run loop 的 timer，程序启动后我们可看到控制台如下循环打印:
 ```c++
  🎯... kCFRunLoopAfterWaiting
  ⏰⏰⏰ timer 回调...
@@ -251,7 +252,7 @@ int main(int argc, char * argv[]) {
  🎯... kCFRunLoopAfterWaiting
  ⏰⏰⏰ timer 回调...
 ```
-&emsp;主线程进入了一种 “休眠--被 timer 唤醒执行回调--休眠” 的循环之中，此时我们打开 `_wrapRunLoopWithAutoreleasePoolHandler` 断点发现程序进入，然后再打开 `objc_autoreleasePoolPop` 断点，然后点击 Continue program execution 按钮，此时会进入 `objc_autoreleasePoolPop` 断点，在控制台 bt 打印函数调用栈：
+&emsp;主线程进入了一种 “休眠--被 timer 唤醒执行回调--休眠” 的循环之中，此时我们打开 `_wrapRunLoopWithAutoreleasePoolHandler` 断点发现程序进入，然后再打开 objc_autoreleasePoolPop 断点，然后点击 Continue program execution 按钮，此时会进入 objc_autoreleasePoolPop 断点，在控制台 bt 打印函数调用栈：
 ```c++
 (lldb) bt
 * thread #1, queue = 'com.apple.main-thread', stop reason = breakpoint 1.1
@@ -268,17 +269,20 @@ int main(int argc, char * argv[]) {
     frame #10: 0x00000001de1ce8e0 libdyld.dylib`start + 4
 (lldb)
 ```
-&emsp;确实看到了 `_wrapRunLoopWithAutoreleasePoolHandler` 调用了 `objc_autoreleasePoolPop`。
+&emsp;确实看到了 \_wrapRunLoopWithAutoreleasePoolHandler 调用了 objc_autoreleasePoolPop。
 
-&emsp;这样整体下来：Entry-->push ---> BeforeWaiting--->pop-->push -->Exit-->pop，按照这样的顺序，保证了，每一次 push 都对应一个 pop。
+&emsp;这样整体下来：Entry-->push ➡️ BeforeWaiting--->pop-->push ➡️ Exit-->pop，按照这样的顺序，保证了在每次 run loop 循环中都进行一次 push 和 pop。
 
 &emsp;从上面 run loop observer 工作便知，每一次 loop，便会有一次 pop 和 push，因此我们得出：
+
 1. 如果手动添加 autoreleasePool，autoreleasePool 作用域里的自动释放对象会在出 pool 作用域的那一刻释放。
-2. 如果是 run loop 自动添加的 autoreleasePool，那么在每一次 run loop 循环结束时，autoreleasePool 执行 pop 操作 释放这次循环中所有的自动释放对象。在 run loop 循环开启时再 push 新的自动释放池，保证 run loop 的每次循环中的对象都能得到释放。
+2. 如果是 run loop 自动添加的 autoreleasePool，首先在 run loop 循环开启时 push 一个新的自动释放池，然后在每一次 run loop 循环将要进入休眠时 autoreleasePool 执行 pop 操作释放这次循环中所有的自动释放对象，并同时再 push 一个新的自动释放池在下一个 loop 循环中使用，这样保证 run loop 的每次循环中的创建的自动释放对象都得到释放，然后在 run loop 切换 mode 退出时，再执行最后一次 pop，保证在 run loop 的运行过程中自动释放池的 push 和 pop 成对出现。
+
 ## NSTimer 实现过程
 &emsp;NSTimer.h 中提供了一组 NSTimer 的创建方法，其中不同构造函数的 NSInvocation、SEL、block 类型的参数分别代表 NSTimer 对象的不同的回调方式。其中 block  的回调形式是 iOS 10.0 后新增的，可以帮助我们避免 NSTimer 对象和其 target 参数的循环引用问题，`timerWithTimeInterval...` 和 `initWithFireDate` 返回的 NSTimer 对象还需要我们手动添加到当前线程的 run loop 中，`scheduledTimerWithTimeInterval...` 构建的 NSTimer 对象则是默认添加到当前线程的 run loop 的 NSDefaultRunLoopMode 模式下的。
 
 &emsp;block 回调的形式都有一个 `API_AVAILABLE(macosx(10.12), ios(10.0), watchos(3.0), tvos(10.0));`。
+
 ### NSTimer 创建函数
 &emsp;下面五个方法返回的 NSTimer 对象需要手动调用 NSRunLoop 的 `-(void)addTimer:(NSTimer *)timer forMode:(NSRunLoopMode)mode;` 函数添加到指定 run loop 的指定 mode 下。
 ```c++
@@ -362,8 +366,10 @@ NSTimer *timer3 = [NSTimer timerWithTimeInterval:1 repeats:YES block:^(NSTimer *
 &emsp;iOS 10.0 以后苹果也提供了 block 形式的 NSTimer 构建函数，我们直接使用即可。（大概现在还有 iOS 10.0 之前的用户吗）
 
 &emsp;看到这里会发现计时器是不能暂停的，invalidate 函数是移除计数器使用的，所以无论是重复执行的计时器还是一次性的计时器只要调用 invalidate 方法则会变得无效，只是一次性的计时器执行完操作后会自动调用 invalidate 方法。所以想要暂停和恢复计时器的只能 invalidate 旧计时器然后再新建计时器，且当我们不再需要使用计时器时必须调用 invalidate 方法。
+
 ### NSTimer 执行流程
 &emsp;CFRunLoopTimerRef 与 NSTimer 是可以 toll-free bridged（免费桥接转换）的。当 timer 加到 run loop 的时候，run loop 会注册对应的触发时间点，时间到了，run loop 若处于休眠则会被唤醒，执行 timer 对应的回调函数。下面我们沿着 CFRunLoopTimerRef 的源码来完整分析一下计时器的流程。
+
 #### CFRunLoopTimerRef 创建
 &emsp;首先是 CFRunLoopTimerRef 的创建函数：(详细分析可参考前面的：[iOS 从源码解析Run Loop (四)：Source、Timer、Observer 创建以及添加到 mode 的过程](https://juejin.cn/post/6908639874857828366))
 ```c++
@@ -422,6 +428,7 @@ if (fireDate < now1) {
 void CFRunLoopAddTimer(CFRunLoopRef rl, CFRunLoopTimerRef rlt, CFStringRef modeName);
 ```
 &emsp;上面添加完成后，会调用 \__CFRepositionTimerInMode 函数，然后调用 \__CFArmNextTimerInMode，再调用 mk_timer_arm 函数把 CFRunLoopModeRef 的 \_timerPort 和一个时间点注册到系统中，等待着 mach_msg 发消息唤醒休眠中的 run loop 起来执行到达时间的计时器。
+
 #### \__CFArmNextTimerInMode
 &emsp;同一个 run loop mode 下的多个 timer 共享同一个 \_timerPort，这是一个循环的流程：注册 timer(mk_timer_arm)—接收 timer(mach_msg)—根据多个 timer 计算离当前最近的下次 handle 时间—注册 timer(mk_timer_arm)。
 
@@ -442,6 +449,7 @@ __CFArmNextTimerInMode
     mk_timer_arm 
 ```
 &emsp;每次计时器都会调用 \__CFArmNextTimerInMode 函数，注册计时器的下次回调。休眠中的 run loop 通过当前的 run loop mode 的 \_timerPort 端口唤醒后，在本次 run loop 循环中在 \__CFRunLoopDoTimers 函数中循环调用 \__CFRunLoopDoTimer 函数，执行达到触发时间的 timer 的 \_callout 函数。`__CFRUNLOOP_IS_CALLING_OUT_TO_A_TIMER_CALLBACK_FUNCTION__(rlt->_callout, rlt, context_info);` 是执行计时器的 \_callout 函数。
+
 ### NSTimer 不准时问题
 &emsp;通过上面的 NSTimer 执行流程可看到计时器的触发回调完全依赖 run loop 的运行（macOS 和 iOS 下都是使用 mk_timer 来唤醒 run loop），使用 NSTimer 之前必须注册到 run loop，但是 run loop 为了节省资源并不会在非常准确的时间点调用计时器，如果一个任务执行时间较长（例如本次 run loop 循环中 source0 事件执行时间过长或者计时器自身回调执行时间过长，都会导致计时器下次正常时间点的回调被延后或者延后时间过长的话则直接忽略这次回调（计时器回调执行之前会判断当前的执行状态 !__CFRunLoopTimerIsFiring(rlt)，如果是计时器自身回调执行时间过长导致下次回调被忽略的情况大概与此标识有关 ）），那么当错过一个时间点后只能等到下一个时间点执行，并不会延后执行（NSTimer 提供了一个 tolerance 属性用于设置宽容度，即当前时间点已经过了计时器的本次触发点，但是超过的时间长度小于 tolerance 的话，那么本次计时器回调还可以正常执行，不过是不准时的延后执行。 tolerance 的值默认是 0，最大值的话是计时器间隔时间 \_interval 的一半，可以根据自身的情况酌情设置 tolerance 的值，（其实还是觉得如果自己的计时器不准时了还是应该从自己写的代码中找原因，自己去找该优化的点，或者是主线实在优化不动的话就把计时器放到子线程中去））。
 
