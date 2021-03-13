@@ -279,9 +279,9 @@ int main(int argc, char * argv[]) {
 2. 如果是 run loop 自动添加的 autoreleasePool，首先在 run loop 循环开启时 push 一个新的自动释放池，然后在每一次 run loop 循环将要进入休眠时 autoreleasePool 执行 pop 操作释放这次循环中所有的自动释放对象，并同时再 push 一个新的自动释放池在下一个 loop 循环中使用，这样保证 run loop 的每次循环中的创建的自动释放对象都得到释放，然后在 run loop 切换 mode 退出时，再执行最后一次 pop，保证在 run loop 的运行过程中自动释放池的 push 和 pop 成对出现。
 
 ## NSTimer 实现过程
-&emsp;NSTimer.h 中提供了一组 NSTimer 的创建方法，其中不同构造函数的 NSInvocation、SEL、block 类型的参数分别代表 NSTimer 对象的不同的回调方式。其中 block  的回调形式是 iOS 10.0 后新增的，可以帮助我们避免 NSTimer 对象和其 target 参数的循环引用问题，`timerWithTimeInterval...` 和 `initWithFireDate` 返回的 NSTimer 对象还需要我们手动添加到当前线程的 run loop 中，`scheduledTimerWithTimeInterval...` 构建的 NSTimer 对象则是默认添加到当前线程的 run loop 的 NSDefaultRunLoopMode 模式下的。
+&emsp;NSTimer.h 中提供了一组 NSTimer 的创建方法，其中不同构造函数的 NSInvocation、SEL、block 类型的参数分别代表 NSTimer 对象的不同的回调方式。其中 block  的回调形式是 iOS 10.0 后新增的，可以帮助我们避免 NSTimer 对象和其 target 参数的循环引用问题，`timerWithTimeInterval...` 和 `initWithFireDate` 返回的 NSTimer 对象还需要我们手动添加到当前线程的 run loop 中，`scheduledTimerWithTimeInterval...` 构建的 NSTimer 对象则是默认添加到当前线程的 run loop 的 NSDefaultRunLoopMode 模式下的（必要的情况下我们还要再补一行把 timer 添加到当前线程的 run loop 的 NSRunLoopCommonModes 模式下）。
 
-&emsp;block 回调的形式都有一个 `API_AVAILABLE(macosx(10.12), ios(10.0), watchos(3.0), tvos(10.0));`。
+&emsp;block 回调的形式都有一个 `API_AVAILABLE(macosx(10.12), ios(10.0), watchos(3.0), tvos(10.0));` 标注，表示是 iOS 10 后新增的。
 
 ### NSTimer 创建函数
 &emsp;下面五个方法返回的 NSTimer 对象需要手动调用 NSRunLoop 的 `-(void)addTimer:(NSTimer *)timer forMode:(NSRunLoopMode)mode;` 函数添加到指定 run loop 的指定 mode 下。
@@ -298,11 +298,11 @@ int main(int argc, char * argv[]) {
 + (NSTimer *)scheduledTimerWithTimeInterval:(NSTimeInterval)ti target:(id)aTarget selector:(SEL)aSelector userInfo:(nullable id)userInfo repeats:(BOOL)yesOrNo;
 + (NSTimer *)scheduledTimerWithTimeInterval:(NSTimeInterval)interval repeats:(BOOL)repeats block:(void (^)(NSTimer *timer))block API_AVAILABLE(macosx(10.12), ios(10.0), watchos(3.0), tvos(10.0));
 ```
-&emsp;如果使用 `scheduledTimerWithTimeInterval...` 则需要注意 run loop 的 mode 切换到 UITrackingRunLoopMode 模式时，计时器会停止回调，当滑动停止 run loop 切回到 kCFRunLoopDefaultMode 模式时计时器又开始正常回调，当手动添加到 run loop 时则尽量添加到  NSRunLoopCommonModes 模式下可保证 run loop 的 mode 切换不影响计时器的回调（此时的计时器对象会被同时添加到多个 common 标记的 run loop mode 的 \_timers 中）。
+&emsp;如果使用 `scheduledTimerWithTimeInterval...` 则需要注意 run loop 的 mode 切换到 UITrackingRunLoopMode 模式时，计时器会停止回调，当滑动停止 run loop 切回到 kCFRunLoopDefaultMode 模式时计时器又开始正常回调，必要情况下我们需要把 timer 添加到  NSRunLoopCommonModes 模式下可保证 run loop 的 mode 切换不影响计时器的回调（此时的计时器对象会被同时添加到多个 common 标记的 run loop mode 的 \_timers 中）。
 
 &emsp;还有一个知识点需要注意一下，添加到 run loop 指定 mode 下的 NSTimer 会被 mode 所持有，因为它会被加入到 run loop mode 的 \_timers 中去，如果 mode name 是 NSRunLoopCommonModes 的话，同时还会被加入到 run loop 的 \_commonModeItems 中，所以当不再需要使用  NSTimer 对象计时时必须调用 invalidate 函数把它从 \_timers 和 \_commonModeItems 集合中移除。如下代码在 ARC 下打印各个计时器的引用计数可进行证实：
 ```c++
-// timer 默认添加到 run loop 的 NSDefaultRunLoopMode 下，觉的引用计数应该是 2 的，但是打印是 3，下面的手动添加的都是正常 +1
+// timer 默认添加到 run loop 的 NSDefaultRunLoopMode 下，引用计数应该是 3 (觉得这里应该是 2 呀？)
 NSTimer *timer = [NSTimer scheduledTimerWithTimeInterval:1 repeats:YES block:^(NSTimer * _Nonnull timer) { }]; // 3
 
 // 起始引用计数是 1
@@ -329,7 +329,7 @@ NSTimer *timer3 = [NSTimer timerWithTimeInterval:1 repeats:YES block:^(NSTimer *
 - (instancetype)initWithFireDate:(NSDate *)date interval:(NSTimeInterval)ti target:(id)t selector:(SEL)s userInfo:(nullable id)ui repeats:(BOOL)rep NS_DESIGNATED_INITIALIZER;
 + (NSTimer *)scheduledTimerWithTimeInterval:(NSTimeInterval)ti target:(id)aTarget selector:(SEL)aSelector userInfo:(nullable id)userInfo repeats:(BOOL)yesOrNo;
 ```
-&emsp;使用以上三个函数构建或初始化 NSTimer 对象时，NSTimer 对象会持有传入的 target 的，因为 NSTimer 对象回调时要执行 target 的 aSelector 函数，如果此时 target 持有 NSTimer 对象的话则会构成循环引用导致内存泄漏，一般在 ViewController 中添加 NSTimer 属性会遇到此问题。解决这个问题的方法通常有两种：一种是将 target 分离出来独立成一个对象（在这个对象中弱引用 NSTimer 并将对象本身作为 NSTimer 的 target），控制器通过这个对象间接使用 NSTimer；另一种方式的思路仍然是转移 target，只是可以直接增加 NSTimer 扩展（分类），让 NSTimer 类对象做为 target，同时可以将操作 selector 封装到 block 中，示例代码如下。（类对象全局唯一且不需要也不能释放）[iOS刨根问底-深入理解RunLoop](https://www.cnblogs.com/kenshincui/p/6823841.html)
+&emsp;使用以上三个函数构建或初始化 NSTimer 对象时，NSTimer 对象会持有传入的 target 的，因为 NSTimer 对象回调时要执行 target 的 aSelector 函数，如果此时 target 同时也持有 NSTimer 对象的话则会构成循环引用导致内存泄漏，一般在 ViewController 中添加 NSTimer 属性会遇到此问题。解决这个问题的方法通常有两种：一种是将 target 分离出来独立成一个对象（在这个对象中弱引用 NSTimer 并将对象本身作为 NSTimer 的 target），控制器通过这个对象间接使用 NSTimer；另一种方式的思路仍然是转移 target，只是可以直接增加 NSTimer 扩展（分类），让 NSTimer 类对象做为 target，同时可以将操作 selector 封装到 block 中，示例代码如下。（类对象全局唯一且不需要也不能释放）[iOS刨根问底-深入理解RunLoop](https://www.cnblogs.com/kenshincui/p/6823841.html)
 ```c++
 #import "NSTimer+Block.h"
 
@@ -430,7 +430,7 @@ void CFRunLoopAddTimer(CFRunLoopRef rl, CFRunLoopTimerRef rlt, CFStringRef modeN
 &emsp;上面添加完成后，会调用 \__CFRepositionTimerInMode 函数，然后调用 \__CFArmNextTimerInMode，再调用 mk_timer_arm 函数把 CFRunLoopModeRef 的 \_timerPort 和一个时间点注册到系统中，等待着 mach_msg 发消息唤醒休眠中的 run loop 起来执行到达时间的计时器。
 
 #### \__CFArmNextTimerInMode
-&emsp;同一个 run loop mode 下的多个 timer 共享同一个 \_timerPort，这是一个循环的流程：注册 timer(mk_timer_arm)—接收 timer(mach_msg)—根据多个 timer 计算离当前最近的下次 handle 时间—注册 timer(mk_timer_arm)。
+&emsp;同一个 run loop mode 下的多个 timer 共享同一个 \_timerPort，这是一个循环的流程：注册 timer(mk_timer_arm)—接收 timer(mach_msg)—根据多个 timer 计算离当前最近的下次回调的触发时间点—注册 timer(mk_timer_arm)。
 
 &emsp;在使用 CFRunLoopAddTimer 添加 timer 时的调用堆栈如下：
 ```c++
