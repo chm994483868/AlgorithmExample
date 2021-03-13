@@ -509,6 +509,7 @@ __CFArmNextTimerInMode
 @end
 ```
 &emsp;performSelector:withObject:afterDelay:inModes: 在延迟之后使用指定的模式在当前线程上调用接收方（NSObject 及其子类对象）的方法。
+
 &emsp;`aSelector`：一个选择器，用于标识要调用的方法。该方法应该没有明显的返回值（void），并且应该采用 id 类型的单个参数，或者不带参数。
 
 &emsp;`anArgument`：调用时传递给方法的参数。如果该方法不接受参数，则传递 nil。
@@ -580,6 +581,7 @@ __CFArmNextTimerInMode
 &emsp;发送 aSelector 消息之前，此方法返回。接收器会保留 target 和 anArgument 对象，直到选择器的 timer 触发，然后将其释放作为清理的一部分。
 
 &emsp;如果要在处理当前事件后发送多个消息，并且要确保这些消息按特定顺序发送，请使用此方法。
+
 ### NSObject + NSThreadPerformAdditions
 &emsp;当调用 performSelector:onThread: 时，实际上其会创建一个 timer 加到对应的线程去，同样的，如果对应线程没有 run loop 该方法也会失效。
 ```c++
@@ -615,6 +617,7 @@ emsp;`aSelector`: 一个选择器，用于标识要调用的方法。该方法�
 &emsp;你无法取消使用此方法排队的消息。如果要取消当前线程上的消息的选项，则必须使用 performSelector:withObject:afterDelay: 或 performSelector:withObject:afterDelay:inModes: 方法。
 
 &emsp;该方法向其当前上下文的 run loop 进行注册，并依赖于定期运行的 run loop 才能正确执行。一个常见的上下文是调用 dispatch queue 时调用，可能会调用此方法并最终向不是定期自动运行的 run loop 注册。如果在一个 dispatch queue 上运行时需要这种功能，则应使用 dispatch_after 和相关方法来获取所需的行为。
+
 ### NSObject 协议中的 performSelector 方法
 &emsp;在 NSObject 类中实现的 NSObject 协议的 performSelector 方法，则与 run loop 无关，它们相当于直接调用 recevier 的方法。
 ```c++

@@ -218,6 +218,7 @@ entries =>
 ...
 ```
 &emsp;在 Core Foundation 中则必须手动创建端口及其 source1。在这两种情况下，都使用与端口不透明类型（CFMachPortRef、CFMessagePortRef 或 CFSocketRef）相关联的函数来创建适当的对象。
+
 ## 事件响应
 > &emsp;在 com.apple.uikit.eventfetch-thread 线程下苹果注册了一个 Source1 (基于 mach port 的) 用来接收系统事件，其回调函数为 \__IOHIDEventSystemClientQueueCallback()，HID 是 Human Interface Devices “人机交互” 的首字母缩写。
 > 
@@ -634,6 +635,7 @@ static void runLoopObserverCallBack(CFRunLoopObserverRef observer, CFRunLoopActi
 &emsp;监测 kCFRunLoopBeforeSources 或者 kCFRunLoopAfterWaiting 两个活动状态变化，即一旦发现进入睡眠前的 kCFRunLoopBeforeSources 状态，或者唤醒后的状态 kCFRunLoopAfterWaiting，在设置的时间阈值内一直没有变化，即可判定为卡顿。
 
 &emsp;在 run loop 的本次循环中，从 kCFRunLoopBeforeSources 到 kCFRunLoopBeforeWaiting 处理了 source/timer/block 的事情，如果时间花的太长必然导致主线程卡顿。从 kCFRunLoopBeforeWaiting 到 kCFRunLoopAfterWaiting 状态，如果本次唤醒花了太多时间也会必然造成卡顿。
+
 ## 参考链接
 **参考链接:🔗**
 + [runloop 源码](https://opensource.apple.com/tarballs/CF/)

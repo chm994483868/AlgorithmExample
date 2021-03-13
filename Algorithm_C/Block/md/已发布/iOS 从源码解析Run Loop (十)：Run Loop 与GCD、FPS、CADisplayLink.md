@@ -95,6 +95,7 @@ API_AVAILABLE(ios(3.1), watchos(2.0), tvos(9.0)) API_UNAVAILABLE(macos)
 &emsp;当你的应用程序完成 display link 时，应调用 invalidate 函数将其从所有 run loop 中移除，并将其与 target 解除关联。
 
 &emsp;CADisplayLink 不应被子类化。
+
 #### displayLinkWithTarget:selector:
 &emsp;返回一个新建的 display link 对象。
 ```c++
@@ -111,6 +112,7 @@ API_AVAILABLE(ios(3.1), watchos(2.0), tvos(9.0)) API_UNAVAILABLE(macos)
 &emsp;其中 sender 是 displayLinkWithTarget:selector: 返回的 display link 对象。
 
 &emsp;新建的 display link 对象 retain 了 `target`。
+
 #### addToRunLoop:forMode:
 &emsp;注册 display link 对象到 run loop 中。
 ```c++
@@ -133,6 +135,7 @@ API_AVAILABLE(ios(3.1), watchos(2.0), tvos(9.0)) API_UNAVAILABLE(macos)
 &emsp;`runloop`：与 display link 关联的 run loop。`mode`：display link 正在运行的 run loop mode。
 
 &emsp;如果 display link 不再与任何 run loop mode 相关联，则 run loop 将释放该 display link。
+
 #### invalidate
 &emsp;从所有的 run loop modes 中移除 display link。
 ```c++
@@ -143,6 +146,7 @@ API_AVAILABLE(ios(3.1), watchos(2.0), tvos(9.0)) API_UNAVAILABLE(macos)
 &emsp;从所有 run loop modes 中移除 display link 会导致其被 run loop 释放。display link 还会释放 target。
 
 &emsp;invalidate 是线程安全的，这意味着可以从与运行 display link 的线程 “分开” 的线程中调用 invalidate 函数。
+
 #### duration
 &emsp;（只读）屏幕刷新更新两帧之间的时间间隔。（duration 属性用于提供屏幕最大刷新频率（maximumFramesPerSecond 60）下每一帧的时间间隔，这个属性可以用于在应用中获取帧率。）
 ```c++
@@ -151,6 +155,7 @@ API_AVAILABLE(ios(3.1), watchos(2.0), tvos(9.0)) API_UNAVAILABLE(macos)
 &emsp;在至少一次调用 target 的 sel 之前，duration 的值是不确定的。（应用程序可以通过将 duration 乘以 frameInterval 来计算渲染每个帧所需的时间量。）
 
 &emsp;duration 提供了每帧之间的时间，也就是屏幕每次刷新之间的时间。 duration 只是个大概的时间，如果 CPU 忙于其它计算，就没法保证以相同的频率执行屏幕的绘制操作，这样会跳过几次调用回调方法的机会。
+
 ##### frameInterval
 &emsp;（已废弃）在 display link 再次通知 target 之前必须经过的帧数。
 ```c++
@@ -159,6 +164,7 @@ API_AVAILABLE(ios(3.1), watchos(2.0), tvos(9.0)) API_UNAVAILABLE(macos)
 &emsp;默认值为 1，这将导致以显示的刷新率通知应用程序。如果该值设置为大于 1 的值，则 display link 将以本机刷新率的一小部分通知应用程序。例如，将间隔设置为 2 会导致 display link 每隔一帧触发一次，从而提供一半的帧速率。
 
 &emsp;将此值设置为小于1会导致未定义的行为。
+
 #### timestamp
 &emsp;与显示的最后一帧关联的时间戳。（这个属性用来返回上一次屏幕刷新的时间戳。例如视频播放的应用，可以通过时间戳来获取上一帧的具体时间，来计算下一帧。）
 ```c++
@@ -166,6 +172,7 @@ API_AVAILABLE(ios(3.1), watchos(2.0), tvos(9.0)) API_UNAVAILABLE(macos)
 @property(readonly, nonatomic) CFTimeInterval timestamp;
 ```
 &emsp;target 应使用此属性的值来计算应在下一帧中显示的内容。
+
 #### preferredFramesPerSecond
 &emsp;display link 回调的首选帧速率。
 ```c++
@@ -180,12 +187,14 @@ API_AVAILABLE(ios(3.1), watchos(2.0), tvos(9.0)) API_UNAVAILABLE(macos)
 &emsp;如果在特定帧率内无法提供对象的操作，可以通过降低帧率解决。一个拥有持续稳定但是较慢帧率的应用要比跳帧的应用顺滑的多。可以通过 preferredFramesPerSecond 来设置每秒刷新次数。preferredFramesPerSecond 默认值为屏幕最大帧率（maximumFramesPerSecond）目前是60。
 
 &emsp;实际的屏幕帧率会和 preferredFramesPerSecond 有一定的出入，结果是由设置的值和屏幕最大帧率（maximumFramesPerSecond）相互影响产生的。规则大概如下：如果屏幕最大帧率（preferredFramesPerSecond）是 60,实际帧率只能是15、20、30、60 中的一种。如果设置大于 60 的值，屏幕实际帧率为 60。如果设置的是 26~35 之间的值，实际帧率是 30。如果设置为 0，会使用最高帧率。
+
 ##### maximumFramesPerSecond
 &emsp;maximumFramesPerSecond 是 UIScreen 的一个只读属性，表示屏幕每秒可以显示的最大帧数。
 ```c++
 @property(readonly) NSInteger maximumFramesPerSecond;
 ```
 &emsp;在 iOS 上，每秒最大帧数通常为 60。对于 tvOS 设备，此值可能会根据所连接屏幕的硬件功能或用户在 Apple TV 上选择的分辨率而有所不同。
+
 #### paused
 &emsp;paused 是一个布尔值，用于说明 display link 到 target 的通知（回调 sel）是否已暂停。
 ```c++
@@ -195,6 +204,7 @@ API_AVAILABLE(ios(3.1), watchos(2.0), tvos(9.0)) API_UNAVAILABLE(macos)
 &emsp;默认值为 NO。如果值为 YES，则 display link 不会向 target 发送通知（回调 sel）。
 
 &emsp;paused 是线程安全的，这意味着可以从与运行 display link 的线程分开的线程中进行设置。
+
 #### targetTimestamp
 &emsp;（只读的）iOS 10.0 后新增的属性，与显示的下一帧关联的时间戳。
 ```c++
@@ -250,6 +260,7 @@ duration: 0.016667 timestamp: 366093.060335 targetTimestamp: 366093.077002 frame
 &emsp;通过以上可知 CADisplayLink 的内部是 source1 来驱动的。
 
 &emsp;以上部分便是 CADisplayLink 部分的学习，下面我们来看 YYFPSLabel 的具体实现。
+
 ### YYFPSLabel 帧率监测
 &emsp; [YYFPSLabel](https://github.com/ibireme/YYText/blob/master/Demo/YYTextDemo/YYFPSLabel.m)
 ```c++
@@ -325,7 +336,7 @@ duration: 0.016667 timestamp: 366093.060335 targetTimestamp: 366093.077002 frame
     // 统计 tick 被调用的次数
     _count++;
     
-    // link.timestamp 是当前帧的时间戳，减去上一次统计帧率达时间戳，当时间间隔大于等于 1 秒时才进行帧率统计，
+    // link.timestamp 是当前帧的时间戳，减去上一次统计帧率的时间戳，当时间间隔大于等于 1 秒时才进行帧率统计，
     // 即 1 秒钟统计一次帧率（也没必要过于频繁的统计帧率）
     NSTimeInterval delta = link.timestamp - _lastTime;
     
