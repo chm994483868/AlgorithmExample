@@ -56,6 +56,7 @@ Lfunc_end0:
                                         ; -- End function
 ```
 &emsp;`objc_nonatomic_strong` 属性的 `getter` 函数内部没有调用任何函数，只是地址偏移取值。
+
 ### [LGPerson setObjc_nonatomic_strong:]
 ```c++
     .p2align    2               ; -- Begin function -[LGPerson setObjc_nonatomic_strong:]
@@ -118,6 +119,7 @@ objc_storeStrong(id *location, id obj)
 ```
 ### [LGPerson objc_nonatomic_retain]/[LGPerson setObjc_nonatomic_retain:]
 &emsp;`objc_nonatomic_retain` 属性的 `setter` 和 `getter` 函数和 `objc_nonatomic_strong` 一致，这里不再分析。
+
 ### [LGPerson objc_nonatomic_copy] 
 ```c++
     .p2align    2               ; -- Begin function -[LGPerson objc_nonatomic_copy]
