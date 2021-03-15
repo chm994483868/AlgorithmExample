@@ -217,8 +217,10 @@ void changeInfo(uint32_t set, uint32_t clear) {
     }
 #endif
 ```
+
 ### FAST_CACHE_HAS_DEFAULT_CORE/RW_HAS_DEFAULT_CORE
 &emsp;`FAST_CACHE_HAS_DEFAULT_CORE` 用以在 `__LP64__` 平台下判断 `objc_class` 的 `cache_t cache` 的 `uint16_t _flags` 二进制表示时第 `15` 位的值是否为 `1`，以此表示该类或者父类是否有 `new/self/class/respondsToSelector/isKindOfClass` 函数的默认实现。而在 `非 __LP64__` 平台下，则是使用 `RW_HAS_DEFAULT_CORE`，且判断的位置发生了变化，`RW_HAS_DEFAULT_CORE` 用以判断从 `objc_class` 的  `class_data_bits_t bits` 中取得 `class_rw_t` 指针指向的 `class_rw_t` 实例的 `uint32_t flags` 的第 `13` 位的值是否为 `1`，以此表示该类或者父类是否有 `new/self/class/respondsToSelector/isKindOfClass` 函数的默认实现。
+
 ```c++
 #if __LP64__
 ...
@@ -236,6 +238,7 @@ void changeInfo(uint32_t set, uint32_t clear) {
 ...
 #endif
 ```
+
 ### hasCustomCore/setHasDefaultCore/setHasCustomCore
 &emsp;在 `__LP64__` 平台和其它平台下判断、设置、清除 `objc_class` 的默认 `Core` 函数的标记位。
 ```c++
@@ -278,9 +281,11 @@ void changeInfo(uint32_t set, uint32_t clear) {
     }
 #endif
 ```
+
 ### FAST_CACHE_HAS_CXX_CTOR/RW_HAS_CXX_CTOR/FAST_CACHE_HAS_CXX_DTOR/RW_HAS_CXX_DTOR
 &emsp;`FAST_CACHE_HAS_CXX_CTOR` 用以在 `__LP64__` 平台下判断 `objc_class` 的 `cache_t cache` 的 `uint16_t _flags` 二进制表示时第 `1` 位的值是否为 `1`，以此表示该类或者父类是否有 `.cxx_construct` 函数实现。而在 `非 __LP64__` 平台下，则是使用 `RW_HAS_CXX_CTOR`，且判断的位置发生了变化，`RW_HAS_CXX_CTOR` 用以判断从 `objc_class` 的 `class_data_bits_t bits` 中取得 `class_rw_t` 指针指向的 `class_rw_t` 实例的 `uint32_t flags` 的第 `18` 位的值是否为 `1`，以此表示该类或者父类是否有 `.cxx_construct` 函数实现。对应的 `FAST_CACHE_HAS_CXX_DTOR` 和 `RW_HAS_CXX_DTOR` 表示该类或者父类是否有 `.cxx_destruct` 函数实现。
 这里需要注意的是在 `__LP64__ && __arm64__` 平台下 `FAST_CACHE_HAS_CXX_DTOR` 是 `1<<0`，而在 `__LP64__ && !__arm64__` 平台下 `FAST_CACHE_HAS_CXX_DTOR` 是 `1<<2`。 
+
 ```c++
 #if __LP64__
 ...
@@ -379,6 +384,7 @@ void changeInfo(uint32_t set, uint32_t clear) {
 ```
 ### FAST_CACHE_REQUIRES_RAW_ISA/RW_REQUIRES_RAW_ISA
 &emsp;`FAST_CACHE_REQUIRES_RAW_ISA` 用以在 `__LP64__` 平台下判断 `objc_class` 的 `cache_t cache` 的 `uint16_t _flags` 二进制表示时第 `13` 位的值是否为 `1`，以此表示类实例对象（此处是指类对象，不是使用类构建的实例对象，一定要记得）是否需要原始的 `isa`。而在 `非 __LP64__` 且 `SUPPORT_NONPOINTER_ISA` 的平台下，则是使用 `RW_REQUIRES_RAW_ISA`，且判断的位置发生了变化，`RW_REQUIRES_RAW_ISA` 用以判断从 `objc_class` 的 `class_data_bits_t bits` 中取得 `class_rw_t` 指针指向的 `class_rw_t` 实例的 `uint32_t flags` 的第 `15` 位的值是否为 `1`，以此表示类实例对象（此处是指类对象，不是使用类构建的实例对象，一定要记得）是否需要原始的 `isa`。
+
 ```c++
 #if __LP64__
 ...
@@ -500,6 +506,7 @@ void objc_class::setInstancesRequireRawIsaRecursively(bool inherited)
     });
 }
 ```
+
 #### foreach_realized_class_and_subclass
 ```c++
 // Enumerates a class and all of its realized subclasses.
@@ -512,6 +519,7 @@ foreach_realized_class_and_subclass(Class top, bool (^code)(Class) __attribute((
     foreach_realized_class_and_subclass_2(top, count, false, code);
 }
 ```
+
 #### unreasonableClassCount
 ```c++
 /*
@@ -592,12 +600,14 @@ foreach_realized_class_and_subclass_2(Class top, unsigned &count,
 ```
 ### bool canAllocNonpointer()
 &emsp;表示 `objc_class` 的 `isa` 是非指针，即类对象不需要原始 `isa` 时，能根据该函数返回值设置 `isa_t isa` 的 `uintptr_t nonpointer : 1` 字段，标记该类的 `isa` 是非指针。
+
 ```c++
 bool canAllocNonpointer() {
     ASSERT(!isFuture());
     return !instancesRequireRawIsa();
 }
 ```
+
 ### bool isSwiftStable()
 &emsp;调用 `class_data_bits_t bits` 的 `isSwiftStable` 函数，内部实现是通过与操作判断 `uintptr_t bits` 的二进制表示的第 `1` 位是否是 `1`，表示该类是否是有稳定的 `Swift ABI` 的 `Swift` 类。
 ```c++
@@ -609,6 +619,7 @@ bool isSwiftStable() {
     return bits.isSwiftStable();
 }
 ```
+
 ### bool isSwiftLegacy()
 &emsp;调用 `class_data_bits_t bits` 的 `isSwiftLegacy` 函数，内部实现是通过与操作判断 `uintptr_t bits` 的二进制表示的第 `0` 位是否是 `1`，表示该类是否是有稳定的 `Swift ABI` 的 `Swift` 类。（遗留的类）
 ```c++
@@ -620,6 +631,7 @@ bool isSwiftLegacy() {
     return bits.isSwiftLegacy();
 }
 ```
+
 ### bool isAnySwift()
 &emsp;调用 `class_data_bits_t bits` 的 `isAnySwift` 函数，`isSwiftStable` 或者 `isSwiftLegacy`。
 ```c++
@@ -632,6 +644,7 @@ bool isAnySwift() {
     return isSwiftStable() || isSwiftLegacy();
 }
 ```
+
 ### bool isSwiftStable_ButAllowLegacyForNow()
 &emsp;调用 `struct class_data_bits_t` 的 `isSwiftStable_ButAllowLegacyForNow` 函数。
 ```c++
@@ -650,6 +663,7 @@ bool isAnySwift() {
     return isSwiftStable() || isSwiftLegacy();
 }
 ```
+
 ### bool isStubClass() const
 &emsp;全局搜索此函数发现只在 `objc_class` 的 `bool isRealized() const` 函数内调用了一次，它用于判断类对象是否已经实现完成。 
 ```c++
@@ -664,6 +678,7 @@ bool isStubClass() const {
     return 1 <= isa && isa < 16;
 }
 ```
+
 ### bool isUnfixedBackwardDeployingStableSwift()
 ```c++
 // Swift stable ABI built for old deployment targets looks weird.
@@ -705,6 +720,7 @@ bool isUnfixedBackwardDeployingStableSwift() {
     return !isActuallySwiftLegacy;
 }
 ```
+
 ### fixupBackwardDeployingStableSwift
 ```c++
 void fixupBackwardDeployingStableSwift() {
@@ -744,7 +760,7 @@ _objc_swiftMetadataInitializer swiftMetadataInitializer() {
 // Return YES if the class's ivars are managed by ARC, or the class is MRC but has ARC-style weak ivars.
 // 如果类的 ivars 由 ARC 管理，或者该类是 MRC 但具有 ARC 样式的 weak ivars，则返回 YES。
 // (weak 修饰符是可以在 MRC 中使用的，weak 是和 ARC 一起推出的，
-// 根据之前 weak 的实现原理也可知它的实现流程和 ARC 或者 MRC 是完成没有关系的。)
+// 根据之前 weak 的实现原理也可知它的实现流程和 ARC 或者 MRC 是完全没有关系的。)
 
 bool hasAutomaticIvars() {
     return data()->ro()->flags & (RO_IS_ARC | RO_HAS_WEAK_WITHOUT_ARC);
@@ -759,6 +775,7 @@ bool isARC() {
     return data()->ro()->flags & RO_IS_ARC;
 }
 ```
+
 ### RW_FORBIDS_ASSOCIATED_OBJECTS
 &emsp;禁止类的实例对象进行关联对象的掩码，看到它前缀是 `RW` 开始的，表示它用在 `struct class_rw_t` 的 `uint32_t flags` 中。（`AssociatedObject` 的实现原理可以参考之前的文章）
 ```c++
@@ -766,6 +783,7 @@ bool isARC() {
 // 类不允许在其实例上使用 关联对象。
 #define RW_FORBIDS_ASSOCIATED_OBJECTS       (1<<20)
 ```
+
 ### bool forbidsAssociatedObjects()
 &emsp;禁止该类的实例对象进行 `AssociatedObject`。从 `class_data_bits_t bits` 中取出 `class_rw_t` 指针，然后从 `struct class_rw_t` 中取出 `uint32_t flags` 和 `RW_FORBIDS_ASSOCIATED_OBJECTS`（第 `20` 位值为 `1`）与操作的结果。
 ```c++
@@ -821,11 +839,13 @@ void setShouldGrowCache(bool) {
 ```
 ### bool isInitializing()
 &esmp;`RW_INITIALIZING` 是 `RW` 前缀开头，可直接联想到其判断位置在 `struct class_rw_t` 的 `uint32_t flags` 中，与前面的一些判断相比这里 `objc_class` 的位置发生了变化，前面我们所有的判断都是在当前的 `objc_class` 中进行的，而此处的判断要转移到当前 `objc_class` 的元类中，元类的类型也是 `struct objc_class`，所以它们同样也有 `class_data_bits_t bits`、`cache_t cache` 等成员变量，这里 `isInitializing` 函数使用的正是元类的 `class_data_bits_t bits` 成员变量。`getMeta` 函数是取得当前 `objc_class` 的元类，然后 `data`  函数从元类的 `class_data_bits_t bits` 中取得 `class_rw_t` 指针，然后取得 `struct class_rw_t` 的 `uint32_t flags` 和 `RW_INITIALIZING` 做与操作，取得 `flags` 二进制表示的第 `28` 位的值作为结果返回。
+
 ```c++
 bool isInitializing() {
     return getMeta()->data()->flags & RW_INITIALIZING;
 }
 ```
+
 ### void setInitialized()
 &emsp;标记该类初始化完成。
 ```c++
@@ -986,6 +1006,7 @@ bool isFuture() const {
 ...
 #endif
 ```
+
 ### bool isMetaClass()
 &emsp;如果 `FAST_CACHE_META` 存在，则从 `cache_t cache` 的 `uint16_t _flags` 二进制表示的第 `2/0` 位判断当前 `objc_class` 是否是元类。其它情况则从 `class_data_bits_t bits` 中取得 `class_rw_t` 指针指向的 `class_rw_t` 实例的 `uint32_t flags` 二进制表示的第 `0` 位进行判断。
 ```c++
@@ -1000,6 +1021,7 @@ bool isFuture() const {
 #endif
     }
 ```
+
 ### bool isMetaClassMaybeUnrealized()
 ```c++
 // Like isMetaClass, but also valid on un-realized classes.
@@ -1012,6 +1034,7 @@ bool isMetaClassMaybeUnrealized() {
     return data()->flags & RW_META;
 }
 ```
+
 ### Class getMeta()
 &emsp;取得当前类的元类。
 ```c++

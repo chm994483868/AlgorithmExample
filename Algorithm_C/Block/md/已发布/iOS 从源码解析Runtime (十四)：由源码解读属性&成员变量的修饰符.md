@@ -1,11 +1,12 @@
 # iOS 从源码解析Runtime (十四)：由源码解读属性&成员变量的修饰符
 
-> &emsp;当我们分别使用 `atomic` 和 `nonatomic` 来修饰属性时，编译器是怎么处理这两种不同的情况的呢？大家都知道即使使用 `atomic` 修饰属性也并不能保证线程安全，那它和 `nonatomic` 有什么区别呢，那 `atomic` 的性能损耗来自哪里呢？`copy` 属性是怎么实现的？等等，关于属性修饰符的各种疑问我们本篇来统一来解读。⛽️⛽️
+> &emsp;当我们分别使用 `atomic` 和 `nonatomic` 来修饰属性时，编译器是怎么处理这两种不同的情况的呢？大家都知道即使使用 `atomic` 修饰属性也并不能保证线程安全，那我们还要 `atomic` 干啥呢？那它和 `nonatomic` 有什么区别呢？那 `atomic` 的性能损耗来自哪里呢？`copy` 属性是怎么实现的？等等，关于属性修饰符的各种疑问我们本篇来统一来解读。⛽️⛽️
 
 ## @property 修饰符
 &emsp;首先定义一个 `LGPerson` 类，添加一系列如下不同修饰符的属性，属性的本质是编译器自动帮我们生成:  `_Ivar` + `setter` + `getter`。
 ```c++
 // LGPerson.h 如下声明，LGPerson.m 文件什么也不写
+
 #import <Foundation/Foundation.h>
 NS_ASSUME_NONNULL_BEGIN
 @interface LGPerson : NSObject
@@ -154,6 +155,7 @@ Lfunc_end4:
                                         ; -- End function
 ```
 &emsp;`objc_nonatomic_copy` 属性的 `getter` 函数内部看到最后 `b` 指令跳转到了 `objc_getProperty` 函数。下面我们来看一下 `objc_getProperty` 函数实现。如果属性不是 `atomic` 修饰的话不需要对读取过程加锁，`objc_getProperty` 函数的前半部分就已经 `return` 成员变量了，看到成员变量的依然是通过 `self` 指针偏移找到并返回。如果属性是 `atomic` 修饰的话，会通过 `PropertyLocks[slot]` 取得一把锁，而加锁的内容是 `id value = objc_retain(*slot)` 会对成员变量执行一次 `retain` 操作（保证 getter 函数执行过程中对象不会被释放），引用计数 `+1`，然后为了性能，在解锁后才调用 `objc_autoreleaseReturnValue(value)` 把成员变量放进自动释放池，保证和刚刚的 `retain` 操作抵消，保证成员变量能正常释放销毁。 
+
 ```c++
 // ptrdiff_t offset
 // ptrdiff_t 是 C/C++ 标准库中定义的一个与机器相关的数据类型。
@@ -223,6 +225,7 @@ Lfunc_end5:
                                         ; -- End function
 ```
 &emsp;`objc_nonatomic_copy` 属性的 `setter` 函数内部看到 `bl` 指令跳转到了 `objc_setProperty_nonatomic_copy` 函数。下面我们来看一下 `objc_setProperty_nonatomic_copy` 函数实现。
+
 ```c++
 void objc_setProperty_nonatomic_copy(id self, SEL _cmd, id newValue, ptrdiff_t offset)
 {
@@ -352,6 +355,7 @@ objc_loadWeak(id *location)
 }
 ```
 &emsp;在 `weak` 篇有详细分析过该函数，这里就不重复了。（`retain` 和 `autorelease` 配对使用，防止读值过程中对象释放，同时自动释放池的延迟释放也能保证对象的正常销毁）
+
 ### [LGPerson setObjc_nonatomic_weak:]
 ```c++
 ...
@@ -359,8 +363,10 @@ bl    _objc_storeWeak
 ...
 ```
 &emsp;`objc_nonatomic_weak` 属性的 `setter` 函数内部看到 `bl` 指令跳转到了 `objc_storeWeak` 函数，该函数特别长特别重要，在 `weak` 篇有非常详细的分析过，这里就不重复了。(`weak` 不会 `retain` 新值)
+
 ### [LGPerson objc_nonatomic_unsafe_unretained]
 &emsp;`objc_nonatomic_unsafe_unretained` 属性的 `getter` 函数和 `objc_nonatomic_strong` 属性的 `getter` 函数 一样，内部没有调用任何函数，只是地址偏移取值。
+
 ### [LGPerson setObjc_nonatomic_unsafe_unretained:]
 ```c++
     .p2align    2               ; -- Begin function -[LGPerson objc_nonatomic_unsafe_unretained]
@@ -385,10 +391,13 @@ Lfunc_end8:
                                         ; -- End function
 ```
 &emsp;`objc_nonatomic_unsafe_unretained` 属性的 `setter` 函数看到内部没有调用任何其它函数，就是纯粹的入参、地址偏移、存储入参到成员变量的位置。这里也验证了 `unsafe_unretained` 的 `setter` 的本质，即不 `retain` 新值也不 `release` 旧值。`setter` 和 `getter` 函数都是简单的根据地址存入值和读取值。所以这里也引出另一个问题，赋值给 `unsafe_unretained` 属性的对象并不会被 `unsafe_unretained` 属性所持有，那么当此对象正常释放销毁以后，也并没有把 `unsafe_unretained` 属性置为 `nil`，此时我们如果再用 `unsafe_unretained` 属性根据地址读取对象，会直接引发野指针访问导致 `crash`。
+
 ### [LGPerson objc_nonatomic_assign]/[LGPerson setObjc_nonatomic_assign:]
 &emsp;`objc_nonatomic_assign` 属性的 `setter` 和 `getter` 函数和 `objc_nonatomic_unsafe_unretained` 属性如出一辙，这里就不展开了。
+
 ### [LGPerson objc_nonatomic_strong_readonly]
 &emsp;`objc_nonatomic_strong_readonly` 属性只生成了 `getter` 函数，也符合我们的预期。
+
 ### [LGPerson objc_atomic_strong]/[LGPerson setObjc_atomic_strong:]
 ```c++
 // getter
@@ -414,8 +423,10 @@ void objc_setProperty_atomic(id self, SEL _cmd, id newValue, ptrdiff_t offset)
 }
 ```
 &emsp;`objc_atomic_strong` 属性在 `setter` 和 `getter` 函数中都加了锁。
+
 ### [LGPerson objc_atomic_retain]/[LGPerson setObjc_atomic_retain:]
 &emsp;`objc_atomic_retain` 属性 和 `objc_atomic_strong` 属性的 `setter` 和 `getter` 函数如出一辙，不再展开。
+
 ### [LGPerson objc_atomic_copy]/[LGPerson setObjc_atomic_copy:]
 ```c++
 // getter
@@ -436,12 +447,13 @@ void objc_setProperty_atomic_copy(id self, SEL _cmd, id newValue, ptrdiff_t offs
 }
 ```
 &emsp;`objc_atomic_weak`、`objc_atomic_unsafe_unretained`、`objc_atomic_assign` 和对应的 `nonatomic` 修饰的属性的 `setter` `getter` 函数相同，就不再展开了。属性修饰符的内容看完了，那么我们常用的 `__strong`、`__weak`、`__unsafe_unretained` 等等修饰成员变量的修饰符系统又是如何处理的呢？下面我们来一探究竟。
+
 ## 成员变量修饰符
-&emsp;当我们定义一个类的实例变量的时候，可以为其指定其修饰符 `__strong`、`__weak`、`__unsafe_unretained`（未指定时默认为 `__strong`），这使得成员变量可以像 `strong`、`weak`、`unsafe_unretained` 修饰符修饰的属性一样在 `ARC` 下进行正确的引用计数管理。定义如下测试类:
+&emsp;当我们定义一个类的成员变量的时候，可以为其指定其修饰符 `__strong`、`__weak`、`__unsafe_unretained`（未指定时默认为 `__strong`），这使得成员变量可以像 `strong`、`weak`、`unsafe_unretained` 修饰符修饰的属性一样在 `ARC` 下进行正确的引用计数管理。定义如下测试类:
 ```c++
 // LGPerson.h .m 什么都不用实现
 @interface LGPerson : NSObject {
-    NSObject *ivar_none; // 无修饰符的对象默认会加 __strong
+    NSObject *ivar_none; // 未明确指定修饰符的成员变量默认为 __strong 修饰
     __strong NSObject *ivar_strong;
     __weak NSObject *ivar_weak;
     __unsafe_unretained NSObject *ivar_unsafe_unretained;
@@ -483,7 +495,7 @@ OBJC_EXPORT void class_setWeakIvarLayout(Class _Nullable cls, const uint8_t * _N
 ```
 &emsp;`ivarLayout` 和 `weakIvarLayout` 类型是 `uint8_t *`，一个 `uint8_t` 在 `16` 进制下是两位。
 
-> &emsp;`ivarLayout` 是一系列的字符，每两个一组，比如 `\xmn`，每一组 `Ivar Layout` 中第一位表示有 `m` 个非强属性，第二位表示接下来有 `n` 个强属性。
+> &emsp;`ivarLayout` 是一系列的字符，每两个一组，比如 `\xmn`，每一组 `Ivar Layout` 中第一位表示有 `m` 个非强引用成员变量，第二位表示接下来有 `n` 个强引用成员变量。
 
 🌰 1：
 ```objective-c
