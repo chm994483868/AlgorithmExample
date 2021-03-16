@@ -952,6 +952,7 @@ objc_class::getLoadMethod()
 ```c++
 #define RW_REALIZED           (1<<31)
 ```
+
 ### bool isRealized() const
 &emsp;`struct class_rw_t` 的 `uint32_t flags` 二进制表示的第 `31` 位和 `RW_REALIZED` 与操作的结果。 
 ```c++
@@ -961,12 +962,14 @@ bool isRealized() const {
     return !isStubClass() && (data()->flags & RW_REALIZED);
 }
 ```
+
 ### RW_FUTURE
 ```c++
 // class is unresolved future class.
 // class 是未解决的 future class。
 #define RW_FUTURE             (1<<30)
 ```
+
 ### bool isFuture() const
 &emsp;`struct class_rw_t` 的 `uint32_t flags` 二进制表示的第 `30` 位和 `RW_REALIZED` 与操作的结果。 
 ```c++
@@ -978,6 +981,7 @@ bool isFuture() const {
     return data()->flags & RW_FUTURE;
 }
 ```
+
 ### FAST_CACHE_META/RW_META/RO_META
 &emsp;在 `__LP64__` 平台下标识 `objc_class` 是否是元类的值在 `cache_t cache` 中，其它情况则是在 `struct class_rw_t` 的 `uint32_t flags` 中（需要根据指针进行寻址）。
 ```c++
