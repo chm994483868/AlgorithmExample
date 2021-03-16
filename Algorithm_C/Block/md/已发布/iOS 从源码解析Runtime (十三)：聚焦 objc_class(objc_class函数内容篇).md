@@ -903,7 +903,8 @@ bool isLoadable() {
 }
 ```
 ### IMP getLoadMethod()
-&emsp;获取一个类的 `+load` 函数，首先我们要对 `+load` 函数和别的函数做出一些理解上的区别，首先我们在任何时候都不应该自己主动去调用 `+load` 函数，它是由系统自动调用的，且它被系统调用时是直接通过它的函数地址调用的，它是不走 `objc_msgSend` 消息发送流程的。当我们在自己的类定义中添加了 `+load` 函数，编译过程中编译器会把它存储在元类的 `struct class_ro_t` 的 `method_list_t * baseMethodList` 成员变量中。那么 `category` 中的 `+load` 函数在编译过程中会被放在哪里呢？ 
+&emsp;获取一个类的 `+load` 函数，首先我们要对 `+load` 函数和别的函数做出一些理解上的区别，首先我们在任何时候都不应该自己主动去调用 `+load` 函数，它是由系统自动调用的，且它被系统调用时是直接通过它的函数地址调用的，它是不走 `objc_msgSend` 消息发送流程的。当我们在自己的类定义中添加了 `+load` 函数，编译过程中编译器会把它存储在元类的 `struct class_ro_t` 的 `method_list_t * baseMethodList` 成员变量中。那么 `category` 中的 `+load` 函数在编译过程中会被放在哪里呢？
+
 ```c++
 /*
 * objc_class::getLoadMethod
