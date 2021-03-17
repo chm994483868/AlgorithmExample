@@ -198,6 +198,7 @@ private:
     ...
 };
 ```
+
 #### PointerUnion
 &emsp;这里分析模版类 `objc::PointerUnion` 基于 `objc::PointerUnion<const class_ro_t *, class_rw_ext_t *>` 来进行。其中 `PT1` 是 `const class_ro_t *`（并且加了 `const`，表示 `class_ro_t` 内容不可被修改），`PT2` 是 `class_rw_ext_t *`。
 
@@ -316,6 +317,7 @@ public:
     }
 };
 ```
+
 #### PointerUnionTypeSelector
 ```c++
 // Ret will be EQ type if T1 is same as T2 or NE type otherwise.
@@ -329,6 +331,7 @@ template <typename T> struct PointerUnionTypeSelectorReturn {
   using Return = T;
 };
 ```
+
 ### class_rw_t public 部分
 &emsp;分析 `class_rw_t` 的 `public` 部分。
 ```c++
@@ -617,6 +620,7 @@ class list_array_tt {
     ...
 };
 ```
+
 #### list_array_tt private 部分
 ```c++
 template <typename Element, typename List>

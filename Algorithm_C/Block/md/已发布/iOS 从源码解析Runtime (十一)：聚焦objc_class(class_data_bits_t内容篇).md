@@ -293,7 +293,7 @@ struct class_ro_t {
     
     // 当父类大小发生变化时，调整子类的实例对象的大小。
     // 具体内容可查看 moveIvars 函数
-    // （自己成员变量的起始偏移量，会有些一些继承自父类的成员变量）
+    // （自己成员变量的起始偏移量，会有一些继承自父类的成员变量）
     uint32_t instanceStart;
     
     // 根据内存对齐计算成员变量从前到后所占用的内存大小，
@@ -307,7 +307,7 @@ struct class_ro_t {
         
     uint32_t instanceSize;
     
-    // 仅在 64 为系统架构下的包含的保留位
+    // 仅在 64 位系统架构下的包含的保留位
 #ifdef __LP64__
     uint32_t reserved;
 #endif
@@ -631,6 +631,7 @@ struct entsize_list_tt {
 };
 ```
 &emsp;`entsize_list_tt` 源码全部看完了，还挺清晰的，注释极其详细，这里就不展开分析了，接下来分析 `entsize_list_tt` 的子类: `method_list_t`、`ivar_list_t`、`property_list_t`。
+
 #### method_list_t
 &emsp;`method_list_t` 是在 `class_ro_t` 中用于保存方法列表的数据结构。它继承自 `entsize_list_tt`。
 ```c++
@@ -670,6 +671,7 @@ struct method_t {
 };
 ```
 可参考 [stl 中 std::binary_function 的使用](https://blog.csdn.net/tangaowen/article/details/7547475)
+
 #### isUniqued、isFixedUp、setFixedUp
 &emsp;三个函数主要涉及到 `method_list_t` 的 `flags` 标志位。
 ```c++
@@ -768,6 +770,7 @@ struct ivar_list_t : entsize_list_tt<ivar_t, ivar_list_t, 0> {
     }
 };
 ```
+
 #### ivar_t
 ```c++
 struct ivar_t {
@@ -838,6 +841,7 @@ struct ivar_t {
     }
 };
 ```
+
 ##### 验证 int32_t *offset
 &emsp;我们首先定义一个 `LGPerson` 类：
 ```c++

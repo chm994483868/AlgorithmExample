@@ -1071,6 +1071,7 @@ bool isRootMetaclass() {
     return ISA() == (Class)this;
 }
 ```
+
 ### const char *mangledName()
 &emsp;伪装一个类的名字，看到其是保存在 `struct class_ro_t` 的 `const char * name` 内。
 ```c++
@@ -1095,6 +1096,7 @@ const char *mangledName() {
 const char *demangledName(bool needsLock);
 const char *nameForLogging();
 ```
+
 ### word_align
 &emsp;根据入参 `x` 进行 `8/4` 字节对齐。
 ```c++
@@ -1167,7 +1169,7 @@ uint32_t unalignedInstanceSize() const {
 ### uint32_t alignedInstanceSize() const
 ```c++
 // Class's ivar size rounded up to a pointer-size boundary.
-// 类的ivar大小四舍五入到指针大小的边界。
+// 类的 ivar 大小四舍五入到指针大小的边界。
 //（对 instanceSize 进行 8 字节对齐）
 uint32_t alignedInstanceSize() const {
     // __LP64__ 平台下 8 字节对齐，其它则是 4 字节对齐
