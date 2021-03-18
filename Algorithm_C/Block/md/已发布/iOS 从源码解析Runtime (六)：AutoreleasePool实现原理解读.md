@@ -245,6 +245,7 @@ C_ASSERT(sizeof(thread_data_t) == 16);
     OBJC_EXTERN __attribute__((noinline, used, visibility("hidden"))) \
     prototype { asm(""); }
 ```
+
 #### __attribute__((used))
 &emsp;`__attribute__((used))` 的作用：
 
@@ -261,6 +262,7 @@ C_ASSERT(sizeof(thread_data_t) == 16);
 // 向编译器说明这段代码有用，即使在没有用到的情况下编译器也不会警告
 #define __attribute_used__ __attribute__((__used__))
 ```
+
 #### __attribute__((visibility("hidden")))
 > &emsp;在 Linux 下动态库 (.so) 中，通过 GCC 的 C++ visibility 属性可以控制共享文件导出符号。在 GCC 4.0 及以上版本中，有个 visibility 属性，可以应用到函数、变量、模板以及 C++ 类。
   限制符号可见性的原因：从动态库中尽可能少地输出符号是一个好的实践经验。输出一个受限制的符号会提高程序的模块性，并隐藏实现的细节。动态库装载和识别的符号越少，程序启动和运行的速度就越快。导出所有符号会减慢程序速度，并耗用大量内存。
@@ -352,6 +354,7 @@ private:
 
 // SIZE-sizeof(*this) bytes of contents follow
 ```
+
 ### new/delete
 ```c++
 // 申请空间并进行内存对齐
@@ -398,10 +401,12 @@ static void operator delete(void * p) {
 int mprotect(const void *start, size_t len, int prot);
 ```
 &emsp;`mprotect()` 函数把自 `start` 开始的、长度为 `len` 的内存区的保护属性修改为 `prot` 指定的值。`prot` 可以取以下几个值，并且可以用 `|` 将几个属性合起来使用：
+
 1. `PROT_READ`：表示内存段内的内容可读。
 2. `PROT_WRITE`：表示内存段内的内容可写。
 3. `PROT_EXEC`：表示内存段中的内容可执行。
 4. `PROT_NONE`：表示内存段中的内容根本没法访问。
+
 &emsp;需要指出的是，指定的内存区间必须包含整个内存页（一般为 `4Kb` 大小, 不同体系结构和操作系统，一页的大小不尽相同。如何获得页大小呢？通过 `PAGE_SIZE` 宏或者 `getpagesize()` 系统调用即可）。区间开始的地址 `start` 必须是一个内存页的起始地址，并且区间长度 `len` 必须是页大小的整数倍。如果执行成功，则返回 `0`；如果执行失败，则返回 `-1`。具体内容可参考[mprotect 函数用法](https://www.cnblogs.com/ims-/p/13222243.html)
 
 ### AutoreleasePoolPage(AutoreleasePoolPage *newParent)/~AutoreleasePoolPage()
@@ -545,8 +550,10 @@ id * end() {
     return (id *) ((uint8_t *)this+SIZE);
 }
 ```
+
 #### empty
 &emsp;`next` 指针通常指向的是当前自动释放池内最后面一个自动释放对象的后面，如果此时 `next` 指向 `begin` 的位置，表示目前自动释放池内没有存放自动释放对象。
+
 ```c++
 bool empty() {
     return next == begin();
@@ -566,6 +573,7 @@ bool lessThanHalfFull() {
     return (next - begin() < (end() - begin()) / 2);
 }
 ```
+
 ### add
 &emsp;把 `autorelease` 对象放进自动释放池。
 ```c++
@@ -591,6 +599,7 @@ id *add(id obj)
     return ret;
 }
 ```
+
 ### releaseAll/releaseUntil
 ```c++
 void releaseAll() 
@@ -1128,6 +1137,7 @@ static void badPop(void *token)
     objc_autoreleasePoolInvalid(token);
 }
 ```
+
 ### popPage/popPageDebug
 ```c++
 // 这里有一个模版参数 (bool 类型的 allowDebug)，

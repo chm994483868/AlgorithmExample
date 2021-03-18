@@ -162,6 +162,7 @@ objc_object::clearDeallocating()
     assert(!sidetable_present());
 }
 ```
+
 ### sidetable_clearDeallocating
 ```c++
 void 
@@ -252,13 +253,13 @@ objc_object::sidetable_unlock()
 ## MRC 函数返回值的释放操作
 &emsp;一些结论：
 
-关于 `Autorelease`:
+&emsp;关于 `Autorelease`:
 1. 在没有手加 `AutoreleasePool` 的情况下，`Autorelease` 对象是在当前的 `runloop` 迭代结束时释放的，而它能够释放的原因是系统在每个 `runloop` 迭代中都加入了自动释放池 `Push` 和 `Pop`。
 2. `AutoreleasePool` 执行 `pop` 时完成的最重要的事情就是对池里的所有对象执行一次 `release` 操作。
 3. `AutoreleasePool` 从不会 `retain` 放进池里的对象，它所做的唯一事情就是延迟释放，直白一点理解的话就是在池 `pop` 时 `release` 放进池里的对象。
 4. 当对象连续调用 `autorelease` 函数时，对象会被放进自动释放池多次（对象放进自动释放池不会做重复检测），当自动释放池 `pop` 时会对对象调用对应次数的 `release` 操作，此时极有可能导致对象过度释放而使程序 `crash`。
 
-关于 `MRC` 下函数返回值放进自动释放池:
+&emsp;关于 `MRC` 下函数返回值放进自动释放池:
 ```c++
 + (CusPerson *)returnInstanceValue; {
     CusPerson *temp = [[[CusPerson alloc] init] autorelease]; // 情况 1
@@ -272,6 +273,7 @@ objc_object::sidetable_unlock()
 + 情况 2 `temp` 对象没有放进自动释放池，需要在调用 `returnInstanceValue` 后当不再需要返回的对象时，对象要主动调用一次 `release` 或 `autorelease` 保证对象能正确释放。
 + 如果我们需要一直持有函数返回的对象，那么我们可以主动调用 `retain` 函数或者用一个 `retain/strong` 修饰的属性来接收函数返回值，当我们不使用对象时需要在合适的地方调用 `release` 操作，保证对象能正常销毁防止内存泄漏。
 + 成员变量默认是持有赋值给它的对象（默认是 \_\_strong 修饰的），属性的话根据不同的修饰符来决定是否持有赋值给它的对象。（`strong/retain/weak/unsafe_unretain`）。
+
 &emsp;`ARC` 下情况则大不相同，下面我们开始分析。
 
 ## rootAutorelease
@@ -380,12 +382,14 @@ enum ReturnDisposition : bool {
 
 + `getReturnDisposition` 函数是取得 `RETURN_DISPOSITION_KEY` 在 `tls` 中保存的值。
 + `setReturnDisposition` 函数是以 `RETURN_DISPOSITION_KEY` 为 `key`，把 `disposition` 保存在 `tls` 中。 
+
 ```c++
 static ALWAYS_INLINE ReturnDisposition 
 getReturnDisposition() {
     return (ReturnDisposition)(uintptr_t)tls_get_direct(RETURN_DISPOSITION_KEY);
 }
 ```
+
 ```c++
 static ALWAYS_INLINE void 
 setReturnDisposition(ReturnDisposition disposition) {
@@ -393,6 +397,7 @@ setReturnDisposition(ReturnDisposition disposition) {
     tls_set_direct(RETURN_DISPOSITION_KEY, (void*)(uintptr_t)disposition);
 }
 ```
+
 ### __builtin_return_address
 1. 这里函数返回地址不是函数返回值的地址是函数被调用后返回的地址，这里要从汇编的角度来理解。
   当我们的代码编译为汇编代码后，汇编指令从上到下一行一行来执行。
@@ -638,6 +643,7 @@ callerAcceptsOptimizedReturn(const void *ra)
 // unknown architecture
 # endif
 ```
+
 ### prepareOptimizedReturn
 ```c++
 // Try to prepare for optimized return with the given disposition (+0 or +1).
@@ -851,6 +857,7 @@ void arr_init(void)
     _objc_associations_init();
 }
 ```
+
 ## 验证结论
 &emsp;何时函数返回值会被放进自动释放池？
 ```c++

@@ -5,6 +5,29 @@
 //  Created by CHM on 2020/7/3.
 //  Copyright © 2020 CHM. All rights reserved.
 //
+//Could not connect to development server.
+//
+//Ensure the following:
+//- Node server is running and available on the same network - run 'npm start' from react-native root
+//- Node server URL is correctly set in AppDelegate
+//- WiFi is enabled and connected to the same network as the Node Server
+//
+//URL: http://localhost:8081/index.bundle?platform=ios&dev=true&minify=false
+//
+//RCTFatal
+//__28-[RCTCxxBridge handleError:]_block_invoke
+//_dispatch_call_block_and_release
+//_dispatch_client_callout
+//_dispatch_main_queue_callback_4CF
+//__CFRUNLOOP_IS_SERVICING_THE_MAIN_DISPATCH_QUEUE__
+//__CFRunLoopRun
+//CFRunLoopRunSpecific
+//GSEventRunModal
+//-[UIApplication _run]
+//UIApplicationMain
+//main
+//start
+//0x0
 
 #include <iostream>
 #include <cstdio>
