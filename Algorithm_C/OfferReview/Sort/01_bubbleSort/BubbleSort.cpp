@@ -28,6 +28,7 @@ void BubbleSort::bubbleSort(int nums[], int count) {
         if (noExchange) {
             break;
         }
+        
         k = n;
     }
     
