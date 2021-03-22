@@ -20,7 +20,7 @@ void MergeSort::mergeSort(int nums[], int first, int last, int temp[]) {
     
     int mid = ((last - first) >> 1) + first;
     mergeSort(nums, first, mid, temp);
-    mergeSort(nums, mid + 1, last, temp);
+    mergeSort(nums, mid + 1, first, temp);
     
     mergeArray(nums, first, mid, last, temp);
     
@@ -47,23 +47,13 @@ void MergeSort::mergeArray(int nums[], int first, int mid, int last, int temp[])
     
     while (i <= m && j <= n) {
         if (nums[i] <= nums[j]) {
-            temp[k++] = nums[i++];
-        } else {
-            temp[k++] = nums[j++];
+            temp[k++] = nums[i];
         }
+        
+        
     }
     
-    while (i <= m) {
-        temp[k++] = nums[i++];
-    }
     
-    while (j <= n) {
-        temp[k++] = nums[j++];
-    }
-    
-    for (i = 0; i < k; ++i) {
-        nums[first + i] = temp[i];
-    }
     
     //if (nums[mid] <= nums[mid + 1]) { // 左边序列的最大值小于右边序列的最小值，表示已经是有序的了，直接 return 就好了
     //    return;
