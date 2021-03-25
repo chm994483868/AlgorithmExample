@@ -2,7 +2,6 @@
 
 // jsCodeLocation = [NSURL URLWithString:@"http://192.168.5.128:8081/index.bundle?platform=ios"];
 1. 添加苹果内购可购买商品的过滤机制。
-2.  
 
 ## RN 与 Native 交互
 1. RN 调用 OC
