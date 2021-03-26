@@ -1,7 +1,11 @@
 # KYY 知识点记录
 
+
+
 // jsCodeLocation = [NSURL URLWithString:@"http://192.168.5.128:8081/index.bundle?platform=ios"];
+
 1. 添加苹果内购可购买商品的过滤机制。
+2. 修改充币页面头像昵称丢失、默认选中一个充值项。
 
 ## RN 与 Native 交互
 1. RN 调用 OC
