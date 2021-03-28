@@ -81,7 +81,7 @@ NS_ASSUME_NONNULL_END
 2. 添加 `setter` 方法 `setCusProperty`
 3. 添加 `getter` 方法 `cusProperty`
 
-&emsp;即如下 `HMObject.m` 代码实现：
+&emsp;即如下 `HMObject.m` 的代码实现：
 ```c++
 #import "HMObject.h"
 
