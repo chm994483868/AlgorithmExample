@@ -473,7 +473,7 @@ public:
 ```c++
 typedef DenseMap<const void *, ObjcAssociation> ObjectAssociationMap;
 ```
-&emsp;`DenseMap` 这里不在展开，把 `ObjectAssociationMap` 理解为一个 `key` 是 `const void *` `value` 是 `ObjcAssociation` 的哈希表即可。
+&emsp;`DenseMap` 这里不再展开，把 `ObjectAssociationMap` 理解为一个 `key` 是 `const void *`，`value` 是 `ObjcAssociation` 的哈希表即可。
 
 ### AssociationsHashMap
 ```c++
@@ -663,7 +663,7 @@ _object_set_associative_reference(id object, const void *key, id value, uintptr_
             if (!result.second) {
                 // 替换
                 // 如果之前有旧值的话把旧值的成员变量交换到 association
-                // 然后在 函数执行结束时把旧值根据对应的策略判断执行 release
+                // 然后在 函数执行结束时把旧值根据对应的关联策略判断执行 release
                 association.swap(result.first->second);
             }
         } else {
