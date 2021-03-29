@@ -29,8 +29,7 @@ extern bool hasLoadMethods(const headerType *mhdr);
 // 调用 load 函数前的准备
 extern void prepare_load_methods(const headerType *mhdr);
 
-void
-load_images(const char *path __unused, const struct mach_header *mh)
+void load_images(const char *path __unused, const struct mach_header *mh)
 {
     if (!didInitialAttachCategories && didCallDyldNotifyRegister) {
         didInitialAttachCategories = true;
