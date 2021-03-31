@@ -631,6 +631,7 @@ static void weak_grow_maybe(weak_table_t *weak_table)
 }
 ```
 &emsp;该函数用于扩充 `weak_table_t` 的 `weak_entry_t *weak_entries` 的长度，扩充条件是 `num_entries` 超过了 `mask + 1` 的 3/4。看到 `weak_entries` 的初始化长度是 `64`，每次扩充的长度则是 `mask + 1` 的 2 倍，扩容完毕后会把原哈希数组中的 `weak_entry_t` 重新哈希化插入到新空间内，并更新 `weak_tabl_t` 各成员变量。占据的内存空间的总容量则是 `(mask + 1) * sizeof(weak_entry_t)` 字节。综上 `mask + 1` 总是 2 的 `N` 次方。（初始时 N 是 6：`2^6 = 64`，以后则是 N >= 6）
+
 ### weak_compact_maybe
 &emsp;此函数会在 `weak_entry_remove` 函数中调用，旨在 `weak_entry_t` 从 `weak_table_t` 的哈希数组中移除后，如果哈希数组中占用比较低的话，缩小 `weak_entry_t *weak_entries` 的长度，优化内存使用，同时提高哈希效率，下面看下它的实现：
 ```c++
