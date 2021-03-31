@@ -12,7 +12,7 @@ int main(int argc, const char * argv[]) {
         printf("Start tag\n");
         {
             __weak id weakPtr = obj; // 调用 objc_initWeak 进行 weak 变量初始化
-            weakPtr = obj2; // 修改 weak 变量指向
+            weakPtr = obj2; // 调用 objc_storeWeak 修改 weak 变量指向
         } 
         // 出了这个右边花括号调用 objc_destroyWeak 函数进行 weak 变量销毁
         //（注意这里是 weak 变量的销毁，并不是 weak 变量指向的对象销毁）
