@@ -752,8 +752,6 @@ printf(fmt, (val->__forwarding->val));
 
 2. 当在 `block` 内部使用 `__block` 变量时（即使是基本型如 `__block int a = 10`）会有如下的 `copy` 和 `dispose` 函数生成。
 
-   
-
    当 `block` 表达式内使用外部对象变量和外部 `__block` 变量，以及外部 `block` 时会生成这一对 `copy` 和 `dispose`函数。
 
 `__main_block_copy_0`
@@ -900,18 +898,19 @@ __Block_byref_object_4 object = {
 
 ## `block` 存储域
 &emsp;通过前面的学习可知，`block` 转换为 `block` 的结构体实例，`__block` 变量转换为 `__block` 变量结构体实例。
+
 &emsp;**`block` 也可作为 `OC` 对象**。将 `block` 当作 `OC` 对象来看时，该 `block` 的类为 `_NSConcreteStackBlock`、`_NSConcreteGlobalBlock`、`_NSConcreteMallocBlock` 三种类型之一。 由名称中含有 `stack` 可知，该类的对象 `block` 设置在栈上，同样由 `global` 可知，与全局变量一样，设置在程序的数据区域（`.data` 区）中，`malloc` 设置在由 `malloc` 函数分配的内存块（即堆）中。
 
-|类|设置对象的存储域|
-|---|---|
-|_NSConcreteStackBlock|栈|
-|_NSConcreteGlobalBlock|程序的数据区域(.data 区)|
-|_NSConcreteMallocBlock|堆|
+| 类 | 设置对象的存储域 |
+| --- | --- |
+| _NSConcreteStackBlock | 栈 |
+| _NSConcreteGlobalBlock | 程序的数据区域(.data 区) |
+| _NSConcreteMallocBlock | 堆 |
 
-&emsp;**在记述全局变量的地方使用 `block` 语法** 时，生成的 `block` 为 `_NSConcreteGlobalBlock` 类对象。
-**`block` 具体属于哪种类型，不能通过 `clang` 转换代码看出, `block` 的实际的 `isa` 是通过 `runtime` 来动态确定的。**
+&emsp;**在记述全局变量的地方使用 `block` 语法** 时，生成的 `block` 为 `_NSConcreteGlobalBlock` 类型。
+**`block` 具体属于哪种类型，不能通过 `clang` 转换代码看出, `block` 的实际的 `isa` 是在运行时来动态确定的。**
 
-如下 `_NSConcreteGlobalBlock` 类型的 `block`：
+&emsp;如下 `_NSConcreteGlobalBlock` 类型的 `block`：
 ```c++
 void (^blk)(void) = ^{ printf("全局区的 _NSConcreteGlobalBlock Block！\n"); };
 
@@ -957,9 +956,9 @@ NSLog(@"❄️❄️❄️ block isa: %@", globalBlock);
 **虽然通过 `clang` 转换的源代码通常是 `_NSConcreteStackBlock` 类对象，但实现上却有不同。总结如下:**
 
 + 记述全局变量的地方有 `block` 语法时
-+ `block` 语法的表达式中不使用截获的自动变量时
++ `block` 语法的表达式中不截获外部自动变量时
 
-以上情况下，`block` 为 `_NSConcreteGlobalBlock` 类对象，即 `block` 配置在程序的数据区域中。除此之外 `block` 语法生成的 `block` 为 `_NSConcreteStackBlock` 类对象，且设置在栈上。
+以上情况下，`block` 为 `_NSConcreteGlobalBlock` 类型，即 `block` 配置在程序的数据区域中。除此之外 `block` 语法生成的 `block` 为 `_NSConcreteStackBlock` 类，且设置在栈上。
 
 ```c++
 // 不捕获外部自动变量是 global
@@ -1111,7 +1110,7 @@ NSLog(@"❄️❄️❄️ stackBlock isa: %@", ^{ NSLog(@"❄️❄️❄️ a 
  blk = 0x7ffeefbff538
  
  ```
- 看一下下面这个返回 `block` 的函数:
+ &emsp;看一下下面这个返回 `block` 的函数:
  ```c++
  typedef int (^blk_t)(int);
  blk_t func(int rate) {
@@ -1120,7 +1119,7 @@ NSLog(@"❄️❄️❄️ stackBlock isa: %@", ^{ NSLog(@"❄️❄️❄️ a 
      };
  }
  ```
- 源代码为返回配置在栈上的 `block` 的函数。即程序执行中从 **该函数** 返回 **函数调用方** 时变量作用域结束，因此栈上的 `block` 也被废弃。虽然看似有这样的问题，但是该源代码通过对应 `ARC` 的编译器可转换为如下:
+ &emsp;源代码为返回配置在栈上的 `block` 的函数。即程序执行中从 **该函数** 返回 **函数调用方** 时变量作用域结束，因此栈上的 `block` 也被废弃。虽然看似有这样的问题，但是该源代码通过对应 `ARC` 的编译器可转换为如下:
  ```c++
  blk_t func(int rate) {
  blk_t tmp = &__func_block_impl_0(__func_block_func_0, &__func_block_desc_0_DATA, rate);
@@ -1214,11 +1213,11 @@ blk();
 // 当 block 在栈上也能使用时，从栈上复制到堆上，就只是浪费 CPU 资源。
 // 此时需要我们判断，自行手动复制。
 ```
-|Block 的类|副本源的配置存储域|复制效果|
-|---|---|---|
-|_NSConcreteStackBlock|栈|从栈复制到堆|
-|_NSConcreteGlobalBlock|程序的数据区域|什么也不做|
-|_NSConcreteMallocBlock|堆|引用计数增加|
+| Block 的类 | 副本源的配置存储域 | 复制效果 |
+| --- | --- | --- |
+| _NSConcreteStackBlock | 栈 | 从栈复制到堆 |
+| _NSConcreteGlobalBlock | 程序的数据区域 | 什么也不做|
+| _NSConcreteMallocBlock | 堆|引用计数增加 |
 不管 `Block` 配置在何处，用 `copy` 方法复制都不会引起任何问题，在不确定时调用 `copy` 方法即可。
 
 ## `__block` 变量存储域
