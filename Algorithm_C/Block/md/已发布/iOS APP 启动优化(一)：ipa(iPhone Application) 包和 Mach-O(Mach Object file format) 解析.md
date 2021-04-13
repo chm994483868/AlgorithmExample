@@ -49,6 +49,18 @@ Test_ipa_Simple: Mach-O 64-bit executable arm64
 > Mach-O 为 Mach Object 文件格式的缩写，全称为 Mach Object File Format 它是一种用于可执行文件、目标代码、动态库、内核转储的文件格式。作为 a.out 格式的替代者，Mach-O 提供了更强的扩展性，并提升了符号表中信息的访问速度。
 Mach-O 曾经为大部分基于 Mach 核心的操作系统所使用。NeXTSTEP、Darwin 和 Mac OS X 等系统使用这种格式作为其原生可执行档、库和目标代码的格式。而同样使用 GNU Mach 作为其微内核的 GNU Hurd 系统则使用 ELF 而非 Mach-O 作为其标准的二进制文件格式。[Mach-O-维基百科](https://zh.wikipedia.org/wiki/Mach-O)
 
+&emsp;在 Xcode -> Build Setting -> Mach-O Type 中，我们可以选择下面几种类型：
+
++ Executable
++ Dynamic Library
++ Bundle
++ Static Library
++ Relocatable Object File
+
+&emsp;如果我们新建 iOS App 的话默认就是 Executable，如果新建 Framework 或 Static Library 则分别默认是  Dynamic Library 和 Static Library，如果我们同时选中 Include Tests，创建出的 TARGETS 中的 Tests 和 UITests 的 Mach-O Type 默认是 Bundle。
+
+
+
 &emsp;在 [Code Size Performance Guidelines](https://developer.apple.com/library/archive/documentation/Performance/Conceptual/CodeFootprint/CodeFootprint.html#//apple_ref/doc/uid/10000149-SW1) 文档中的 [Overview of the Mach-O Executable Format](https://developer.apple.com/library/archive/documentation/Performance/Conceptual/CodeFootprint/Articles/MachOOverview.html#//apple_ref/doc/uid/20001860-BAJGJEJC) 章节提到了 Mach-O 格式，并描述了如何组织 Mach-O executable format 来提高代码的效率，下面我们先看下这一节的原文。
 
 &emsp;Mach-O 是 OS X 中二进制文件的 native 可执行格式，是 shipping code 的首选格式。可执行格式决定二进制文件中的代码（code）和数据（data）读入内存的顺序。代码和数据的顺序会影响内存使用和分页活动（paging activity），因此会直接影响程序的性能。
@@ -108,15 +120,14 @@ Mach-O 曾经为大部分基于 Mach 核心的操作系统所使用。NeXTSTEP�
 
 &emsp;以上是 Overview of the Mach-O Executable Format 章节中的全部内容，可能我们对其中的 segment 和 section 还不太熟悉，后续我们会进行更详细的解读。
 
-&emsp;下面看一下戴铭老师的关于 Mach-O 文章的引子，这样一定能引起你学习本篇文章的兴趣。
+&emsp;下面先看一下戴铭老师的关于 Mach-O 文章的引子，这样一定能引起你学习 Mach-O 的兴趣。
 
 &emsp;首先 Mach-O 二进制文件包含程序的核心逻辑，以及入口点主要功能，那么我们学习 Mach-O 能学到哪些东西呢?
 
-&emsp;通过学习 Mach-O 可以了解到应用程序是如何加载到系统的，如何执行的。
-
-&emsp;通过学习 Mach-O 可以了解到符号查找，函数调用堆栈符号化等。
-
-&emsp;了解这些对于了解编译和逆向工程都会有帮助，还会了解到动态链接器的内部工作原理以及字节码格式的信息、Leb128 字节流、Mach 导出时 Trie 二进制 image 压缩。
+1. 通过学习 Mach-O 可以了解到应用程序是如何加载到系统的，如何执行的。
+2. 通过学习 Mach-O 可以了解到符号查找，函数调用堆栈符号化等。
+3. 通过学习 Mach-O 可以对编译和逆向工程都有帮助。
+4. 通过学习 Mach-O 还可以了解到动态链接器的内部工作原理以及字节码格式的信息、Leb128 字节流、Mach 导出时 Trie 二进制 image 压缩。
 
 1. Mach-O 文件的内部逻辑（内部结构）是什么样的？
 2. 它是怎么构建出来的?
@@ -125,6 +136,11 @@ Mach-O 曾经为大部分基于 Mach 核心的操作系统所使用。NeXTSTEP�
 5. 如何工作？
 6. 谁让它工作？
 7. 怎么导入和导出符号的？
+
+
+
+
+
 
 
 
