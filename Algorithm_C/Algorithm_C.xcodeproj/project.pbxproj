@@ -233,7 +233,7 @@
 		8E2572D424D304690080F598 /* MoreThanHalfNumber.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = MoreThanHalfNumber.hpp; sourceTree = "<group>"; };
 		8E2572D624D304DE0080F598 /* Array.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Array.cpp; sourceTree = "<group>"; };
 		8E2572D724D304DE0080F598 /* Array.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = Array.hpp; sourceTree = "<group>"; };
-		8E314959261FD06D00BBB2E2 /* iOS APP 启动优化(一)：ipa(iPhone Application) 包和可执行文件格式 Mach-O(Mach Object file format) 解析.md */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = net.daringfireball.markdown; path = "iOS APP 启动优化(一)：ipa(iPhone Application) 包和可执行文件格式 Mach-O(Mach Object file format) 解析.md"; sourceTree = "<group>"; };
+		8E314959261FD06D00BBB2E2 /* iOS APP 启动优化(一)：ipa(iPhone Application) 包和 Mach-O(Mach Object file format) 解析.md */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = net.daringfireball.markdown; path = "iOS APP 启动优化(一)：ipa(iPhone Application) 包和 Mach-O(Mach Object file format) 解析.md"; sourceTree = "<group>"; };
 		8E31495A261FD06D00BBB2E2 /* iOS APP 启动优化(二)：dyld（the dynamic link editor）是动态链接器.md */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = net.daringfireball.markdown; path = "iOS APP 启动优化(二)：dyld（the dynamic link editor）是动态链接器.md"; sourceTree = "<group>"; };
 		8E31495B261FD0C700BBB2E2 /* ReactNative_iOSNative.md */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = net.daringfireball.markdown; path = ReactNative_iOSNative.md; sourceTree = "<group>"; };
 		8E3613F72610A65900E2BC5F /* iOS 2021 面试前的准备（总结各知识点方便面试前快速复习使用）（八）.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 2021 面试前的准备（总结各知识点方便面试前快速复习使用）（八）.md"; sourceTree = "<group>"; };
@@ -1444,7 +1444,7 @@
 		D2164F1C24F7AF070000A6AA /* 已发布 */ = {
 			isa = PBXGroup;
 			children = (
-				8E314959261FD06D00BBB2E2 /* iOS APP 启动优化(一)：ipa(iPhone Application) 包和可执行文件格式 Mach-O(Mach Object file format) 解析.md */,
+				8E314959261FD06D00BBB2E2 /* iOS APP 启动优化(一)：ipa(iPhone Application) 包和 Mach-O(Mach Object file format) 解析.md */,
 				8E31495A261FD06D00BBB2E2 /* iOS APP 启动优化(二)：dyld（the dynamic link editor）是动态链接器.md */,
 				D2EB014724DB7B3A009EAFD6 /* iOS 从 libclosure-74 源码来研究 Block 实现原理(1).md */,
 				8EF1A8AA253B4E7E0058AEAD /* iOS 从 libclosure-74 源码来研究 Block 实现原理(2).md */,

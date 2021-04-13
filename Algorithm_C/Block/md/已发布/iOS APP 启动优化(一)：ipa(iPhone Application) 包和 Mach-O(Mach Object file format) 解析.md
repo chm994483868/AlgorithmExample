@@ -1,4 +1,4 @@
-# iOS APP 启动优化(一)：ipa(iPhone application archive) 包和可执行文件格式 Mach-O(Mach Object file format) 解析
+# iOS APP 启动优化(一)：ipa(iPhone application archive) 包和 Mach-O(Mach Object file format) 解析
 
 > IPA 后缀的文件是 iOS 系统的软件包，全称为 iPhone application archive。通常情况下，IPA 文件都是使用苹果公司的 FairPlayDRM 技术进行加密保护的。每个 IPA 文件都是 ARM 架构的可执行文件以及该应用的资源文件的打包文件，只能安装在 iPhone、iPod Touch、iPad 以及使用 Apple Silicon 平台的 Mac 上。该文件可以通过修改后缀名为 zip 后，进行解压缩，查看其软件包中的内容。[IPA文件-维基百科](https://zh.wikipedia.org/wiki/IPA文件)
 > 
@@ -46,7 +46,7 @@ Test_ipa_Simple: Mach-O 64-bit executable arm64
 ```
 
 ## Mach-O 格式概述
-> Mach-O 为 Mach Object 文件格式的缩写，它是一种用于可执行档、目标代码、动态库、内核转储的文件格式。作为 a.out 格式的替代者，Mach-O 提供了更强的扩展性，并提升了符号表中信息的访问速度。
+> Mach-O 为 Mach Object 文件格式的缩写，全称为 Mach Object File Format 它是一种用于可执行文件、目标代码、动态库、内核转储的文件格式。作为 a.out 格式的替代者，Mach-O 提供了更强的扩展性，并提升了符号表中信息的访问速度。
 Mach-O 曾经为大部分基于 Mach 核心的操作系统所使用。NeXTSTEP、Darwin 和 Mac OS X 等系统使用这种格式作为其原生可执行档、库和目标代码的格式。而同样使用 GNU Mach 作为其微内核的 GNU Hurd 系统则使用 ELF 而非 Mach-O 作为其标准的二进制文件格式。[Mach-O-维基百科](https://zh.wikipedia.org/wiki/Mach-O)
 
 &emsp;在 [Code Size Performance Guidelines](https://developer.apple.com/library/archive/documentation/Performance/Conceptual/CodeFootprint/CodeFootprint.html#//apple_ref/doc/uid/10000149-SW1) 文档中的 [Overview of the Mach-O Executable Format](https://developer.apple.com/library/archive/documentation/Performance/Conceptual/CodeFootprint/Articles/MachOOverview.html#//apple_ref/doc/uid/20001860-BAJGJEJC) 章节提到了 Mach-O 格式，并描述了如何组织 Mach-O executable format 来提高代码的效率，下面我们先看下这一节的原文。
@@ -107,6 +107,27 @@ Mach-O 曾经为大部分基于 Mach 核心的操作系统所使用。NeXTSTEP�
 &emsp;ANSI C 和 C++ 标准规定系统必须将未初始化静态变量（uninitialized static variables）设置为零。（其他类型的未初始化数据保持未初始化状态）由于未初始化的静态变量和临时定义符号（tentative-definition symbols）存储在分开的 sections 中，系统需要对它们进行不同的处理。但是，当变量位于不同的 sections 时，它们更有可能最终出现在不同的内存页上，因此可以分别进行换入和换出操作，从而使你的代码运行速度更慢。这些问题的解决方案（如 [Reducing Shared Memory Pages](https://developer.apple.com/library/archive/documentation/Performance/Conceptual/CodeFootprint/Articles/SharedPages.html#//apple_ref/doc/uid/20001863-CJBJFIDD) 中所述）是将非常量全局数据（non-constant global data）合并到 \_\_DATA segment 的一个 section 中。
 
 &emsp;以上是 Overview of the Mach-O Executable Format 章节中的全部内容，可能我们对其中的 segment 和 section 还不太熟悉，后续我们会进行更详细的解读。
+
+&emsp;下面看一下戴铭老师的关于 Mach-O 文章的引子，这样一定能引起你学习本篇文章的兴趣。
+
+&emsp;首先 Mach-O 二进制文件包含程序的核心逻辑，以及入口点主要功能，那么我们学习 Mach-O 能学到哪些东西呢?
+
+&emsp;通过学习 Mach-O 可以了解到应用程序是如何加载到系统的，如何执行的。
+
+&emsp;通过学习 Mach-O 可以了解到符号查找，函数调用堆栈符号化等。
+
+&emsp;了解这些对于了解编译和逆向工程都会有帮助，还会了解到动态链接器的内部工作原理以及字节码格式的信息、Leb128 字节流、Mach 导出时 Trie 二进制 image 压缩。
+
+1. Mach-O 文件的内部逻辑（内部结构）是什么样的？
+2. 它是怎么构建出来的?
+3. 组织方式如何?
+4. 怎么加载的？
+5. 如何工作？
+6. 谁让它工作？
+7. 怎么导入和导出符号的？
+
+
+
 
 
 
