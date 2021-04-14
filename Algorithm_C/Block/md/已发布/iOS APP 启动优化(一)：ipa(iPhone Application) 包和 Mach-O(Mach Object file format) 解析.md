@@ -118,27 +118,24 @@ Mach-O 曾经为大部分基于 Mach 核心的操作系统所使用。NeXTSTEP�
 
 &emsp;ANSI C 和 C++ 标准规定系统必须将未初始化静态变量（uninitialized static variables）设置为零。（其他类型的未初始化数据保持未初始化状态）由于未初始化的静态变量和临时定义符号（tentative-definition symbols）存储在分开的 sections 中，系统需要对它们进行不同的处理。但是，当变量位于不同的 sections 时，它们更有可能最终出现在不同的内存页上，因此可以分别进行换入和换出操作，从而使你的代码运行速度更慢。这些问题的解决方案（如 [Reducing Shared Memory Pages](https://developer.apple.com/library/archive/documentation/Performance/Conceptual/CodeFootprint/Articles/SharedPages.html#//apple_ref/doc/uid/20001863-CJBJFIDD) 中所述）是将非常量全局数据（non-constant global data）合并到 \_\_DATA segment 的一个 section 中。
 
-&emsp;以上是 Overview of the Mach-O Executable Format 章节中的全部内容，可能我们对其中的 segment 和 section 还不太熟悉，后续我们会进行更详细的解读。
+&emsp;以上是 Overview of the Mach-O Executable Format 章节中的全部内容，可能我们对其中的 segment 和 section 还不太熟悉，下面我们会进行更详细的解读。
 
-&emsp;下面先看一下戴铭老师的关于 Mach-O 文章的引子，这样一定能引起你学习 Mach-O 的兴趣。
+## Mach-O 文件内部构成
+&emsp;下面我们结合 [apple/darwin-xnu](https://github.com/apple/darwin-xnu) 中的源码来分析 Mach-O 的内部构成，首先看一张大家都在用的官方的图片。
 
-&emsp;首先 Mach-O 二进制文件包含程序的核心逻辑，以及入口点主要功能，那么我们学习 Mach-O 能学到哪些东西呢?
+&emsp;从图上我们能明显看出 Mach-O 文件的数据主体分为三大部分：Header、Load commands、Data。
 
-1. 通过学习 Mach-O 可以了解到应用程序是如何加载到系统的，如何执行的。
-2. 通过学习 Mach-O 可以了解到符号查找，函数调用堆栈符号化等。
-3. 通过学习 Mach-O 可以对编译和逆向工程都有帮助。
-4. 通过学习 Mach-O 还可以了解到动态链接器的内部工作原理以及字节码格式的信息、Leb128 字节流、Mach 导出时 Trie 二进制 image 压缩。
+### Header
+&emsp;
 
-1. Mach-O 文件的内部逻辑（内部结构）是什么样的？
-2. 它是怎么构建出来的?
-3. 组织方式如何?
-4. 怎么加载的？
-5. 如何工作？
-6. 谁让它工作？
-7. 怎么导入和导出符号的？
-
-
-
+```c++
+hmc@HMdeMac-mini Test_ipa_Simple.app % otool -v -h Test_ipa_Simple        
+Test_ipa_Simple:
+Mach header
+      magic  cputype cpusubtype  caps    filetype ncmds sizeofcmds      flags
+MH_MAGIC_64    ARM64        ALL  0x00     EXECUTE    22       2800   NOUNDEFS DYLDLINK TWOLEVEL PIE
+hmc@HMdeMac-mini Test_ipa_Simple.app % 
+```
 
 
 
@@ -167,3 +164,28 @@ Mach-O 曾经为大部分基于 Mach 核心的操作系统所使用。NeXTSTEP�
 + [Overview of the Mach-O Executable Format](https://developer.apple.com/library/archive/documentation/Performance/Conceptual/CodeFootprint/Articles/Articles/Articles/MachOOverview.html#//apple_ref/doc/uid/20001860-BAJGJEJC)
 + [iOS安全：Mach-O Type](https://easeapi.com/blog/blog/23.html)
 + [探秘 Mach-O 文件](http://hawk0620.github.io/blog/2018/03/22/study-mach-o-file/)
++ [apple/darwin-xnu](https://github.com/apple/darwin-xnu) 
++ [Mac 命令 - otool](https://blog.csdn.net/lovechris00/article/details/81561627)
+
+
+
+
+
+
+
+&emsp;下面先看一下戴铭老师的关于 Mach-O 文章的引子，这样一定能引起你学习 Mach-O 的兴趣。
+
+&emsp;首先 Mach-O 二进制文件包含程序的核心逻辑，以及入口点主要功能，那么我们学习 Mach-O 能学到哪些东西呢?
+
+1. 通过学习 Mach-O 可以了解到应用程序是如何加载到系统的，如何执行的。
+2. 通过学习 Mach-O 可以了解到符号查找，函数调用堆栈符号化等。
+3. 通过学习 Mach-O 可以对编译和逆向工程都有帮助。
+4. 通过学习 Mach-O 还可以了解到动态链接器的内部工作原理以及字节码格式的信息、Leb128 字节流、Mach 导出时 Trie 二进制 image 压缩。
+
+1. Mach-O 文件的内部逻辑（内部结构）是什么样的？
+2. 它是怎么构建出来的?
+3. 组织方式如何?
+4. 怎么加载的？
+5. 如何工作？
+6. 谁让它工作？
+7. 怎么导入和导出符号的？
