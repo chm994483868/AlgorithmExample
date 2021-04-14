@@ -166,8 +166,8 @@ hmc@HMdeMac-mini Test_ipa_Simple.app %
 + [探秘 Mach-O 文件](http://hawk0620.github.io/blog/2018/03/22/study-mach-o-file/)
 + [apple/darwin-xnu](https://github.com/apple/darwin-xnu) 
 + [Mac 命令 - otool](https://blog.csdn.net/lovechris00/article/details/81561627)
-
-
++ [iOS 启动优化 + 监控实践](https://juejin.cn/post/6844904194877587469)
++ [dyld背后的故事&源码分析](https://juejin.cn/post/6844903782833192968)
 
 
 
