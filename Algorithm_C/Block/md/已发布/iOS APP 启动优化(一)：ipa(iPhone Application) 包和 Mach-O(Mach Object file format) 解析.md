@@ -49,7 +49,7 @@ Test_ipa_Simple: Mach-O 64-bit executable arm64
 > Mach-O 为 Mach Object 文件格式的缩写，全称为 Mach Object File Format 它是一种用于可执行文件、目标代码、动态库、内核转储的文件格式。作为 a.out 格式的替代者，Mach-O 提供了更强的扩展性，并提升了符号表中信息的访问速度。
 Mach-O 曾经为大部分基于 Mach 核心的操作系统所使用。NeXTSTEP、Darwin 和 Mac OS X 等系统使用这种格式作为其原生可执行档、库和目标代码的格式。而同样使用 GNU Mach 作为其微内核的 GNU Hurd 系统则使用 ELF 而非 Mach-O 作为其标准的二进制文件格式。[Mach-O-维基百科](https://zh.wikipedia.org/wiki/Mach-O)
 
-&emsp;在 Xcode -> Build Setting -> Mach-O Type 中，我们可以选择下面几种类型：
+&emsp;在 Xcode -> Build Setting -> Mach-O Type 中，Xcode 直接给我们列出了下面几种类型，看名字的话我们大概可以猜一下他们分别对应什么类型：
 
 + Executable
 + Dynamic Library
@@ -57,9 +57,9 @@ Mach-O 曾经为大部分基于 Mach 核心的操作系统所使用。NeXTSTEP�
 + Static Library
 + Relocatable Object File
 
-&emsp;如果我们新建 iOS App 的话默认就是 Executable，如果新建 Framework 或 Static Library 则分别默认是  Dynamic Library 和 Static Library，如果我们同时选中 Include Tests，创建出的 TARGETS 中的 Tests 和 UITests 的 Mach-O Type 默认是 Bundle。
+&emsp;如果我们新建 iOS App 的话 Mach-O Type 默认就是 Executable，如果新建 Framework 或 Static Library 则 Mach-O Type 分别默认是  Dynamic Library 和 Static Library，如果我们同时选中 Include Tests，创建出的 TARGETS 中的 Tests 和 UITests 的 Mach-O Type 默认是 Bundle。
 
-
+&emsp;实际上在 [apple/darwin-xnu](https://github.com/apple/darwin-xnu) 的 darwin-xnu/EXTERNAL_HEADERS/mach-o/loader.h 中定义了一组宏来表示不同的 Mach-O Type，如 `#define MH_EXECUTE 0x2 /* demand paged executable file */`、`#define MH_DYLIB 0x6 /* dynamically bound shared library */`、`#define MH_BUNDLE 0x8 /* dynamically bound bundle file */`、`#define MH_OBJECT 0x1 /* relocatable object file */` 等（它们分别对应上面的 Mach-O Type）。在数据结构层面这一组不同的宏正用于为 struct mach_header_64 的 filetype 字段赋值，来表示当前 Mach-O 的不同类型，等下面我们具体分析 Mach-O 结构的时候再来详细分析这些宏值所代表的含义。
 
 &emsp;在 [Code Size Performance Guidelines](https://developer.apple.com/library/archive/documentation/Performance/Conceptual/CodeFootprint/CodeFootprint.html#//apple_ref/doc/uid/10000149-SW1) 文档中的 [Overview of the Mach-O Executable Format](https://developer.apple.com/library/archive/documentation/Performance/Conceptual/CodeFootprint/Articles/MachOOverview.html#//apple_ref/doc/uid/20001860-BAJGJEJC) 章节提到了 Mach-O 格式，并描述了如何组织 Mach-O executable format 来提高代码的效率，下面我们先看下这一节的原文。
 
