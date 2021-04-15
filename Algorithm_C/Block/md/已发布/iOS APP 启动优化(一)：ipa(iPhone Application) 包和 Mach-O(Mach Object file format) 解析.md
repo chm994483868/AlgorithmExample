@@ -1,13 +1,21 @@
 # iOS APP 启动优化(一)：ipa(iPhone application archive) 包和 Mach-O(Mach Object file format) 解析
 
-> IPA 后缀的文件是 iOS 系统的软件包，全称为 iPhone application archive。通常情况下，IPA 文件都是使用苹果公司的 FairPlayDRM 技术进行加密保护的。每个 IPA 文件都是 ARM 架构的可执行文件以及该应用的资源文件的打包文件，只能安装在 iPhone、iPod Touch、iPad 以及使用 Apple Silicon 平台的 Mac 上。该文件可以通过修改后缀名为 zip 后，进行解压缩，查看其软件包中的内容。[IPA文件-维基百科](https://zh.wikipedia.org/wiki/IPA文件)
+> &emsp;IPA 后缀的文件是 iOS 系统的软件包，全称为 iPhone application archive。通常情况下，IPA 文件都是使用苹果公司的 FairPlayDRM 技术进行加密保护的。每个 IPA 文件都是 ARM 架构的可执行文件以及该应用的资源文件的打包文件，只能安装在 iPhone、iPod Touch、iPad 以及使用 Apple Silicon 平台的 Mac 上。该文件可以通过修改后缀名为 zip 后，进行解压缩，查看其软件包中的内容。[IPA文件-维基百科](https://zh.wikipedia.org/wiki/IPA文件)
 > 
-> 数字版权管理（英语：Digital rights management，缩写为 DRM）是一系列访问控制技术，通常用于控制数字内容和设备在被销售之后的使用过程。DRM 有时也称为拷贝保护、复制控制、技术保护措施等，但这些称呼存在争议。许多数字出版社和软件厂商都使用了 DRM，例如亚马逊、AT&T、AOL、Apple Inc.、Netflix、Google[7]、BBC、微软、Sony、Valve Corporation 等。[数字版权管理-维基百科](https://zh.wikipedia.org/wiki/数字版权管理)
+> &emsp;数字版权管理（英语：Digital rights management，缩写为 DRM）是一系列访问控制技术，通常用于控制数字内容和设备在被销售之后的使用过程。DRM 有时也称为拷贝保护、复制控制、技术保护措施等，但这些称呼存在争议。许多数字出版社和软件厂商都使用了 DRM，例如亚马逊、AT&T、AOL、Apple Inc.、Netflix、Google[7]、BBC、微软、Sony、Valve Corporation 等。[数字版权管理-维基百科](https://zh.wikipedia.org/wiki/数字版权管理)
 
 ## 解压 .ipa 文件查看其内容并引出 Mach-O 格式
 &emsp;相信每一位 iOS 开发者都进行过打包测试，当我们把 Ad Hoc 或者 App Store Connect 的包导出到本地时会看到一个 xxx.ipa 文件，ipa 是 iPhone Application 的缩写。实际上 xxx.ipa 只是一个变相的 zip 压缩包，我们可以把 xxx.ipa 文件直接通过 unzip 命令进行解压。
 
-&emsp;我们直接新建一个命名为 Test_ipa_Simple 的空白 iOS App，直接进行 Archive 后并导出 Test_ipa_Simple.ipa 文件查看它的内部结构。在终端执行 unzip Test_ipa_Simple.ipa 解压之后，会有一个 Payload 目录，而 Payload 里则是一个看似是文件的 Test_ipa_Simple.app，而实际上它又是一个目录，或者说是一个完整的 App Bundle。其中 Base.lproj 中是我们的 Main.storyboard 和 LaunchScreen.storyboard 的内容，然后是 embedded.mobileprovision（描述文件）和 PkgInfo、Info.plist、_CodeSignature 用于描述 App 的一些信息，然后我们要重点关注的便是当前这个目录里面体积最大的文件 Test_ipa_Simple，它是和我们的 ipa 包同名的一个二进制文件，然后用 file 命令查看他的文件类型是一个在 arm64 处理器架构下的可执行（executable）文件，格式则是 Mach-O。（下面是终端执行记录，可大致浏览一下）
+&emsp;我们直接新建一个命名为 Test_ipa_Simple 的空白 iOS App，直接进行 Archive 后并导出 Test_ipa_Simple.ipa 文件查看它的内部结构。在终端执行 unzip Test_ipa_Simple.ipa 解压之后，会有一个 Payload 目录，而 Payload 里则是一个看似是文件的 Test_ipa_Simple.app，而实际上它又是一个目录，或者说是一个完整的 App Bundle。其中 Base.lproj 中是我们的 Main.storyboard 和 LaunchScreen.storyboard 的内容，然后是 embedded.mobileprovision（描述文件）和 PkgInfo、Info.plist、_CodeSignature 用于描述 App 的一些信息，然后我们要重点关注的便是当前这个目录里面体积最大的文件 Test_ipa_Simple，它是和我们的 ipa 包同名的一个二进制文件，然后用 file 命令查看它的文件类型是一个在 arm64 处理器架构下的可执行（executable）文件，格式则是 Mach-O，其他还存在 FAT 格式的 Mach-O 文件，它是多个架构的顺序组合，例如这里取 `/bin/ls` 路径下的系统文件 `ls` 作为示例，可看到它是一个 FAT 文件，它包含 x86_64 和 arm64e 两个架构（这里是 m1 Mac 下的 ls 文件），即这里的 `ls` 是一个支持 x86_64 和 arm64e 两种处理器架构的通用程序包，里面包含的两部分都是 Mach-O 格式。   。在了解了二进制文件的数据结构以后，一切就都显得没有秘密了。（下面是终端执行记录，可大致浏览一下）
+
+```c++
+hmc@HMdeMac-mini Desktop % file ls
+ls: Mach-O universal binary with 2 architectures: [x86_64:Mach-O 64-bit executable x86_64] [arm64e:Mach-O 64-bit executable arm64e]
+ls (for architecture x86_64):    Mach-O 64-bit executable x86_64
+ls (for architecture arm64e):    Mach-O 64-bit executable arm64e
+hmc@HMdeMac-mini Desktop % 
+```
 
 ```c++
 hmc@bogon Test_ipa_Simple 2021-04-09 08-10-25 % unzip Test_ipa_Simple.ipa 
@@ -46,16 +54,16 @@ Test_ipa_Simple: Mach-O 64-bit executable arm64
 ```
 
 ## Mach-O 格式概述
-> Mach-O 为 Mach Object 文件格式的缩写，全称为 Mach Object File Format 它是一种用于可执行文件、目标代码、动态库、内核转储的文件格式。作为 a.out 格式的替代者，Mach-O 提供了更强的扩展性，并提升了符号表中信息的访问速度。
+> &emsp;Mach-O 为 Mach Object 文件格式的缩写，全称为 Mach Object File Format 它是一种用于可执行文件、目标代码、动态库、内核转储的文件格式。作为 a.out 格式的替代者，Mach-O 提供了更强的扩展性，并提升了符号表中信息的访问速度。
 Mach-O 曾经为大部分基于 Mach 核心的操作系统所使用。NeXTSTEP、Darwin 和 Mac OS X 等系统使用这种格式作为其原生可执行档、库和目标代码的格式。而同样使用 GNU Mach 作为其微内核的 GNU Hurd 系统则使用 ELF 而非 Mach-O 作为其标准的二进制文件格式。[Mach-O-维基百科](https://zh.wikipedia.org/wiki/Mach-O)
 
 &emsp;在 Xcode -> Build Setting -> Mach-O Type 中，Xcode 直接给我们列出了下面几种类型，看名字的话我们大概可以猜一下他们分别对应什么类型：
 
-+ Executable
-+ Dynamic Library
-+ Bundle
-+ Static Library
-+ Relocatable Object File
++ Executable（应用的主要二进制）
++ Dynamic Library（动态链接库（又称DSO或DLL））
++ Bundle（不能被链接的 Dylib，只能在运行时使用 dlopen( ) 加载，可当做 macOS 的插件）
++ Static Library（静态链接库）
++ Relocatable Object File（可重定向文件类型）
 
 &emsp;如果我们新建 iOS App 的话 Mach-O Type 默认就是 Executable，如果新建 Framework 或 Static Library 则 Mach-O Type 分别默认是  Dynamic Library 和 Static Library，如果我们同时选中 Include Tests，创建出的 TARGETS 中的 Tests 和 UITests 的 Mach-O Type 默认是 Bundle。
 
@@ -123,10 +131,12 @@ Mach-O 曾经为大部分基于 Mach 核心的操作系统所使用。NeXTSTEP�
 ## Mach-O 文件内部构成
 &emsp;下面我们结合 [apple/darwin-xnu](https://github.com/apple/darwin-xnu) 中的源码来分析 Mach-O 的内部构成，首先看一张大家都在用的官方的图片。
 
+![d06ff3536b6369f4652b6a5b862f9ced.png](https://p6-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/ffa97f6d060e441a8d83d1bacc58f190~tplv-k3u1fbpfcp-watermark.image)
+
 &emsp;从图上我们能明显看出 Mach-O 文件的数据主体分为三大部分：Header、Load commands、Data。
 
 ### Header
-&emsp;
+&emsp;header 部分存放的是当前 Mach-O 文件的概述信息，例如：CPU 类型（架构）、CPU 子类型、文件类型（对应上面的 Mach-O Type）、Load commands 的数量、Load commands 的大小等内容。通过 `otool -v -h Test_ipa_Simple` 可查看上面 Test_ipa_Simple 文件的 header 中的内容，看到其中有我们较为熟悉的 cputype 是 ARM64、filetype 是可执行文件（EXECUTE）。
 
 ```c++
 hmc@HMdeMac-mini Test_ipa_Simple.app % otool -v -h Test_ipa_Simple        
@@ -136,6 +146,32 @@ Mach header
 MH_MAGIC_64    ARM64        ALL  0x00     EXECUTE    22       2800   NOUNDEFS DYLDLINK TWOLEVEL PIE
 hmc@HMdeMac-mini Test_ipa_Simple.app % 
 ```
+
+&emsp;Mach-O 文件的 Header 部分对应的数据结构定义在 darwin-xnu/EXTERNAL_HEADERS/mach-o/loader.h 中，struct mach_header 和 struct mach_header_64 分别对应 32-bit architectures 和 64-bit architectures。（对于 32/64-bit architectures，32/64 位 mach header 出现在 Mach-O 文件的最开头）
+
+```c++
+struct mach_header_64 {
+    uint32_t    magic;        /* mach magic number identifier */
+    cpu_type_t    cputype;    /* cpu specifier */
+    cpu_subtype_t    cpusubtype;    /* machine specifier */
+    uint32_t    filetype;    /* type of file */
+    uint32_t    ncmds;        /* number of load commands */
+    uint32_t    sizeofcmds;    /* the size of all the load commands */
+    uint32_t    flags;        /* flags */
+    uint32_t    reserved;    /* reserved */
+};
+```
+
++ magic 是 mach 的魔法数标识，Test_ipa_Simple 的 magic 是 MH_MAGIC_64，该值是 loader.h 中的一个宏：`#define MH_MAGIC_64 0xfeedfacf` 用于表示 ARM64。
+
+...
+
+### Load commands
+&emsp;记录各个 segments 的信息和位置，只是类别和标记的介绍，包含一些信息的偏移地址、文件大小等内容。
+
+### Data
+&emsp;记录具体的内容信息。不同类别的信息对应不同的数据含义。Load Commands 到 Data 的箭头，Data 的位置是由 Load Commands 指定的。
+
 
 
 
@@ -155,6 +191,7 @@ hmc@HMdeMac-mini Test_ipa_Simple.app %
 
 ## 参考链接
 **参考链接:🔗**
++ [MachOView工具](https://www.jianshu.com/p/2092d2d374e5)
 + [深入理解MachO数据解析规则](https://juejin.cn/post/6947843156163428383)
 + [iOS App启动优化（一）—— 了解App的启动流程](https://juejin.cn/post/6844903968837992461)
 + [了解iOS上的可执行文件和Mach-O格式](http://www.cocoachina.com/articles/10988)
