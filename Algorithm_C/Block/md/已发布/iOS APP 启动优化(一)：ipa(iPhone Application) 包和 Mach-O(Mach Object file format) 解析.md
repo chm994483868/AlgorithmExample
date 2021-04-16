@@ -7,7 +7,7 @@
 ## 解压 .ipa 文件查看其内容并引出 Mach-O 格式
 &emsp;相信每一位 iOS 开发者都进行过打包测试，当我们把 Ad Hoc 或者 App Store Connect 的包导出到本地时会看到一个 xxx.ipa 文件，ipa 是 iPhone Application 的缩写。实际上 xxx.ipa 只是一个变相的 zip 压缩包，我们可以把 xxx.ipa 文件直接通过 unzip 命令进行解压。
 
-&emsp;我们直接新建一个命名为 Test_ipa_Simple 的空白 iOS App，直接进行 Archive 后并导出 Test_ipa_Simple.ipa 文件查看它的内部结构。在终端执行 unzip Test_ipa_Simple.ipa 解压之后，会有一个 Payload 目录，而 Payload 里则是一个看似是文件的 Test_ipa_Simple.app，而实际上它又是一个目录，或者说是一个完整的 App Bundle。其中 Base.lproj 中是我们的 Main.storyboard 和 LaunchScreen.storyboard 的内容，然后是 embedded.mobileprovision（描述文件）和 PkgInfo、Info.plist、_CodeSignature 用于描述 App 的一些信息，然后我们要重点关注的便是当前这个目录里面体积最大的文件 Test_ipa_Simple，它是和我们的 ipa 包同名的一个二进制文件，然后用 file 命令查看它的文件类型是一个在 arm64 处理器架构下的可执行（executable）文件，格式则是 Mach-O，其他还存在 FAT 格式的 Mach-O 文件，它是多个架构的顺序组合，例如这里取 `/bin/ls` 路径下的系统文件 `ls` 作为示例，可看到它是一个 FAT 文件，它包含 x86_64 和 arm64e 两个架构（这里是 m1 Mac 下的 ls 文件），即这里的 `ls` 是一个支持 x86_64 和 arm64e 两种处理器架构的通用程序包，里面包含的两部分都是 Mach-O 格式。   。在了解了二进制文件的数据结构以后，一切就都显得没有秘密了。（下面是终端执行记录，可大致浏览一下）
+&emsp;我们直接新建一个命名为 Test_ipa_Simple 的空白 iOS App，直接进行 Archive 后并导出 Test_ipa_Simple.ipa 文件查看它的内部结构。在终端执行 unzip Test_ipa_Simple.ipa 解压之后，会有一个 Payload 目录，而 Payload 里则是一个看似是文件的 Test_ipa_Simple.app，而实际上它又是一个目录，或者说是一个完整的 App Bundle。其中 Base.lproj 中是我们的 Main.storyboard 和 LaunchScreen.storyboard 的内容，然后是 embedded.mobileprovision（描述文件）和 PkgInfo、Info.plist、_CodeSignature 用于描述 App 的一些信息，然后我们要重点关注的便是当前这个目录里面体积最大的文件 Test_ipa_Simple，它是和我们的 ipa 包同名的一个二进制文件，然后用 file 命令查看它的文件类型是一个在 arm64 处理器架构下的可执行（executable）文件，格式则是 Mach-O，其他还存在 FAT 格式的 Mach-O 文件（可直白的理解为胖的 Mach-O 文件），它们是支持多个架构的二进制文件的顺序组合，例如这里取 `/bin/ls` 路径下的系统文件 `ls` 作为示例，使用 file 命令对它进行查看，可看到它是一个 FAT 文件，它包含 x86_64 和 arm64e 两个架构（这里是 m1 Mac 下的 `ls` 文件），即这里的 `ls` 是一个支持 x86_64 和 arm64e 两种处理器架构的通用二进制文件，里面包含的两部分都是 Mach-O 格式的 64-bit 可执行文件。   。在了解了二进制文件的数据结构以后，一切就都显得没有秘密了。（下面是终端执行记录，可大致浏览一下）
 
 ```c++
 hmc@HMdeMac-mini Desktop % file ls
@@ -129,25 +129,14 @@ Mach-O 曾经为大部分基于 Mach 核心的操作系统所使用。NeXTSTEP�
 &emsp;以上是 Overview of the Mach-O Executable Format 章节中的全部内容，可能我们对其中的 segment 和 section 还不太熟悉，下面我们会进行更详细的解读。
 
 ## Mach-O 文件内部构成
-&emsp;下面我们结合 [apple/darwin-xnu](https://github.com/apple/darwin-xnu) 中的源码来分析 Mach-O 的内部构成，首先看一张大家都在用的官方的图片。
+&emsp;下面我们结合 [apple/darwin-xnu](https://github.com/apple/darwin-xnu) 中的源码来分析 Mach-O 二进制文件的内部构成，首先看一张大家都在用的官方的图片。
 
 ![d06ff3536b6369f4652b6a5b862f9ced.png](https://p6-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/ffa97f6d060e441a8d83d1bacc58f190~tplv-k3u1fbpfcp-watermark.image)
 
-&emsp;从图上我们能明显看出 Mach-O 文件的数据主体分为三大部分：Header、Load commands、Data。
+&emsp;从图上我们能明显看出 Mach-O 文件的数据主体分为三大部分：分别是 Header（头部）、Load commands（加载命令）、Data（最终的数据），可看到完全对应到上一节中提到的 “Mach-O 二进制文件被组织成段（segments），每个段包含一个或多个 sections”。 
 
-### Header
-&emsp;header 部分存放的是当前 Mach-O 文件的概述信息，例如：CPU 类型（架构）、CPU 子类型、文件类型（对应上面的 Mach-O Type）、Load commands 的数量、Load commands 的大小等内容。通过 `otool -v -h Test_ipa_Simple` 可查看上面 Test_ipa_Simple 文件的 header 中的内容，看到其中有我们较为熟悉的 cputype 是 ARM64、filetype 是可执行文件（EXECUTE）。
-
-```c++
-hmc@HMdeMac-mini Test_ipa_Simple.app % otool -v -h Test_ipa_Simple        
-Test_ipa_Simple:
-Mach header
-      magic  cputype cpusubtype  caps    filetype ncmds sizeofcmds      flags
-MH_MAGIC_64    ARM64        ALL  0x00     EXECUTE    22       2800   NOUNDEFS DYLDLINK TWOLEVEL PIE
-hmc@HMdeMac-mini Test_ipa_Simple.app % 
-```
-
-&emsp;Mach-O 文件的 Header 部分对应的数据结构定义在 darwin-xnu/EXTERNAL_HEADERS/mach-o/loader.h 中，struct mach_header 和 struct mach_header_64 分别对应 32-bit architectures 和 64-bit architectures。（对于 32/64-bit architectures，32/64 位 mach header 出现在 Mach-O 文件的最开头）
+### Header（Mach-O 头部）
+&emsp;Mach-O 文件的 Header 部分对应的数据结构定义在 darwin-xnu/EXTERNAL_HEADERS/mach-o/loader.h 中，struct mach_header 和 struct mach_header_64 分别对应 32-bit architectures 和 64-bit architectures。（对于 32/64-bit architectures，32/64 位的 mach header 都出现在 Mach-O 文件的最开头。）
 
 ```c++
 struct mach_header_64 {
@@ -161,10 +150,42 @@ struct mach_header_64 {
     uint32_t    reserved;    /* reserved */
 };
 ```
+&emsp;观察 mach_header_64 结构体各个字段的名字，可看到 header 部分存放的是当前 Mach-O 文件的一些概述信息，例如：支持的 CPU 类型（架构）、支持的 CPU 子类型、文件类型（对应上面的 Mach-O Type）、Load commands 的数量、Load commands 的大小等内容。
 
-+ magic 是 mach 的魔法数标识，Test_ipa_Simple 的 magic 是 MH_MAGIC_64，该值是 loader.h 中的一个宏：`#define MH_MAGIC_64 0xfeedfacf` 用于表示 ARM64。
++ magic 是 mach 的魔法数标识，Test_ipa_Simple 的 magic 是 MH_MAGIC_64，该值是 loader.h 中的一个宏：`#define MH_MAGIC_64 0xfeedfacf` 用于表示 64 位的 mach 魔法数（64-bit mach magic number）。
++ filetype 表示 Mach-O Type，这个可以有很多类型，静态库（.a）、单个目标文件（.o）都可以通过这个类型标识来区分。
++ ncmds 表示 Load commands 加载命令的个数。
++ sizeofcmds 表示 Load commands 加载命令所占的大小。
++ flags 不同的位表示不同的标识信息，比如 TWOLEVEL 是指符号都是两级格式的，符号自身 + 加上自己所在的单元，PIE 标识是位置无关的。
 
-...
+&emsp;这里我们可以通过几种不同方式来查看 Test_ipa_Simple 文件 header 中各个字段的具体值。
+
+1. 通过 `otool -v -h Test_ipa_Simple` 可查看上面 Test_ipa_Simple 文件的 header 中的内容，去掉 `-v` 则是各字段的原始数值。看到其中有我们较为熟悉的 cputype 是 ARM64、filetype 是可执行文件（EXECUTE）。
+
+```c++
+hmc@bogon Test_ipa_Simple.app % otool -h Test_ipa_Simple
+Test_ipa_Simple:
+Mach header
+      magic  cputype cpusubtype  caps    filetype ncmds sizeofcmds      flags
+ 0xfeedfacf 16777228          0  0x00           2    22       2800 0x00200085
+ 
++++++++++++++++++++++++++++++++++++++++++++
+
+hmc@HMdeMac-mini Test_ipa_Simple.app % otool -v -h Test_ipa_Simple        
+Test_ipa_Simple:
+Mach header
+      magic  cputype cpusubtype  caps    filetype ncmds sizeofcmds      flags
+MH_MAGIC_64    ARM64        ALL  0x00     EXECUTE    22       2800   NOUNDEFS DYLDLINK TWOLEVEL PIE
+hmc@HMdeMac-mini Test_ipa_Simple.app % 
+```
+
+2. 通过 [MachOView](https://github.com/fangshufeng/MachOView) 工具查看。 
+
+![截屏2021-04-16 08.45.44.png](https://p6-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/1c07afe370ea4fd08615393af1adf057~tplv-k3u1fbpfcp-watermark.image)
+
+3. 直接使用 xxd 命令读取以十六进制读取二进制文件的内容。（这里看到 magic 值是 0xcffaedfe 🤔️）
+
+![截屏2021-04-16 08.51.00.png](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/dc0b2f9d65974ce5a778f975888c07a4~tplv-k3u1fbpfcp-watermark.image)
 
 ### Load commands
 &emsp;记录各个 segments 的信息和位置，只是类别和标记的介绍，包含一些信息的偏移地址、文件大小等内容。
@@ -192,6 +213,7 @@ struct mach_header_64 {
 ## 参考链接
 **参考链接:🔗**
 + [MachOView工具](https://www.jianshu.com/p/2092d2d374e5)
++ [查看二进制文件](https://www.cnblogs.com/skydragon/p/7200173.html)
 + [深入理解MachO数据解析规则](https://juejin.cn/post/6947843156163428383)
 + [iOS App启动优化（一）—— 了解App的启动流程](https://juejin.cn/post/6844903968837992461)
 + [了解iOS上的可执行文件和Mach-O格式](http://www.cocoachina.com/articles/10988)
