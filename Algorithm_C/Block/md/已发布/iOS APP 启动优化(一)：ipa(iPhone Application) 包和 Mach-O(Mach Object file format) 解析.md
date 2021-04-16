@@ -183,12 +183,88 @@ hmc@HMdeMac-mini Test_ipa_Simple.app %
 
 ![截屏2021-04-16 08.45.44.png](https://p6-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/1c07afe370ea4fd08615393af1adf057~tplv-k3u1fbpfcp-watermark.image)
 
-3. 直接使用 xxd 命令读取以十六进制读取二进制文件的内容。（这里看到 magic 值是 0xcffaedfe 🤔️）
+3. 直接使用 xxd 命令读取以十六进制读取二进制文件的内容。（这里看到 magic 值是 0xcffaedfe 🤔️）`#define MH_CIGAM_64 0xcffaedfe /* NXSwapInt(MH_MAGIC_64) */`
 
 ![截屏2021-04-16 08.51.00.png](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/dc0b2f9d65974ce5a778f975888c07a4~tplv-k3u1fbpfcp-watermark.image)
 
 ### Load commands
-&emsp;记录各个 segments 的信息和位置，只是类别和标记的介绍，包含一些信息的偏移地址、文件大小等内容。
+&emsp;Header 中的数据已经说明了整个 Mach-O 文件的基本信息，但是整个 Mach-O 中最重要的还是 Load commands。它说明了操作系统应当如何加载文件中的数据，对系统内核加载器和动态链接器起指导作用。一来它描述了文件中数据的具体组织结构，二来它也说明了进程启动后，对应的内存空间结构是如何组织的。
+
+&emsp;我们可以用 `otool -l Test_ipa_Simple` 来查看 Test_ipa_Simple 这个 Mach-O 文件的 Load commands（加载命令）：
+```c++
+hmc@bogon Test_ipa_Simple.app % otool -l Test_ipa_Simple 
+Test_ipa_Simple:
+Load command 0
+      cmd LC_SEGMENT_64
+  cmdsize 72
+  segname __PAGEZERO
+   vmaddr 0x0000000000000000
+   vmsize 0x0000000100000000
+  fileoff 0
+ filesize 0
+  maxprot 0x00000000
+ initprot 0x00000000
+   nsects 0
+    flags 0x0
+Load command 1
+      cmd LC_SEGMENT_64
+  cmdsize 792
+  segname __TEXT
+   vmaddr 0x0000000100000000
+   vmsize 0x0000000000008000
+  fileoff 0
+ filesize 32768
+  maxprot 0x00000005
+ initprot 0x00000005
+   nsects 9
+    flags 0x0
+Section
+  sectname __text
+   segname __TEXT
+      addr 0x0000000100006264
+      size 0x0000000000000234
+    offset 25188
+     align 2^2 (4)
+    reloff 0
+    nreloc 0
+     flags 0x80000400
+ reserved1 0
+ reserved2 0
+Section
+  sectname __stubs
+   segname __TEXT
+
+```
+
+上面这段是执行结果的一部分，是加载PAGE_ZERO和TEXT两个segment的load command。PAGE_ZERO是一段“空白”数据区，这段数据没有任何读写运行权限，方便捕捉总线错误（SIGBUS）。TEXT则是主体代码段，我们注意到其中的r-x，不包含w写权限，这是为了避免代码逻辑被肆意篡改。
+
+我再提一个加载命令，LC_MAIN。这个加载指令，会声明整个程序的入口地址，保证进程启动后能够正常的开始整个应用程序的运行。
+
+除此之外，Mach-O里还有LC_SYMTAB、LC_LOAD_DYLIB、LC_CODE_SIGNATURE等加载命令，大家可以去官方文档查找其含义。
+
+至于Data部分，在了解了头部和加载命令后，就没什么特别可说的了。Data是最原始的编译数据，里面包含了Objective-C的类信息、常量等。
+
+本文是对Mach-O文件格式的一个理解小结，希望能够抛砖引玉，帮助各位朋友把握可执行文件的主题脉络，进而解决各类问题。
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 ### Data
 &emsp;记录具体的内容信息。不同类别的信息对应不同的数据含义。Load Commands 到 Data 的箭头，Data 的位置是由 Load Commands 指定的。
