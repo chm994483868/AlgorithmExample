@@ -7,7 +7,7 @@
 ## 解压 .ipa 文件查看其内容并引出 Mach-O 格式
 &emsp;相信每一位 iOS 开发者都进行过打包测试，当我们把 Ad Hoc 或者 App Store Connect 的包导出到本地时会看到一个 xxx.ipa 文件，ipa 是 iPhone Application 的缩写。实际上 xxx.ipa 只是一个变相的 zip 压缩包，我们可以把 xxx.ipa 文件直接通过 unzip 命令进行解压。
 
-&emsp;我们直接新建一个命名为 Test_ipa_Simple 的空白 iOS App，直接进行 Archive 后并导出 Test_ipa_Simple.ipa 文件查看它的内部结构。在终端执行 unzip Test_ipa_Simple.ipa 解压之后，会有一个 Payload 目录，而 Payload 里则是一个看似是文件的 Test_ipa_Simple.app，而实际上它又是一个目录，或者说是一个完整的 App Bundle。其中 Base.lproj 中是我们的 Main.storyboard 和 LaunchScreen.storyboard 的内容，然后是 embedded.mobileprovision（描述文件）和 PkgInfo、Info.plist、_CodeSignature 用于描述 App 的一些信息，然后我们要重点关注的便是当前这个目录里面体积最大的文件 Test_ipa_Simple，它是和我们的 ipa 包同名的一个二进制文件，然后用 file 命令查看它的文件类型是一个在 arm64 处理器架构下的可执行（executable）文件，格式则是 Mach-O，其他还存在 FAT 格式的 Mach-O 文件（可直白的理解为胖的 Mach-O 文件），它们是支持多个架构的二进制文件的顺序组合，例如这里取 `/bin/ls` 路径下的系统文件 `ls` 作为示例，使用 file 命令对它进行查看，可看到它是一个 FAT 文件，它包含 x86_64 和 arm64e 两个架构（这里是 m1 Mac 下的 `ls` 文件），即这里的 `ls` 是一个支持 x86_64 和 arm64e 两种处理器架构的通用二进制文件，里面包含的两部分都是 Mach-O 格式的 64-bit 可执行文件。   。在了解了二进制文件的数据结构以后，一切就都显得没有秘密了。（下面是终端执行记录，可大致浏览一下）
+&emsp;我们直接新建一个命名为 Test_ipa_Simple 的空白 iOS App，直接进行 Archive 后并导出 Test_ipa_Simple.ipa 文件查看它的内部结构。在终端执行 unzip Test_ipa_Simple.ipa 解压之后，会有一个 Payload 目录，而 Payload 里则是一个看似是文件的 Test_ipa_Simple.app，而实际上它又是一个目录，或者说是一个完整的 App Bundle。其中 Base.lproj 中是我们的 Main.storyboard 和 LaunchScreen.storyboard 的内容，然后是 embedded.mobileprovision（描述文件）和 PkgInfo、Info.plist、_CodeSignature 用于描述 App 的一些信息，然后我们要重点关注的便是当前这个目录里面体积最大的文件 Test_ipa_Simple，它是和我们的 ipa 包同名的一个[二进制文件](https://www.zhihu.com/question/19971994)，然后用 file 命令查看它的文件类型是一个在 arm64 处理器架构下的可执行（executable）文件，格式则是 Mach-O，其他还存在 FAT 格式的 Mach-O 文件（可直白的理解为胖的 Mach-O 文件），它们是支持多个架构的二进制文件的顺序组合，例如这里取 `/bin/ls` 路径下的系统文件 `ls` 作为示例，使用 file 命令对它进行查看，可看到它是一个 FAT 文件，它包含 x86_64 和 arm64e 两个架构（这里是 m1 Mac 下的 `ls` 文件），即这里的 `ls` 是一个支持 x86_64 和 arm64e 两种处理器架构的通用二进制文件，里面包含的两部分都是 Mach-O 格式的 64-bit 可执行文件。   。在了解了二进制文件的数据结构以后，一切就都显得没有秘密了。（下面是终端执行记录，可大致浏览一下）
 
 ```c++
 hmc@HMdeMac-mini Desktop % file ls
@@ -153,6 +153,9 @@ struct mach_header_64 {
 &emsp;观察 mach_header_64 结构体各个字段的名字，可看到 header 部分存放的是当前 Mach-O 文件的一些概述信息，例如：支持的 CPU 类型（架构）、支持的 CPU 子类型、文件类型（对应上面的 Mach-O Type）、Load commands 的数量、Load commands 的大小等内容。
 
 + magic 是 mach 的魔法数标识，Test_ipa_Simple 的 magic 是 MH_MAGIC_64，该值是 loader.h 中的一个宏：`#define MH_MAGIC_64 0xfeedfacf` 用于表示 64 位的 mach 魔法数（64-bit mach magic number）。
+
+&emsp;这里牵涉到一个 magic number（魔数）的概念。对于一个二进制文件来说，其对应的类型可以在其最初几个字节来标识出来，即 “魔数”。例如我们特别熟悉的 png 格式的图片，使用 xxd 命令查看前 8 个字节的内容 `00000000: 8950 4e47 0d0a 1a0a 0000 000d 4948 4452  .PNG........IHDR` 我们可识别出它是一张 png 格式的图片，再例如常见的 shell 脚本文件前 8 个字节的内容 `00000000: 6563 686f 2022 7e7e 7e7e 7e7e 7e7e 7e7e  echo "~~~~~~~~~~`。
+
 + filetype 表示 Mach-O Type，这个可以有很多类型，静态库（.a）、单个目标文件（.o）都可以通过这个类型标识来区分。
 + ncmds 表示 Load commands 加载命令的个数。
 + sizeofcmds 表示 Load commands 加载命令所占的大小。
@@ -188,7 +191,7 @@ hmc@HMdeMac-mini Test_ipa_Simple.app %
 ![截屏2021-04-16 08.51.00.png](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/dc0b2f9d65974ce5a778f975888c07a4~tplv-k3u1fbpfcp-watermark.image)
 
 ### Load commands
-&emsp;Header 中的数据已经说明了整个 Mach-O 文件的基本信息，但是整个 Mach-O 中最重要的还是 Load commands。它说明了操作系统应当如何加载文件中的数据，对系统内核加载器和动态链接器起指导作用。一来它描述了文件中数据的具体组织结构，二来它也说明了进程启动后，对应的内存空间结构是如何组织的。
+&emsp;Header 中的数据已经说明了整个 Mach-O 文件的基本信息，但是整个 Mach-O 中最重要的还是 Load commands。它说明了操作系统应当如何加载文件中的数据，对 **系统内核加载器和动态链接器** 起指导作用。一来它描述了文件中数据的具体组织结构，二来它也说明了进程启动后，对应的内存空间结构是如何组织的。
 
 &emsp;我们可以用 `otool -l Test_ipa_Simple` 来查看 Test_ipa_Simple 这个 Mach-O 文件的 Load commands（加载命令）：
 ```c++
@@ -236,15 +239,14 @@ Section
 
 ```
 
-上面这段是执行结果的一部分，是加载PAGE_ZERO和TEXT两个segment的load command。PAGE_ZERO是一段“空白”数据区，这段数据没有任何读写运行权限，方便捕捉总线错误（SIGBUS）。TEXT则是主体代码段，我们注意到其中的r-x，不包含w写权限，这是为了避免代码逻辑被肆意篡改。
+&emsp;上面这段是执行结果的一部分，是加载 PAGE_ZERO 和 TEXT 两个 segment 的 load command。PAGE_ZERO 是一段 “空白” 数据区，这段数据没有任何读写运行权限，方便捕捉总线错误（SIGBUS）。TEXT 则是主体代码段，我们注意到其中的 r-x，不包含 w 写权限，这是为了避免代码逻辑被肆意篡改。
 
-我再提一个加载命令，LC_MAIN。这个加载指令，会声明整个程序的入口地址，保证进程启动后能够正常的开始整个应用程序的运行。
+&emsp;我再提一个加载命令，LC_MAIN。这个加载指令，会声明整个程序的入口地址，保证进程启动后能够正常的开始整个应用程序的运行。
 
-除此之外，Mach-O里还有LC_SYMTAB、LC_LOAD_DYLIB、LC_CODE_SIGNATURE等加载命令，大家可以去官方文档查找其含义。
+&emsp;除此之外，Mach-O 里还有 LC_SYMTAB、LC_LOAD_DYLIB、LC_CODE_SIGNATURE 等加载命令，大家可以去官方文档查找其含义。
 
-至于Data部分，在了解了头部和加载命令后，就没什么特别可说的了。Data是最原始的编译数据，里面包含了Objective-C的类信息、常量等。
+&emsp;至于 Data 部分，在了解了头部和加载命令后，就没什么特别可说的了。Data 是最原始的编译数据，里面包含了 Objective-C 的类信息、常量等。
 
-本文是对Mach-O文件格式的一个理解小结，希望能够抛砖引玉，帮助各位朋友把握可执行文件的主题脉络，进而解决各类问题。
 
 
 
