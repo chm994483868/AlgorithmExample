@@ -1,7 +1,7 @@
 # iOS APP 启动优化(一)：ipa(iPhone application archive) 包和 Mach-O(Mach Object file format) 解析
 
 > &emsp;IPA 后缀的文件是 iOS 系统的软件包，全称为 iPhone application archive。通常情况下，IPA 文件都是使用苹果公司的 FairPlayDRM 技术进行加密保护的。每个 IPA 文件都是 ARM 架构的可执行文件以及该应用的资源文件的打包文件，只能安装在 iPhone、iPod Touch、iPad 以及使用 Apple Silicon 平台的 Mac 上。该文件可以通过修改后缀名为 zip 后，进行解压缩，查看其软件包中的内容。[IPA文件-维基百科](https://zh.wikipedia.org/wiki/IPA文件)
-> 
+ 
 > &emsp;数字版权管理（英语：Digital rights management，缩写为 DRM）是一系列访问控制技术，通常用于控制数字内容和设备在被销售之后的使用过程。DRM 有时也称为拷贝保护、复制控制、技术保护措施等，但这些称呼存在争议。许多数字出版社和软件厂商都使用了 DRM，例如亚马逊、AT&T、AOL、Apple Inc.、Netflix、Google[7]、BBC、微软、Sony、Valve Corporation 等。[数字版权管理-维基百科](https://zh.wikipedia.org/wiki/数字版权管理)
 
 ## 解压 .ipa 文件查看其内容并引出 Mach-O 格式
@@ -150,6 +150,7 @@ struct mach_header_64 {
     uint32_t    reserved;    /* reserved */
 };
 ```
+
 &emsp;观察 mach_header_64 结构体各个字段的名字，可看到 header 部分存放的是当前 Mach-O 文件的一些概述信息，例如：支持的 CPU 类型（架构）、支持的 CPU 子类型、文件类型（对应上面的 Mach-O Type）、Load commands 的数量、Load commands 的大小等内容。
 
 + magic 是 mach 的魔法数标识，Test_ipa_Simple 的 magic 是 MH_MAGIC_64，该值是 loader.h 中的一个宏：`#define MH_MAGIC_64 0xfeedfacf` 用于表示 64 位的 mach 魔法数（64-bit mach magic number）。
@@ -186,64 +187,212 @@ hmc@HMdeMac-mini Test_ipa_Simple.app %
 
 ![截屏2021-04-16 08.45.44.png](https://p6-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/1c07afe370ea4fd08615393af1adf057~tplv-k3u1fbpfcp-watermark.image)
 
-3. 直接使用 xxd 命令读取以十六进制读取二进制文件的内容。（这里看到 magic 值是 0xcffaedfe 🤔️）`#define MH_CIGAM_64 0xcffaedfe /* NXSwapInt(MH_MAGIC_64) */`
+3. 直接使用 xxd 命令读取以十六进制读取二进制文件的内容。（这里看到 magic 值是 0xcffaedfe，同一个文件上面使用 otool 和 MachOView 看到的值是 0xfeedfacf 🤔️）`#define MH_CIGAM_64 0xcffaedfe /* NXSwapInt(MH_MAGIC_64) */`
 
 ![截屏2021-04-16 08.51.00.png](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/dc0b2f9d65974ce5a778f975888c07a4~tplv-k3u1fbpfcp-watermark.image)
 
 ### Load commands
-&emsp;Header 中的数据已经说明了整个 Mach-O 文件的基本信息，但是整个 Mach-O 中最重要的还是 Load commands。它说明了操作系统应当如何加载文件中的数据，对 **系统内核加载器和动态链接器** 起指导作用。一来它描述了文件中数据的具体组织结构，二来它也说明了进程启动后，对应的内存空间结构是如何组织的。
+&emsp;Header 中的数据已经说明了整个 Mach-O 文件的基本信息，但是整个 Mach-O 中最重要的还是 Load commands。
 
-&emsp;我们可以用 `otool -l Test_ipa_Simple` 来查看 Test_ipa_Simple 这个 Mach-O 文件的 Load commands（加载命令）：
++ 它说明了操作系统应当如何加载文件中的数据，对系统内核加载器和动态链接器起指导作用。
++ 一来它描述了文件中数据的具体组织结构。
++ 二来它也说明了进程启动后，对应的内存空间结构是如何组织的。
+
+&emsp;同样这里我们也通过几种不同的方式来查看 Test_ipa_Simple 文件中 Load commands 部分的内容。
+
+&emsp;我们可以用 `otool -l Test_ipa_Simple` 来查看 Test_ipa_Simple 这个 Mach-O 文件中的 Load commands（加载命令）。（上面通过 Test_ipa_Simple 的 header 部分的 ncmds 字段我们知道它一共有 22 条加载命令（包含加载 \_\_PAGEZERO 段的话是 23 条加载命令），但是内容过长了这里就仅列出 Load command 0 和 Load command 1 的内容，它们两个都是 LC_SEGMENT_64） 
+
 ```c++
 hmc@bogon Test_ipa_Simple.app % otool -l Test_ipa_Simple 
 Test_ipa_Simple:
-Load command 0
+Load command 0 // ⬅️ 加载命令 0
       cmd LC_SEGMENT_64
   cmdsize 72
-  segname __PAGEZERO
+  segname __PAGEZERO // ⬅️ PAGEZERO 段
    vmaddr 0x0000000000000000
    vmsize 0x0000000100000000
   fileoff 0
  filesize 0
-  maxprot 0x00000000
- initprot 0x00000000
+  maxprot ---
+ initprot ---
    nsects 0
-    flags 0x0
-Load command 1
+    flags (none)
+Load command 1 // ⬅️ 加载命令 1
       cmd LC_SEGMENT_64
   cmdsize 792
-  segname __TEXT
+  segname __TEXT // ⬅️ TEXT 段
    vmaddr 0x0000000100000000
    vmsize 0x0000000000008000
   fileoff 0
  filesize 32768
-  maxprot 0x00000005
- initprot 0x00000005
-   nsects 9
-    flags 0x0
-Section
-  sectname __text
-   segname __TEXT
-      addr 0x0000000100006264
-      size 0x0000000000000234
-    offset 25188
+  maxprot r-x // ⬅️ 仅有读权限
+ initprot r-x
+   nsects 9 // ⬅️ 告诉我们 TEXT 段有 9 个 section 
+    flags (none)
+Section // ⬇️ 下面便是对 TEXT 段 9 个区的描述（0 区）
+  sectname __text // ⬅️ 区名 __text 
+   segname __TEXT // ⬅️ 段名 __TEXT (这里也完全对应我们上面阅读 Overview of the Mach-O Executable Format 文档中的内容)
+      addr 0x000000010000621c
+      size 0x00000000000001fc
+    offset 25116
      align 2^2 (4)
     reloff 0
     nreloc 0
-     flags 0x80000400
+      type S_REGULAR
+attributes PURE_INSTRUCTIONS SOME_INSTRUCTIONS
  reserved1 0
  reserved2 0
-Section
-  sectname __stubs
-   segname __TEXT
-
+Section // ⬅️ (1 区)
+  sectname __stubs // ⬅️ 区名 __stubs
+   segname __TEXT // ⬅️ 段名 __TEXT
+      addr 0x0000000100006418
+      size 0x000000000000009c
+    offset 25624
+     align 2^2 (4)
+    reloff 0
+    nreloc 0
+      type S_SYMBOL_STUBS
+attributes PURE_INSTRUCTIONS SOME_INSTRUCTIONS
+ reserved1 0 (index into indirect symbol table)
+ reserved2 12 (size of stubs)
+Section // ⬅️ (2 区)
+  sectname __stub_helper // ⬅️ 区名 __stub_helper
+   segname __TEXT // ⬅️ 段名 __TEXT
+      addr 0x00000001000064b4
+      size 0x00000000000000b4
+    offset 25780
+     align 2^2 (4)
+    reloff 0
+    nreloc 0
+      type S_REGULAR
+attributes PURE_INSTRUCTIONS SOME_INSTRUCTIONS
+ reserved1 0
+ reserved2 0
+Section // ⬅️ (3 区)
+  sectname __objc_methlist // ⬅️ 区名 __objc_methlist
+   segname __TEXT // ⬅️ 段名 __TEXT
+      addr 0x0000000100006568
+      size 0x00000000000000bc
+    offset 25960
+     align 2^3 (8)
+    reloff 0
+    nreloc 0
+      type S_REGULAR
+attributes (none)
+ reserved1 0
+ reserved2 0
+Section // ⬅️ (4 区)
+  sectname __objc_methname // ⬅️ 区名 __objc_methname
+   segname __TEXT // ⬅️ 段名 __TEXT
+      addr 0x0000000100006624
+      size 0x0000000000000d68
+    offset 26148
+     align 2^0 (1)
+    reloff 0
+    nreloc 0
+      type S_CSTRING_LITERALS
+attributes (none)
+ reserved1 0
+ reserved2 0
+Section // ⬅️ (5 区)
+  sectname __objc_classname // ⬅️ 区名 __objc_classname
+   segname __TEXT // ⬅️ 段名 __TEXT
+      addr 0x000000010000738c
+      size 0x0000000000000070
+    offset 29580
+     align 2^0 (1)
+    reloff 0
+    nreloc 0
+      type S_CSTRING_LITERALS
+attributes (none)
+ reserved1 0
+ reserved2 0
+Section // ⬅️ (6 区)
+  sectname __objc_methtype // ⬅️ 区名 __objc_methtype
+   segname __TEXT // ⬅️ 段名 __TEXT
+      addr 0x00000001000073fc
+      size 0x0000000000000b0f
+    offset 29692
+     align 2^0 (1)
+    reloff 0
+    nreloc 0
+      type S_CSTRING_LITERALS
+attributes (none)
+ reserved1 0
+ reserved2 0
+Section // ⬅️ (7 区)
+  sectname __cstring // ⬅️ 区名 __cstring
+   segname __TEXT // ⬅️ 段名 __TEXT
+      addr 0x0000000100007f0b
+      size 0x0000000000000090
+    offset 32523
+     align 2^0 (1)
+    reloff 0
+    nreloc 0
+      type S_CSTRING_LITERALS
+attributes (none)
+ reserved1 0
+ reserved2 0
+Section // ⬅️ (8 区)
+  sectname __unwind_info // ⬅️ 区名 __unwind_info
+   segname __TEXT // ⬅️ 段名 __TEXT
+      addr 0x0000000100007f9c
+      size 0x0000000000000064
+    offset 32668
+     align 2^2 (4)
+    reloff 0
+    nreloc 0
+      type S_REGULAR
+attributes (none)
+ reserved1 0
+ reserved2 0
+Load command 2 // ⬇️ 其它的加载命令
+...
 ```
 
-&emsp;上面这段是执行结果的一部分，是加载 PAGE_ZERO 和 TEXT 两个 segment 的 load command。PAGE_ZERO 是一段 “空白” 数据区，这段数据没有任何读写运行权限，方便捕捉总线错误（SIGBUS）。TEXT 则是主体代码段，我们注意到其中的 r-x，不包含 w 写权限，这是为了避免代码逻辑被肆意篡改。
+&emsp;上面是加载 \_\_PAGE_ZERO 和 \_\_TEXT 两个 segment 的 Load command。\_\_PAGE_ZERO 是一段 “空白” 数据区，这段数据没有任何读写运行权限，方便捕捉总线错误（SIGBUS）。\_\_TEXT 则是主体代码段，我们注意到其中的 r-x，不包含 w 写权限，这是为了避免代码逻辑被肆意篡改。
 
-&emsp;我再提一个加载命令，LC_MAIN。这个加载指令，会声明整个程序的入口地址，保证进程启动后能够正常的开始整个应用程序的运行。
+&emsp;加载命令 LC_MAIN 会声明整个程序的入口地址，保证进程启动后能够正常的开始整个应用程序的运行。
 
-&emsp;除此之外，Mach-O 里还有 LC_SYMTAB、LC_LOAD_DYLIB、LC_CODE_SIGNATURE 等加载命令，大家可以去官方文档查找其含义。
+```c++
+...
+Load command 12 // ⬅️ 加载命令 12
+       cmd LC_MAIN // ⬅️ LC_MAIN
+   cmdsize 24
+  entryoff 25424
+ stacksize 0
+Load command 13
+...
+```
+
+| Load command | cmd | segname | sections |
+| --- | --- | --- | --- |
+| 0 | LC_SEGMENT_64 | \_\_PAGEZERO | _ |
+| 1 | LC_SEGMENT_64 | \_\_TEXT | \_\_text、\_\_stubs、\_\_stub_helper、\_\_objc_methlist、\_\_objc_methname、\_\_objc_classname、\_\_objc_methtype、\_\_cstring、\_\_unwind_info |
+| 2 | LC_SEGMENT_64 | \_\_DATA_CONST | \_\_got、\_\_cfstring、\_\_objc_classlist、\_\_objc_protolist、\_\_objc_imageinfo |
+| 3 | LC_SEGMENT_64 | \_\_DATA | __la_symbol_ptr、__objc_const、__objc_selrefs、__objc_classrefs、__objc_superrefs、__objc_ivar、__objc_data、__data |
+| 4 | LC_SEGMENT_64 | \_\_LINKEDIT | _ |
+| 5 | LC_DYLD_INFO_ONLY | _ | _ |
+| 6 | LC_SYMTAB |  |  |
+| 7 | LC_DYSYMTAB | _ | _ |
+| 8 | LC_LOAD_DYLINKER | _ | _ |
+| 9 | LC_UUID | _ | _ |
+| 10 | LC_BUILD_VERSION | _ | _ |
+| 11 | LC_SOURCE_VERSION | _ | _ |
+| 12 | LC_MAIN | _ | _ |
+| 13 | LC_ENCRYPTION_INFO_64 | _ | _ |
+| 14 | LC_LOAD_DYLIB | _ | _ |
+| 15 | LC_LOAD_DYLIB | _ | _ |
+| 16 | LC_LOAD_DYLIB | _ | _ |
+| 17 | LC_LOAD_DYLIB | _ | _ |
+| 18 | LC_LOAD_DYLIB | _ | _ |
+| 19 | LC_RPATH | _ | _ |
+| 20 | LC_FUNCTION_STARTS | _ | _ |
+| 21 | LC_DATA_IN_CODE | _ | _ |
+| 22 | LC_CODE_SIGNATURE | _ | _ |
+
+
+
 
 &emsp;至于 Data 部分，在了解了头部和加载命令后，就没什么特别可说的了。Data 是最原始的编译数据，里面包含了 Objective-C 的类信息、常量等。
 
@@ -271,6 +420,8 @@ Section
 ### Data
 &emsp;记录具体的内容信息。不同类别的信息对应不同的数据含义。Load Commands 到 Data 的箭头，Data 的位置是由 Load Commands 指定的。
 
+&emsp;Data数据，存储了实际的内容，主要是程序的指令和数据，它们的排布完全依照 Load Commands 的描述.
+包含load commands中需要的各个段(segment)的数据
 
 
 
@@ -305,6 +456,8 @@ Section
 + [Mac 命令 - otool](https://blog.csdn.net/lovechris00/article/details/81561627)
 + [iOS 启动优化 + 监控实践](https://juejin.cn/post/6844904194877587469)
 + [dyld背后的故事&源码分析](https://juejin.cn/post/6844903782833192968)
++ [Mac OS X ABI Mach-O File Format Reference（Mach-O文件格式参考](https://www.jianshu.com/p/f10f916a9a63)
++ [aidansteele/osx-abi-macho-file-format-reference](https://github.com/aidansteele/osx-abi-macho-file-format-reference)
 
 
 
