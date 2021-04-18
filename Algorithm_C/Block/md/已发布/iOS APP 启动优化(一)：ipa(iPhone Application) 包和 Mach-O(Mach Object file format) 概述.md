@@ -1,4 +1,4 @@
-# iOS APP 启动优化(一)：ipa(iPhone application archive) 包和 Mach-O(Mach Object file format) 解析
+# iOS APP 启动优化(一)：ipa(iPhone application archive) 包和 Mach-O(Mach Object file format) 概述
 
 > &emsp;IPA 后缀的文件是 iOS 系统的软件包，全称为 iPhone application archive。通常情况下，IPA 文件都是使用苹果公司的 FairPlayDRM 技术进行加密保护的。每个 IPA 文件都是 ARM 架构的可执行文件以及该应用的资源文件的打包文件，只能安装在 iPhone、iPod Touch、iPad 以及使用 Apple Silicon 平台的 Mac 上。该文件可以通过修改后缀名为 zip 后，进行解压缩，查看其软件包中的内容。[IPA文件-维基百科](https://zh.wikipedia.org/wiki/IPA文件)
  
@@ -183,20 +183,30 @@ MH_MAGIC_64    ARM64        ALL  0x00     EXECUTE    22       2800   NOUNDEFS DY
 hmc@HMdeMac-mini Test_ipa_Simple.app % 
 ```
 
+&emsp;这里 flags 中的几个值我们可以直接在 loader.h 里面找到，然后它们对应的值进行按位 & 以后得到的值正是：0x00200085。
+
+```c++
+#define MH_NOUNDEFS 0x1 /* the object file has no undefined references */
+#define MH_DYLDLINK 0x4 /* the object file is input for the dynamic linker and can't be staticly link edited again */
+#define MH_TWOLEVEL 0x80 /* the image is using two-level name space bindings */
+#define MH_PIE 0x200000 /* When this bit is set, the OS will load the main executable at a random address. Only used in MH_EXECUTE filetypes. */
+```
+
 2. 通过 [MachOView](https://github.com/fangshufeng/MachOView) 工具查看。 
 
 ![截屏2021-04-16 08.45.44.png](https://p6-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/1c07afe370ea4fd08615393af1adf057~tplv-k3u1fbpfcp-watermark.image)
 
-3. 直接使用 xxd 命令读取以十六进制读取二进制文件的内容。（这里看到 magic 值是 0xcffaedfe，同一个文件上面使用 otool 和 MachOView 看到的值是 0xfeedfacf 🤔️）`#define MH_CIGAM_64 0xcffaedfe /* NXSwapInt(MH_MAGIC_64) */`
+3. 直接使用 xxd 命令读取以十六进制读取二进制文件的内容。（这里看到 magic 值是 0xcffaedfe，同一个文件上面使用 otool 和 MachOView 看到的值是 0xfeedfacf）`#define MH_CIGAM_64 0xcffaedfe /* NXSwapInt(MH_MAGIC_64) */`
 
 ![截屏2021-04-16 08.51.00.png](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/dc0b2f9d65974ce5a778f975888c07a4~tplv-k3u1fbpfcp-watermark.image)
 
 ### Load commands
-&emsp;Header 中的数据已经说明了整个 Mach-O 文件的基本信息，但是整个 Mach-O 中最重要的还是 Load commands。
+&emsp;Header 中的数据已经说明了整个 Mach-O 文件的基本信息，但是整个 Mach-O 中最重要的还是 Load commands。它说明了操作系统应当如何加载 Mach-O 文件中的数据，对系统内核加载器和动态链接器起指导作用。
 
-+ 它说明了操作系统应当如何加载文件中的数据，对系统内核加载器和动态链接器起指导作用。
 + 一来它描述了文件中数据的具体组织结构。
 + 二来它也说明了进程启动后，对应的内存空间结构是如何组织的。
+
+&emsp;load commands "specify both the logical structure of the file and the layout of the file in virtual memory". load commands “既指定文件的逻辑结构，也指定文件在虚拟内存中的布局”。 
 
 &emsp;同样这里我们也通过几种不同的方式来查看 Test_ipa_Simple 文件中 Load commands 部分的内容。
 
@@ -350,9 +360,9 @@ Load command 2 // ⬇️ 其它的加载命令
 ...
 ```
 
-&emsp;上面是加载 \_\_PAGE_ZERO 和 \_\_TEXT 两个 segment 的 Load command。\_\_PAGE_ZERO 是一段 “空白” 数据区，这段数据没有任何读写运行权限，方便捕捉总线错误（SIGBUS）。\_\_TEXT 则是主体代码段，我们注意到其中的 r-x，不包含 w 写权限，这是为了避免代码逻辑被肆意篡改。
+&emsp;上面是加载 \_\_PAGE_ZERO 和 \_\_TEXT 两个 segment 的 Load command 的全部内容。\_\_PAGE_ZERO 是一段 “空白” 数据区，这段数据没有任何读写运行权限，方便捕捉总线错误（SIGBUS）。\_\_TEXT 则是主体代码段，我们注意到其中的 r-x，不包含 w 写权限，这是为了避免代码逻辑被肆意篡改。
 
-&emsp;加载命令 LC_MAIN 会声明整个程序的入口地址，保证进程启动后能够正常的开始整个应用程序的运行。
+&emsp;加载命令 LC_MAIN 会声明整个程序的入口地址，保证进程启动后能够正常的开始整个应用程序的运行。（我们程序的 main 函数。）
 
 ```c++
 ...
@@ -365,79 +375,40 @@ Load command 13
 ...
 ```
 
-| Load command | cmd | segname | sections |
-| --- | --- | --- | --- |
-| 0 | LC_SEGMENT_64 | \_\_PAGEZERO | _ |
-| 1 | LC_SEGMENT_64 | \_\_TEXT | \_\_text、\_\_stubs、\_\_stub_helper、\_\_objc_methlist、\_\_objc_methname、\_\_objc_classname、\_\_objc_methtype、\_\_cstring、\_\_unwind_info |
-| 2 | LC_SEGMENT_64 | \_\_DATA_CONST | \_\_got、\_\_cfstring、\_\_objc_classlist、\_\_objc_protolist、\_\_objc_imageinfo |
-| 3 | LC_SEGMENT_64 | \_\_DATA | __la_symbol_ptr、__objc_const、__objc_selrefs、__objc_classrefs、__objc_superrefs、__objc_ivar、__objc_data、__data |
-| 4 | LC_SEGMENT_64 | \_\_LINKEDIT | _ |
-| 5 | LC_DYLD_INFO_ONLY | _ | _ |
-| 6 | LC_SYMTAB |  |  |
-| 7 | LC_DYSYMTAB | _ | _ |
-| 8 | LC_LOAD_DYLINKER | _ | _ |
-| 9 | LC_UUID | _ | _ |
-| 10 | LC_BUILD_VERSION | _ | _ |
-| 11 | LC_SOURCE_VERSION | _ | _ |
-| 12 | LC_MAIN | _ | _ |
-| 13 | LC_ENCRYPTION_INFO_64 | _ | _ |
-| 14 | LC_LOAD_DYLIB | _ | _ |
-| 15 | LC_LOAD_DYLIB | _ | _ |
-| 16 | LC_LOAD_DYLIB | _ | _ |
-| 17 | LC_LOAD_DYLIB | _ | _ |
-| 18 | LC_LOAD_DYLIB | _ | _ |
-| 19 | LC_RPATH | _ | _ |
-| 20 | LC_FUNCTION_STARTS | _ | _ |
-| 21 | LC_DATA_IN_CODE | _ | _ |
-| 22 | LC_CODE_SIGNATURE | _ | _ |
+&emsp;下面的表格我们列出 Mach-O 文件 Test_ipa_simple 中的全部 23 条 Load commands 的名字以及它们对应的段名和包含的区名。
 
+| Load command | cmd | segname | sections | name |
+| --- | --- | --- | --- | --- |
+| 0 | LC_SEGMENT_64 | \_\_PAGEZERO | _ | _ |
+| 1 | LC_SEGMENT_64 | \_\_TEXT | \_\_text<br>\_\_stubs<br>\_\_stub_helper<br>\_\_objc_methlist<br>\_\_objc_methname<br>\_\_objc_classname<br>\_\_objc_methtype<br>\_\_cstring<br>\_\_unwind_info | _ |
+| 2 | LC_SEGMENT_64 | \_\_DATA_CONST | \_\_got<br>\_\_cfstring<br>\_\_objc_classlist<br>\_\_objc_protolist<br>\_\_objc_imageinfo | _ |
+| 3 | LC_SEGMENT_64 | \_\_DATA | \_\_la_symbol_ptr<br>\_\_objc_const<br>\_\_objc_selrefs<br>\_\_objc_classrefs<br>\_\_objc_superrefs<br>\_\_objc_ivar<br>\_\_objc_data<br>\_\_data | _ |
+| 4 | LC_SEGMENT_64 | \_\_LINKEDIT | _ | _ |
+| 5 | LC_DYLD_INFO_ONLY | _ | _ | _ |
+| 6 | LC_SYMTAB | _ | _ | _ |
+| 7 | LC_DYSYMTAB | _ | _ | _ |
+| 8 | LC_LOAD_DYLINKER | _ | _ | /usr/lib/dyld (offset 12) |
+| 9 | LC_UUID | _ | _ | _ |
+| 10 | LC_BUILD_VERSION | _ | _ | _ |
+| 11 | LC_SOURCE_VERSION | _ | _ | _ |
+| 12 | LC_MAIN | _ | _ | _ |
+| 13 | LC_ENCRYPTION_INFO_64 | _ | _ | _ |
+| 14 | LC_LOAD_DYLIB(Foundation) | _ | _ | /System/Library/Frameworks/Foundation.framework/Foundation (offset 24) |
+| 15 | LC_LOAD_DYLIB(libobjc.A.dylib) | _ | _ | /usr/lib/libobjc.A.dylib (offset 24) |
+| 16 | LC_LOAD_DYLIB(libSystem.B.dylib) | _ | _ | /usr/lib/libSystem.B.dylib (offset 24) |
+| 17 | LC_LOAD_DYLIB(CoreFoundation) | _ | _ | /System/Library/Frameworks/CoreFoundation.framework/CoreFoundation (offset 24) |
+| 18 | LC_LOAD_DYLIB(UIKit) | _ | _ | /System/Library/Frameworks/UIKit.framework/UIKit (offset 24) |
+| 19 | LC_RPATH | _ | _ | _ |
+| 20 | LC_FUNCTION_STARTS | _ | _ | _ |
+| 21 | LC_DATA_IN_CODE | _ | _ | _ |
+| 22 | LC_CODE_SIGNATURE | _ | _ | _ |
 
+&emsp;使用 MachOView 查看的话 23 条 Load commands 是这样的。
 
-
-&emsp;至于 Data 部分，在了解了头部和加载命令后，就没什么特别可说的了。Data 是最原始的编译数据，里面包含了 Objective-C 的类信息、常量等。
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+![截屏2021-04-18 下午4.10.55.png](https://p9-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/615183ec70fc43b8b51463a2c8b847f1~tplv-k3u1fbpfcp-watermark.image)
 
 ### Data
-&emsp;记录具体的内容信息。不同类别的信息对应不同的数据含义。Load Commands 到 Data 的箭头，Data 的位置是由 Load Commands 指定的。
-
-&emsp;Data数据，存储了实际的内容，主要是程序的指令和数据，它们的排布完全依照 Load Commands 的描述.
-包含load commands中需要的各个段(segment)的数据
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+&emsp;至于 Data 部分，在了解了头部和加载命令后，就没什么特别可说的了。Data 是最原始的编译数据，主要是程序的指令和数据，里面包含了 Objective-C 的类信息、常量等，它们的排布完全依照 Load Commands 的描述，包含 Load commands 中需要的各个段（segment）的数据。Load Commands 到 Data 的箭头，Data 的位置是由 Load Commands 指定的。
 
 ## 参考链接
 **参考链接:🔗**
@@ -458,24 +429,4 @@ Load command 13
 + [dyld背后的故事&源码分析](https://juejin.cn/post/6844903782833192968)
 + [Mac OS X ABI Mach-O File Format Reference（Mach-O文件格式参考](https://www.jianshu.com/p/f10f916a9a63)
 + [aidansteele/osx-abi-macho-file-format-reference](https://github.com/aidansteele/osx-abi-macho-file-format-reference)
-
-
-
-
-
-&emsp;下面先看一下戴铭老师的关于 Mach-O 文章的引子，这样一定能引起你学习 Mach-O 的兴趣。
-
-&emsp;首先 Mach-O 二进制文件包含程序的核心逻辑，以及入口点主要功能，那么我们学习 Mach-O 能学到哪些东西呢?
-
-1. 通过学习 Mach-O 可以了解到应用程序是如何加载到系统的，如何执行的。
-2. 通过学习 Mach-O 可以了解到符号查找，函数调用堆栈符号化等。
-3. 通过学习 Mach-O 可以对编译和逆向工程都有帮助。
-4. 通过学习 Mach-O 还可以了解到动态链接器的内部工作原理以及字节码格式的信息、Leb128 字节流、Mach 导出时 Trie 二进制 image 压缩。
-
-1. Mach-O 文件的内部逻辑（内部结构）是什么样的？
-2. 它是怎么构建出来的?
-3. 组织方式如何?
-4. 怎么加载的？
-5. 如何工作？
-6. 谁让它工作？
-7. 怎么导入和导出符号的？
++ [The Nitty Gritty of “Hello World” on macOS](https://www.reinterpretcast.com/hello-world-mach-o)
