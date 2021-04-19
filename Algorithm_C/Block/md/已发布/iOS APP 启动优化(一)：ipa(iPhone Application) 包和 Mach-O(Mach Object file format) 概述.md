@@ -133,7 +133,7 @@ Mach-O 曾经为大部分基于 Mach 核心的操作系统所使用。NeXTSTEP�
 
 ![d06ff3536b6369f4652b6a5b862f9ced.png](https://p6-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/ffa97f6d060e441a8d83d1bacc58f190~tplv-k3u1fbpfcp-watermark.image)
 
-&emsp;从图上我们能明显看出 Mach-O 文件的数据主体分为三大部分：分别是 Header（头部）、Load commands（加载命令）、Data（最终的数据），可看到完全对应到上一节中提到的 “Mach-O 二进制文件被组织成段（segments），每个段包含一个或多个 sections”。 
+&emsp;从图上我们能明显看出 Mach-O 文件的数据主体分为三大部分：分别是 Header（头部）、Load commands（加载命令）、Data（最终的数据），可看到完全对应到上一节中提到的 “Mach-O 二进制文件被组织成多个段（segments），每个段包含一个或多个 sections”。 
 
 ### Header（Mach-O 头部）
 &emsp;Mach-O 文件的 Header 部分对应的数据结构定义在 darwin-xnu/EXTERNAL_HEADERS/mach-o/loader.h 中，struct mach_header 和 struct mach_header_64 分别对应 32-bit architectures 和 64-bit architectures。（对于 32/64-bit architectures，32/64 位的 mach header 都出现在 Mach-O 文件的最开头。）
@@ -201,7 +201,7 @@ hmc@HMdeMac-mini Test_ipa_Simple.app %
 ![截屏2021-04-16 08.51.00.png](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/dc0b2f9d65974ce5a778f975888c07a4~tplv-k3u1fbpfcp-watermark.image)
 
 ### Load commands
-&emsp;Header 中的数据已经说明了整个 Mach-O 文件的基本信息，但是整个 Mach-O 中最重要的还是 Load commands。它说明了操作系统应当如何加载 Mach-O 文件中的数据，对系统内核加载器和动态链接器起指导作用。
+&emsp;Header 中的数据已经说明了整个 Mach-O 文件的基本信息，但是整个 Mach-O 中最重要的还是 Load commands。它说明了操作系统应当如何加载 Mach-O 文件中的数据（描述了怎样加载每个 Segment 的信息），对系统内核加载器和动态链接器起指导作用。
 
 + 一来它描述了文件中数据的具体组织结构。
 + 二来它也说明了进程启动后，对应的内存空间结构是如何组织的。
@@ -404,25 +404,27 @@ Load command 13
 | 22 | LC_CODE_SIGNATURE | _ | _ | _ |
 
 &emsp;使用 MachOView 查看的话 23 条 Load commands 是这样的。
-
+             
 ![截屏2021-04-18 下午4.10.55.png](https://p9-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/615183ec70fc43b8b51463a2c8b847f1~tplv-k3u1fbpfcp-watermark.image)
 
 ### Data
-&emsp;至于 Data 部分，在了解了头部和加载命令后，就没什么特别可说的了。Data 是最原始的编译数据，主要是程序的指令和数据，里面包含了 Objective-C 的类信息、常量等，它们的排布完全依照 Load Commands 的描述，包含 Load commands 中需要的各个段（segment）的数据。Load Commands 到 Data 的箭头，Data 的位置是由 Load Commands 指定的。
+&emsp;至于 Data 部分，在了解了头部和加载命令后，就没什么特别可说的了。Data 是最原始的编译数据，主要是程序的指令（代码）和数据，里面包含了 Objective-C 的类信息、常量等，它们的排布完全依照 Load Commands 的描述，包含 Load commands 中提到的各个段（Segments）的数据。Load Commands 到 Data 的箭头，Data 的位置是由 Load Commands 指定的。
 
 ## 参考链接
 **参考链接:🔗**
 + [MachOView工具](https://www.jianshu.com/p/2092d2d374e5)
 + [查看二进制文件](https://www.cnblogs.com/skydragon/p/7200173.html)
-+ [深入理解MachO数据解析规则](https://juejin.cn/post/6947843156163428383)
 + [iOS App启动优化（一）—— 了解App的启动流程](https://juejin.cn/post/6844903968837992461)
 + [了解iOS上的可执行文件和Mach-O格式](http://www.cocoachina.com/articles/10988)
++ [探秘 Mach-O 文件](http://hawk0620.github.io/blog/2018/03/22/study-mach-o-file/)
+
+
+
 + [Apple 操作系统可执行文件 Mach-O](https://xiaozhuanlan.com/topic/1895704362)
 + [iOS开发之runtime（11）：Mach-O 犹抱琵琶半遮面](https://xiaozhuanlan.com/topic/0328479651)
 + [iOS开发之runtime（12）：深入 Mach-O](https://xiaozhuanlan.com/topic/9204153876)
 + [Overview of the Mach-O Executable Format](https://developer.apple.com/library/archive/documentation/Performance/Conceptual/CodeFootprint/Articles/Articles/Articles/MachOOverview.html#//apple_ref/doc/uid/20001860-BAJGJEJC)
 + [iOS安全：Mach-O Type](https://easeapi.com/blog/blog/23.html)
-+ [探秘 Mach-O 文件](http://hawk0620.github.io/blog/2018/03/22/study-mach-o-file/)
 + [apple/darwin-xnu](https://github.com/apple/darwin-xnu) 
 + [Mac 命令 - otool](https://blog.csdn.net/lovechris00/article/details/81561627)
 + [iOS 启动优化 + 监控实践](https://juejin.cn/post/6844904194877587469)
@@ -430,3 +432,4 @@ Load command 13
 + [Mac OS X ABI Mach-O File Format Reference（Mach-O文件格式参考](https://www.jianshu.com/p/f10f916a9a63)
 + [aidansteele/osx-abi-macho-file-format-reference](https://github.com/aidansteele/osx-abi-macho-file-format-reference)
 + [The Nitty Gritty of “Hello World” on macOS](https://www.reinterpretcast.com/hello-world-mach-o)
++ [深入理解MachO数据解析规则](https://juejin.cn/post/6947843156163428383)
