@@ -157,8 +157,8 @@ struct mach_header_64 {
 
 &emsp;这里牵涉到一个 magic number（魔数）的概念。对于一个二进制文件来说，其对应的类型可以在其最初几个字节来标识出来，即 “魔数”。例如我们特别熟悉的 png 格式的图片，使用 xxd 命令查看前 8 个字节的内容 `00000000: 8950 4e47 0d0a 1a0a 0000 000d 4948 4452  .PNG........IHDR` 我们可识别出它是一张 png 格式的图片，再例如常见的 shell 脚本文件前 8 个字节的内容 `00000000: 6563 686f 2022 7e7e 7e7e 7e7e 7e7e 7e7e  echo "~~~~~~~~~~`。
 
-+ filetype 表示 Mach-O Type，这个可以有很多类型，静态库（.a）、单个目标文件（.o）都可以通过这个类型标识来区分。
-+ ncmds 表示 Load commands 加载命令的个数。
++ filetype 表示 Mach-O Type，这个可以有很多类型，静态库（.a）、单个目标文件（.o）都可以通过这个类型标识来区分。（可执行文件、符号文件(DSYM)、内核扩展等）
++ ncmds 表示 Load commands 加载命令的数量。
 + sizeofcmds 表示 Load commands 加载命令所占的大小。
 + flags 不同的位表示不同的标识信息，比如 TWOLEVEL 是指符号都是两级格式的，符号自身 + 加上自己所在的单元，PIE 标识是位置无关的。
 
@@ -186,11 +186,19 @@ hmc@HMdeMac-mini Test_ipa_Simple.app %
 &emsp;这里 flags 中的几个值我们可以直接在 loader.h 里面找到，然后它们对应的值进行按位 & 以后得到的值正是：0x00200085。
 
 ```c++
+// 目标文件没有未定义的符号
 #define MH_NOUNDEFS 0x1 /* the object file has no undefined references */
+
+// 目标文件是动态链接输入文件，不能被再次静态链接
 #define MH_DYLDLINK 0x4 /* the object file is input for the dynamic linker and can't be staticly link edited again */
+
+// 只读 segments 和 可读写 segments 分离
+#define MH_SPLIT_SEGS 0x20 /* the file has its read-only and read-write segments split */
+
 #define MH_TWOLEVEL 0x80 /* the image is using two-level name space bindings */
 #define MH_PIE 0x200000 /* When this bit is set, the OS will load the main executable at a random address. Only used in MH_EXECUTE filetypes. */
 ```
+> &emsp;简单总结一下就是 Headers 能帮助校验 Mach-O 合法性和定位文件的运行环境。[探秘 Mach-O 文件](http://hawk0620.github.io/blog/2018/03/22/study-mach-o-file/)
 
 2. 通过 [MachOView](https://github.com/fangshufeng/MachOView) 工具查看。 
 
@@ -433,3 +441,4 @@ Load command 13
 + [aidansteele/osx-abi-macho-file-format-reference](https://github.com/aidansteele/osx-abi-macho-file-format-reference)
 + [The Nitty Gritty of “Hello World” on macOS](https://www.reinterpretcast.com/hello-world-mach-o)
 + [深入理解MachO数据解析规则](https://juejin.cn/post/6947843156163428383)
++ [图解 Mach-O 中的 got](https://mp.weixin.qq.com/s/vt2LjEbgYsnU1ZI5P9atRw)
