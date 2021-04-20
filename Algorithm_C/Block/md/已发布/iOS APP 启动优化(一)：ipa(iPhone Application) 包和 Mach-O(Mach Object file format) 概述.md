@@ -5,6 +5,7 @@
 > &emsp;数字版权管理（英语：Digital rights management，缩写为 DRM）是一系列访问控制技术，通常用于控制数字内容和设备在被销售之后的使用过程。DRM 有时也称为拷贝保护、复制控制、技术保护措施等，但这些称呼存在争议。许多数字出版社和软件厂商都使用了 DRM，例如亚马逊、AT&T、AOL、Apple Inc.、Netflix、Google[7]、BBC、微软、Sony、Valve Corporation 等。[数字版权管理-维基百科](https://zh.wikipedia.org/wiki/数字版权管理)
 
 ## 解压 .ipa 文件查看其内容并引出 Mach-O 格式
+
 &emsp;相信每一位 iOS 开发者都进行过打包测试，当我们把 Ad Hoc 或者 App Store Connect 的包导出到本地时会看到一个 xxx.ipa 文件，ipa 是 iPhone Application 的缩写。实际上 xxx.ipa 只是一个变相的 zip 压缩包，我们可以把 xxx.ipa 文件直接通过 unzip 命令进行解压。
 
 &emsp;我们直接新建一个命名为 Test_ipa_Simple 的空白 iOS App，直接进行 Archive 后并导出 Test_ipa_Simple.ipa 文件查看它的内部结构。在终端执行 unzip Test_ipa_Simple.ipa 解压之后，会有一个 Payload 目录，而 Payload 里则是一个看似是文件的 Test_ipa_Simple.app，而实际上它又是一个目录，或者说是一个完整的 App Bundle。其中 Base.lproj 中是我们的 Main.storyboard 和 LaunchScreen.storyboard 的内容，然后是 embedded.mobileprovision（描述文件）和 PkgInfo、Info.plist、_CodeSignature 用于描述 App 的一些信息，然后我们要重点关注的便是当前这个目录里面体积最大的文件 Test_ipa_Simple，它是和我们的 ipa 包同名的一个[二进制文件](https://www.zhihu.com/question/19971994)，然后用 file 命令查看它的文件类型是一个在 arm64 处理器架构下的可执行（executable）文件，格式则是 Mach-O，其他还存在 FAT 格式的 Mach-O 文件（可直白的理解为胖的 Mach-O 文件），它们是支持多个架构的二进制文件的顺序组合，例如这里取 `/bin/ls` 路径下的系统文件 `ls` 作为示例，使用 file 命令对它进行查看，可看到它是一个 FAT 文件，它包含 x86_64 和 arm64e 两个架构（这里是 m1 Mac 下的 `ls` 文件），即这里的 `ls` 是一个支持 x86_64 和 arm64e 两种处理器架构的通用二进制文件，里面包含的两部分都是 Mach-O 格式的 64-bit 可执行文件。   。在了解了二进制文件的数据结构以后，一切就都显得没有秘密了。（下面是终端执行记录，可大致浏览一下）
@@ -54,6 +55,7 @@ Test_ipa_Simple: Mach-O 64-bit executable arm64
 ```
 
 ## Mach-O 格式概述
+
 > &emsp;Mach-O 为 Mach Object 文件格式的缩写，全称为 Mach Object File Format 它是一种用于可执行文件、目标代码、动态库、内核转储的文件格式。作为 a.out 格式的替代者，Mach-O 提供了更强的扩展性，并提升了符号表中信息的访问速度。
 Mach-O 曾经为大部分基于 Mach 核心的操作系统所使用。NeXTSTEP、Darwin 和 Mac OS X 等系统使用这种格式作为其原生可执行档、库和目标代码的格式。而同样使用 GNU Mach 作为其微内核的 GNU Hurd 系统则使用 ELF 而非 Mach-O 作为其标准的二进制文件格式。[Mach-O-维基百科](https://zh.wikipedia.org/wiki/Mach-O)
 
@@ -129,6 +131,7 @@ Mach-O 曾经为大部分基于 Mach 核心的操作系统所使用。NeXTSTEP�
 &emsp;以上是 Overview of the Mach-O Executable Format 章节中的全部内容，可能我们对其中的 segment 和 section 还不太熟悉，下面我们会进行更详细的解读。
 
 ## Mach-O 文件内部构成
+
 &emsp;下面我们结合 [apple/darwin-xnu](https://github.com/apple/darwin-xnu) 中的源码来分析 Mach-O 二进制文件的内部构成，首先看一张大家都在用的官方的图片。
 
 ![d06ff3536b6369f4652b6a5b862f9ced.png](https://p6-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/ffa97f6d060e441a8d83d1bacc58f190~tplv-k3u1fbpfcp-watermark.image)
@@ -136,6 +139,7 @@ Mach-O 曾经为大部分基于 Mach 核心的操作系统所使用。NeXTSTEP�
 &emsp;从图上我们能明显看出 Mach-O 文件的数据主体分为三大部分：分别是 Header（头部）、Load commands（加载命令）、Data（最终的数据），可看到完全对应到上一节中提到的 “Mach-O 二进制文件被组织成多个段（segments），每个段包含一个或多个 sections”。 
 
 ### Header（Mach-O 头部）
+
 &emsp;Mach-O 文件的 Header 部分对应的数据结构定义在 darwin-xnu/EXTERNAL_HEADERS/mach-o/loader.h 中，struct mach_header 和 struct mach_header_64 分别对应 32-bit architectures 和 64-bit architectures。（对于 32/64-bit architectures，32/64 位的 mach header 都出现在 Mach-O 文件的最开头。）
 
 ```c++
@@ -209,14 +213,136 @@ hmc@HMdeMac-mini Test_ipa_Simple.app %
 ![截屏2021-04-16 08.51.00.png](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/dc0b2f9d65974ce5a778f975888c07a4~tplv-k3u1fbpfcp-watermark.image)
 
 ### Load commands
-&emsp;Header 中的数据已经说明了整个 Mach-O 文件的基本信息，但是整个 Mach-O 中最重要的还是 Load commands。它说明了操作系统应当如何加载 Mach-O 文件中的数据（描述了怎样加载每个 Segment 的信息），对系统内核加载器和动态链接器起指导作用。
 
-+ 一来它描述了文件中数据的具体组织结构。
-+ 二来它也说明了进程启动后，对应的内存空间结构是如何组织的。
+&emsp;Header 中的数据已经说明了整个 Mach-O 文件的基本信息，但是整个 Mach-O 中最重要的还是 Load commands，Header 之后就是 Load commands，其占用的内存和加载命令的总数在 Header 中已经指出。它说明了操作系统应当如何加载 Mach-O 文件中的数据（描述了怎样加载每个 Segment 的信息），对系统内核加载器和动态链接器起指导作用。
+
+1. 它描述了文件中数据的具体组织结构。
+2. 它也说明了进程启动后，对应的内存空间结构是如何组织的。
 
 &emsp;load commands "specify both the logical structure of the file and the layout of the file in virtual memory". load commands “既指定文件的逻辑结构，也指定文件在虚拟内存中的布局”。 
 
-&emsp;同样这里我们也通过几种不同的方式来查看 Test_ipa_Simple 文件中 Load commands 部分的内容。
+&emsp;Mach-O 文件的 Load commands 部分对应的数据结构定义在 darwin-xnu/EXTERNAL_HEADERS/mach-o/loader.h 中：struct load_command。
+
+&emsp;Load commands 直接跟在 mach_header 后面。所有 commands 的总大小由 mach_header 中的 sizeofcmds 字段给出。所有 load commands 的前两个字段必须是 cmd 和 cmdsize。cmd 字段用表示该 command 类型的常量填充。每个 command 类型都有一个特定的 structure。cmdsize 字段是以字节为单位的特定 load command structure 的大小，再加上它后面作为 load command 一部分的任何内容（i.e. section structures, strings, etc.）。要前进到下一个 load command，可以将 cmdsize 添加到当前 load command 的偏移量或指针中。32 位体系结构的 cmdsize 必须是 4 字节的倍数，而 64 位体系结构的 cmdsize 必须是 8 字节的倍数（这永远是所有 load commands 的最大对齐方式）。padded bytes 必须为零。目标文件中的所有表也必须遵循这些规则，以便可以对文件进行内存映射。否则，指向这些表的指针将无法在某些机器上正常工作。With all padding zeroed like objects will compare byte for byte.
+
+```c++
+struct load_command {
+    uint32_t cmd;        /* type of load command */
+    uint32_t cmdsize;    /* total size of command in bytes */
+};
+```
+
+&emsp;cmd 字段指示 load command 的类型，cmdsize 字段主要用于计算出下一条 load command 的位置，即从本条 load command 的起始位置再偏移其 cmdsize 后便是下一条 load command 的起始位置。
+
+#### cmdsize
+
+&emsp;下面我们摘出 LC_SEGMENT_64(__TEXT)、LC_SEGMENT_64(__DATA)、LC_SEGMENT_64(__LINKEDIT) 三条 load command，可看到它们的前两个字段都是 cmd 和 cmdsize，然后加上后面的内容构成本条完整的 load command。然后每条 load command 的起始地址加上 command size 后的偏移是下一条 load command 的起始地址。
+
+![截屏2021-04-20 08.58.05.png](https://p6-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/5f6f96ee6c564c808d972165bfd3b9da~tplv-k3u1fbpfcp-watermark.image)
+
+![截屏2021-04-20 08.58.15.png](https://p9-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/778bb7aa82ab4dd7a7c9365c85ae49c8~tplv-k3u1fbpfcp-watermark.image)
+
+![截屏2021-04-20 08.58.24.png](https://p9-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/b9070785fe1a4900a94e6e7ad0e02575~tplv-k3u1fbpfcp-watermark.image)
+
+&emsp;上面的起始地址 + Command Size：0x00000068 + 792 = 0x00000380 + 1112 = 0x000007D8。
+
+#### type of load command
+
+&emsp;cmd 字段指示 load command 的类型，在 loader.h 中定义了一系列枚举来表示不同类型的加载命令。
+```c++
+/* Constants for the cmd field of all load commands, the type */
+
+// 将 segment（段）映射到进程的内存空间
+#define LC_SEGMENT_64 0x19 /* 64-bit segment of this file to be mapped */
+
+// 二进制文件 id，与符号表 uuid 对应，可用作符号表匹配
+#define LC_UUID 0x1b /* the uuid */
+
+// 加载动态链接器
+#define LC_LOAD_DYLINKER 0xe /* load a dynamic linker */
+
+// 描述在 __LINKEDIT 段的哪里找字符串表、符号表
+#define LC_SYMTAB 0x2 /* link-edit stab symbol table info */
+
+// 代码签名
+#define LC_CODE_SIGNATURE 0x1d /* local of code signature */
+
+// 其他的暂时就不一一列举了
+。。。
+```
+
+#### Segment
+
+&emsp;定义在 loader.h 中的 struct segment_command。
+
+&emsp;segment load command 指示要将此文件的一部分映射到 task's（进程的） 地址空间中。vmsize 是内存中此 segment 的大小，可能等于或大于从该文件映射的量 filesize。文件映射从 fileoff 开始到内存段的开头 vmaddr。段的其余内存（如果有的话）按需分配并用 0 填充。segment 的最大虚拟内存保护和初始虚拟内存保护由 maxprot 和 initprot 字段指定。如果 segment 具有 sections，那么 section structures 直接遵循 segment command，其大小将反映在 cmdsize 中。
+
+```c++
+struct segment_command_64 { /* for 64-bit architectures */
+    uint32_t    cmd;        /* LC_SEGMENT_64 */
+    uint32_t    cmdsize;    /* includes sizeof section_64 structs */
+    char        segname[16];    /* segment name */
+    uint64_t    vmaddr;        /* memory address of this segment */
+    uint64_t    vmsize;        /* memory size of this segment */
+    uint64_t    fileoff;    /* file offset of this segment */
+    uint64_t    filesize;    /* amount to map from the file */
+    vm_prot_t    maxprot;    /* maximum VM protection */
+    vm_prot_t    initprot;    /* initial VM protection */
+    uint32_t    nsects;        /* number of sections in segment */
+    uint32_t    flags;        /* flags */
+};
+```
++ cmd 是上面一小节的 type of load command。
++ segname[16] 段的名字，前面我们见到过 \_\_TEXT、\_\_DATA、\_\_PAGEZERO、\_\_LINKEDIT，两个下划线开头然后所有的字母都是大写。在 loader.h 中依然可以找到它们的定义。
+```c++
+/* The currently known segment names and the section names in those segments */
+
+// 可执行文件捕获空指针的段 
+#define SEG_PAGEZERO "__PAGEZERO" /* the pagezero segment which has no */
+                                  /* protections and catches NULL */
+                                  /* references for MH_EXECUTE files */
+                                  
+// 代码段，只读数据段 
+#define SEG_TEXT "__TEXT" /* the tradition UNIX text segment */
+
+// 数据段 
+#define SEG_DATA "__DATA" /* the tradition UNIX data segment */
+
+// 包含动态链接器所需的符号、字符串表等数据 
+#define SEG_LINKEDIT "__LINKEDIT" /* the segment containing all structs */
+                                  /* created and maintained by the link */
+                                  /* editor.  Created with -seglinkedit */
+                                  /* option to ld(1) for MH_EXECUTE and */
+                                  /* FVMLIB file types only */
+```
++ vmaddr 段的虚拟内存地址（未偏移），由于 ALSR，程序会在进程加上一段偏移量（slide），段的真实地址 = vm address + slide。
++ vmsize 段的虚拟内存大小。
++ fileoff 段在文件的偏移。
++ filesize 段在文件的大小。
++ nsects 段中包含多少个 section。
+ 
+#### Section 
+
+&emsp;定义在 loader.h 中的 struct section_64。
+
+```c++
+struct section_64 { /* for 64-bit architectures */
+    char        sectname[16];    /* name of this section */
+    char        segname[16];    /* segment this section goes in */
+    uint64_t    addr;        /* memory address of this section */
+    uint64_t    size;        /* size in bytes of this section */
+    uint32_t    offset;        /* file offset of this section */
+    uint32_t    align;        /* section alignment (power of 2) */
+    uint32_t    reloff;        /* file offset of relocation entries */
+    uint32_t    nreloc;        /* number of relocation entries */
+    uint32_t    flags;        /* flags (section type and attributes)*/
+    uint32_t    reserved1;    /* reserved (for offset or index) */
+    uint32_t    reserved2;    /* reserved (for count or sizeof) */
+    uint32_t    reserved3;    /* reserved */
+};
+```
+
+&emsp;同样这里我们也通过几种不同的方式来查看 Test_ipa_Simple 文件中 Load commands 部分的一些详细内容。
 
 &emsp;我们可以用 `otool -l Test_ipa_Simple` 来查看 Test_ipa_Simple 这个 Mach-O 文件中的 Load commands（加载命令）。（上面通过 Test_ipa_Simple 的 header 部分的 ncmds 字段我们知道它一共有 22 条加载命令（包含加载 \_\_PAGEZERO 段的话是 23 条加载命令），但是内容过长了这里就仅列出 Load command 0 和 Load command 1 的内容，它们两个都是 LC_SEGMENT_64） 
 
@@ -425,9 +551,6 @@ Load command 13
 + [iOS App启动优化（一）—— 了解App的启动流程](https://juejin.cn/post/6844903968837992461)
 + [了解iOS上的可执行文件和Mach-O格式](http://www.cocoachina.com/articles/10988)
 + [探秘 Mach-O 文件](http://hawk0620.github.io/blog/2018/03/22/study-mach-o-file/)
-
-
-
 + [Apple 操作系统可执行文件 Mach-O](https://xiaozhuanlan.com/topic/1895704362)
 + [iOS开发之runtime（11）：Mach-O 犹抱琵琶半遮面](https://xiaozhuanlan.com/topic/0328479651)
 + [iOS开发之runtime（12）：深入 Mach-O](https://xiaozhuanlan.com/topic/9204153876)

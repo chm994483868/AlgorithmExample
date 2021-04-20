@@ -241,6 +241,7 @@
 		8E5CCE0624B9FF3D0081B5FF /* Review_1.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Review_1.cpp; sourceTree = "<group>"; };
 		8E6DFE182523862B00D2830E /* iOS 从源码解析Runtime (八)：聚焦cache_t 相关数据结构及函数解析(1).md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 从源码解析Runtime (八)：聚焦cache_t 相关数据结构及函数解析(1).md"; sourceTree = "<group>"; };
 		8E819539262CFD010072C00D /* iOS APP 启动优化(二)：Code Size Performance Guidelines.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS APP 启动优化(二)：Code Size Performance Guidelines.md"; sourceTree = "<group>"; };
+		8E894F01262EC2A400879DA0 /* Bugly问题列表.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "Bugly问题列表.md"; sourceTree = "<group>"; };
 		8E919554254D57DA0039A12E /* AssignmentOperator_1.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = AssignmentOperator_1.cpp; sourceTree = "<group>"; };
 		8E919555254D57DA0039A12E /* AssignmentOperator_1.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = AssignmentOperator_1.hpp; sourceTree = "<group>"; };
 		8E91955F254EE3280039A12E /* QueueWithTwoStacks_1.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = QueueWithTwoStacks_1.cpp; sourceTree = "<group>"; };
@@ -2231,6 +2232,7 @@
 				D20B5C7B24EB64500077EF6D /* iOS底层runtime应用之动态添加属性:成员变量.md */,
 				D20B5C7C24EBB92B0077EF6D /* iOS底层懒加载类:非懒加载类.md */,
 				8E31495B261FD0C700BBB2E2 /* ReactNative_iOSNative.md */,
+				8E894F01262EC2A400879DA0 /* Bugly问题列表.md */,
 			);
 			path = md;
 			sourceTree = "<group>";
