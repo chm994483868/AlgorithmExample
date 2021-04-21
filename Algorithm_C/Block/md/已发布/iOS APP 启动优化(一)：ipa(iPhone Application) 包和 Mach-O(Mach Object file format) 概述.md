@@ -292,8 +292,10 @@ struct segment_command_64 { /* for 64-bit architectures */
     uint32_t    flags;        /* flags */
 };
 ```
+
 + cmd 是上面一小节的 type of load command。
 + segname[16] 段的名字，前面我们见到过 \_\_TEXT、\_\_DATA、\_\_PAGEZERO、\_\_LINKEDIT，两个下划线开头然后所有的字母都是大写。在 loader.h 中依然可以找到它们的定义。
+
 ```c++
 /* The currently known segment names and the section names in those segments */
 
@@ -315,6 +317,7 @@ struct segment_command_64 { /* for 64-bit architectures */
                                   /* option to ld(1) for MH_EXECUTE and */
                                   /* FVMLIB file types only */
 ```
+
 + vmaddr 段的虚拟内存地址（未偏移），由于 ALSR，程序会在进程加上一段偏移量（slide），段的真实地址 = vm address + slide。
 + vmsize 段的虚拟内存大小。
 + fileoff 段在文件的偏移。
@@ -324,6 +327,12 @@ struct segment_command_64 { /* for 64-bit architectures */
 #### Section 
 
 &emsp;定义在 loader.h 中的 struct section_64。
+
+&emsp;一个 segment 由零个或多个 sections 组成。Non-MH_OBJECT 文件的所有 segments 中都有相应的 sections，并由 link editor 生成时填充到指定的 segment 对齐。MH_EXECUTE 和 MH_FVMLIB 格式文件的第一 segment 在其第一 section 之前包含目标文件的 mach_header 和 load commands。0 填充部分总是在其 segment （\_\_PAGEZERO）中的最后一个（在所有格式中）。这允许将归 0 的 segment 填充映射到内存中，其中可能存在 0 填充 sections。gigabyte 的 0 填充 sections，那些 section 类型为 S_GB_ZEROFILL，只能位于具有这种类型的部分的 segment 中。然后将这些 segments 放置在所有其他 segments 之后。
+
+&emsp;MH_OBJECT 格式将其所有 sections 放在一个 segment 中以实现紧凑性。没有填充到指定的 segment 边界，并且 mach_header 和 load commands 不是该 segment 的一部分。 link editor 将合并具有相同段名称 sectname，进入相同段，segname 的段。结果 section 与合并 section 的最大对齐方式对齐，并且是新 section 的对齐方式。合并后的 sections 与合并后的 sections 中的原始对齐方式对齐。任何用于获得指定对齐的填充字节都为 0。
+
+&emsp;mach object files 的 section 结构的 reloff 和 nreloc 字段引用的 relocation entries 的格式在头文件 <reloc.h> 中描述。
 
 ```c++
 struct section_64 { /* for 64-bit architectures */
@@ -341,6 +350,19 @@ struct section_64 { /* for 64-bit architectures */
     uint32_t    reserved3;    /* reserved */
 };
 ```
++ segname[16] 当前 section 所在的 segment 的名字。
++ sectname[16] section 的名字。前面的学习过程中我们可能对以下几个 sections 比较眼熟了。
+
+1. \_\_Text.\_\_text 主程序代码
+2. \_\_Text.\_\_cstring c 字符串
+3. \_\_Text.\_\_stubs 桩代码
+4. \_\_Text.\_\_stub_helper
+5. \_\_Data.\_\_data 初始化可变的数据
+6. \_\_Data.\_\_objc_imageinfo 镜像信息 ，在运行时初始化时 objc_init，调用 load_images 加载新的镜像到 infolist 中
+7. \_\_Data.\_\_la_symbol_ptr
+8. \_\_Data.\_\_nl_symbol_ptr
+9. \_\_Data.\_\_objc_classlist 类列表
+10. \_\_Data.\_\_objc_classrefs 引用的类
 
 &emsp;同样这里我们也通过几种不同的方式来查看 Test_ipa_Simple 文件中 Load commands 部分的一些详细内容。
 
