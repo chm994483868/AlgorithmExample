@@ -238,6 +238,7 @@
 		8E31495B261FD0C700BBB2E2 /* ReactNative_iOSNative.md */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = net.daringfireball.markdown; path = ReactNative_iOSNative.md; sourceTree = "<group>"; };
 		8E3613F72610A65900E2BC5F /* iOS 2021 面试前的准备（总结各知识点方便面试前快速复习使用）（八）.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 2021 面试前的准备（总结各知识点方便面试前快速复习使用）（八）.md"; sourceTree = "<group>"; };
 		8E421CBB25F4E98B008CBDB4 /* iOS 2021 面试前的准备（总结各知识点方便面试前快速复习使用）（三）.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 2021 面试前的准备（总结各知识点方便面试前快速复习使用）（三）.md"; sourceTree = "<group>"; };
+		8E512271263190C70089E16C /* Bugly 问题修改.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "Bugly 问题修改.md"; sourceTree = "<group>"; };
 		8E5CCE0624B9FF3D0081B5FF /* Review_1.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Review_1.cpp; sourceTree = "<group>"; };
 		8E6DFE182523862B00D2830E /* iOS 从源码解析Runtime (八)：聚焦cache_t 相关数据结构及函数解析(1).md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 从源码解析Runtime (八)：聚焦cache_t 相关数据结构及函数解析(1).md"; sourceTree = "<group>"; };
 		8E819539262CFD010072C00D /* iOS APP 启动优化(二)：Code Size Performance Guidelines.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS APP 启动优化(二)：Code Size Performance Guidelines.md"; sourceTree = "<group>"; };
@@ -2242,6 +2243,7 @@
 			children = (
 				D2EB010524D9131D009EAFD6 /* Sort */,
 				D2EB00FF24D912C6009EAFD6 /* main.swift */,
+				8E512271263190C70089E16C /* Bugly 问题修改.md */,
 			);
 			path = Algorithm_Swift;
 			sourceTree = "<group>";

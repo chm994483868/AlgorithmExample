@@ -86,11 +86,112 @@
 
 &emsp;当你的项目代码稳定下来时，你应该开始试验用于优化代码的基本 GCC 选项。GCC 编译器支持优化选项，允许你选择是使用较小的二进制大小（smaller binary size）、更快的代码（faster code）还是更快的构建时间（faster build times）。
 
-&emsp;对于新项目，Xcode 会自动禁用开发构建样式的优化，并选择“最快，最小” 部署生成样式的选项。任何类型的代码优化都会导致生成时间变慢，因为优化过程涉及到额外的工作。如果您的代码正在更改，就像在开发周期中一样，您不希望启用优化。但是，当您的开发周期接近尾声时，部署构建样式可以指示成品的大小。
+&emsp;对于新项目，Xcode 会自动禁用开发构建样式的优化（optimizations for the development build style），并选择 “fastest, smallest” 部署构建样式（“fastest, smallest” option for the deployment build style）的选项。任何类型的代码优化都会导致生成时间变慢，因为优化过程涉及到额外的工作。如果你的代码正在更改（如在开发周期中所做的那样），则你不希望启用优化。在开发周期即将结束时，部署构建样式（deployment build style）可以为你指示最终产品的大小。
+
+&emsp;Table 1 列出了 Xcode 中可用的优化级别（optimization levels）。当你选择其中一个选项时，Xcode 会将给定组或文件的相应标志传递给 GCC 编译器（ Xcode passes the appropriate flags to the GCC compiler for the given group or files）。这些选项可在 target-level 或作为 build style 的一部分可见。有关项目的构建设置的信息，请参阅 Xcode Help。
+
+&emsp;Table 1  GCC compiler optimization options
+| Xcode Setting | Description |
+| --- | --- |
+| None | 编译器不会尝试优化代码。当你专注于解决逻辑错误并且需要快速编译时，请在开发过程中使用此选项。 Do not use this option for shipping your executable。 |
+| Fast | 编译器执行简单的优化以提高代码性能，同时最小化对编译时间的影响。此选项在编译期间也会使用更多内存。 |
+| Faster | 执行几乎所有不需要 space-time trade-off 的受支持优化。使用此选项时编译器不执行循环展开（loop unrolling）或函数内联（function inlining）。此选项增加编译时间和生成代码的性能。 |
+| Fastest | 执行所有优化以提高生成代码的速度。当编译器执行积极的函数内联时，此选项可以增加生成代码的大小。<br>通常不建议使用此选项。有关详细信息，请参见避免过多的函数内联（Avoid Excessive Function Inlining）。 |
+| Fastest, smallest | 执行通常不会增加代码大小的所有优化。这是传送代码（shipping code）的首选选项，因为它使可执行文件的内存占用更小。 |
+
+&emsp;与任何性能增强一样，不要假设哪个选项会给你带来最佳效果。你应该始终衡量你尝试的每个优化的结果。例如，“Fastest” 选项可能会为特定模块生成速度极快的代码，但这样做通常会以牺牲可执行文件的大小为代价。如果代码需要在运行时从磁盘中传入，则你从代码生成中获得的任何速度优势都很容易丢失。（如果代码需要在运行时从磁盘分页，那么从代码生成中获得的任何速度优势都很容易丢失。）
+
+### Additional Optimizations
+
+&emsp;除了代码级（code-level）优化之外，你还可以使用一些附加技术在 module level 组织代码。以下各节介绍这些技术。
+
+#### Dead Strip Your Code
+
+&emsp;对于静态链接（statically-linked）的可执行文件，dead-code stripping 是从可执行文件中删除未引用代码的过程。dead-stripping 背后的思想是，如果代码未被引用，就不能使用它，因此在可执行文件中就不需要它。删除 dead code 可以减少可执行文件的大小，并有助于减少分页（reduce paging）。
+
+&emsp;从 Xcode Tools 版本 1.5 开始，静态链接器（static linker）（ld）支持可执行文件的 dead stripping。你可以直接从 Xcode 或通过向静态链接器（static linker）传递适当的命令行选项来启用此功能。
+
+&emsp;要在 Xcode 中启用 dead-code stripping，请执行以下操作：
+
+1. 选择你的 target。
+2. 打开 Inspector 或 Get Info 窗口并选择 Build 选项卡。
+3. 在链接设置（Linking settings）中，启用 Dead Code Stripping 选项。
+
+&emsp;TARGETS -> Build Settings -> 搜索 Linking -> Dead Code Stripping 设置为 YES/NO（默认是 YES）。
+
+4. 在 Code Generation settings 中，将 Level of Debug Symbols 选项设置为 All Symbols。
+&emsp;TARGETS -> Build Settings -> 搜索 All Symbols -> Strip Style 设置为 All Symbols/Non-Global Symbols/Debugging Symbols（默认是 All Symbols）。
+
+&emsp;要从命令行启用 dead-code stripping，请将 -dead_strip 选项传递给 ld。还应该将 -gfull 选项传递给 GCC，以便为代码生成一组完整的调试符号（debugging symbols）。链接器（linker）使用这个额外的调试信息对可执行文件进行 dead strip。
+
+> &emsp;Note: 建议使用 “All Symbols” 或 -gfull 选项，即使你不打算 dead strip。尽管该选项生成较大的中间文件（intermediate files），但通常会生成较小的可执行文件，因为链接器（linker）能够更有效地删除重复的符号信息。
+
+&emsp;如果不想删除任何未使用的函数，至少应该将它们隔离在 \_\_TEXT segment 的一个单独部分中。将未使用的函数移到 common section 可以改进代码引用的局部性，并降低它们被加载到内存中的可能性。有关如何在 common section 中对函数进行分组的详细信息，请参见 Improving Locality of Reference。
+
+#### Strip Symbol Information
+
+&emsp;调试符号（debugging symbols）和动态绑定信息（dynamic-binding information）可能会占用大量空间，并且占可执行文件大小的很大一部分。在 shipping 代码之前，应该去掉所有不需要的符号。
+
+&emsp;要从可执行文件中删除调试符号（debugging symbols），请将 Xcode build-style 设置更改为 “Deployment”，然后 rebuild 可执行文件。如果你愿意，还可以按目标（target）生成调试符号。有关构建样式（build styles）和目标设置（target settings）的详细信息，请参阅Xcode Help。
+
+&emsp;要从可执行文件中手动删除动态绑定符号（dynamic-binding symbols），请使用 strip tool。此工具删除动态链接器（dynamic linker）在运行时通常用于绑定外部符号的符号信息。删除不希望动态绑定的函数的符号会减少可执行文件的大小，并减少动态链接器必须绑定的符号数。通常，你会使用此命令而不使用任何选项来删除非外部符号（non-external symbols），如以下示例所示：
+
+```c++
+% cd ~/MyApp/MyApp.app/Contents/MacOS
+% strip MyApp
+```
+
+&emsp;此命令相当于使用 -u 和 -r 选项运行 strip。它删除所有标记为非外部的符号，但不删除标记为外部的符号。
+
+&emsp;手动剥离动态绑定符号的另一种方法是使用导出文件来限制在构建时导出的符号。导出文件标识运行时从可执行文件中可用的特定符号。有关创建导出文件的详细信息，请参见 Minimizing Your Exported Symbols。
+
+&emsp;An alternative to stripping out dynamic-binding symbols manually is to use an exports file to limit the symbols exported at build time. An exports file identifies the specific symbols available at runtime from your executable. For more information on creating an exports file, see Minimizing Your Exported Symbols.
+
+#### Eliminate C++ Exception Handling Overhead
+
+&emsp;当抛出异常时，C++ 运行库必须能够将堆栈展开回第一匹配 catch 块的点。为此，GCC  编译器为每个可能引发异常的函数生成堆栈展开信息。此展开信息存储在可执行文件中，并描述堆栈上的对象。这些信息使得在抛出异常时调用这些对象的析构函数来清除它们成为可能。
+
+&emsp;即使你的代码不抛出异常，GCC 编译器仍然会为 C++ 代码生成默认的堆栈展开信息。如果你广泛使用异常，这个额外的代码会显著增加可执行文件的大小。
+
+##### Disabling Exceptions
+
+&emsp;通过禁用目标的 “Enable C++ Exceptions” 构建选项，可以禁用 XCoad 中的异常处理。从命令行，将 -fno-exceptions 选项传递给编译器。此选项删除函数的堆栈展开信息。但是，仍然必须从代码中删除任何 try、catch 和 throw 语句。
+
+##### Selectively Disabling Exceptions
+
+&emsp;如果代码在某些地方使用异常，而不是在任何地方使用异常，则可以通过向方法声明中添加空的异常规范来显式标识不需要展开信息的方法。例如，在下面的代码中，编译器必须为 my_function 生成堆栈展开信息，理由是 my_other_function 或它调用的函数可能引发异常。
+
+```c++
+extern int my_other_function (int a, int b);
+int my_function (int a, int b)
+{
+   return my_other_function (a, b);
+}
+```
+
+&emsp;但是，如果你知道 my_other_function 函数不能抛出异常，你可以通过在函数声明中包含空异常规范（throw ()）来向编译器发出信号。因此，你可以如下声明前面的函数：
+
+```c++
+extern int foo (int a, int b) throw ();
+int my_function (int a, int b) throw ()
+{
+   return foo (a, b);
+}
+
+```
+
+##### Minimizing Exception Use
+
+&emsp;
 
 
 
-For new projects, Xcode automatically disables optimizations for the development build style and selects the “fastest, smallest” option for the deployment build style. Code optimizations of any kind result in slower build times because of the extra work involved in the optimization process. If your code is changing, as it does during the development cycle, you do not want optimizations enabled. As you near the end of your development cycle, though, the deployment build style can give you an indication of the size of your finished product.
+
+
+
+
+
+
 
 
 
