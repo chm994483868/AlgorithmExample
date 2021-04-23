@@ -180,9 +180,64 @@ int my_function (int a, int b) throw ()
 
 ```
 
-##### Minimizing Exception Use
+##### Minimizing Exception Use（尽量减少异常捕获的使用）
 
-&emsp;
+&emsp;在编写代码时，请仔细考虑异常的使用。异常应该用来表示异常情况，也就是说，它们应该用来报告你没有预料到的问题。如果从文件读取时出现文件结束错误（end-of-file error），则不希望抛出异常，因为这是一种已知类型的错误，可以轻松处理。如果你试图读取一个已知已打开的文件，并且被告知该文件 ID 无效，那么你可能希望抛出一个异常。
+
+#### Avoid Excessive Function Inlining（避免内联函数使用过度）
+
+&emsp;尽管内联函数（inline functions）在某些情况下可以提高速度，但如果使用过度，它们也会降低 OS X 上的性能。内联函数消除了调用函数的开销，但是通过用代码的副本（copy of the code）替换每个函数调用来实现。如果内联函数经常被调用，那么这些额外的代码会很快累积起来，使可执行文件膨胀并导致分页问题。
+
+&emsp;如果使用得当，内联函数可以节省时间，并且对代码占用的影响最小。请记住，内联函数的代码通常应该非常短，很少调用。如果在函数中执行代码所需的时间少于调用函数所需的时间，则函数是内联的最佳候选函数。一般来说，这意味着一个内联函数的代码应该不超过几行。你还应该确保从代码中尽可能少的地方调用函数。即使是一个很短的函数，如果在几十个或几百个地方内联使用，也会导致过度膨胀。
+
+&emsp;另外，你应该知道，一般应该避免使用 GCC 的 “Fastest” 优化级别。在这个优化级别上，编译器会积极地尝试创建内联函数，即使对于没有标记为内联的函数也是如此。不幸的是，这样做会大大增加可执行文件的大小，并由于分页而导致更糟糕的性能问题。
+
+#### Build Frameworks as a Single Module
+
+&emsp;大多数共享库（shared libraries）不需要 Mach-O 运行时的模块特性（module features）。此外，跨模块调用产生的开销与跨库调用相同。因此，你应该将项目的所有中间对象文件链接到一个模块中。
+
+&emsp;要合并对象文件，必须在链接阶段（link phase）将 -r 选项传递给 ld。如果你使用 Xcode 来构建代码，那么默认情况下这是为你完成的。
+
+## Improving Locality of Reference
+
+&emsp;对应用程序性能的一个重要改进是减少应用程序在任何给定时间使用的虚拟内存页（virtual memory pages）的数量。这组页（set of pages）称为工作集（working set），由应用程序代码（application code）和运行时数据（runtime data）组成。减少内存中数据的数量（in-memory data）是算法的一个功能（is a function of your algorithms），但是减少内存中代码的数量（in-memory code）可以通过一个称为分散加载（scatter loading）的处理来实现。这种技术也被称为改进代码引用的局部性（improving the locality of reference）。
+
+&emsp;通常，方法和函数的编译代码是由源文件以生成的二进制文件组织的。（通常，编译的方法和函数代码由生成的二进制文件中的源文件组织。）分散加载（scatter loading）会更改此组织，而是将相关方法和函数分组在一起，而与这些方法和函数的原始位置无关。这个过程允许内核将活动应用程序（active application）最常引用的可执行页保存在尽可能小的内存空间中。这不仅减少了应用程序的占用空间，还降低了这些页面被调出（大概是指内存紧张时被回收）的可能性。
+
+> &emsp;Important:通常应该等到开发周期的很晚才分散加载应用程序。在开发过程中，代码往往会四处移动，这会使以前的评测结果无效。
+
+### Profiling Code With gprof
+
+&emsp;给定在运行时收集的评测数据，gprof 生成程序的执行 profile。被调用例程的效果包含在每个调用方的 profile 中。profile 数据取自 call graph profile file(gmon.out 默认情况下），它是由编译并与 -pg 选项链接的程序创建的。可执行文件中的符号表（symbol table）与 call graph profile file 相关联。如果指定了多个 profile file，gprof 输出将显示给定 profile files 中 profile 信息的总和。
+
+&emsp;gprof 工具有很多用途，包括：
+
++ Sampler application 工作不好的情况，例如 command-line tools 或在短时间后退出的应用程序
++ 在这种情况下，你需要一个包含给定程序中可能调用的所有代码的 call graph，而不是周期性地对调用进行采样
++ 需要更改代码的 link order 以优化代码局部性的情况
+
+#### Generating Profiling Data
+
+&emsp;在分析应用程序之前，必须将项目设置为生成 profiling information。要为 Xcode 项目生成 profiling information，必须修改目标或生成样式设置，以包含 “生成分析代码” 选项(有关启用目标和构建样式设置的信息，请参见 Xcode Help。）
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Before you can profile your application, you must set up your project to generate profiling information. To generate profiling information for your Xcode project, you must modify your target or build-style settings to include the “Generate profiling code” option. (See the Xcode Help for information on enabling target and build-style settings.)
+
+
+
 
 
 
