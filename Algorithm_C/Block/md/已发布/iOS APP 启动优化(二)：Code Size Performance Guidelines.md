@@ -206,9 +206,10 @@ int my_function (int a, int b) throw ()
 
 > &emsp;Important:通常应该等到开发周期的很晚才分散加载应用程序。在开发过程中，代码往往会四处移动，这会使以前的评测结果无效。
 
-### Profiling Code With gprof
+### Profiling Code With gprof（通过 gprof 分析代码）
 
-&emsp;给定在运行时收集的评测数据，gprof 生成程序的执行 profile。被调用例程的效果包含在每个调用方的 profile 中。profile 数据取自 call graph profile file(gmon.out 默认情况下），它是由编译并与 -pg 选项链接的程序创建的。可执行文件中的符号表（symbol table）与 call graph profile file 相关联。如果指定了多个 profile file，gprof 输出将显示给定 profile files 中 profile 信息的总和。
+&emsp;根据运行时收集的分析数据
+，gprof 生成程序的 execution profile。被调用例程的效果包含在每个调用方的 profile 中。profile 数据取自 call graph profile file(gmon.out 默认情况下），它是由程序编译创建的，并与 -pg 选项链接。可执行文件中的符号表（symbol table）与 call graph profile file 相关联。如果指定了多个 profile file，gprof 输出将显示给定 profile files 中 profile 信息的总和。
 
 &emsp;gprof 工具有很多用途，包括：
 
@@ -218,7 +219,19 @@ int my_function (int a, int b) throw ()
 
 #### Generating Profiling Data
 
-&emsp;在分析应用程序之前，必须将项目设置为生成 profiling information。要为 Xcode 项目生成 profiling information，必须修改目标或生成样式设置，以包含 “生成分析代码” 选项(有关启用目标和构建样式设置的信息，请参见 Xcode Help。）
+&emsp;在分析应用程序之前，必须将项目设置为 generate profiling information。要为 Xcode 项目生成 profiling information，必须修改 target 或 build-style settings，以包含 “Generate profiling code” 选项。（位置在 TARGETS -> Build Settings -> Build Options -> Generate profiling code(YES/NO)）(有关启用 target 和 build-style settings 的信息，请参见 Xcode Help）
+
+&emsp;程序内的 profiling code 生成一个名为 gmon.out 且包含 profiling information 的文件。
+(通常，此文件放在当前工作目录中。）若要分析此文件中的数据，请在调用 gprof 之前将其复制到包含可执行文件的目录中，或只是指定路径到 gmon.out 当你运行 gprof 时。
+
+&emsp;除了分析你自己的代码之外，你可以通过与 Carbon 和 Cocoa frameworks 这些框架的 profile versions 进行链接，找出它们花费了多少时间。
+为此，请将 DYLD_IMAGE_SUFFIX 设置添加到 target 或 build style，并将其值设置为 \_profile。dynamic linker 将此后缀与 framework 名称相结合，以针对 framework 的 profile version 进行链接。要确定哪些 frameworks 支持 profiling （概要分析），请查看 frameworks 本身。例如，Carbon library 附带了 profile 和 debug 版本。
+
+&emsp;Note: libraries 的 profile 和 debug 版本是作为 developer tools package 的一部分安装的，在用户系统上可能不可用。确保你的 shipping executable 没有链接到这些库之一。
+
+#### Generating Order Files
+
+&emsp;order file 包含一个有序的 lines 序列，每个 line 由源文件名和符号名组成，用冒号分隔，没有其他空格。每一行表示要放置在可执行文件部分中的块。如果手动修改文件，则必须完全遵循此格式，以便链接器可以处理该文件。如果对象文件name:symbol name pair并不完全是链接器看到的名称，它会尽最大努力将名称与被链接的对象匹配起来。
 
 
 
@@ -227,23 +240,7 @@ int my_function (int a, int b) throw ()
 
 
 
-
-
-
-
-
-
-
-Before you can profile your application, you must set up your project to generate profiling information. To generate profiling information for your Xcode project, you must modify your target or build-style settings to include the “Generate profiling code” option. (See the Xcode Help for information on enabling target and build-style settings.)
-
-
-
-
-
-
-
-
-
+An order file contains an ordered sequence of lines, each line consisting of a source file name and a symbol name, separated by a colon with no other white space. Each line represents a block to be placed in a section of the executable. If you modify the file by hand, you must follow this format exactly so the linker can process the file. If the object file name:symbol name pair is not exactly the name seen by the linker, it tries its best to match up the names with the objects being linked.
 
 
 
