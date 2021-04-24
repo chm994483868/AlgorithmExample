@@ -7,7 +7,7 @@
 
 &emsp;在程序性能方面，内存使用率和效率之间有明显的相关性。应用程序占用的内存越多，效率就越低。更多的内存意味着更多的内存分配、更多的代码和更多潜在的分页活动的可能性。
 
-&emsp;本文档的编程主题的重点是减少可执行代码。减少代码占用不仅仅是在编译器中启用代码优化的问题，尽管这确实有帮助。你还可以通过组织代码来减少代码占用空间，以便在任何给定时间仅将最少数量的必需函数存储在内存中。你可以通过分析代码来实现此优化。
+&emsp;本文档的主题的重点是减少可执行代码。减少代码占用不仅仅是在编译器中启用代码优化的问题，尽管这确实有帮助。你还可以通过组织代码来减少代码占用空间，以便在任何给定时间仅将最少数量的必需函数存储在内存中。你可以通过分析代码来实现此优化。
 
 &emsp;减少应用程序分配的内存量对于减少内存占用也很重要；Performance Documentation 中的 [Memory Usage Performance Guidelines](https://developer.apple.com/library/archive/documentation/Performance/Conceptual/ManagingMemory/ManagingMemory.html#//apple_ref/doc/uid/10000160i) 中包含了这些信息。
 
@@ -243,16 +243,43 @@ gprof -S MyApp.profile/MyApp gmon.out
 &emsp;-S 选项生成四个相互排斥的 order files：
 
 | gmon.order | 基于 profiling call graph 的 “closest is best” 分析进行排序。经常互相 call 的 call 放在一起。 |
-| callf.order | 按每个常规 调用 数量排序的例行公事，首先是最大的号码。
- |
-|  |  |
-|  |  |
+| callf.order | Routines 按对每个 Routine 的调用次数排序，首先最大调用次数。 |
+| callo.order | 按照调用顺序对 Routines 进行排序 |
+| time.order | 按花费的 CPU 时间对 Routines 进行排序，花最多时间的 Routine 放在第一。 |
+
+&emsp;你应该尝试使用这些 files 中的每一个，看看哪些 file 提供了最大的性能改进（如果有的话）。
+请参阅 Using pagestuff to Examine Pages on Disk，以便讨论如何衡量 ordering 结果。
+
+&emsp;这些 order files 只包含 profiling 期间使用的那些 procedures。linker 跟踪缺失的 procedures（程序），并在 order files 中列出的程序之后以默认顺序将它们链接起来。
+仅当项目目录（project directory）包含由 linker 的 -whatsloaded 选项生成的文件时，才会在 order file 中生成 library functions 的 static names（静态名称）；有关详细信息，请参见 Creating a Default Order File。
+
+&emsp;gprof-S 选项不适用于已使用 order file 链接的可执行文件。
+
+#### Fixing Up Your Order Files
+
+&emsp;生成 order files 后，你应该仔细检查它们并确保它们是正确的。在许多情况下，你需要手动编辑 order files，包括：
+
++ 可执行文件包含汇编语言文件（assembly-language files）。
++ 你 profiled（分析）了一个 stripped 的可执行文件。
++ 你的可执行文件包含未使用 -g 选项编译的文件。
++ 你的项目定义内部标签（defines internal labels）（通常用于 goto 语句）。
++ 你希望保留特定 object file 中例程的顺序（order of routines）。
+
+&emsp;如果 symbol 的定义位于 assembly file、剥离的可执行文件或未使用-g选项编译的文件中，gprof 将从顺序文件中的符号条目中忽略源文件名。如果项目使用此类文件，则必须手动编辑订单文件并添加适当的源文件名。或者，您可以完全删除符号引用，以强制以默认顺序链接相应的例程。
 
 
 
 
 
-Routines sorted by the number of calls made to each routine, largest numbers first.
+
+
+
+If the definition of a symbol is located in an assembly file, a stripped executable file, or a file compiled without the -g option, gprof omits the source file name from the symbol’s entry in the order file. If your project uses such files, you must edit the order file manually and add the appropriate source filenames. Alternatively, you can delete the symbol references altogether to force the corresponding routines to be linked in default order.
+
+
+
+
+
 
 
 
