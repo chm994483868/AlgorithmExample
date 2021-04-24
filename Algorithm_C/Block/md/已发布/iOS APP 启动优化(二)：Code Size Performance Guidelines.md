@@ -177,7 +177,6 @@ int my_function (int a, int b) throw ()
 {
    return foo (a, b);
 }
-
 ```
 
 ##### Minimizing Exception Use（尽量减少异常捕获的使用）
@@ -231,19 +230,29 @@ int my_function (int a, int b) throw ()
 
 #### Generating Order Files
 
-&emsp;order file 包含一个有序的 lines 序列，每个 line 由源文件名和符号名组成，用冒号分隔，没有其他空格。每一行表示要放置在可执行文件部分中的块。如果手动修改文件，则必须完全遵循此格式，以便链接器可以处理该文件。如果对象文件name:symbol name pair并不完全是链接器看到的名称，它会尽最大努力将名称与被链接的对象匹配起来。
+&emsp;order file 包含一个有序的 lines 序列，每一 line 由一个 source file name 和一个 symbol name 组成，用冒号分隔，没有其他空格。每一 line 表示要放置在可执行文件 section 中的 block。如果手动修改 order file，则必须完全遵循此格式，以便 linker 可以处理该 order file。如果 object file 的 name:symbol name pair 并不完全是 linker 看到的名称，它会尽最大努力将名称与被 linked 的 objects 匹配起来。
+
+&emsp;procedure 重新排序的 order file 中的 lines 由 an object filename 和 procedure name（function、method 或其他 symbol）组成。order file 中列出 procedures（程序） 的顺序表示它们链接到可执行文件的 \_\_text section 的顺序。
+
+&emsp;要从使用 program 生成的 profiling data 创建 order file，请使用 -S 选项运行 gprof（请参阅 gprof 的手册页）。例如：
+
+```c++
+gprof -S MyApp.profile/MyApp gmon.out
+```
+
+&emsp;-S 选项生成四个相互排斥的 order files：
+
+| gmon.order | 基于 profiling call graph 的 “closest is best” 分析进行排序。经常互相 call 的 call 放在一起。 |
+| callf.order | 按每个常规 调用 数量排序的例行公事，首先是最大的号码。
+ |
+|  |  |
+|  |  |
 
 
 
 
 
-
-
-
-An order file contains an ordered sequence of lines, each line consisting of a source file name and a symbol name, separated by a colon with no other white space. Each line represents a block to be placed in a section of the executable. If you modify the file by hand, you must follow this format exactly so the linker can process the file. If the object file name:symbol name pair is not exactly the name seen by the linker, it tries its best to match up the names with the objects being linked.
-
-
-
+Routines sorted by the number of calls made to each routine, largest numbers first.
 
 
 
