@@ -267,7 +267,33 @@ gprof -S MyApp.profile/MyApp gmon.out
 
 &emsp;如果 symbol 的定义位于 an assembly file、a stripped executable file 或 a file compiled without the -g option，gprof 将从 order file 中的 symbol’s entry 中忽略 source file name。如果项目使用此类 files，则必须手动编辑 order file 并添加适当的 source filenames。或者，你可以完全删除 symbol references，以强制以默认顺序 linked 相应的 routines。
 
-&emsp;如果代码包含 internal labels，则必须从 order files 中删除这些 labels；否则，定义标签的函数将在链接阶段被拆分。可以通过在程序集文件前面加上字符串L\来防止将内部标签包含在程序集文件中。汇编程序将带有此前缀的符号解释为特定函数的本地符号，并将其剥离以防止其他工具（如gprof）访问。
+&emsp;如果代码包含 internal labels，则必须从 order files 中删除这些 labels；否则，定义 label 的函数将在链接阶段被 split apart。可以通过在 assembly files 前面加上字符串 L_ 来防止将 internal labels 包含在 assembly files 中（You can prevent the inclusion of internal labels in assembly files altogether by prefixing them with the string L_）。汇编程序将带有此前缀的符号解释为特定函数的本地符号，并将其剥离（strips）以防止其他工具（如 gprof ）访问。（想起 objc-msg-arm64.s 文件中的 L 前缀的汇编指令标签）
+
+&emsp;要保留特定 object file 中 routines 的顺序，请使用特殊符号 .section_all。例如，如果 object file foo.o 来自 assembly source，并且你希望 link 所有 routines 而不重新排序它们，请删除对 foo.o 的所有现有引用，并在 order file 中插入以下行：
+
+```c++
+foo.o:.section_all
+```
+
+&emsp;此选项对于从 assembly source 编译的 object files 或没有 source 的 object files 非常有用。
+
+#### Linking with an Order File
+
+&emsp;生成 order file 后，可以使用 -sectorder 和 -e start 选项链接程序：
+
+```c++
+cc -o outputFile inputFile.o … -sectorder __TEXT __text orderFile -e start
+```
+
+&emsp;要在 Xcode 项目中使用 order file，请在项目的 Deployment build style 中修改 “Other Linker Flags” 选项。Add the text `-sectorder __TEXT __text` orderFile to this setting to specify your order file.
+
+&emsp;如果任何 inputFile 是 library 而不是 object file，则可能需要在链接之前编辑 order file，以将对 object file 的所有引用替换为对相应 library file 的引用。同样，linker 尽最大努力使 order file 中的名称与其正在编辑的 sources 匹配。
+
+&emsp;使用这些选项，linker 构造可执行文件 outputFile，以便从 input files 的 \_\_text sections 构造 \_\_TEXT segment 的 \_\_text section 的内容。linker 按照 orderFile 中列出的顺序排列 input files 中的 routines。
+
+&emsp;当 linker 处理 order file 时，它将 object-file 和 symbol-name 对未在 order file 中列出的 procedures 放入 outputFile 的 \_\_text section。它以默认顺序链接这些符号。多次列出的对象文件和符号名称对总是生成警告，并使用第一次出现的对。
+
+&emsp;
 
 
 
@@ -277,12 +303,7 @@ gprof -S MyApp.profile/MyApp gmon.out
 
 
 
-If your code contains internal labels, you must remove those labels from the order files; otherwise, the function that defines the label will be split apart during the linking phase. You can prevent the inclusion of internal labels in assembly files altogether by prefixing them with the string L_. The assembler interprets symbols with this prefix as local to a particular function and strips them to prevent access by other tools such as gprof.
-
-
-
-
-
+As the linker processes the order file, it places the procedures whose object-file and symbol-name pairs aren’t listed in the order file into the __text section of outputFile. It links these symbols in the default order. Object-file and symbol-name pairs listed more than once always generate a warning, and the first occurrence of the pair is used.
 
 
 
