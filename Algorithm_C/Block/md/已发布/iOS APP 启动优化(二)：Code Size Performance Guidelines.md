@@ -291,9 +291,56 @@ cc -o outputFile inputFile.o … -sectorder __TEXT __text orderFile -e start
 
 &emsp;使用这些选项，linker 构造可执行文件 outputFile，以便从 input files 的 \_\_text sections 构造 \_\_TEXT segment 的 \_\_text section 的内容。linker 按照 orderFile 中列出的顺序排列 input files 中的 routines。
 
-&emsp;当 linker 处理 order file 时，它将 object-file 和 symbol-name 对未在 order file 中列出的 procedures 放入 outputFile 的 \_\_text section。它以默认顺序链接这些符号。多次列出的对象文件和符号名称对总是生成警告，并使用第一次出现的对。
+&emsp;当 linker 处理 order file 时，它将 object-file 和 symbol-name pairs 未在 order file 中列出的 procedures 放入 outputFile 的 \_\_text section。它以默认顺序链接这些符号。多次列出的 object-file 和 symbol-name pairs 总是生成警告，并且使用该 pair 的第一次出现。
 
-&emsp;
+&emsp;默认情况下，linker 打印 linked objects 中不在 order file 中的 symbol names 数、顺序文件中不在链接对象中的符号名称数以及它尝试匹配的不明确符号名称数的摘要。要请求这些符号的详细列表，请使用 -sectorder_detail 选项。
+
+&emsp;linker 的 -e start 选项保留 executable 的入口点（entry point）。start 符号（注意，缺少前导“ _”）在 C runtime shared library 的 /usr/bin/crt1.o 中定义；它表示程序中正常链接时的第一个 text 地址。当 reorder procedures 时，必须使用此选项来修复入口点。另一种方法是将 /usr/lib/crt1.o:start 或 /usr/lib/crt1.o:section_all 作为 order file 的第一行。
+
+#### Limitations of gprof Order Files
+
+&emsp;gprof 生成的 .order 文件只包含在运行可执行文件时 called 或 sampled 的那些函数。为了使 library functions 正确地出现在 order file 中，linker 生成的 whatsloaded 文件应该存在于工作目录中。
+
+&emsp;-S 选项不适用于已与 order file 链接的可执行文件。
+
+&emsp;生成 gmon.order 文件可能需要很长时间—可以使用 -x 参数抑制（suppressed）它。
+
+&emsp;下列项目的文件名将丢失：
+
++ 不使用 -g 参数编译的文件
++ 从 assembly-language source 生成的 routines 
++ 删除了调试符号的可执行文件（如 strip 工具）（executables that have had their debugging symbols removed (as with the strip tool)）
+
+### Profiling With the Monitor Functions
+
+&emsp;文件 /usr/include/monitor.h 声明了一组函数，你可以使用这些函数以编程方式分析代码的特定部分。你可以使用这些函数仅为代码的某些部分或所有代码收集统计信息。然后可以使用 gprof 工具从生成的文件中构建调用图（call graph）和其他性能分析数据（performance analysis data）。Listing 1 展示了如何使用 monitor 函数。
+
+&emsp;Listing 1  Using monitor functions
+```c++
+#include <monitor.h>
+ 
+    /* To start profiling: */
+    moninit();
+    moncontrol(1);
+ 
+    /* To stop, and dump to a file */
+    moncontrol(0);
+    monoutput("/tmp/myprofiledata.out");
+    monreset();
+```
+
+### Organizing Code at Compile Time
+
+&emsp;GCC 编译器允许你在声明的任何函数或变量上指定属性（attributes）。section 属性允许你告诉 GCC 你希望放置特定代码段的段和节。section 属性可让你告诉 GCC 你要放置一段特定的代码的哪个 segment 和 section。
+
+&emsp;Warning: 除非你了解 Mach-O 可执行文件的结构，并且知道在相应的 segments 中放置 functions 和 data 的规则，否则不要使用 section 属性。将 function 或 global variable 放在不适当的 section 可能会中断程序。
+
+&emsp;section 属性接受几个参数，这些参数控制结果代码的放置位置。至少，必须为要放置的代码指定段和节名称。其他选项也可用，并在GCC文档中描述。
+
+
+
+
+The section attribute takes several parameters that control where the resulting code is placed. At a minimum, you must specify a segment and section name for the code you want to place. Other options are also available and are described in the GCC documentation.
 
 
 
@@ -301,9 +348,6 @@ cc -o outputFile inputFile.o … -sectorder __TEXT __text orderFile -e start
 
 
 
-
-
-As the linker processes the order file, it places the procedures whose object-file and symbol-name pairs aren’t listed in the order file into the __text section of outputFile. It links these symbols in the default order. Object-file and symbol-name pairs listed more than once always generate a warning, and the first occurrence of the pair is used.
 
 
 
