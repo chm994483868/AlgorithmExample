@@ -335,12 +335,33 @@ cc -o outputFile inputFile.o … -sectorder __TEXT __text orderFile -e start
 
 &emsp;Warning: 除非你了解 Mach-O 可执行文件的结构，并且知道在相应的 segments 中放置 functions 和 data 的规则，否则不要使用 section 属性。将 function 或 global variable 放在不适当的 section 可能会中断程序。
 
-&emsp;section 属性接受几个参数，这些参数控制结果代码的放置位置。至少，必须为要放置的代码指定段和节名称。其他选项也可用，并在GCC文档中描述。
+&emsp;section 属性接受几个参数，这些参数控制结果代码的放置位置。至少，必须为要放置的代码指定 segment 和 section 名称。其他 options 也可用，在 GCC 文档中有描述。
+
+&emsp;下面的列表显示了如何对函数使用 section 属性。在本例中，section 属性被添加到函数的前向声明中。该属性告诉编译器将函数放置在可执行文件的特定 \_\_text section。
+
+```c++
+void MyFunction (int a) __attribute__((section("__TEXT,__text.10")));
+```
+
+&emsp;下面的列表显示了一些如何使用 section 属性组织全局变量的示例。
+
+```c++
+extern const int x __attribute__((section("__TEXT,__my_const")));
+const int x=2;
+ 
+extern char foo_string[] __attribute__((section("__DATA,__my_data")));
+char foo_string[] = "My text string\n";
+```
+
+&emsp;有关指定 section 属性的详细信息，请参阅 /Developer/documentation/DeveloperTools/gcc3 中的 GCC 编译器文档。
+
+### Reordering the __text Section
+
+&emsp;如 Mach-O 可执行文件格式概述中所述，\文本段保存程序的实际代码和只读部分。按照惯例，编译器工具将Mach-O对象文件（扩展名为.O）中的过程放在文本段的文本部分。
 
 
 
 
-The section attribute takes several parameters that control where the resulting code is placed. At a minimum, you must specify a segment and section name for the code you want to place. Other options are also available and are described in the GCC documentation.
 
 
 
@@ -350,7 +371,7 @@ The section attribute takes several parameters that control where the resulting 
 
 
 
-
+As described in Overview of the Mach-O Executable Format, the __TEXT segment holds the actual code and read-only portions of your program. The compiler tools, by convention, place procedures from your Mach-O object files (with extension .o) in the __text section of the __TEXT segment.
 
 
 
