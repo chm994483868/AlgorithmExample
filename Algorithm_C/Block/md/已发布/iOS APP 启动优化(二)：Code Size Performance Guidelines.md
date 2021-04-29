@@ -331,7 +331,7 @@ cc -o outputFile inputFile.o … -sectorder __TEXT __text orderFile -e start
 
 ### Organizing Code at Compile Time
 
-&emsp;GCC 编译器允许你在声明的任何函数或变量上指定属性（attributes）。section 属性允许你告诉 GCC 你希望放置特定代码段的段和节。section 属性可让你告诉 GCC 你要放置一段特定的代码的哪个 segment 和 section。
+&emsp;GCC 编译器允许你在声明的任何函数或变量上指定属性（attributes）。section 属性可让你告诉 GCC 你要放置一段特定的代码的哪个 segment 和 section。
 
 &emsp;Warning: 除非你了解 Mach-O 可执行文件的结构，并且知道在相应的 segments 中放置 functions 和 data 的规则，否则不要使用 section 属性。将 function 或 global variable 放在不适当的 section 可能会中断程序。
 
@@ -357,7 +357,19 @@ char foo_string[] = "My text string\n";
 
 ### Reordering the __text Section
 
-&emsp;如 Mach-O 可执行文件格式概述中所述，\文本段保存程序的实际代码和只读部分。按照惯例，编译器工具将Mach-O对象文件（扩展名为.O）中的过程放在文本段的文本部分。
+&emsp;如 Mach-O 可执行文件格式概述中所述，\_\_TEXT segment 保存程序的 actual code 和 read-only 部分。按照惯例，编译器工具将 Mach-O 对象文件（扩展名为 .O）中的 procedures 放在 \_\_TEXT segment 的 \_\_text section。
+
+&emsp;当程序运行时，\_\_text section 的 page 会按需加载到内存中，因为这些 pages 上的 routines 会被使用。代码按照它在给定源文件中出现的顺序链接到 \_\_text section，源文件按照它们在 linker command line 中列出的顺序（或在 Xcode 中指定的顺序）链接。因此，来自第一个 object file 的代码从头到尾被链接，接着是来自第二个文件和第三个文件的代码，依此类推。
+
+&emsp;以 source file 声明顺序加载 code 很少是最优的。例如，假设代码中的某些方法或函数被重复调用，而其他方法或函数很少使用。对 procedures 进行重新排序，将常用代码放在 \_\_text section 的开头，可以最大限度地减少应用程序使用的平均页数（average number of pages），从而减少分页活动（paging activity）。
+
+&emsp;作为另一个例子，假设代码定义的所有对象都同时初始化。因为每个类的 initialization routine 都是在 a separate source file 中定义的，所以 initialization code 通常分布在 \_\_text section。通过对所有类连续初始化代码的重新排序，可以减少需要读入的页数，从而提高初始化性能。应用程序只需要少量包含初始化代码的 pages，而不需要大量 pages，每个 page 只包含一小部分初始化代码。
+
+#### Reordering Procedures
+
+&emsp;根据应用程序的大小（size）和复杂性（complexity），你应该采用一种排序代码的策略，以最大程度地提高可执行文件的性能。与大多数性能调优一样，测量和重新调整程序顺序花费的时间越多，节省的内存就越多。通过运行应用程序并按调用频率（call frequency）对 routines 进行排序，可以很容易地获得良好的初次排序（a good first-cut ordering）。下面列出了此策略（strategy）的步骤，并在以下各节中进行了详细说明：
+
+1. 构建应用程序的配置文件版本。此步骤生成一个可执行文件，其中包含分析和重新排序过程中使用的符号。
 
 
 
@@ -371,7 +383,9 @@ char foo_string[] = "My text string\n";
 
 
 
-As described in Overview of the Mach-O Executable Format, the __TEXT segment holds the actual code and read-only portions of your program. The compiler tools, by convention, place procedures from your Mach-O object files (with extension .o) in the __text section of the __TEXT segment.
+
+
+
 
 
 
