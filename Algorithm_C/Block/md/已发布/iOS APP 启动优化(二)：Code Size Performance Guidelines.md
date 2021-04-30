@@ -369,7 +369,71 @@ char foo_string[] = "My text string\n";
 
 &emsp;根据应用程序的大小（size）和复杂性（complexity），你应该采用一种排序代码的策略，以最大程度地提高可执行文件的性能。与大多数性能调优一样，测量和重新调整程序顺序花费的时间越多，节省的内存就越多。通过运行应用程序并按调用频率（call frequency）对 routines 进行排序，可以很容易地获得良好的初次排序（a good first-cut ordering）。下面列出了此策略（strategy）的步骤，并在以下各节中进行了详细说明：
 
-1. 构建应用程序的配置文件版本。此步骤生成一个可执行文件，其中包含分析和重新排序过程中使用的符号。
+1. 构建应用程序的 a profile version。此步骤生成一个可执行文件，其中包含分析和重新排序过程中使用的符号。
+2. 运行并使用应用程序创建 a set of profile data。执行一系列功能测试，或让某人在测试期间使用该程序。
+
+> Important: 为了获得最佳结果，请关注最典型的使用模式。避免使用应用程序的所有特性，否则 profile data 可能会被 diluted（稀释）。 For example, focus on launch time and the time to activate and deactivate your main window. Do not bring up ancillary window.
+
+3. 创建 order files。Order files 按优化顺序（optimized order）列出 procedures。linker 使用 order files 对可执行文件中的 procedures 重新排序。
+4. 使用 order files 运行 linker。这将创建一个可执行文件，其中的 procedures 链接到 order file 中指定的 \_\_text section。
+
+&emsp;For information on profiling your code and generating and linking an order file, see Profiling Code With gprof.
+
+#### Procedure Reordering for Large Programs
+
+&emsp;对于许多程序来说，由上述步骤生成的顺序比无序过程带来了实质性的改进。对于一个功能很少的简单应用程序，这样的排序代表了通过 procedure 重新排序获得的大部分收益。然而，更大的应用程序和其他大型程序可以从额外的分析中获益匪浅。虽然基于调用频率（call frequency）或调用图（call graph）的 order files 是一个很好的开始，但你可以利用对应用程序结构的了解来进一步减少 virtual-memory working set。
+
+##### Creating a Default Order File
+
+&emsp;如果要使用上述技术以外的其他技术对应用程序的 procedures 进行重新排序，则可以跳过分析步骤，从列出应用程序所有 routines 的默认 order file 开始。一旦你有了一个合适形式的 routines 列表，你就可以手动或使用你选择的排序技术重新排列条目。然后可以将生成的 order file 与 linker 的 -sectorder 选项一起使用，如 Linking with an Order File 中所述。
+
+&emsp;要创建默认 order file，请首先使用 -whatsloaded 选项运行 linker：
+
+```c++
+cc -o outputFile inputFile.o -whatsloaded > loadedFile
+```
+
+&emsp;这将创建一个 loadingFile 文件，该文件列出了可执行文件（包括 frameworks 或其他 libraries 中的任何文件）中加载的 object files。-whatsLoad 选项还可以用于确保 gprof -S 生成的 order files 包含静态库（static libraries）中 procedures 的名称。
+
+&emsp;使用 loadedFile 文件，可以使用 -onjls 选项和 \_\_TEXT \_\_text 参数运行 nm：
+
+```c++
+nm -onjls __TEXT __text `cat loadedFile` > orderFile
+```
+
+&emsp;orderFile 文件的内容是 text section 的 symbol table。Procedures 在符号表中以其默认链接顺序列出。你可以重新排列此文件中的条目以更改要链接过程的顺序，然后按照“链接顺序文件”中的说明运行链接器。
+
+
+
+
+
+
+
+The content of the file orderFile is the symbol table for the text section. Procedures are listed in the symbol table in their default link order. You can rearrange entries in this file to change the order in which you want procedures to be linked, then run the linker as described in Linking with an Order File.
+
+
+
+
+
+
+
+
+
+
+
+##### Using pagestuff to Examine Pages on Disk
+
+##### Grouping Routines According to Usage
+
+##### Finding That One Last Hot Routine
+
+### Reordering Other Sections
+
+#### Reordering Literal Sections
+
+#### Reordering Data Sections
+
+### Reordering Assembly Language Code
 
 
 
