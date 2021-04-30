@@ -401,27 +401,47 @@ cc -o outputFile inputFile.o -whatsloaded > loadedFile
 nm -onjls __TEXT __text `cat loadedFile` > orderFile
 ```
 
-&emsp;orderFile 文件的内容是 text section 的 symbol table。Procedures 在符号表中以其默认链接顺序列出。你可以重新排列此文件中的条目以更改要链接过程的顺序，然后按照“链接顺序文件”中的说明运行链接器。
-
-
-
-
-
-
-
-The content of the file orderFile is the symbol table for the text section. Procedures are listed in the symbol table in their default link order. You can rearrange entries in this file to change the order in which you want procedures to be linked, then run the linker as described in Linking with an Order File.
-
-
-
-
-
-
-
-
-
-
+&emsp;orderFile 文件的内容是 text section 的 symbol table。procedures 在符号表中以其默认链接顺序列出。你可以重新排列此文件中的条目，以更改要链接 procedures 的顺序，然后按照 Linking with an Order File 所述运行 linker。
 
 ##### Using pagestuff to Examine Pages on Disk
+
+&emsp;Pagestuff 工具通过告诉你在给定的时间可能在内存中加载了可执行文件的哪些 pages，可以帮助你评估 procedure ordering 的有效性。本节简要介绍如何使用此工具。有关更多信息，请参阅 pagestuff man page。
+
+&emsp;Pagestuff 工具打印出特定可执行代码 page 上的 symbols。以下是命令的语法：
+
+```c++
+pagestuff filename [pageNumber | -a]
+```
+
+&emsp;pagestuff 的输出是包含在 pageNumber 页上的 filename 中的过程列表。要查看文件的所有页面，请使用 -a 选项代替页码。此输出允许您确定与内存中的文件相关联的每个页面是否已优化。如果不是这样，您可以重新排列order文件中的条目并再次链接可执行文件，以最大限度地提高性能。例如，将两个相关过程移到一起，使它们链接在同一页上。完善排序可能需要几个链接和调整周期
+
+
+
+The output of pagestuff is a list of procedures contained in filename on page pageNumber. To view all the pages of the file, use the -a option in place of the page number. This output allows you to determine if each page associated with the file in memory is optimized. If it isn’t, you can rearrange entries in the order file and link the executable again to maximize performance gains. For example, move two related procedures together so they are linked on the same page. Perfecting the ordering may require several cycles of linking and tuning
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 ##### Grouping Routines According to Usage
 
