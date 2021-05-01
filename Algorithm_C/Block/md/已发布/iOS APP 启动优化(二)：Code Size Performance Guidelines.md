@@ -413,39 +413,147 @@ nm -onjls __TEXT __text `cat loadedFile` > orderFile
 pagestuff filename [pageNumber | -a]
 ```
 
-&emsp;pagestuff 的输出是包含在 pageNumber 页上的 filename 中的过程列表。要查看文件的所有页面，请使用 -a 选项代替页码。此输出允许您确定与内存中的文件相关联的每个页面是否已优化。如果不是这样，您可以重新排列order文件中的条目并再次链接可执行文件，以最大限度地提高性能。例如，将两个相关过程移到一起，使它们链接在同一页上。完善排序可能需要几个链接和调整周期
-
-
-
-The output of pagestuff is a list of procedures contained in filename on page pageNumber. To view all the pages of the file, use the -a option in place of the page number. This output allows you to determine if each page associated with the file in memory is optimized. If it isn’t, you can rearrange entries in the order file and link the executable again to maximize performance gains. For example, move two related procedures together so they are linked on the same page. Perfecting the ordering may require several cycles of linking and tuning
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+&emsp;pagestuff 的输出是包含在 filename 的 pageNumber 页码上的页中的 procedures 列表。 要查看文件的所有 pages，请使用 -a 选项代替页码。此输出允许你确定与内存中的文件相关联的每个页是否已优化。如果不是这样，你可以重新排列 order file 中的条目并再次链接可执行文件，以最大限度地提高性能。例如，将两个相关 procedures 移到一起，使它们链接在同一页上。完善排序可能需要几个链接和调整周期。（Perfecting the ordering may require several cycles of linking and tuning.）
 
 ##### Grouping Routines According to Usage
 
+&emsp;为什么要为应用程序的各个操作生成 profile data？该策略基于以下假设：大型应用程序有三组常规 routines：
+
++ Hot routines 在应用程序的最常见用法期间运行。这些通常是原始 routines，它为应用程序的 features（例如，访问文档的数据结构的 routines）或实现应用程序的核心 features 的 routines 提供基础，例如在字处理器中实现打字的 routines。这些 routines 应该聚集在同一组 pages 中。
++ Warm routines 实现应用程序的特定 features。Warm routines 通常与用户偶尔执行的特定 features 相关联（例如启动、打印或导入图形）。因为这些 routines 经常被合理地使用，所以将它们聚集在同一个小 pages 集中，这样它们就可以快速加载。但是，由于用户不访问此功能的时间很长，因此这些 routines 不应位于 hot category 中。
++ 在应用程序中很少使用 Cold routines。Cold routines 实现模糊 features 或覆盖边界或错误情况。将这些 routines 组合在一起，以避免在 hot or warm page 上浪费空间。
+
+&emsp;在任何给定的时间，你都应该期望大多数 hot pages 是驻留的，而对于用户当前使用的功能，你应该期望 hot pages 是驻留的。只有极少数情况下，cold page 才是常驻的。
+
+&emsp;为了实现这种理想的排序，需要收集大量的 profile data sets。首先，收集 hot routines。如上所述，编译应用程序进行分析（profiling），启动它，然后使用程序。使用 gprof -S，从 profile data 生成一个以调用频率排序的 order file，称为 hot.order。
+
+&emsp;创建 hot order file 后，为用户偶尔使用的 features 创建 order files，例如仅在启动应用程序时运行的 routines。打印、打开文档、导入图像和使用各种 non-document windows 和工具是用户偶尔使用但不连续使用的 features 的其他示例，是拥有自己的 order files 的良好候选。建议在分析 feature 之后命名这些 order files（例如，feature.order）。
+
+&emsp;最后，要生成所有 routines 的列表，请构建一个 “default” order 文件 default.order（如 Reordering Procedures 中所述）。
+
+&emsp;一旦有了这些 order files，就可以使用 Listing 2 中所示的代码来组合它们。可以使用此列表构建 command-line utility，该 utility 可以删除 order files 中的重复行，同时保留原始数据的顺序。
+
+Listing 2  Code for Unique.c
+
+```c++
+//
+//  unique
+//
+//  A command for combining files while removing
+//  duplicate lines of text. The order of other lines of text
+//  in the input files is preserved.
+//  unique 是在删除重复的文本行的同时合并文件的命令。将保留输入文件中其他行文本的顺序。
+//
+//  Build using this command line:
+//
+//  cc -ObjC -O -o unique -framework Foundation Unique.c
+//
+//  Note that “unique” differs from the BSD command “uniq” in that
+//  “uniq” combines duplicate adjacent lines, while “unique” does not
+//  require duplicate lines to be adjacent. “unique” is also spelled
+//  correctly.
+//  请注意，“unique” 与 BSD 命令 “uniq” 的不同之处在于，
+//  “uniq” 组合了重复的相邻行，而 “unique” 不要求重复行相邻 “unique” 的拼写也正确。
+ 
+#import <stdio.h>
+#import <string.h>
+#import <Foundation/NSSet.h>
+#import <Foundation/NSData.h>
+ 
+#define kBufferSize 8*1024
+ 
+void ProcessFile(FILE *fp)
+{
+    char buf[ kBufferSize ];
+ 
+    static id theSet = nil;
+ 
+    if( theSet == nil )
+    {
+        theSet = [[NSMutableSet alloc] init];
+    }
+ 
+    while( fgets(buf, kBufferSize, fp) )
+    {
+        id dataForString;
+ 
+        dataForString = [[NSData alloc] initWithBytes:buf length:strlen(buf)];
+ 
+        if( ! [theSet containsObject:dataForString] )
+        {
+            [theSet addObject:dataForString];
+            fputs(buf, stdout);
+        }
+ 
+        [dataForString release];
+    }
+}
+ 
+int main( int argc, char *argv[] )
+{
+    int     i;
+    FILE *  theFile;
+    int     status = 0;
+ 
+    if( argc > 1 )
+    {
+        for( i = 1; i < argc; i++ )
+        {
+            if( theFile = fopen( argv[i], "r" ) )
+            {
+                ProcessFile( theFile );
+                fclose( theFile );
+            }
+            else
+            {
+                fprintf( stderr, "Could not open ‘%s’\n", argv[i] );
+                status = 1;
+                break;
+            }
+        }
+    }
+    else
+    {
+        ProcessFile( stdin );
+    }
+ 
+    return status;
+}
+```
+
+&emsp;一旦构建，你将使用该程序生成最终 order file，其语法如下所示：
+
+```c++
+unique hot.order feature1.order ... featureN.order default.order > final.order
+```
+
+&emsp;当然，排序的真正测试是减少分页 I/O 的数量。运行应用程序，使用不同的功能，并检查排序文件在不同条件下的性能。你可以使用 top 工具（以及其他工具）来度量分页性能。
+
 ##### Finding That One Last Hot Routine
+
+&emsp;重新排序后，通常会在一个页区域中包含一些 cold routines，这些 routines 通常在文本排序（text ordering）结束时就很少使用。然而，一到两个 hot routines 可能会从裂缝中滑出，落在这个 cold 的区域。这是一个代价高昂的错误，因为使用其中一个 hot routines 现在需要驻留整个 page，而这个 page 中充满了不太可能使用的 cold routines。
+
+&emsp;检查可执行文件的 cold pages 是否未被意外地分页。查找驻留在应用程序文本段的冷区中具有高页面偏移量的页面。如果有一个不需要的页面，您需要找出调用该页面上的例程。一种方法是在接触该页的特定操作期间进行概要分析，并使用grep工具在概要分析程序输出中搜索驻留在该页上的例程。或者，一种快速识别页面被触摸位置的方法是在gdb调试器下运行应用程序，并使用Mach call vm\u protect来禁止对该页面的所有访问：
+
+
+
+
+
+Check that the cold pages of your executable are not being paged in unexpectedly. Look for pages that are resident with high-page offsets in the cold region of your application’s text segment. If there is an unwanted page, you need to find out what routine on that page is being called. One way to do this is to profile during the particular operation that is touching that page, and use the grep tool to search the profiler output for routines that reside on that page. Alternatively, a quick way to identify the location where a page is being touched is to run the application under the gdb debugger and use the Mach call vm_protect to disallow all access to that page:
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 ### Reordering Other Sections
 
