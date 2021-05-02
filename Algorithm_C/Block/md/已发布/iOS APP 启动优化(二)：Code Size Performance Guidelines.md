@@ -694,44 +694,108 @@ const struct daytime daytimeTable[] = {
 
 ### Initializing Static Data
 
-&emsp;正如 Overview of the Mach-O Executable Format 中指出的，编译器将未初始化的静态数据存储在数据段的 bss 部分，并将初始化的数据存储在数据部分。如果\uu bss部分中只有少量静态数据，则可能需要考虑将其移到\uu data部分。将数据存储在两个不同的部分会增加可执行文件使用的内存页的数量，从而增加分页的可能性。
+&emsp;正如 Overview of the Mach-O Executable Format 中指出的，编译器将未初始化的静态数据存储在 \_\_DATA segment 的 \_\_bss section，并将初始化的数据存储在 \_\_data section。如果 \_\_bss section 中只有少量静态数据，则可能需要考虑将其移到 \_\_data section。将数据存储在两个不同的 sections 会增加可执行文件使用的内存页的数量，从而增加分页的可能性。
 
+&emsp;合并 \_\_bss 和 \_\_data sections 的目的是减少应用程序使用的内存页数。如果将数据移到 \_\_data section 会增加该 section 中的内存页数，则此技术没有任何好处。事实上，添加到 \_\_data section 的页会增加在启动时读取和初始化数据所花费的时间。
 
+&emsp;假设你声明以下静态变量：
 
-As is pointed out in Overview of the Mach-O Executable Format, the compiler stores uninitialized static data in the __bss section of the __DATA segment and stores initialized data in the __data section. If you have only a small amount of static data in the __bss section, you might want to consider moving it to the __data section instead. Storing data in two different sections increases the number of memory pages used by the executable, which in turn increases the potential for paging.
+```c++
+static int x;
+static short conv_table[128];
+```
 
+&emsp;要将这些变量移到可执行文件的 \_\_DATA segment 的 \_\_data section 中，请将定义更改为：
 
-
+```c++
+static int x = 0;
+static short conv_table[128] = {0};
+```
 
 ### Avoiding Tentative-Definition Symbols
 
+&emsp;编译器将遇到的任何重复符号放入 \_\_DATA segment 的 \_\_common section（请参阅 Overview of the Mach-O Executable Format）。这里的问题与未初始化的静态变量相同。如果一个可执行文件的非常量全局数据分布在多个 sections 中，则这些数据更有可能位于不同的内存页上；因此，页可能必须单独交换。\_\_common section 的目标与 \_\_bss section 的目标相同：如果在可执行文件中有少量数据，则将其从可执行文件中删除。
+
+&emsp;a tentative-definition symbol 的 common source 是头文件中该符号的定义。通常，头声明一个符号，但不包括该符号的定义；而是在实现文件中提供定义。但是出现在头文件中的定义会导致代码或数据出现在包含头文件的每个实现文件中。这个问题的解决方案是确保头文件只包含声明，而不包含定义。
+
+&emsp;对于函数，你显然会在头文件中声明该函数的原型，并将该函数的定义放在实现文件中。对于全局变量和数据结构，应该执行类似的操作。与其在头文件中定义变量，不如在实现文件中定义并适当初始化它。然后，在头文件中声明该变量，在声明前面加上 extern 关键字。这种技术将变量定义本地化为一个文件，同时仍然允许从其他文件访问该变量。
+
+&emsp;当意外地导入同一头文件两次时，还可以获得 tentative-definition symbols。为确保不执行此操作，请包含预处理器指令以禁止包含已包含的文件。因此，在头文件中，你将拥有以下代码：
+
+```c++
+#ifndef MYHEADER_H
+#define MYHEADER_H
+// Your header file declarations. . .
+#endif
+```
+
+&emsp;然后，如果要包含该头文件，请按以下方式包含它：
+
+```c++
+#ifndef MYHEADER_H
+#include "MyHeader.h"
+#endif
+```
+
 ### Analyzing Mach-O Executables
+
+&emsp;你可以使用多种工具来确定非常量数据占用了多少内存。这些工具报告数据使用的各个方面。
+
+&emsp;在应用程序或 framework 运行时，使用 size 和 pagestuff 工具查看各种 data sections 有多大以及它们包含哪些符号。需要查找的内容包括：
+
++ 要查找包含大量非常量数据的可执行文件，请检查 \_\_DATA segment 中包含大 \_\_data sections 的文件。
++ 检查 \_\_bss 和 \_\_common sections 是否存在可以删除或移动到 \_\_data section 的变量和符号。
++ 若要查找虽然声明为常量，但编译器无法将其视为常量的数据，请检查 \_\_DATA segment 中是否存在可执行文件或带有 \_\_const section 的对象文件。
+
+&emsp;\_\_DATA segment 中一些较大的内存消耗者是已初始化但未声明常量的固定大小全局数组。有时可以通过在源代码中搜索 “[]={” 来找到这些表。
+
+&emsp;你还可以让编译器帮助你找到哪些数组可以设置为常量。将 const 放在所有你怀疑为只读的初始化数组前面，然后重新编译。如果一个数组不是真正的只读的，它将不会编译。删除有问题的常量并重试。
 
 ## Minimizing Your Exported Symbols
 
+&emsp;如果应用程序或 framework 具有公共接口，则应将导出的符号限制为接口所需的符号。导出的符号占用可执行文件的空间，应尽可能减少。这不仅减少了可执行文件的大小，还减少了动态链接器（dynamic linker）的工作量。
+
+&emsp;默认情况下，Xcode 从项目中导出所有符号。你可以使用下面的信息来标识和消除不希望导出的符号。
+
 ### Identifying Exported Symbols
+
+&emsp;要查看应用程序导出的符号，请使用 nm 工具。此工具读取可执行文件的符号表，并显示你请求的符号信息。可以查看所有符号，也可以只查看可执行代码特定段中的符号。例如，要仅显示外部可用的全局符号，可以在命令行上指定 -g 选项。
+
+&emsp;要查看详细的符号信息，请使用 -m 选项运行 nm。此选项的输出告诉你符号的类型以及它是外部的还是本地的（非外部的）。例如，要查看 TextEdit 应用程序的详细符号信息，可以使用 nm，如下所示：
+
+```c++
+%cd /Applications/TextEdit.app/Contents/MacOS
+% nm -m TextEdit
+```
+
+&emsp;结果输出的一部分可能如下所示：
+
+```c++
+9005cea4 (prebound undefined [lazy bound]) external _abort (from libSystem)
+9000a5c0 (prebound undefined [lazy bound]) external _atexit (from libSystem)
+90009380 (prebound undefined [lazy bound]) external _calloc (from libSystem)
+00018d14 (__DATA,__common) [referenced dynamically] external _catch_exception_raise
+00018d18 (__DATA,__common) [referenced dynamically] external _catch_exception_raise_state
+00018d1c (__DATA,__common) [referenced dynamically] external _catch_exception_raise_state_identity
+```
+
+&emsp;在此模式下，nm 根据符号显示各种信息。对于驻留在 \_\_TEXT segment 中的函数和其他代码，nm 显示预绑定信息和源库。对于 \_\_DATA segment 中的信息，nm 显示符号的特定 section 及其链接。对于所有符号，nm 显示符号是外部的还是本地的。
 
 ### Limiting Your Exported Symbols
 
+&emsp;如果知道要从项目中导出的符号，则应创建一个导出文件，并将该文件添加到项目的链接器设置中。导出文件是一个纯文本文件，其中包含要使外部调用者可用的符号的名称。每个符号必须单独列在一行上。前导和尾随空格不被视为符号名称的一部分。以 # 符号开头的行将被忽略。
+
+&emsp;要在 Xcode 项目中包含导出文件，请修改项目的 target or build-style settings。将 “Exported symbols file” 设置的值设置为导出文件的名称。Xcode 将适当的选项传递给静态链接器。
+
+&emsp;要从命令行导出符号列表，请将 -exported_symbols_list 选项添加到链接器命令。也可以导出所有符号，然后限制特定列表，而不是导出特定的符号列表。要限制特定的符号列表，请在链接器命令中使用 -unexported_symbols_list 选项。
+
+&emsp;请注意，运行时库导出的符号必须显式包含在导出文件中，才能正确启动应用程序。要收集这些符号的列表，请在没有导出文件的情况下链接代码，然后从终端执行 nm -m 命令。从生成的输出中，收集所有标记为外部的、不属于代码一部分的符号，并将它们添加到导出文件中。
+
 ### Limiting Exports Using GCC 4.0
 
+&emsp;GCC4.0 支持单个符号的自定义可见性属性。此外，编译器还提供编译时标志，允许你为已编译文件的所有符号设置默认可见性。
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+&emsp;有关使用 GCC 4 的新符号可见性特征的信息，请参见 C++ Runtime Environment Programming Guide 中的 “Controlling Symbol Visibility“。
 
 ## 参考链接
 **参考链接:🔗**
