@@ -533,41 +533,187 @@ unique hot.order feature1.order ... featureN.order default.order > final.order
 
 &emsp;重新排序后，通常会在一个页区域中包含一些 cold routines，这些 routines 通常在文本排序（text ordering）结束时就很少使用。然而，一到两个 hot routines 可能会从裂缝中滑出，落在这个 cold 的区域。这是一个代价高昂的错误，因为使用其中一个 hot routines 现在需要驻留整个 page，而这个 page 中充满了不太可能使用的 cold routines。
 
-&emsp;检查可执行文件的 cold pages 是否未被意外地分页。查找驻留在应用程序文本段的冷区中具有高页面偏移量的页面。如果有一个不需要的页面，您需要找出调用该页面上的例程。一种方法是在接触该页的特定操作期间进行概要分析，并使用grep工具在概要分析程序输出中搜索驻留在该页上的例程。或者，一种快速识别页面被触摸位置的方法是在gdb调试器下运行应用程序，并使用Mach call vm\u protect来禁止对该页面的所有访问：
+&emsp;检查可执行文件的 cold pages 是否未被意外地分页。查找在应用程序 text segment 的 cold region 中具有 high-page offsets 的常驻页（pages that are resident）。如果有一个不需要的页，你需要找出调用该页上的 routine。一种方法是在接触该页的特定操作期间进行概要分析，并使用 grep 工具在概要分析程序输出中搜索驻留在该页上的 routines。或者，一种快速识别页被触摸位置的方法是在 gdb 调试器下运行应用程序，并使用 Mach call vm_protect 来禁止对该页的所有访问：
 
+```c++
+(gdb) p vm_protect(task_self(), startpage_addr, vm_page_size, FALSE, 0);
+```
 
-
-
-
-Check that the cold pages of your executable are not being paged in unexpectedly. Look for pages that are resident with high-page offsets in the cold region of your application’s text segment. If there is an unwanted page, you need to find out what routine on that page is being called. One way to do this is to profile during the particular operation that is touching that page, and use the grep tool to search the profiler output for routines that reside on that page. Alternatively, a quick way to identify the location where a page is being touched is to run the application under the gdb debugger and use the Mach call vm_protect to disallow all access to that page:
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+&emsp;清除页保护后，对该页的任何访问都会导致内存错误，从而中断调试器（debugger）中的程序。此时，你只需查看函数调用堆栈（使用 bt 命令）即可了解调用 routine 的原因。
 
 ### Reordering Other Sections
 
+&emsp;可以使用 linker 的 -sectorder 选项来组织可执行文件的大多数 sections 中的 blocks。偶尔可能受益（occasionally benefit）于重新排列的 sections 是 literal sections，例如 \_\_TEXT segment 的 \_\_cstring section 或 \_\_DATA segment 的 \_\_data section。
+
 #### Reordering Literal Sections
+
+&emsp;使用 ld 和 otool 工具可以最容易地生成 literal sections 的 order file 中的行。对于 literal sections，otool 为每种类型的 literal section 创建特定类型的 order file：
+
++ 对于 C 字符串 literal sections，order-file 格式是每行一个文本 C 字符串（C 字符串中允许使用 ANSI C 转义序列）。例如，如下一行：
+
+```c++
+Hello world\n
+```
+
++ 对于 4 字节的 literal sections，order-file 格式是一个 32 位十六进制数，每行前导 0x，行的其余部分作为注释处理。例如，如下一行：
+
+```c++
+0x3f8ccccd (1.10000002384185790000e+00)
+```
+
++ 对于 8 字节的 literal sections，order file 行由每行两个 32 位十六进制数组成，每行用空格分隔，每个空格都有一个前导 0x，其余的行作为注释处理。例如，如下一行：
+
+```c++
+0x3ff00000 0x00000000 (1.00000000000000000000e+00)
+```
+
++ 对于 literal pointer sections，order file 中的行的格式表示指针，每行一个。文字指针由 segment name、文字指针的 section name 和文字本身表示。它们之间用冒号分隔，没有多余的空格。例如，如下一行：
+
+```c++
+__OBJC:__selector_strs:new
+```
+
++ 对于所有的 literal sections，order file 中的每一行都被简单地输入到 literal section，并以 order 文件 的顺序出现在输出文件（output file）中。不进行检查，以查看文字是否在加载的对象中。
+
+
+&emsp;要对 literal section 重新排序，首先使用 ld -whatsloaded 选项创建一个 “whatsloaded” 文件，如 Creating a Default Order File 中所述。然后，使用适当的 options、segment 和 section 名称以及 filenames 运行 otool。otool 的输出是指定 section 的默认 order file。例如，以下命令行生成一个 order file，其中列出了文件 cstring_order 中的 \_\_TEXT segment 的 \_\_cstring section 的默认加载顺序：
+
+```c++
+otool -X -v -s __TEXT __cstring `cat whatsloaded` > cstring_order
+```
+
+&emsp;一旦创建了文件 cstring_order，就可以编辑该文件并重新排列其条目以优化引用的位置。例如，你可以将程序最常用的文字字符串（例如出现在用户界面中的标签）放在文件的开头。要在可执行文件中生成所需的加载顺序，请使用以下命令：
+
+```c++
+cc -o hello hello.o -sectorder __TEXT __cstring  cstring_order
+```
 
 #### Reordering Data Sections
 
+&emsp;目前没有工具来测量对 data symbols 的代码引用。但是，你可能知道程序的数据引用模式，并且可以通过将很少使用的特性的数据与其他数据分离来节省一些成本。实现 \_\_data section 重新排序的一种方法是按大小对数据进行排序，这样小的数据项最终会出现在尽可能少的页上。例如，如果一个较大的数据项跨两个页放置，而两个较小的数据项共享其中的每一个页，则必须对较大的数据项进行分页才能访问较小的数据项。按大小重新排序数据可以最大限度地降低这种低效率。因为这些数据通常需要写入虚拟内存备份存储区（virtual-memory backing store），所以在某些程序中这可能是一个很大的节省。
+
+&emsp;要重新排序 \_\_data section，请首先创建一个 order file，按你希望链接的顺序列出 source files 和 symbols（在 Generating Order Files 的开头描述了 order file entries）。然后，使用 -sectorder 命令行选项链接程序：
+
+```c++
+cc -o outputFile inputFile.o … -sectorder __DATA __data orderFile -e start
+```
+
+&emsp;要在 Xcode 项目中使用 order file，请在项目的 Deployment build style 中修改 “Other Linker Flags” 选项。将 text -sectorder \_\_DATA \_\_data orderFile 添加到此设置以指定你的 order file。
+
 ### Reordering Assembly Language Code
 
+&emsp;在重新排序用汇编语言编写的 routines 时，需要记住的一些附加准则：
+
++ temporary labels in assembly code
+
+&emsp;在手动编码的汇编代码中，请注意分支到临时标签的分支会在非临时标签上分支。例如，如果使用以 “L” 开头的标签或 d 标签（其中 d 是数字），如本例所示
+
+```c++
+foo: b 1f
+    ...
+bar: ...
+1:   ...
+```
+
+&emsp;生成的程序将无法正确链接或执行，因为只有 foo 和 bar 符号才能将其放入对象文件的符号表中。对临时标签 1 的引用被编译为偏移量；结果，没有为指令 b 1f 生成重定位条目。如果链接器没有将与符号栏关联的块直接放在与 foo 关联的块之后，则 1f 的分支将不会到达正确的位置。因为没有重定位条目，链接器不知道如何修复分支。解决此问题的源代码更改是将标签 1 更改为非临时标签（例如 bar 1）。通过将包含手工编码的汇编代码的对象文件链接为一个整体，而无需重新排序，可以避免这些文件出现问题。
+
++ the pseudo-symbol .section_start
+
+&emsp;如果任何输入文件中指定的 section 的大小为非零，并且没有具有其 section 开头值的符号，则链接器将伪符号 .section_start 用作与节中第一个块关联的符号名。此符号的目的是处理其符号不会持久存在于对象文件中的文字常量。因为文字字符串和浮点常量都在文字部分，所以这对 Apple 编译器来说不是问题。你可能会看到汇编语言程序或非 Apple 编译器使用的此符号。但是，你不应该对这些代码重新排序，而应该将整个文件链接起来，而不必重新排序（请参见 Linking with an Order File）。
+
+## Reducing Shared Memory Pages
+
+&emsp;如 Overview of the Mach-O Executable Format 所述，Mach-O 二进制文件的 \_\_DATA segment 中的数据是可写的，因此是可共享的（通过 copy-on-write）。在内存不足的情况下，可写数据会增加可能需要写入磁盘的页数，从而降低分页性能。对于 frameworks，可写数据最初是共享的，但有可能被复制到每个进程的内存空间。
+
+&emsp;减少可执行文件中的 dynamic 或 non-constant data 会对性能产生重大影响，特别是对于 frameworks，以下部分将向你展示如何减少可执行文件的 \_\_DATA segment 的大小，从而减少 shared memory pages 的数量。
+
+### Declaring Data as const
+
+&emsp;使 \_\_DATA segment 变小的最简单方法是将范围更广的数据标记为常量。大多数时候，很容易将数据标记为常量。例如，如果你永远不会修改数组中的元素，则应在数组声明中包含 const 关键字，如下所示：
+
+```c++
+const int fibonacci_table[8] = {1, 1, 2, 3, 5, 8, 13, 21};
+```
+
+&emsp;记住将指针标记为常量（适当时）。在下面的示例中，字符串 “a” 和 “b” 是常量，但数组指针 foo 不是：
+
+```c++
+static const char *foo[] = {"a", "b"};
+foo[1] = "c";       // OK: foo[1] is not constant.
+```
+
+&emsp;要将整个声明标记为常量，需要将 const 关键字添加到指针以使指针为常量。在以下示例中，数组及其内容都是常量：
+
+```c++
+static const char *const foo[] = {"a", "b"};
+foo[1] = "c";       // NOT OK: foo[1] is constant.
+```
+
+&emsp;有时你可能需要重写代码来分离常量数据。下面的示例包含一个结构数组，其中只有一个字段声明为 const。因为整个数组没有声明为 const，所以它存储在 \_\_DATA segment 中。
+
+```c++
+const char *const imageNames[100] = { "FooImage", /* . . . */ };
+NSImage *imageInstances[100] = { nil, /* . . . */ };
+```
+
+&emsp;如果未初始化的数据项包含指针，则编译器无法将该项存储在 \_\_TEXT segment 中。字符串结束于 \_\_TEXT segment 的 \_\_cstring section，但数据项的其余部分（包括指向字符串的指针）结束于 \_\_DATA segment 的 const section。在下面的示例中，daythedule 将在 \_\_TEXT 和 \_\_DATA segments 之间拆分，即使它是 constant：
+
+```c++
+struct daytime {
+    const int value;
+    const char *const name;
+};
+ 
+const struct daytime daytimeTable[] = {
+    {1, "dawn"},
+    {2, "day"},
+    {3, "dusk"},
+    {4, "night"}
+};
+```
+
+&emsp;要将整个数组放入 \_\_TEXT segment，必须重写此结构，使其使用固定大小的 char 数组而不是字符串指针，如以下示例所示：
+
+```c++
+struct daytime {
+    const int value;
+    const char name[6];
+};
+ 
+const struct daytime daytimeTable[] = {
+    {1, {'d', 'a', 'w', 'n', '\0'}},
+    {2, {'d', 'a', 'y', '\0'}},
+    {3, {'d', 'u', 's', 'k', '\0'}},
+    {4, {'n', 'i', 'g', 'h', 't', '\0'}}
+};
+```
+
+&emsp;不幸的是，如果字符串的大小千差万别，就没有好的解决方案，因为这种解决方案会留下大量未使用的空间。
+
+&emsp;数组被分成两段，因为编译器总是在 \_\_TEXT segment 的 \_\_cstring section 存储常量字符串。如果编译器将数组的其余部分存储在 \_\_DATA segment 的 \_\_data section 中，则字符串和指向字符串的指针可能会出现在不同的页上。如果发生这种情况，系统将不得不用新地址更新指向字符串的指针，而如果指针位于 \_\_TEXT segment 中，则不能这样做，因为 \_\_TEXT segment 被标记为只读。因此指向字符串的指针以及数组的其余部分必须存储在 \_\_DATA segment 的 const section。\_\_const section 是为声明为 const 的数据保留的，这些数据不能放在 \_\_TEXT segment 中。
+
+### Initializing Static Data
+
+&emsp;正如 Overview of the Mach-O Executable Format 中指出的，编译器将未初始化的静态数据存储在数据段的 bss 部分，并将初始化的数据存储在数据部分。如果\uu bss部分中只有少量静态数据，则可能需要考虑将其移到\uu data部分。将数据存储在两个不同的部分会增加可执行文件使用的内存页的数量，从而增加分页的可能性。
+
+
+
+As is pointed out in Overview of the Mach-O Executable Format, the compiler stores uninitialized static data in the __bss section of the __DATA segment and stores initialized data in the __data section. If you have only a small amount of static data in the __bss section, you might want to consider moving it to the __data section instead. Storing data in two different sections increases the number of memory pages used by the executable, which in turn increases the potential for paging.
 
 
 
 
+### Avoiding Tentative-Definition Symbols
 
+### Analyzing Mach-O Executables
+
+## Minimizing Your Exported Symbols
+
+### Identifying Exported Symbols
+
+### Limiting Your Exported Symbols
+
+### Limiting Exports Using GCC 4.0
 
 
 
