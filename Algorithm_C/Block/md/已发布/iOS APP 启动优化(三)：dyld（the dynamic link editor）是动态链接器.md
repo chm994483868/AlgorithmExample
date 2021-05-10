@@ -65,38 +65,27 @@ libSTATICLIB.a: current ar archive random library
 
 + 什么是 framework ?
 
-> &emsp;Framework 是Cocoa/Cocoa Touch 程序中使用的一种资源打包方式，可以将代码文件、头文件、资源文件、说明文档等集中在一起，方便开发者使用。一般如果是静态 Framework 的话，资源打包进 Framework 是读取不了的。静态 Framework 和 .a 文件都是编译进可执行文件里面的。只有动态 Framework 能在 .app 下面的 Framework 文件夹下看到，并读取 .framework 里的资源文件。
+> &emsp;Framework 是 Cocoa/Cocoa Touch 程序中使用的一种资源打包方式，可以将代码文件、头文件、资源文件、说明文档等集中在一起，方便开发者使用。一般如果是静态 Framework 的话，资源打包进 Framework 是读取不了的。静态 Framework 和 .a 文件都是编译进可执行文件里面的。只有动态 Framework 能在 .app 下面的 Framework 文件夹下看到，并读取 .framework 里的资源文件。
 >
 > &emsp;Cocoa/Cocoa Touch 开发框架本身提供了大量的 Framework，比如 Foundation.framework / UIKit.framework / AppKit.framework 等。需要注意的是，这些 framework 无一例外都是动态库。
 >
 > &emsp;平时我们用的第三方 SDK 的 framework 都是静态库，真正的动态库是上不了 AppStore 的(iOS 8 之后能上 AppStore，因为有个 App Extension，需要动态库支持)。
 
+&emsp;我们用 use_frameworks! 生成的 pod 里面，pods 这个 PROJECT 下面会为每一个 pod 生成一个 target，比如有一个 pod 叫做 AFNetworking，那么就会有一个叫 AFNetworking 的 target，最后这个 target 生成的就是 AFNetworking.framework。
 
+### 关于 use_frameworks!
 
+&emsp;在使用 CocoaPods 的时候在 Podfile 里加入 use_frameworks! ，那么在编译的时候就会默认生成动态库，我们能看到每个源码 Pod 都会在 Pods 工程下面生成一个对应的动态库 Framework 的 target，我们能在这个 target 的 Build Settings -> Mach-O Type 看到默认设置是 Dynamic Library，也就是会生成一个动态 Framework，我们能在 Products 下面看到每一个 Pod 对应生成的动态库。
 
+![截屏2021-05-10 08.32.00.png](https://p9-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/7e4bca1afb7844c5b81bac837ab20687~tplv-k3u1fbpfcp-watermark.image)
 
+&emsp;这些生成的动态库将链接到主项目给主工程使用，但是我们上面说过动态库需要在主工程 target 的 General -> Frameworks, Libraries, and Embedded Content 添加这个动态库并设置其 Embed 为 Embed & Sign 才能使用，而我们并没有在 Frameworks, Libraries, and Embedded Content 中看到这些动态库。那这是怎么回事呢，其实是 cocoapods 已经执行了脚本把这些动态库嵌入到了 .app 的 Framework 目录下，相当于在 Frameworks, Libraries, and Embedded Content 加入了这些动态库，我们能在主工程 target 的 Build Phase -> [CP]Embed Pods Frameworks 里看到执行的脚本。（"${PODS_ROOT}/Target Support Files/Pods-Test_ipa_Simple/Pods-Test_ipa_Simple-frameworks.sh"）
 
+![截屏2021-05-10 08.22.43.png](https://p1-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/b3c70781d38645aba9736a352ce5b513~tplv-k3u1fbpfcp-watermark.image)
 
+&emsp;所以 Pod 默认是生成动态库，然后嵌入到 .app 下面的 Framework 文件夹里。我们去 Pods 工程的 target 里把 Build Settings -> Mach-O Type 设置为 Static Library。那么生成的就是静态库，但是 cocoapods 也会把它嵌入到 .app 的 Framework 目录下，而因为它是静态库，所以会报错：unrecognized selector sent to instanceunrecognized selector sent to instance 。[iOS里的动态库和静态库](https://www.jianshu.com/p/42891fb90304)
 
-
-
-
-## LLDB 常用命令
-
-1. p po p/x p/o p/t p/d p/c
-2. expression 修改参数
-3. call 
-4. x x/4gx x/4xg
-5. image list
-6. image lookup --address+地址
-7. thread list
-8. thread backtrace（bt）bt all
-9. thread return frame variable
-10. register read register read/x
-
-## clang 
-
-&emsp;clang:Clang 是一个 C++ 编写、基于 LLVM、发布于 LLVM BSD 许可证下的 C/C++/Objective-C/ Objective-C++ 编译器。它与 GNU C 语言规范几乎完全兼容(当然，也有部分不兼容的内容， 包括编译命令选项也会有点差异)，并在此基础上增加了额外的语法特性，比如 C 函数重载 (通过 \_ attribute_((overloadable)) 来修饰函数)，其目标(之一)就是超越 GCC。
+## 一组函数的执行顺序
 
 ```c++
 // main.m 代码如下：
@@ -144,9 +133,46 @@ int main(int argc, char * argv[]) {
 2021-05-07 14:46:45.242218+0800 Test_ipa_Simple[43277:456220] 🦁🦁🦁 main 执行
 🦁🦁🦁 main_back 执行 
 ```
-&emsp;\_\_attribute__ 可以设置函数属性(Function Attribute)、变量属性(Variable Attribute)和类型属性(Type Attribute)。\_\_attribute__ 前后都有两个下划线，并且后面会紧跟一对原括弧，括弧里面是相应的 \_\_attribute__ 参数，\_\_attribute__ 语法格式为：`__attribute__ ( ( attribute-list ) )`。
 
-&emsp;若函数被设定为 constructor 属性，则该函数会在 main 函数执行之前被自动的执行。类似的，若函数被设定为 destructor 属性，则该函数会在 main 函数执行之后或者 exit 被调用后被自动的执行。
+&emsp;根据控制台打印，可以看到 load 函数最先执行，然后是 constructor 属性修饰的 main_front 函数执行，然后是 main 函数执行，最后是 destructor 属性修饰的 main_back 函数执行。
+
+&emsp;\_\_attribute__ 可以设置函数属性(Function Attribute)、变量属性(Variable Attribute)和类型属性(Type Attribute)。\_\_attribute__ 前后都有两个下划线，并且后面会紧跟一对原括弧，括弧里面是相应的 \_\_attribute__ 参数，\_\_attribute__ 语法格式为：`__attribute__((attribute-list))`。
+
+&emsp;若函数被设定为 `constructor` 属性，则该函数会在 main 函数执行之前被自动的执行。类似的，若函数被设定为 `destructor` 属性，则该函数会在 main 函数执行之后或者 exit 被调用后被自动的执行。
+
+&emsp;我们知道 .h、.m 的类在程序运行时先进行预编译，之后进行编译，编译完成后会进行汇编，在汇编结束后会进入一个阶段叫连接（把所有的代码链接到我们的程序中），最后会生成一个可执行文件。
+
+&emsp;下面我们将了解 App 运行需要加载依赖库，需要加载 .h、.m 文件，那么谁来决定加载这些东西的先后顺序呢？这就是我们今天要说的主角 dyld（连接器）。就是由它来决定加载内容的先后顺序。
+
+&emsp;app：images（镜像文件）-> dyld：读到内存（也就是加表里），启动主程序 - 进行 link - 一些必要对象的初始化（runtime，libsysteminit，OS_init 的初始化）。
+
+
+
+
+
+
+
+
+
+
+## LLDB 常用命令
+
+1. p po p/x p/o p/t p/d p/c
+2. expression 修改参数
+3. call 
+4. x x/4gx x/4xg
+5. image list
+6. image lookup --address+地址
+7. thread list
+8. thread backtrace（bt）bt all
+9. thread return frame variable
+10. register read register read/x
+
+## clang 
+
+&emsp;clang:Clang 是一个 C++ 编写、基于 LLVM、发布于 LLVM BSD 许可证下的 C/C++/Objective-C/ Objective-C++ 编译器。它与 GNU C 语言规范几乎完全兼容(当然，也有部分不兼容的内容， 包括编译命令选项也会有点差异)，并在此基础上增加了额外的语法特性，比如 C 函数重载 (通过 \_ attribute_((overloadable)) 来修饰函数)，其目标(之一)就是超越 GCC。
+
+
 
 
 
@@ -168,4 +194,5 @@ int main(int argc, char * argv[]) {
 + [OC底层原理之-App启动过程（dyld加载流程）](https://juejin.cn/post/6876773824491159565)
 + [iOS里的动态库和静态库](https://www.jianshu.com/p/42891fb90304)
 + [Xcode 中的链接路径问题](https://www.jianshu.com/p/cd614e080078)
++ [iOS 利用 Framework 进行动态更新](https://nixwang.com/2015/11/09/ios-dynamic-update/)
 
