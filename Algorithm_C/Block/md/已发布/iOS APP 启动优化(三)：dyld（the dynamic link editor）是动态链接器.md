@@ -148,9 +148,19 @@ int main(int argc, char * argv[]) {
 
 ### 探究 Dyld
 
-#### 分析主程序初始化过程
+&emsp;macOS 的 dyld 程序位置在 `/usr/lib/dyld`   
 
+![截屏2021-05-12 08.08.33.png](https://p1-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/909ef5653e4c40479d3b43a437dcb9e7~tplv-k3u1fbpfcp-watermark.image)
 
+```c++
+hmc@bogon Simple % file dyld
+dyld: Mach-O universal binary with 3 architectures: [x86_64:Mach-O 64-bit dynamic linker x86_64] [i386:Mach-O dynamic linker i386] [arm64e]
+dyld (for architecture x86_64):    Mach-O 64-bit dynamic linker x86_64
+dyld (for architecture i386):    Mach-O dynamic linker i386
+dyld (for architecture arm64e):    Mach-O 64-bit dynamic linker arm64e
+```
+
+&emsp;dyld 是英文 the dynamic link editor 的简写，翻译过来就是动态链接器，是苹果操作系统的一个重要的组成部分。在 iOS/macOS 系统中，仅有很少量的进程只需要内核就能完成加载，基本上所有的进程都是动态链接的，所以 Mach-O 镜像文件中会有很多对外部的库和符号的引用，但是这些引用并不能直接用，在启动时还必须要通过这些引用进行内容的填补，这个填补工作就是由动态链接器 dyld 来完成的，也就是符号绑定。系统内核在加载 Mach-O 文件时，都需要用 dyld 链接程序，将程序加载到内存中。
 
 
 
@@ -206,6 +216,8 @@ int main(int argc, char * argv[]) {
 **参考链接:🔗**
 + [dyld-832.7.3](https://opensource.apple.com/tarballs/dyld/)
 + [OC底层原理之-App启动过程（dyld加载流程）](https://juejin.cn/post/6876773824491159565)
++ [iOS中的dyld缓存是什么？](https://blog.csdn.net/gaoyuqiang30/article/details/52536168)
++ [iOS进阶之底层原理-应用程序加载（dyld加载流程、类与分类的加载）](https://blog.csdn.net/hengsf123456/article/details/116205004?utm_medium=distribute.pc_relevant.none-task-blog-baidujs_title-4&spm=1001.2101.3001.4242)
 + [iOS里的动态库和静态库](https://www.jianshu.com/p/42891fb90304)
 + [Xcode 中的链接路径问题](https://www.jianshu.com/p/cd614e080078)
 + [iOS 利用 Framework 进行动态更新](https://nixwang.com/2015/11/09/ios-dynamic-update/)
