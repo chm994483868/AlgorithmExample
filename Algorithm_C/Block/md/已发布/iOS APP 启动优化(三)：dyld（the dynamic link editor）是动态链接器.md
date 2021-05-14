@@ -160,12 +160,166 @@ dyld (for architecture i386):    Mach-O dynamic linker i386
 dyld (for architecture arm64e):    Mach-O 64-bit dynamic linker arm64e
 ```
 
+&emsp;可以看到我电脑里面的 dyld 是一个 fat Mach-O 文件，同时集合了三个平台 x86_64、i386、arm64e。 
+
 &emsp;dyld 是英文 the dynamic link editor 的简写，翻译过来就是动态链接器，是苹果操作系统的一个重要的组成部分。在 iOS/macOS 系统中，仅有很少量的进程只需要内核就能完成加载，基本上所有的进程都是动态链接的，所以 Mach-O 镜像文件中会有很多对外部的库和符号的引用，但是这些引用并不能直接用，在启动时还必须要通过这些引用进行内容的填补，这个填补工作就是由动态链接器 dyld 来完成的，也就是符号绑定。系统内核在加载 Mach-O 文件时，都需要用 dyld 链接程序，将程序加载到内存中。
 
 
+&emsp;在编写项目时，我们大概最先接触到的可执行的代码是 main 和 load 函数，当我们不重写某个类的 load 函数，大概会觉得 main 是我们 APP 的入口函数，当我们重写了某个类的 load 函数后，我们又已知的 load 函数是在 main 之前执行的。（上一节我们也有说过 \_\_attribute__((constructor)) 修饰的 C  函数也会在 main 之前执行）那么从这里可以看出到我们的 APP 真的执行到 main 函数之前其实已经做了一些 APP 的 加载操作，那具体都有哪些呢，我们可以以在 load 函数中打断点，然后打印出函数调用堆栈的形式发现一些端倪。如下图所示：
 
+![截屏2021-05-13 08.11.38.png](https://p1-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/89b62441b6d646b39966c7e2bf52abdb~tplv-k3u1fbpfcp-watermark.image)
 
+```c++
+(lldb) bt
+* thread #1, queue = 'com.apple.main-thread', stop reason = breakpoint 1.1
+    frame #0: 0x0000000100a769c7 Test_ipa_Simple`+[ViewController load](self=ViewController, _cmd="load") at ViewController.m:17:5
+    frame #1: 0x00007fff201804e3 libobjc.A.dylib`load_images + 1442
+    frame #2: 0x0000000108cb5e54 dyld_sim`dyld::notifySingle(dyld_image_states, ImageLoader const*, ImageLoader::InitializerTimingList*) + 425
+    frame #3: 0x0000000108cc4887 dyld_sim`ImageLoader::recursiveInitialization(ImageLoader::LinkContext const&, unsigned int, char const*, ImageLoader::InitializerTimingList&, ImageLoader::UninitedUpwards&) + 437
+    frame #4: 0x0000000108cc2bb0 dyld_sim`ImageLoader::processInitializers(ImageLoader::LinkContext const&, unsigned int, ImageLoader::InitializerTimingList&, ImageLoader::UninitedUpwards&) + 188
+    frame #5: 0x0000000108cc2c50 dyld_sim`ImageLoader::runInitializers(ImageLoader::LinkContext const&, ImageLoader::InitializerTimingList&) + 82
+    frame #6: 0x0000000108cb62a9 dyld_sim`dyld::initializeMainExecutable() + 199
+    frame #7: 0x0000000108cbad50 dyld_sim`dyld::_main(macho_header const*, unsigned long, int, char const**, char const**, char const**, unsigned long*) + 4431
+    frame #8: 0x0000000108cb51c7 dyld_sim`start_sim + 122
+    frame #9: 0x0000000200dea57a dyld`dyld::useSimulatorDyld(int, macho_header const*, char const*, int, char const**, char const**, char const**, unsigned long*, unsigned long*) + 2093
+    frame #10: 0x0000000200de7df3 dyld`dyld::_main(macho_header const*, unsigned long, int, char const**, char const**, char const**, unsigned long*) + 1199
+    frame #11: 0x0000000200de222b dyld`dyldbootstrap::start(dyld3::MachOLoaded const*, int, char const**, dyld3::MachOLoaded const*, unsigned long*) + 457
+  * frame #12: 0x0000000200de2025 dyld`_dyld_start + 37
+(lldb) 
+```
 
+&emsp;可以看到从 \_dyld_start 函数开始直到 +[ViewController load] 函数，中间的函数调用栈都集中在了 dyld 和 dyld_sim。（最后的 libobjc.A.dylib`load_images 调用，后面我们会详细分析）下面我们可以通过 [dyld 的源码](https://opensource.apple.com/tarballs/dyld/) 来一一分析上面函数调用堆栈中出现的函数。
+
+&emsp;\_dyld_start 是汇编函数。
+
+```c++
+#if __arm64__ && !TARGET_OS_SIMULATOR
+    .text
+    .align 2
+    .globl __dyld_start
+__dyld_start:
+    mov     x28, sp
+    and     sp, x28, #~15        // force 16-byte alignment of stack
+    mov    x0, #0
+    mov    x1, #0
+    stp    x1, x0, [sp, #-16]!    // make aligned terminating frame
+    mov    fp, sp            // set up fp to point to terminating frame
+    sub    sp, sp, #16             // make room for local variables
+    
+#if __LP64__
+    ldr     x0, [x28]               // get app's mh into x0
+    ldr     x1, [x28, #8]           // get argc into x1 (kernel passes 32-bit int argc as 64-bits on stack to keep alignment)
+    add     x2, x28, #16            // get argv into x2
+#else
+    ldr     w0, [x28]               // get app's mh into x0
+    ldr     w1, [x28, #4]           // get argc into x1 (kernel passes 32-bit int argc as 64-bits on stack to keep alignment)
+    add     w2, w28, #8             // get argv into x2
+#endif
+
+    adrp    x3,___dso_handle@page
+    add     x3,x3,___dso_handle@pageoff // get dyld's mh in to x4
+    mov    x4,sp                   // x5 has &startGlue
+
+    // call dyldbootstrap::start(app_mh, argc, argv, dyld_mh, &startGlue) 
+    bl    __ZN13dyldbootstrap5startEPKN5dyld311MachOLoadedEiPPKcS3_Pm
+    mov    x16,x0                  // save entry point address in x16
+    
+#if __LP64__
+    ldr     x1, [sp]
+#else
+    ldr     w1, [sp]
+#endif
+
+    cmp    x1, #0
+    b.ne    Lnew
+
+    // LC_UNIXTHREAD way, clean up stack and jump to result
+#if __LP64__
+    add    sp, x28, #8             // restore unaligned stack pointer without app mh
+#else
+    add    sp, x28, #4             // restore unaligned stack pointer without app mh
+#endif
+
+#if __arm64e__
+    braaz   x16                     // jump to the program's entry point
+#else
+    br      x16                     // jump to the program's entry point
+#endif
+
+    // LC_MAIN case, set up stack for call to main()
+Lnew:    mov    lr, x1            // simulate return address into _start in libdyld.dylib
+
+#if __LP64__
+    ldr    x0, [x28, #8]       // main param1 = argc
+    add    x1, x28, #16        // main param2 = argv
+    add    x2, x1, x0, lsl #3
+    add    x2, x2, #8          // main param3 = &env[0]
+    mov    x3, x2
+Lapple:    ldr    x4, [x3]
+    add    x3, x3, #8
+#else
+    ldr    w0, [x28, #4]       // main param1 = argc
+    add    x1, x28, #8         // main param2 = argv
+    add    x2, x1, x0, lsl #2
+    add    x2, x2, #4          // main param3 = &env[0]
+    mov    x3, x2
+Lapple:    ldr    w4, [x3]
+    add    x3, x3, #4
+#endif
+
+    cmp    x4, #0
+    b.ne    Lapple            // main param4 = apple
+    
+#if __arm64e__
+    braaz   x16
+#else
+    br      x16
+#endif
+
+#endif // __arm64__ && !TARGET_OS_SIMULATOR
+```
+
+&emsp;然后看到汇编函数 \_\_dyld_start 内部调用了 dyldbootstrap::start(app_mh, argc, argv, dyld_mh, &startGlue) 函数，即 dyldbootstrap 命名空间中的 start 函数，namespace dyldbootstrap 定义在 dyldInitialization.cpp 中，下面我们一起看下其中的 start 的函数。
+
+```c++
+//
+//  This is code to bootstrap dyld.  This work in normally done for a program by dyld and crt.
+//  In dyld we have to do this manually.
+//
+uintptr_t start(const dyld3::MachOLoaded* appsMachHeader, int argc, const char* argv[],
+                const dyld3::MachOLoaded* dyldsMachHeader, uintptr_t* startGlue)
+{
+
+    // Emit kdebug tracepoint to indicate dyld bootstrap has started <rdar://46878536>
+    dyld3::kdebug_trace_dyld_marker(DBG_DYLD_TIMING_BOOTSTRAP_START, 0, 0, 0, 0);
+
+    // if kernel had to slide dyld, we need to fix up load sensitive locations
+    // we have to do this before using any global variables
+    rebaseDyld(dyldsMachHeader);
+
+    // kernel sets up env pointer to be just past end of agv array
+    const char** envp = &argv[argc+1];
+    
+    // kernel sets up apple pointer to be just past end of envp array
+    const char** apple = envp;
+    while(*apple != NULL) { ++apple; }
+    ++apple;
+
+    // set up random value for stack canary
+    __guard_setup(apple);
+
+#if DYLD_INITIALIZER_SUPPORT
+    // run all C++ initializers inside dyld
+    runDyldInitializers(argc, argv, envp, apple);
+#endif
+
+    _subsystem_init(apple);
+
+    // now that we are done bootstrapping dyld, call dyld's main
+    uintptr_t appsSlide = appsMachHeader->getSlide();
+    return dyld::_main((macho_header*)appsMachHeader, appsSlide, argc, argv, envp, apple, startGlue);
+}
+```
 
 
 
@@ -218,6 +372,8 @@ dyld (for architecture arm64e):    Mach-O 64-bit dynamic linker arm64e
 + [OC底层原理之-App启动过程（dyld加载流程）](https://juejin.cn/post/6876773824491159565)
 + [iOS中的dyld缓存是什么？](https://blog.csdn.net/gaoyuqiang30/article/details/52536168)
 + [iOS进阶之底层原理-应用程序加载（dyld加载流程、类与分类的加载）](https://blog.csdn.net/hengsf123456/article/details/116205004?utm_medium=distribute.pc_relevant.none-task-blog-baidujs_title-4&spm=1001.2101.3001.4242)
++ [iOS应用程序在进入main函数前做了什么？](https://www.jianshu.com/p/73d63220d4f1)
++ [dyld加载应用启动原理详解](https://www.jianshu.com/p/1b9ca38b8b9f)
 + [iOS里的动态库和静态库](https://www.jianshu.com/p/42891fb90304)
 + [Xcode 中的链接路径问题](https://www.jianshu.com/p/cd614e080078)
 + [iOS 利用 Framework 进行动态更新](https://nixwang.com/2015/11/09/ios-dynamic-update/)
