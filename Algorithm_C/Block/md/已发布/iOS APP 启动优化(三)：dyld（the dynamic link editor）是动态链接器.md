@@ -165,7 +165,9 @@ dyld (for architecture arm64e):    Mach-O 64-bit dynamic linker arm64e
 &emsp;dyld 是英文 the dynamic link editor 的简写，翻译过来就是动态链接器，是苹果操作系统的一个重要的组成部分。在 iOS/macOS 系统中，仅有很少量的进程只需要内核就能完成加载，基本上所有的进程都是动态链接的，所以 Mach-O 镜像文件中会有很多对外部的库和符号的引用，但是这些引用并不能直接用，在启动时还必须要通过这些引用进行内容的填补，这个填补工作就是由动态链接器 dyld 来完成的，也就是符号绑定。系统内核在加载 Mach-O 文件时，都需要用 dyld 链接程序，将程序加载到内存中。
 
 
-&emsp;在编写项目时，我们大概最先接触到的可执行的代码是 main 和 load 函数，当我们不重写某个类的 load 函数，大概会觉得 main 是我们 APP 的入口函数，当我们重写了某个类的 load 函数后，我们又已知的 load 函数是在 main 之前执行的。（上一节我们也有说过 \_\_attribute__((constructor)) 修饰的 C  函数也会在 main 之前执行）那么从这里可以看出到我们的 APP 真的执行到 main 函数之前其实已经做了一些 APP 的 加载操作，那具体都有哪些呢，我们可以以在 load 函数中打断点，然后打印出函数调用堆栈的形式发现一些端倪。如下图所示：
+&emsp;在编写项目时，我们大概最先接触到的可执行的代码是 main 和 load 函数，当我们不重写某个类的 load 函数，大概会觉得 main 是我们 APP 的入口函数，当我们重写了某个类的 load 函数后，我们又已知的 load 函数是在 main 之前执行的。（上一节我们也有说过 \_\_attribute__((constructor)) 修饰的 C  函数也会在 main 之前执行）那么从这里可以看出到我们的 APP 真的执行到 main 函数之前其实已经做了一些 APP 的 加载操作，那具体都有哪些呢，我们可以在 load 函数中打断点，然后打印出函数调用堆栈的形式发现一些端倪。如下图所示：
+
+&emsp;在模拟器下的截图，其中的 sim 就代表当前是在 TARGET_OS_SIMULATOR 环境下：
 
 ![截屏2021-05-13 08.11.38.png](https://p1-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/89b62441b6d646b39966c7e2bf52abdb~tplv-k3u1fbpfcp-watermark.image)
 
@@ -188,9 +190,29 @@ dyld (for architecture arm64e):    Mach-O 64-bit dynamic linker arm64e
 (lldb) 
 ```
 
-&emsp;可以看到从 \_dyld_start 函数开始直到 +[ViewController load] 函数，中间的函数调用栈都集中在了 dyld 和 dyld_sim。（最后的 libobjc.A.dylib`load_images 调用，后面我们会详细分析）下面我们可以通过 [dyld 的源码](https://opensource.apple.com/tarballs/dyld/) 来一一分析上面函数调用堆栈中出现的函数。
+&emsp;在真机下的截图，相比较与模拟器环境看到是少了 dyld\`dyld::useSimulatorDyld 和 dyld_sim\`start_sim 调用（切换到模拟器环境），后序的函数调用基本都是一样的，除了运行环境不同外（dyld_sim / dyld）。 
 
-&emsp;\_dyld_start 是汇编函数。
+![截屏2021-05-15 08.06.39.png](https://p1-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/297c64db8ca44b99999fbd81146e4c3e~tplv-k3u1fbpfcp-watermark.image)
+
+```c++
+(lldb) bt
+* thread #1, queue = 'com.apple.main-thread', stop reason = breakpoint 1.1
+  * frame #0: 0x00000001043f19c0 Test_ipa_Simple`+[ViewController load](self=ViewController, _cmd="load") at ViewController.m:17:5
+    frame #1: 0x00000001a2bc925c libobjc.A.dylib`load_images + 944
+    frame #2: 0x00000001046ea21c dyld`dyld::notifySingle(dyld_image_states, ImageLoader const*, ImageLoader::InitializerTimingList*) + 464
+    frame #3: 0x00000001046fb5e8 dyld`ImageLoader::recursiveInitialization(ImageLoader::LinkContext const&, unsigned int, char const*, ImageLoader::InitializerTimingList&, ImageLoader::UninitedUpwards&) + 512
+    frame #4: 0x00000001046f9878 dyld`ImageLoader::processInitializers(ImageLoader::LinkContext const&, unsigned int, ImageLoader::InitializerTimingList&, ImageLoader::UninitedUpwards&) + 184
+    frame #5: 0x00000001046f9940 dyld`ImageLoader::runInitializers(ImageLoader::LinkContext const&, ImageLoader::InitializerTimingList&) + 92
+    frame #6: 0x00000001046ea6d8 dyld`dyld::initializeMainExecutable() + 216
+    frame #7: 0x00000001046ef928 dyld`dyld::_main(macho_header const*, unsigned long, int, char const**, char const**, char const**, unsigned long*) + 5216
+    frame #8: 0x00000001046e9208 dyld`dyldbootstrap::start(dyld3::MachOLoaded const*, int, char const**, dyld3::MachOLoaded const*, unsigned long*) + 396
+    frame #9: 0x00000001046e9038 dyld`_dyld_start + 56
+(lldb) 
+```
+
+&emsp;可以看到从 \_dyld_start 函数开始直到 +[ViewController load] 函数，中间的函数调用栈都集中在了 dyld/dyld_sim。（最后的 libobjc.A.dylib`load_images 调用，后面我们会详细分析）下面我们可以通过 [dyld 的源码](https://opensource.apple.com/tarballs/dyld/) 来一一分析上面函数调用堆栈中出现的函数。
+
+&emsp;\_dyld_start 是汇编函数，这里我们只看 \_\_arm64__ && !TARGET_OS_SIMULATOR 平台下的。
 
 ```c++
 #if __arm64__ && !TARGET_OS_SIMULATOR
@@ -310,6 +332,7 @@ uintptr_t start(const dyld3::MachOLoaded* appsMachHeader, int argc, const char* 
 
 #if DYLD_INITIALIZER_SUPPORT
     // run all C++ initializers inside dyld
+    // 在 dyld 中运行所有 C++ 初始化器
     runDyldInitializers(argc, argv, envp, apple);
 #endif
 
@@ -347,7 +370,7 @@ uintptr_t start(const dyld3::MachOLoaded* appsMachHeader, int argc, const char* 
 
 ## clang 
 
-&emsp;clang:Clang 是一个 C++ 编写、基于 LLVM、发布于 LLVM BSD 许可证下的 C/C++/Objective-C/ Objective-C++ 编译器。它与 GNU C 语言规范几乎完全兼容(当然，也有部分不兼容的内容， 包括编译命令选项也会有点差异)，并在此基础上增加了额外的语法特性，比如 C 函数重载 (通过 \_ attribute_((overloadable)) 来修饰函数)，其目标(之一)就是超越 GCC。
+&emsp;clang:Clang 是一个 C++ 编写、基于 LLVM、发布于 LLVM BSD 许可证下的 C/C++/Objective-C/Objective-C++ 编译器。它与 GNU C 语言规范几乎完全兼容（当然，也有部分不兼容的内容， 包括编译命令选项也会有点差异），并在此基础上增加了额外的语法特性，比如 C 函数重载（通过 \_ attribute_((overloadable)) 来修饰函数)，其目标(之一)就是超越 GCC。
 
 
 
