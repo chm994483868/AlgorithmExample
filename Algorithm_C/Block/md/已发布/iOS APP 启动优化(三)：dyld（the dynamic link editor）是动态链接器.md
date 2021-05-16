@@ -313,21 +313,25 @@ uintptr_t start(const dyld3::MachOLoaded* appsMachHeader, int argc, const char* 
 {
 
     // Emit kdebug tracepoint to indicate dyld bootstrap has started <rdar://46878536>
+    // 发出 kdebug tracepoint 以指示 dyld bootstrap 已启动
     dyld3::kdebug_trace_dyld_marker(DBG_DYLD_TIMING_BOOTSTRAP_START, 0, 0, 0, 0);
 
     // if kernel had to slide dyld, we need to fix up load sensitive locations
     // we have to do this before using any global variables
-    rebaseDyld(dyldsMachHeader);
+    rebaseDyld(dyldsMachHeader); // 用于重定位（设置虚拟地址偏移，这里的偏移主要用于重定向）
 
     // kernel sets up env pointer to be just past end of agv array
+    // 内核将 env 指针设置为刚好超出 agv 数组的末尾
     const char** envp = &argv[argc+1];
     
     // kernel sets up apple pointer to be just past end of envp array
+    // 内核将 apple 指针设置为刚好超出 envp 数组的末尾
     const char** apple = envp;
     while(*apple != NULL) { ++apple; }
     ++apple;
 
     // set up random value for stack canary
+    // 为 stack canary 设置随机值
     __guard_setup(apple);
 
 #if DYLD_INITIALIZER_SUPPORT
@@ -339,13 +343,30 @@ uintptr_t start(const dyld3::MachOLoaded* appsMachHeader, int argc, const char* 
     _subsystem_init(apple);
 
     // now that we are done bootstrapping dyld, call dyld's main
+    // 现在我们完成了 bootstrapping dyld，调用 dyld 的 main（进入 dyld 的主函数）
     uintptr_t appsSlide = appsMachHeader->getSlide();
     return dyld::_main((macho_header*)appsMachHeader, appsSlide, argc, argv, envp, apple, startGlue);
 }
 ```
 
+&emsp;appsMachHeader 和 dyldsMachHeader 两个参数的类型是 const dyld3::MachOLoaded*，在 dyld/dyld3/MachOLoaded.h 文件中可看到命名空间 dyld3 中定义的 struct VIS_HIDDEN MachOLoaded : public MachOFile，MachOLoaded 结构体公开继承自 MachOFile 结构体，在 dyld/dyld3/MachOFile.h 文件中可看到命名空间 dyld3 中定义的 struct VIS_HIDDEN MachOFile : mach_header，MachOFile 结构体继承自 mach_header 结构体。mach_header 在前一篇我们则详细分析过：
 
+> &emsp;Mach-O 文件的 Header 部分对应的数据结构定义在 darwin-xnu/EXTERNAL_HEADERS/mach-o/loader.h 中，struct mach_header 和 struct mach_header_64 分别对应 32-bit architectures 和 64-bit architectures。（对于 32/64-bit architectures，32/64 位的 mach header 都出现在 Mach-O 文件的最开头。）
 
+```c++
+struct mach_header_64 {
+    uint32_t    magic;        /* mach magic number identifier */
+    cpu_type_t    cputype;    /* cpu specifier */
+    cpu_subtype_t    cpusubtype;    /* machine specifier */
+    uint32_t    filetype;    /* type of file */
+    uint32_t    ncmds;        /* number of load commands */
+    uint32_t    sizeofcmds;    /* the size of all the load commands */
+    uint32_t    flags;        /* flags */
+    uint32_t    reserved;    /* reserved */
+};
+```
+
+&emsp;综上，MachOLoaded -> MachOFile -> mach_header。MachOFile 继承 mach_header 使其拥有 mach_header 结构体中所有的成员变量，然后 MachOFile 定义中则声明了一大组针对 Mach-O 的 Header 的函数，例如架构名、CPU 类型等。MachOLoaded 继承自 MachOFile 其定义中则声明了一组加载 Mach-O 的 Header 的函数。 
 
 
 
