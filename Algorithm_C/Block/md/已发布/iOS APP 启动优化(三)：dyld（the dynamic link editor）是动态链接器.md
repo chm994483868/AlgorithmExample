@@ -301,7 +301,7 @@ Lapple:    ldr    w4, [x3]
 #endif // __arm64__ && !TARGET_OS_SIMULATOR
 ```
 
-&emsp;然后看到汇编函数 \_\_dyld_start 内部调用了 dyldbootstrap::start(app_mh, argc, argv, dyld_mh, &startGlue) 函数，即 dyldbootstrap 命名空间中的 start 函数，namespace dyldbootstrap 定义在 dyldInitialization.cpp 中，下面我们一起看下其中的 start 的函数。
+&emsp;然后看到汇编函数 \_\_dyld_start 内部调用了 dyldbootstrap::start(app_mh, argc, argv, dyld_mh, &startGlue) 函数，即 dyldbootstrap 命名空间中的 start 函数，namespace dyldbootstrap 定义在 dyldInitialization.cpp 中，从其名字中我们已经能猜到一些它的作用：用来进行 dyld 的初始化，将 dyld 引导到可运行状态的。下面我们一起看下其中的 start 的函数。
 
 ```c++
 //
@@ -334,7 +334,7 @@ uintptr_t start(const dyld3::MachOLoaded* appsMachHeader, int argc, const char* 
     // 为 stack canary 设置随机值
     __guard_setup(apple);
 
-#if DYLD_INITIALIZER_SUPPORT
+#if DYLD_INITIALIZER_SUPPORT // 前面 DYLD_INITIALIZER_SUPPORT 宏的值是 0，所以这里 #if 内部的内容并不会执行 
     // run all C++ initializers inside dyld
     // 在 dyld 中运行所有 C++ 初始化器
     runDyldInitializers(argc, argv, envp, apple);
@@ -368,9 +368,10 @@ struct mach_header_64 {
 
 &emsp;综上，MachOLoaded -> MachOFile -> mach_header。MachOFile 继承 mach_header 使其拥有 mach_header 结构体中所有的成员变量，然后 MachOFile 定义中则声明了一大组针对 Mach-O 的 Header 的函数，例如架构名、CPU 类型等。MachOLoaded 继承自 MachOFile 其定义中则声明了一组加载 Mach-O 的 Header 的函数。 
 
-&emsp;下面我们接着看 dyld::_main 函数。
+&emsp;下面我们接着看 dyld::_main 函数。首先是根据函数调用方式可以看到 \_main 函数是属于 dyld 命名空间的，在 dyld/src/dyld2.cpp 中可看到 namespace dyld 的定义，在 dyld2.h 和 dyld2.cpp 中可看到分别进行了 `uintptr_t _main(const macho_header* mainExecutableMH, uintptr_t mainExecutableSlide, int argc, const char* argv[], const char* envp[], const char* apple[], uintptr_t* startGlue)` 的声明和定义。
 
-&emsp;
+
+
 
 
 
@@ -463,4 +464,6 @@ struct mach_header_64 {
 + [iOS里的动态库和静态库](https://www.jianshu.com/p/42891fb90304)
 + [Xcode 中的链接路径问题](https://www.jianshu.com/p/cd614e080078)
 + [iOS 利用 Framework 进行动态更新](https://nixwang.com/2015/11/09/ios-dynamic-update/)
++ [命名空间namespace ，以及重复定义的问题解析](https://blog.csdn.net/u014357799/article/details/79121340)
++ [C++ 命名空间namespace](https://www.jianshu.com/p/30e960717ef1)
 
