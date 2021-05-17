@@ -370,6 +370,7 @@ struct mach_header_64 {
 
 &emsp;下面我们接着看 dyld::_main 函数。首先是根据函数调用方式可以看到 \_main 函数是属于 dyld 命名空间的，在 dyld/src/dyld2.cpp 中可看到 namespace dyld 的定义，在 dyld2.h 和 dyld2.cpp 中可看到分别进行了 `uintptr_t _main(const macho_header* mainExecutableMH, uintptr_t mainExecutableSlide, int argc, const char* argv[], const char* envp[], const char* apple[], uintptr_t* startGlue)` 的声明和定义。
 
+&emsp;首先是 \_main 函数的注释：dyld 的入口点。内核加载 dyld 并跳到 \_\_dyld_start，设置一些寄存器并调用此函数。返回目标程序中的 main() 地址，\_\_dyld_start 跳到该地址。
 
 
 
