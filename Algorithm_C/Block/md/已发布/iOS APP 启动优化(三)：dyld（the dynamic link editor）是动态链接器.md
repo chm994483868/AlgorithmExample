@@ -372,6 +372,93 @@ struct mach_header_64 {
 
 &emsp;首先是 \_main 函数的注释：dyld 的入口点。内核加载 dyld 并跳到 \_\_dyld_start，设置一些寄存器并调用此函数。返回目标程序中的 main() 地址，\_\_dyld_start 跳到该地址。
 
+&emsp;下面我们沿着 \_main 函数的定义，来分析 \_main 函数，并对必要的代码段进行摘录。
+
+&emsp;调用 `getHostInfo(mainExecutableMH, mainExecutableSlide);` 函数来获取 Mach-O 头部信息中的当前运行架构信息，仅是为了给 sHostCPU 和 sHostCPUsubtype 两个全局变量赋值。getHostInfo 函数虽然有两个参数  mainExecutableMH 和 mainExecutableSlide 但是实际都只是为了在 \_\_x86_64__ && !TARGET_OS_SIMULATOR 下使用的。
+
+```c++
+static void getHostInfo(const macho_header* mainExecutableMH, uintptr_t mainExecutableSlide)
+{
+#if CPU_SUBTYPES_SUPPORTED
+#if __ARM_ARCH_7K__
+    sHostCPU        = CPU_TYPE_ARM;
+    sHostCPUsubtype = CPU_SUBTYPE_ARM_V7K;
+#elif __ARM_ARCH_7A__
+    sHostCPU        = CPU_TYPE_ARM;
+    sHostCPUsubtype = CPU_SUBTYPE_ARM_V7;
+#elif __ARM_ARCH_6K__
+    sHostCPU        = CPU_TYPE_ARM;
+    sHostCPUsubtype = CPU_SUBTYPE_ARM_V6;
+#elif __ARM_ARCH_7F__
+    sHostCPU        = CPU_TYPE_ARM;
+    sHostCPUsubtype = CPU_SUBTYPE_ARM_V7F;
+#elif __ARM_ARCH_7S__
+    sHostCPU        = CPU_TYPE_ARM;
+    sHostCPUsubtype = CPU_SUBTYPE_ARM_V7S;
+#elif __ARM64_ARCH_8_32__
+    sHostCPU        = CPU_TYPE_ARM64_32;
+    sHostCPUsubtype = CPU_SUBTYPE_ARM64_32_V8;
+#elif __arm64e__
+    sHostCPU        = CPU_TYPE_ARM64;
+    sHostCPUsubtype = CPU_SUBTYPE_ARM64E;
+#elif __arm64__
+    sHostCPU        = CPU_TYPE_ARM64;
+    sHostCPUsubtype = CPU_SUBTYPE_ARM64_V8;
+#else
+    struct host_basic_info info;
+    mach_msg_type_number_t count = HOST_BASIC_INFO_COUNT;
+    mach_port_t hostPort = mach_host_self();
+    kern_return_t result = host_info(hostPort, HOST_BASIC_INFO, (host_info_t)&info, &count);
+    if ( result != KERN_SUCCESS )
+        throw "host_info() failed";
+    sHostCPU        = info.cpu_type;
+    sHostCPUsubtype = info.cpu_subtype;
+    mach_port_deallocate(mach_task_self(), hostPort);
+  #if __x86_64__
+      // host_info returns CPU_TYPE_I386 even for x86_64.  Override that here so that
+      // we don't need to mask the cpu type later.
+      sHostCPU = CPU_TYPE_X86_64;
+    #if !TARGET_OS_SIMULATOR
+      sHaswell = (sHostCPUsubtype == CPU_SUBTYPE_X86_64_H);
+      // <rdar://problem/18528074> x86_64h: Fall back to the x86_64 slice if an app requires GC.
+      if ( sHaswell ) {
+        if ( isGCProgram(mainExecutableMH, mainExecutableSlide) ) {
+            // When running a GC program on a haswell machine, don't use and 'h slices
+            sHostCPUsubtype = CPU_SUBTYPE_X86_64_ALL;
+            sHaswell = false;
+            gLinkContext.sharedRegionMode = ImageLoader::kDontUseSharedRegion;
+        }
+      }
+    #endif
+  #endif
+#endif
+#endif
+}
+```
+
+&emsp;
+
+
+
+
+
+
+
+```c++
+if ( sEnv.DYLD_PRINT_OPTS )
+    printOptions(argv);
+if ( sEnv.DYLD_PRINT_ENV ) 
+    printEnvironmentVariables(envp);
+```
+
+&emsp;此处是判断是否设置了环境变量，如果设置了，那么 xcode 就会在控制台打印相关的详细信息。（在 Edit Scheme... -> Run -> Arguments -> Environment Variables 进行添加） 
+
+&emsp;当添加了 DYLD_PRINT_OPTS 时，会在控制台输出可执行文件的位置。
+```c++
+opt[0] = "/Users/hmc/Library/Developer/CoreSimulator/Devices/4E072E27-E586-4E81-A693-A02A3ED83DEC/data/Containers/Bundle/Application/ECDA091A-1610-49D2-8BC0-B41A58BC76EC/Test_ipa_Simple.app/Test_ipa_Simple"
+```
+
+&emsp;当添加了 DYLD_PRINT_ENV 时，会在控制台输出用户级别、插入的动态库、动态库的路径、模拟器的信息等等一系列的信息，由于内容过多这里就粘贴出来了。
 
 
 
