@@ -436,10 +436,41 @@ static void getHostInfo(const macho_header* mainExecutableMH, uintptr_t mainExec
 }
 ```
 
-&emsp;
+&emsp;这里对 Mach-O 文件进行实例化。
+
+```c++
+// instantiate ImageLoader for main executable
+sMainExecutable = instantiateFromLoadedImage(mainExecutableMH, mainExecutableSlide, sExecPath);
+gLinkContext.mainExecutable = sMainExecutable;
+gLinkContext.mainExecutableCodeSigned = hasCodeSignatureLoadCommand(mainExecutableMH);
+```
+
+&emsp;下面是 instantiateFromLoadedImage 函数实现，在 dyld 获得控制之前，主可执行的内核映射。我们需要 
+为主可执行的已映射的映射器*制作图像加载器*
 
 
+```c++
+// The kernel maps in main executable before dyld gets control.  We need to 
+// make an ImageLoader* for the already mapped in main executable.
+static ImageLoaderMachO* instantiateFromLoadedImage(const macho_header* mh, uintptr_t slide, const char* path)
+{
+    // try mach-o loader
+//    if ( isCompatibleMachO((const uint8_t*)mh, path) ) {
+        ImageLoader* image = ImageLoaderMachO::instantiateMainExecutable(mh, slide, path, gLinkContext);
+        addImage(image);
+        return (ImageLoaderMachO*)image;
+//    }
+    
+//    throw "main executable not a known format";
+}
+```
 
+&emsp;加载共享缓存库
+
+```c++
+// load shared cache
+checkSharedRegionDisable((dyld3::MachOLoaded*)mainExecutableMH, mainExecutableSlide);
+```
 
 
 
