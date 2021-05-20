@@ -349,7 +349,17 @@ uintptr_t start(const dyld3::MachOLoaded* appsMachHeader, int argc, const char* 
 }
 ```
 
-&emsp;appsMachHeader 和 dyldsMachHeader 两个参数的类型是 const dyld3::MachOLoaded*，在 dyld/dyld3/MachOLoaded.h 文件中可看到命名空间 dyld3 中定义的 struct VIS_HIDDEN MachOLoaded : public MachOFile，MachOLoaded 结构体公开继承自 MachOFile 结构体，在 dyld/dyld3/MachOFile.h 文件中可看到命名空间 dyld3 中定义的 struct VIS_HIDDEN MachOFile : mach_header，MachOFile 结构体继承自 mach_header 结构体。mach_header 在前一篇我们则详细分析过：
+&emsp;appsMachHeader 和 dyldsMachHeader 两个参数的类型是 const dyld3::MachOLoaded*，在 dyld/dyld3/MachOLoaded.h 文件中可看到命名空间 dyld3 中定义的 struct VIS_HIDDEN MachOLoaded : public MachOFile，MachOLoaded 结构体公开继承自 MachOFile 结构体，在 dyld/dyld3/MachOFile.h 文件中可看到命名空间 dyld3 中定义的 struct VIS_HIDDEN MachOFile : mach_header，MachOFile 结构体继承自 mach_header 结构体。在 dyld/src/ImageLoader.h 中可看到在 \_\_LP64__ 下 macho_header 公开继承自 mach_header_64 其他平台则是继承自 mach_header（它们的名字仅差一个 0），mach_header 在前一篇 《iOS APP 启动优化(一)：ipa(iPhone application archive) 包和 Mach-O(Mach Object file format) 概述》中我们有详细分析过：
+
+```c++
+#if __LP64__
+    struct macho_header                : public mach_header_64  {};
+    struct macho_nlist                : public nlist_64  {};    
+#else
+    struct macho_header                : public mach_header  {};
+    struct macho_nlist                : public nlist  {};    
+#endif
+```
 
 > &emsp;Mach-O 文件的 Header 部分对应的数据结构定义在 darwin-xnu/EXTERNAL_HEADERS/mach-o/loader.h 中，struct mach_header 和 struct mach_header_64 分别对应 32-bit architectures 和 64-bit architectures。（对于 32/64-bit architectures，32/64 位的 mach header 都出现在 Mach-O 文件的最开头。）
 
@@ -436,7 +446,7 @@ static void getHostInfo(const macho_header* mainExecutableMH, uintptr_t mainExec
 }
 ```
 
-&emsp;这里对 Mach-O 文件进行实例化。
+&emsp;这里对 main Mach-O 文件进行实例化。
 
 ```c++
 // instantiate ImageLoader for main executable
@@ -445,9 +455,9 @@ gLinkContext.mainExecutable = sMainExecutable;
 gLinkContext.mainExecutableCodeSigned = hasCodeSignatureLoadCommand(mainExecutableMH);
 ```
 
-&emsp;下面是 instantiateFromLoadedImage 函数实现，在 dyld 获得控制之前，主可执行的内核映射。我们需要 
-为主可执行的已映射的映射器*制作图像加载器*
+&emsp;instantiateFromLoadedImage 函数返回值是一个 ImageLoaderMachO 指针，`class ImageLoaderMachO : public ImageLoader` ImageLoaderMachO 类公开继承自 ImageLoader 类。ImageLoader 是一个抽象基类。为了支持加载特定的可执行文件格式，可以创建 ImageLoader 的一个具体子类。对于使用中的每个可执行文件（dynamic shared object），将实例化一个 ImageLoader。ImageLoader 基类负责将 images 链接在一起，但它对任何特定的文件格式一无所知。 ImageLoaderMachO 是 ImageLoader 的子类，可加载 mach-o 格式的文件。
 
+&emsp;下面看一下 instantiateFromLoadedImage 函数实现，它内部直接调用 ImageLoaderMachO 的 instantiateMainExecutable 函数进行可执行文件的加载。对于程序中需要的依赖库、插入库，会创建一个对应的 image 对象，对这些 image 进行链接，调用各 image 的初始化方法等等，包括对 runtime 的初始化。
 
 ```c++
 // The kernel maps in main executable before dyld gets control.  We need to 
@@ -455,9 +465,13 @@ gLinkContext.mainExecutableCodeSigned = hasCodeSignatureLoadCommand(mainExecutab
 static ImageLoaderMachO* instantiateFromLoadedImage(const macho_header* mh, uintptr_t slide, const char* path)
 {
     // try mach-o loader
+    // isCompatibleMachO 是检查 mach-o 的 subtype 是否支持当前的 cpu 
 //    if ( isCompatibleMachO((const uint8_t*)mh, path) ) {
         ImageLoader* image = ImageLoaderMachO::instantiateMainExecutable(mh, slide, path, gLinkContext);
+        
+        // 将 image 加载到 imagelist 中，所以我们在 xcode 中使用 image list 命令查看的第一个便是我们的 mach-o
         addImage(image);
+        
         return (ImageLoaderMachO*)image;
 //    }
     
