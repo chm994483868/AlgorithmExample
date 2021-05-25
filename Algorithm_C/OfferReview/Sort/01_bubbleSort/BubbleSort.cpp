@@ -19,14 +19,12 @@ void BubbleSort::bubbleSort(int nums[], int count) {
     
     int k = count - 1;
     for (int i = 0; i < count - 1; ++i) {
-        
-        int n = 0;
         bool noExchange = true;
-        
-        for (int j = 0; j < k; ++j) {
+        int n = 0;
+        for (int j = 0; j < k ; ++j) {
             if (nums[j] > nums[j + 1]) {
-                noExchange = false;
                 swap(&nums[j], &nums[j + 1]);
+                noExchange = false;
                 n = j;
             }
         }
@@ -34,7 +32,7 @@ void BubbleSort::bubbleSort(int nums[], int count) {
         if (noExchange) {
             break;
         }
-        k = n;
+        k = n; // 更新 k 值
     }
     
     //if (nums == nullptr || count <= 0) {
