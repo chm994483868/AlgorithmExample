@@ -62,7 +62,7 @@ Mach-O 曾经为大部分基于 Mach 核心的操作系统所使用。NeXTSTEP�
 &emsp;在 Xcode -> Build Setting -> Mach-O Type 中，Xcode 直接给我们列出了下面几种类型，看名字的话我们大概可以猜一下他们分别对应什么类型：
 
 + Executable（应用的主要二进制）
-+ Dynamic Library（动态链接库（又称DSO或DLL））
++ Dynamic Library（动态链接库（又称 DSO 或 DLL））
 + Bundle（不能被链接的 Dylib，只能在运行时使用 dlopen( ) 加载，可当做 macOS 的插件）
 + Static Library（静态链接库）
 + Relocatable Object File（可重定向文件类型）
@@ -202,6 +202,7 @@ hmc@HMdeMac-mini Test_ipa_Simple.app %
 #define MH_TWOLEVEL 0x80 /* the image is using two-level name space bindings */
 #define MH_PIE 0x200000 /* When this bit is set, the OS will load the main executable at a random address. Only used in MH_EXECUTE filetypes. */
 ```
+
 > &emsp;简单总结一下就是 Headers 能帮助校验 Mach-O 合法性和定位文件的运行环境。[探秘 Mach-O 文件](http://hawk0620.github.io/blog/2018/03/22/study-mach-o-file/)
 
 2. 通过 [MachOView](https://github.com/fangshufeng/MachOView) 工具查看。 
