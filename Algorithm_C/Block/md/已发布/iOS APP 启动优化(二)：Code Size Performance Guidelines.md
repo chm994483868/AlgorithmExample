@@ -575,7 +575,6 @@ __OBJC:__selector_strs:new
 
 + 对于所有的 literal sections，order file 中的每一行都被简单地输入到 literal section，并以 order 文件 的顺序出现在输出文件（output file）中。不进行检查，以查看文字是否在加载的对象中。
 
-
 &emsp;要对 literal section 重新排序，首先使用 ld -whatsloaded 选项创建一个 “whatsloaded” 文件，如 Creating a Default Order File 中所述。然后，使用适当的 options、segment 和 section 名称以及 filenames 运行 otool。otool 的输出是指定 section 的默认 order file。例如，以下命令行生成一个 order file，其中列出了文件 cstring_order 中的 \_\_TEXT segment 的 \_\_cstring section 的默认加载顺序：
 
 ```c++
