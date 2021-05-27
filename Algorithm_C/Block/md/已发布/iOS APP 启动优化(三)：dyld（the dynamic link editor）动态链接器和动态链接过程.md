@@ -1,4 +1,4 @@
-# iOS APP 启动优化(三)：dyld（the dynamic link editor）是动态链接器
+# iOS APP 启动优化(三)：dyld（the dynamic link editor）动态链接器和动态链接过程
 
 ## 静态库与动态库
 
@@ -85,6 +85,8 @@ libSTATICLIB.a: current ar archive random library
 
 &emsp;所以 Pod 默认是生成动态库，然后嵌入到 .app 下面的 Framework 文件夹里。我们去 Pods 工程的 target 里把 Build Settings -> Mach-O Type 设置为 Static Library。那么生成的就是静态库，但是 cocoapods 也会把它嵌入到 .app 的 Framework 目录下，而因为它是静态库，所以会报错：unrecognized selector sent to instanceunrecognized selector sent to instance 。[iOS里的动态库和静态库](https://www.jianshu.com/p/42891fb90304)
 
+&emsp;动态库和静态的知识我们就延伸到这里吧，下面我们继续学习 **链接器** 相关的内容。
+
 ## 一组函数的执行顺序
 
 ```c++
@@ -140,13 +142,15 @@ int main(int argc, char * argv[]) {
 
 &emsp;若函数被设定为 `constructor` 属性，则该函数会在 main 函数执行之前被自动的执行。类似的，若函数被设定为 `destructor` 属性，则该函数会在 main 函数执行之后或者 exit 被调用后被自动的执行。
 
-&emsp;我们知道 .h、.m 的类在程序运行时先进行预编译，之后进行编译，编译完成后会进行汇编，在汇编结束后会进入一个阶段叫连接（把所有的代码链接到我们的程序中），最后会生成一个可执行文件。
+&emsp;我们知道 .h、.m 的类在程序运行时先进行预编译，之后进行编译，编译完成后会进行汇编，在汇编结束后会进入一个阶段叫链接（把所有的代码链接到我们的程序中），最后会生成一个可执行文件。
 
 &emsp;下面我们将了解 App 运行需要加载依赖库，需要加载 .h、.m 文件，那么谁来决定加载这些东西的先后顺序呢？这就是我们今天要说的主角 dyld（链接器）。就是由它来决定加载内容的先后顺序。
 
 &emsp;app：images（镜像文件）-> dyld：读到内存（也就是加表里），启动主程序 - 进行 link - 一些必要对象的初始化（runtime，libsysteminit，OS_init 的初始化）。
 
-### 探究 Dyld
+&emsp;下面我们的目光聚焦在两个点上：链接器本身和链接过程的解读。
+
+### Dyld 探索
 
 &emsp;macOS 的 dyld 程序位置在 `/usr/lib/dyld`   
 
@@ -164,10 +168,9 @@ dyld (for architecture arm64e):    Mach-O 64-bit dynamic linker arm64e
 
 &emsp;dyld 是英文 the dynamic link editor 的简写，翻译过来就是动态链接器，是苹果操作系统的一个重要的组成部分。在 iOS/macOS 系统中，仅有很少量的进程只需要内核就能完成加载，基本上所有的进程都是动态链接的，所以 Mach-O 镜像文件中会有很多对外部的库和符号的引用，但是这些引用并不能直接用，在启动时还必须要通过这些引用进行内容的填补，这个填补工作就是由动态链接器 dyld 来完成的，也就是符号绑定。系统内核在加载 Mach-O 文件时，都需要用 dyld 链接程序，将程序加载到内存中。
 
+&emsp;在编写项目时，我们大概最先接触到的可执行的代码是 main 和 load 函数，当我们不重写某个类的 load 函数时，大概会觉得 main 是我们 APP 的入口函数，当我们重写了某个类的 load 函数后，我们又已知的 load 函数是在 main 之前执行的。（上一小节我们也有说过 \_\_attribute__((constructor)) 修饰的 C  函数也会在 main 之前执行）那么从这里可以看出到我们的 APP 真的执行到 main 函数之前其实已经做了一些 APP 的 加载操作，那具体都有哪些呢，我们可以在 load 函数中打断点，然后打印出函数调用堆栈来发现一些端倪。如下图所示：
 
-&emsp;在编写项目时，我们大概最先接触到的可执行的代码是 main 和 load 函数，当我们不重写某个类的 load 函数，大概会觉得 main 是我们 APP 的入口函数，当我们重写了某个类的 load 函数后，我们又已知的 load 函数是在 main 之前执行的。（上一节我们也有说过 \_\_attribute__((constructor)) 修饰的 C  函数也会在 main 之前执行）那么从这里可以看出到我们的 APP 真的执行到 main 函数之前其实已经做了一些 APP 的 加载操作，那具体都有哪些呢，我们可以在 load 函数中打断点，然后打印出函数调用堆栈的形式发现一些端倪。如下图所示：
-
-&emsp;在模拟器下的截图，其中的 sim 就代表当前是在 TARGET_OS_SIMULATOR 环境下：
+&emsp;在模拟器下的截图，其中的 sim 表示当前是在 TARGET_OS_SIMULATOR 环境下：
 
 ![截屏2021-05-13 08.11.38.png](https://p1-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/89b62441b6d646b39966c7e2bf52abdb~tplv-k3u1fbpfcp-watermark.image)
 
@@ -601,4 +604,5 @@ opt[0] = "/Users/hmc/Library/Developer/CoreSimulator/Devices/4E072E27-E586-4E81-
 + [iOS 利用 Framework 进行动态更新](https://nixwang.com/2015/11/09/ios-dynamic-update/)
 + [命名空间namespace ，以及重复定义的问题解析](https://blog.csdn.net/u014357799/article/details/79121340)
 + [C++ 命名空间namespace](https://www.jianshu.com/p/30e960717ef1)
++ [一文了解 Xcode 生成「静态库」和「动态库」 的流程](https://mp.weixin.qq.com/s/WH8emrMpLeVW-LfGwN09cw)
 
