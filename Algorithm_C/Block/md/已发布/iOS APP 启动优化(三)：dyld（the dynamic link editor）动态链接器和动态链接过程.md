@@ -223,13 +223,13 @@ dyld (for architecture arm64e):    Mach-O 64-bit dynamic linker arm64e
     .align 2
     .globl __dyld_start
 __dyld_start:
-    mov     x28, sp
-    and     sp, x28, #~15        // force 16-byte alignment of stack
+    mov     x28, sp // mov 数据传送指令 x28 -> sp
+    and     sp, x28, #~15        // force 16-byte alignment of stack and 逻辑与指令 ((x28 & #~15) & sp) -> sp
     mov    x0, #0
     mov    x1, #0
     stp    x1, x0, [sp, #-16]!    // make aligned terminating frame
     mov    fp, sp            // set up fp to point to terminating frame
-    sub    sp, sp, #16             // make room for local variables
+    sub    sp, sp, #16             // make room for local variables sub 减法指令 
     
 #if __LP64__
     ldr     x0, [x28]               // get app's mh into x0
@@ -244,8 +244,10 @@ __dyld_start:
     adrp    x3,___dso_handle@page
     add     x3,x3,___dso_handle@pageoff // get dyld's mh in to x4
     mov    x4,sp                   // x5 has &startGlue
-
-    // call dyldbootstrap::start(app_mh, argc, argv, dyld_mh, &startGlue) 
+    
+    // ⬇️⬇️⬇️⬇️⬇️ 这里调用 dyldbootstrap::start 是一个入口  
+    // call dyldbootstrap::start(app_mh, argc, argv, dyld_mh, &startGlue)
+    
     bl    __ZN13dyldbootstrap5startEPKN5dyld311MachOLoadedEiPPKcS3_Pm
     mov    x16,x0                  // save entry point address in x16
     
@@ -304,7 +306,7 @@ Lapple:    ldr    w4, [x3]
 #endif // __arm64__ && !TARGET_OS_SIMULATOR
 ```
 
-&emsp;然后看到汇编函数 \_\_dyld_start 内部调用了 dyldbootstrap::start(app_mh, argc, argv, dyld_mh, &startGlue) 函数，即 dyldbootstrap 命名空间中的 start 函数，namespace dyldbootstrap 定义在 dyldInitialization.cpp 中，从其名字中我们已经能猜到一些它的作用：用来进行 dyld 的初始化，将 dyld 引导到可运行状态的。下面我们一起看下其中的 start 的函数。
+&emsp;然后看到汇编函数 \_\_dyld_start 内部调用了 `dyldbootstrap::start(app_mh, argc, argv, dyld_mh, &startGlue)` 函数，即 dyldbootstrap 命名空间中的 start 函数，namespace dyldbootstrap 定义在 dyldInitialization.cpp 中，它的内容超简单，内部就定义了 start 和 rebaseDyld 两个函数，从命名空间的名字中我们已经能猜到一些它的作用：用来进行 dyld 的初始化，将 dyld 引导到可运行状态的（Code to bootstrap dyld into a runnable state）。下面我们一起看下其中的 start 的函数。
 
 ```c++
 //
@@ -605,4 +607,5 @@ opt[0] = "/Users/hmc/Library/Developer/CoreSimulator/Devices/4E072E27-E586-4E81-
 + [命名空间namespace ，以及重复定义的问题解析](https://blog.csdn.net/u014357799/article/details/79121340)
 + [C++ 命名空间namespace](https://www.jianshu.com/p/30e960717ef1)
 + [一文了解 Xcode 生成「静态库」和「动态库」 的流程](https://mp.weixin.qq.com/s/WH8emrMpLeVW-LfGwN09cw)
++ [Hook static initializers](https://blog.csdn.net/majiakun1/article/details/99413403)
 
