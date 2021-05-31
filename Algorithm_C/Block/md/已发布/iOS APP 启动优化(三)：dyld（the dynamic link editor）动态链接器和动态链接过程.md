@@ -671,6 +671,7 @@ gLinkContext.mainExecutableCodeSigned = hasCodeSignatureLoadCommand(mainExecutab
 #### loadInsertedDylib
 
 &emsp;插入动态库。
+
 ```c++
 // load any inserted libraries
 if ( sEnv.DYLD_INSERT_LIBRARIES != NULL ) {
@@ -679,7 +680,70 @@ if ( sEnv.DYLD_INSERT_LIBRARIES != NULL ) {
 }
 ```
 
+#### link
 
+&emsp;link 主程序。
+
+```c++
+link(sMainExecutable, sEnv.DYLD_BIND_AT_LAUNCH, true, ImageLoader::RPathChain(NULL, NULL), -1);
+sMainExecutable->setNeverUnloadRecursive();
+```
+
+&emsp;link 我们所有的 image（通过上面两个可以知道，必须先 link 主程序，然后在 link 所有的 image） 
+
+```c++
+// link any inserted libraries
+// do this after linking main executable so that any dylibs pulled in by inserted 
+// dylibs (e.g. libSystem) will not be in front of dylibs the program uses
+if ( sInsertedDylibCount > 0 ) {
+    for(unsigned int i=0; i < sInsertedDylibCount; ++i) {
+        ImageLoader* image = sAllImages[i+1];
+        link(image, sEnv.DYLD_BIND_AT_LAUNCH, true, ImageLoader::RPathChain(NULL, NULL), -1);
+        image->setNeverUnloadRecursive();
+    }
+    if ( gLinkContext.allowInterposing ) {
+        // only INSERTED libraries can interpose
+        // register interposing info after all inserted libraries are bound so chaining works
+        for(unsigned int i=0; i < sInsertedDylibCount; ++i) {
+            ImageLoader* image = sAllImages[i+1];
+            image->registerInterposing(gLinkContext);
+        }
+    }
+}
+```
+
+#### weakBind
+
+&emsp;绑定弱符号。
+
+```c++
+// <rdar://problem/12186933> do weak binding only after all inserted images linked
+sMainExecutable->weakBind(gLinkContext);
+```
+
+#### initializeMainExecutable
+
+&emsp;执行所有的初始化方法。
+
+```c++
+// run all initializers
+initializeMainExecutable(); 
+```
+
+#### notifyMonitoringDyldMain
+
+&emsp;查找 main 函数入口
+
+```c++
+// notify any montoring proccesses that this process is about to enter main()
+notifyMonitoringDyldMain();
+```
+
+&emsp;设置运行环境 -> 加载共享缓存 -> 实例化主程序 -> 插入加载动态库 -> 连接主程序 -> 链接插入的动态库 -> 执行弱符号绑定 -> 执行初始化方法 -> 查找入口并返回（） 
+
+### initializeMainExecutable
+
+&emsp;上面我们分析的 main 的总体流程，下面我们详细学习一下 `initializeMainExecutable` 函数。
 
 
 
