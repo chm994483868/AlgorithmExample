@@ -215,6 +215,7 @@ dyld (for architecture arm64e):    Mach-O 64-bit dynamic linker arm64e
 
 &emsp;可以看到从 \_dyld_start 函数开始直到 +[ViewController load] 函数，中间的函数调用栈都集中在了 dyld/dyld_sim。（最后的 libobjc.A.dylib`load_images 调用，后面我们会详细分析）下面我们可以通过 [dyld 的源码](https://opensource.apple.com/tarballs/dyld/) 来一一分析上面函数调用堆栈中出现的函数。
 
+#### \_dyld_start
 &emsp;\_dyld_start 是汇编函数，这里我们只看 \_\_arm64__ && !TARGET_OS_SIMULATOR 平台下的。
 
 ```c++
@@ -306,6 +307,7 @@ Lapple:    ldr    w4, [x3]
 #endif // __arm64__ && !TARGET_OS_SIMULATOR
 ```
 
+#### dyldbootstrap::start
 &emsp;然后看到汇编函数 \_\_dyld_start 内部调用了 `dyldbootstrap::start(app_mh, argc, argv, dyld_mh, &startGlue)` 函数，即 dyldbootstrap 命名空间中的 start 函数，namespace dyldbootstrap 定义在 dyldInitialization.cpp 中，它的内容超简单，内部就定义了 start 和 rebaseDyld 两个函数，从命名空间的名字中我们已经能猜到一些它的作用：用来进行 dyld 的初始化，将 dyld 引导到可运行状态（Code to bootstrap dyld into a runnable state）。下面我们一起看下其中的 start 的函数。
 
 ```c++
@@ -387,6 +389,8 @@ struct mach_header_64 {
 
 &emsp;综上，`MachOLoaded -> MachOFile -> mach_header`。MachOFile 继承 mach_header 使其拥有 mach_header 结构体中所有的成员变量，然后 MachOFile 定义中则声明了一大组针对 Mach-O 的 Header 的函数，例如获取架构名、CPU 类型等。MachOLoaded 继承自 MachOFile 其定义中则声明了一组加载 Mach-O 的 Header 的函数。 
 
+#### dyld::_main 
+
 &emsp;下面我们接着看 `dyld::_main` 函数。首先是根据函数调用方式可以看到 \_main 函数是属于 dyld 命名空间的，在 dyld/src/dyld2.cpp 中可看到 namespace dyld 的定义，在 dyld2.h 和 dyld2.cpp 中可看到分别进行了 `uintptr_t _main(const macho_header* mainExecutableMH, uintptr_t mainExecutableSlide, int argc, const char* argv[], const char* envp[], const char* apple[], uintptr_t* startGlue)` 的声明和定义。
 
 &emsp;首先是 \_main 函数的注释：
@@ -420,7 +424,11 @@ gLinkContext.mainExecutable = sMainExecutable;
 gLinkContext.mainExecutableCodeSigned = hasCodeSignatureLoadCommand(mainExecutableMH);
 ```
 
+##### ImageLoaderMachO
+
 &emsp;这里我们首先看一下 `ImageLoaderMachO` 类（ImageLoaderMachO is a subclass of ImageLoader which loads mach-o format files.）的定义，`instantiateFromLoadedImage` 函数返回一个 `ImageLoaderMachO` 指针，在 dyld/src/ImageLoaderMachO.h 中可看到 `class ImageLoaderMachO : public ImageLoader` 的定义，`ImageLoaderMachO` 类公开继承自 `ImageLoader` 类。`ImageLoader` 是一个抽象基类。为了支持加载特定的可执行文件格式，可以创建 `ImageLoader` 的一个具体子类。对于使用中的每个可执行文件（dynamic shared object），将实例化一个 `ImageLoader`。`ImageLoader` 基类负责将 images 链接在一起，但它对任何特定的文件格式一无所知，主要由其特定子类来实现。如 `ImageLoaderMachO` 是 `ImageLoader` 的特定子类，可加载 mach-o 格式的文件。（例如还有 `class ImageLoaderMegaDylib : public ImageLoader` ImageLoaderMegaDylib is the concrete subclass of ImageLoader which represents all dylibs in the shared cache.）
+
+##### instantiateFromLoadedImage
 
 &emsp;下面我们接着看 `instantiateFromLoadedImage` 函数实现，根据入参 `const macho_header* mh` 它内部直接调用 `ImageLoaderMachO` 的 `instantiateMainExecutable` 函数进行主可执行文件的实例化（即创建 ImageLoader 对象）。对于程序中需要的依赖库、插入库，会创建一个对应的 image 对象，对这些 image 进行链接，调用各 image 的初始化方法等等，包括对 runtime 的初始化。然后将 image 加载到 imagelist 中，所以我们在 xcode 中使用 image list 命令查看的第一个便是我们的 mach-o，最后返回根据我们的主可执行文件创建的 ImageLoader 对象的地址，即这里 `sMainExecutable` 就是创建后的主程序。  
 
@@ -443,6 +451,8 @@ static ImageLoaderMachO* instantiateFromLoadedImage(const macho_header* mh, uint
 //    throw "main executable not a known format";
 }
 ```
+
+##### ImageLoaderMachO::instantiateMainExecutable 
 
 &emsp;下面我们看一下 `ImageLoaderMachO::instantiateMainExecutable` 函数的定义，它的功能便是为 main executable 创建 image。
 
@@ -473,6 +483,8 @@ ImageLoader* ImageLoaderMachO::instantiateMainExecutable(const macho_header* mh,
 &emsp;其中的 `sniffLoadCommands` 函数，它也是 `ImageLoaderMachO` 类的一个函数。
 
 &emsp;`class ImageLoaderMachOCompressed : public ImageLoaderMachO` 即 `ImageLoaderMachOCompressed` 是 `ImageLoaderMachO` 的子类：ImageLoaderMachOCompressed is the concrete subclass of ImageLoader which loads mach-o files that use the compressed LINKEDIT format。
+
+##### sniffLoadCommands
 
 &emsp;下面我们看一下 `sniffLoadCommands` 函数的定义，此函数过长，我们只看它的部分内容。
 
@@ -526,14 +538,11 @@ switch (cmd->cmd) {
 
 &emsp;`sMainExecutable` 创建完毕，我们接着分析 `dyld::_main` 函数。
 
-&emsp;
+#### getHostInfo
 
+&emsp;调用 getHostInfo(mainExecutableMH, mainExecutableSlide); 函数来获取 Mach-O 头部信息中的当前运行架构信息，仅是为了给 sHostCPU 和 sHostCPUsubtype 两个全局变量赋值。getHostInfo 函数虽然有两个参数 mainExecutableMH 和 mainExecutableSlide 但是实际都只是为了在 __x86_64__ && !TARGET_OS_SIMULATOR 下使用的。
 
-
-
-
-调用 getHostInfo(mainExecutableMH, mainExecutableSlide); 函数来获取 Mach-O 头部信息中的当前运行架构信息，仅是为了给 sHostCPU 和 sHostCPUsubtype 两个全局变量赋值。getHostInfo 函数虽然有两个参数 mainExecutableMH 和 mainExecutableSlide 但是实际都只是为了在 __x86_64__ && !TARGET_OS_SIMULATOR 下使用的。
-
+```c++
 static void getHostInfo(const macho_header* mainExecutableMH, uintptr_t mainExecutableSlide)
 {
 #if CPU_SUBTYPES_SUPPORTED
@@ -591,15 +600,85 @@ static void getHostInfo(const macho_header* mainExecutableMH, uintptr_t mainExec
 #endif
 #endif
 }
+```
 
+#### forEachSupportedPlatform
 
+&emsp;在此块区域中我们看到了我们的老朋友 block 在 C/C++ 函数中的使用。
 
-&emsp;加载共享缓存库
+&emsp;判断 `mainExecutableMH` 支持的平台以及当前的版本信息等。
 
+```c++
+// Set the platform ID in the all image infos so debuggers can tell the process type
+// FIXME: This can all be removed once we make the kernel handle it in rdar://43369446
+// The host may not have the platform field in its struct, but there's space for it in the padding, so always set it
+{
+    __block bool platformFound = false;
+    ((dyld3::MachOFile*)mainExecutableMH)->forEachSupportedPlatform(^(dyld3::Platform platform, uint32_t minOS, uint32_t sdk) {
+        if (platformFound) {
+            halt("MH_EXECUTE binaries may only specify one platform");
+        }
+        gProcessInfo->platform = (uint32_t)platform;
+        platformFound = true;
+    });
+    if (gProcessInfo->platform == (uint32_t)dyld3::Platform::unknown) {
+        // There were no platforms found in the binary. This may occur on macOS for alternate toolchains and old binaries.
+        // It should never occur on any of our embedded platforms.
+#if TARGET_OS_OSX
+        gProcessInfo->platform = (uint32_t)dyld3::Platform::macOS;
+#else
+        halt("MH_EXECUTE binaries must specify a minimum supported OS version");
+#endif
+    }
+}
+...
+```
+
+#### setContext
+
+&emsp;`setContext` 是一个静态全局函数，主要为 `ImageLoader::LinkContext gLinkContext;` 这个全局变量的各项属性以及函数指针赋值。设置 crash 以及 log 地址，设置上下文信息。 
+```c++
+CRSetCrashLogMessage("dyld: launch started");
+
+setContext(mainExecutableMH, argc, argv, envp, apple);
+```
+
+#### configureProcessRestrictions
+
+&emsp;设置环境变量，envp 就是 \_main 函数的参数，它是所有环境变量的数组，就是将环境变量插入进去。
+```c++
+configureProcessRestrictions(mainExecutableMH, envp);
+```
+
+#### checkSharedRegionDisable
+
+&emsp;对共享缓存进行处理。 
 ```c++
 // load shared cache
 checkSharedRegionDisable((dyld3::MachOLoaded*)mainExecutableMH, mainExecutableSlide);
 ```
+
+#### instantiateFromLoadedImage 
+
+&emsp;主程序的初始化。
+```c++
+// instantiate ImageLoader for main executable
+sMainExecutable = instantiateFromLoadedImage(mainExecutableMH, mainExecutableSlide, sExecPath);
+gLinkContext.mainExecutable = sMainExecutable;
+gLinkContext.mainExecutableCodeSigned = hasCodeSignatureLoadCommand(mainExecutableMH);
+```
+
+#### loadInsertedDylib
+
+&emsp;插入动态库。
+```c++
+// load any inserted libraries
+if ( sEnv.DYLD_INSERT_LIBRARIES != NULL ) {
+    for (const char* const* lib = sEnv.DYLD_INSERT_LIBRARIES; *lib != NULL; ++lib) 
+        loadInsertedDylib(*lib);
+}
+```
+
 
 
 
