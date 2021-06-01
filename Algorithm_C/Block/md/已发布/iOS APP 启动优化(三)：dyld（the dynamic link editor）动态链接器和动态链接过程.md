@@ -743,7 +743,217 @@ notifyMonitoringDyldMain();
 
 ### initializeMainExecutable
 
-&emsp;上面我们分析的 main 的总体流程，下面我们详细学习一下 `initializeMainExecutable` 函数。
+&emsp;上面我们分析了 main 的总体流程，其中 `initializeMainExecutable` 函数进行了所有的 initializers，下面我们详细学习一下 `initializeMainExecutable` 函数。
+
+```c++
+void initializeMainExecutable()
+{
+    // record that we've reached this step（记录，我们已经达到了这一步）
+    gLinkContext.startedInitializingMainExecutable = true;
+
+    // run initialzers for any inserted dylibs（为任何插入的 dylibs 运行初始化器）
+    ImageLoader::InitializerTimingList initializerTimes[allImagesCount()];
+    initializerTimes[0].count = 0;
+    const size_t rootCount = sImageRoots.size();
+    if ( rootCount > 1 ) {
+        for(size_t i=1; i < rootCount; ++i) {
+            sImageRoots[i]->runInitializers(gLinkContext, initializerTimes[0]);
+        }
+    }
+    
+    // run initializers for main executable and everything it brings up 
+    sMainExecutable->runInitializers(gLinkContext, initializerTimes[0]);
+    
+    // register cxa_atexit() handler to run static terminators in all loaded images when this process exits
+    if ( gLibSystemHelpers != NULL ) 
+        (*gLibSystemHelpers->cxa_atexit)(&runAllStaticTerminators, NULL, NULL);
+
+    // dump info if requested
+    if ( sEnv.DYLD_PRINT_STATISTICS )
+        ImageLoader::printStatistics((unsigned int)allImagesCount(), initializerTimes[0]);
+    if ( sEnv.DYLD_PRINT_STATISTICS_DETAILS )
+        ImageLoaderMachO::printStatisticsDetails((unsigned int)allImagesCount(), initializerTimes[0]);
+}
+```
+
+&emsp;`gLinkContext` 是一个 `ImageLoader::LinkContext gLinkContext;` 类型的全局变量，LinkContext 是在 class ImageLoader 中定义的一个结构体，其中定义了很多函数指针和成员变量，来记录和处理 Link 的上下文。其中 `bool startedInitializingMainExecutable;` 则是用来记录标记 MainExecutable 开始进行 Initializing 了，这里是直接把它的值置为 true。
+
+&emsp;`InitializerTimingList` 也是在 class ImageLoader 中定义的一个挺简单的结构体。用来记录 Initializer 所花费的时间。    
+
+```c++
+struct InitializerTimingList
+{
+    uintptr_t    count;
+    struct {
+        const char*        shortName;
+        uint64_t        initTime;
+    } images[1];
+
+    void addTime(const char* name, uint64_t time);
+};
+
+void ImageLoader::InitializerTimingList::addTime(const char* name, uint64_t time)
+{
+    for (int i=0; i < count; ++i) {
+        if ( strcmp(images[i].shortName, name) == 0 ) {
+            images[i].initTime += time;
+            return;
+        }
+    }
+    images[count].initTime = time;
+    images[count].shortName = name;
+    ++count;
+}
+```
+
+&emsp;下面是 `runInitializers` 函数，同样是 class ImageLoader 中定义的一个函数。
+
+```c++
+void ImageLoader::runInitializers(const LinkContext& context, InitializerTimingList& timingInfo)
+{
+    uint64_t t1 = mach_absolute_time(); // ⬅️ 计时开始
+    mach_port_t thisThread = mach_thread_self();
+    ImageLoader::UninitedUpwards up;
+    up.count = 1;
+    up.imagesAndPaths[0] = { this, this->getPath() };
+    
+    // ⬇️⬇️⬇️⬇️⬇️⬇️⬇️⬇️
+    processInitializers(context, thisThread, timingInfo, up);
+    
+    context.notifyBatch(dyld_image_state_initialized, false); // ⬅️ 大概是通知初始化完成  
+    mach_port_deallocate(mach_task_self(), thisThread); // ⬅️ deallocate 任务
+    uint64_t t2 = mach_absolute_time(); // ⬅️ 计时结束
+    fgTotalInitTime += (t2 - t1);
+}
+```
+
+&emsp;在 runInitializers 中我们看到了两个老面孔，在学习 GCD 源码时见过的 `mach_absolute_time` 和 `mach_thread_self` 一个用来统计初始化时间，一个用来记录当前线程。 
+
+&emsp;`UninitedUpwards` 也是 class ImageLoader 中定义的一个超简单的结构体，其中的成员变量 `std::pair<ImageLoader*, const char*> imagesAndPaths[1];` 一个值记录 ImageLoader 的地址，另一个值记录该 ImageLoader 的路径。 
+
+```c++
+struct UninitedUpwards
+{
+    uintptr_t count;
+    std::pair<ImageLoader*, const char*> imagesAndPaths[1];
+};
+```
+
+&emsp;可看到 `processInitializers(context, thisThread, timingInfo, up);` 是其中最重要的函数，下面来一起看看。
+
+#### processInitializers
+
+&emsp;处理初始化过程，看到 `processInitializers` 中 `recursiveInitialization` 函数的递归调用，之所以递归调用，是因为我们的动态库或者静态库会引入其它类库，而且表是个多表结构，所以需要递归实例化。 
+
+```c++
+// <rdar://problem/14412057> upward dylib initializers can be run too soon
+// To handle dangling dylibs which are upward linked but not downward, all upward linked dylibs
+// have their initialization postponed until after the recursion through downward dylibs
+// has completed.
+void ImageLoader::processInitializers(const LinkContext& context, mach_port_t thisThread,
+                                     InitializerTimingList& timingInfo, ImageLoader::UninitedUpwards& images)
+{
+    uint32_t maxImageCount = context.imageCount()+2;
+    ImageLoader::UninitedUpwards upsBuffer[maxImageCount];
+    ImageLoader::UninitedUpwards& ups = upsBuffer[0];
+    ups.count = 0;
+    
+    // Calling recursive init on all images in images list, building a new list of uninitialized upward dependencies.
+    for (uintptr_t i=0; i < images.count; ++i) {
+        images.imagesAndPaths[i].first->recursiveInitialization(context, thisThread, images.imagesAndPaths[i].second, timingInfo, ups);
+    }
+    
+    // If any upward dependencies remain, init them.
+    if ( ups.count > 0 )
+        processInitializers(context, thisThread, timingInfo, ups);
+}
+```
+
+&emsp;`images.imagesAndPaths[i].first` 是 ImageLoader 指针（`ImageLoader *`），即调用 class ImageLoader 的 `recursiveInitialization` 函数，下面我们看一下 `recursiveInitialization` 函数的定义。
+
+#### recursiveInitialization
+
+&emsp;`recursiveInitialization` 函数定义较长，其中比较重要的是 // initialize lower level libraries first 下的 for 循环，进行循环判断是否都加载过，没有的话就再执行 `dependentImage->recursiveInitialization` 因为我们前面说的动态库可能会依赖其它库。 
+
+```c++
+void ImageLoader::recursiveInitialization(const LinkContext& context, mach_port_t this_thread, const char* pathToInitialize,
+                                          InitializerTimingList& timingInfo, UninitedUpwards& uninitUps)
+{
+    recursive_lock lock_info(this_thread);
+    recursiveSpinLock(lock_info);
+
+    if ( fState < dyld_image_state_dependents_initialized-1 ) {
+        uint8_t oldState = fState;
+        // break cycles
+        fState = dyld_image_state_dependents_initialized-1;
+        try {
+            // initialize lower level libraries first
+            for(unsigned int i=0; i < libraryCount(); ++i) {
+                ImageLoader* dependentImage = libImage(i);
+                if ( dependentImage != NULL ) {
+                    // don't try to initialize stuff "above" me yet
+                    if ( libIsUpward(i) ) {
+                        uninitUps.imagesAndPaths[uninitUps.count] = { dependentImage, libPath(i) };
+                        uninitUps.count++;
+                    }
+                    else if ( dependentImage->fDepth >= fDepth ) {
+                        dependentImage->recursiveInitialization(context, this_thread, libPath(i), timingInfo, uninitUps);
+                    }
+                }
+            }
+            
+            // record termination order
+            if ( this->needsTermination() )
+                context.terminationRecorder(this);
+
+            // let objc know we are about to initialize this image
+            uint64_t t1 = mach_absolute_time(); // ⬅️ 起点计时
+            fState = dyld_image_state_dependents_initialized;
+            oldState = fState;
+            context.notifySingle(dyld_image_state_dependents_initialized, this, &timingInfo);
+            
+            // initialize this image
+            bool hasInitializers = this->doInitialization(context);
+
+            // let anyone know we finished initializing this image
+            fState = dyld_image_state_initialized;
+            oldState = fState;
+            context.notifySingle(dyld_image_state_initialized, this, NULL);
+            
+            if ( hasInitializers ) {
+                uint64_t t2 = mach_absolute_time(); // ⬅️ 终点计时
+                timingInfo.addTime(this->getShortName(), t2-t1);
+            }
+        }
+        catch (const char* msg) {
+            // this image is not initialized
+            fState = oldState;
+            recursiveSpinUnLock();
+            throw;
+        }
+    }
+    
+    recursiveSpinUnLock();
+}
+```
+
+&emsp;然后再往下是 // let objc know we are about to initialize this image 部分的的内容，它们才是 `recursiveInitialization` 函数的核心，我们首先看一下 `context.notifySingle(dyld_image_state_dependents_initialized, this, &timingInfo);` 函数的调用，首先这里我们一直往上追溯的话可发现 context 参数即在 `initializeMainExecutable` 函数中传入的 `ImageLoader::LinkContext gLinkContext;` 这个全局变量，然后在 dyld/src/dyld2.cpp 文件中的 `static void setContext(const macho_header* mainExecutableMH, int argc, const char* argv[], const char* envp[], const char* apple[])` 静态全局函数中，`gLinkContext.notifySingle = &notifySingle;` 即 `recursiveInitialization`  函数中调用的 `context.notifySingle` 即 `gLinkContext.notifySingle` 即 dyld/src/dyld2.cpp 中的 `&notifySingle` 函数。
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
