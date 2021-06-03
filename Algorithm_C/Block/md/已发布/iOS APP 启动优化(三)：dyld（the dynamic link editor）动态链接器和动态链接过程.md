@@ -939,9 +939,93 @@ void ImageLoader::recursiveInitialization(const LinkContext& context, mach_port_
 
 &emsp;然后再往下是 // let objc know we are about to initialize this image 部分的的内容，它们才是 `recursiveInitialization` 函数的核心，我们首先看一下 `context.notifySingle(dyld_image_state_dependents_initialized, this, &timingInfo);` 函数的调用，首先这里我们一直往上追溯的话可发现 context 参数即在 `initializeMainExecutable` 函数中传入的 `ImageLoader::LinkContext gLinkContext;` 这个全局变量，然后在 dyld/src/dyld2.cpp 文件中的 `static void setContext(const macho_header* mainExecutableMH, int argc, const char* argv[], const char* envp[], const char* apple[])` 静态全局函数中，`gLinkContext.notifySingle = &notifySingle;` 即 `recursiveInitialization`  函数中调用的 `context.notifySingle` 即 `gLinkContext.notifySingle` 即 dyld/src/dyld2.cpp 中的 `&notifySingle` 函数。
 
+&emsp;然后我们直接在 dyld2.cpp 中搜索 `notifySingle` 函数， 它是一个静态全局函数，由于该函数实现过长，那么我们只看其中的核心：
 
+```c++
+(*sNotifyObjCInit)(image->getRealPath(), image->machHeader());
+```
 
+&emsp;sNotifyObjCInit 是一个静态全局变量，是一个名字是 `_dyld_objc_notify_init` 的函数指针，`_dyld_objc_notify_init` 是一个返回值为 void 两个参数分别是 const char * 和 const struct mach_header * 的函数指针：
 
+```c++
+typedef void (*_dyld_objc_notify_init)(const char* path, const struct mach_header* mh);
+
+static _dyld_objc_notify_init sNotifyObjCInit;
+```
+
+&emsp;然后同样在 dyld2.cpp 文件中搜索，可看到在 `registerObjCNotifiers` 函数中，有对 `sNotifyObjCInit` 这个全局变量赋值。
+
+```c++
+void registerObjCNotifiers(_dyld_objc_notify_mapped mapped, _dyld_objc_notify_init init, _dyld_objc_notify_unmapped unmapped)
+{
+    // record functions to call
+    sNotifyObjCMapped    = mapped;
+    
+    // ⬇️⬇️⬇️⬇️⬇️
+    sNotifyObjCInit        = init; // ⬅️
+    // ⬆️⬆️⬆️⬆️⬆️
+    
+    sNotifyObjCUnmapped = unmapped;
+
+    // call 'mapped' function with all images mapped so far
+    try {
+        notifyBatchPartial(dyld_image_state_bound, true, NULL, false, true);
+    }
+    catch (const char* msg) {
+        // ignore request to abort during registration
+    }
+
+    // <rdar://problem/32209809> call 'init' function on all images already init'ed (below libSystem)
+    for (std::vector<ImageLoader*>::iterator it=sAllImages.begin(); it != sAllImages.end(); it++) {
+        ImageLoader* image = *it;
+        if ( (image->getState() == dyld_image_state_initialized) && image->notifyObjC() ) {
+            dyld3::ScopedTimer timer(DBG_DYLD_TIMING_OBJC_INIT, (uint64_t)image->machHeader(), 0, 0);
+            
+            // ⬇️⬇️⬇️⬇️⬇️⬇️ 
+            (*sNotifyObjCInit)(image->getRealPath(), image->machHeader());
+        }
+    }
+}
+```
+
+```c++
+typedef void (*_dyld_objc_notify_mapped)(unsigned count, const char* const paths[], const struct mach_header* const mh[]);
+typedef void (*_dyld_objc_notify_init)(const char* path, const struct mach_header* mh);
+typedef void (*_dyld_objc_notify_unmapped)(const char* path, const struct mach_header* mh);
+```
+
+&emsp;我们看到 `registerObjCNotifiers` 函数的 `_dyld_objc_notify_init init` 参数会直接赋值给 `sNotifyObjCInit`，并在下面的 for 循环中进行调用，那么什么时候调用 `registerObjCNotifiers` 函数呢？`_dyld_objc_notify_init init` 的实参又是什么呢？我们全局搜索 `registerObjCNotifiers` 函数。（其实看到这里，看到 registerObjCNotifiers 函数的形参我们可能会有一点印象了，之前看 objc 的源码时的 \_objc_init 函数中涉及到 image 部分。）
+
+&emsp;在 dyld/src/dyldAPIs.cpp 中，`_dyld_objc_notify_register` 函数内部调用了 `registerObjCNotifiers` 函数（属于 namespace dyld）。
+
+```c++
+void _dyld_objc_notify_register(_dyld_objc_notify_mapped    mapped,
+                                _dyld_objc_notify_init      init,
+                                _dyld_objc_notify_unmapped  unmapped)
+{
+    dyld::registerObjCNotifiers(mapped, init, unmapped);
+}
+```
+
+&emsp;这下就连上了 `_dyld_objc_notify_register` 函数在 objc4 源码中也有调用过，并且就在 `_objc_init` 函数中。下面我们先看一下 `_dyld_objc_notify_register` 函数的声明。  
+
+```c++
+//
+// Note: only for use by objc runtime
+// Register handlers to be called when objc images are mapped, unmapped, and initialized.
+// Dyld will call back the "mapped" function with an array of images that contain an objc-image-info section.
+// Those images that are dylibs will have the ref-counts automatically bumped, so objc will no longer need to
+// call dlopen() on them to keep them from being unloaded.  During the call to _dyld_objc_notify_register(),
+// dyld will call the "mapped" function with already loaded objc images.  During any later dlopen() call,
+// dyld will also call the "mapped" function.  Dyld will call the "init" function when dyld would be called
+// initializers in that image.  This is when objc calls any +load methods in that image.
+//
+void _dyld_objc_notify_register(_dyld_objc_notify_mapped    mapped,
+                                _dyld_objc_notify_init      init,
+                                _dyld_objc_notify_unmapped  unmapped);
+```
+
+&emsp;`_dyld_objc_notify_register` 函数仅供 objc runtime 使用，当
 
 
 
