@@ -1014,18 +1014,106 @@ void _dyld_objc_notify_register(_dyld_objc_notify_mapped    mapped,
 // Note: only for use by objc runtime
 // Register handlers to be called when objc images are mapped, unmapped, and initialized.
 // Dyld will call back the "mapped" function with an array of images that contain an objc-image-info section.
-// Those images that are dylibs will have the ref-counts automatically bumped, so objc will no longer need to
-// call dlopen() on them to keep them from being unloaded.  During the call to _dyld_objc_notify_register(),
-// dyld will call the "mapped" function with already loaded objc images.  During any later dlopen() call,
-// dyld will also call the "mapped" function.  Dyld will call the "init" function when dyld would be called
-// initializers in that image.  This is when objc calls any +load methods in that image.
-//
+// Those images that are dylibs will have the ref-counts automatically bumped, so objc will no longer need to call dlopen() on them to keep them from being unloaded.  
+// During the call to _dyld_objc_notify_register(), dyld will call the "mapped" function with already loaded objc images.  
+// During any later dlopen() call, dyld will also call the "mapped" function.  
+// Dyld will call the "init" function when dyld would be called initializers in that image.  
+// This is when objc calls any +load methods in that image.
+
 void _dyld_objc_notify_register(_dyld_objc_notify_mapped    mapped,
                                 _dyld_objc_notify_init      init,
                                 _dyld_objc_notify_unmapped  unmapped);
 ```
 
-&emsp;`_dyld_objc_notify_register` 函数仅供 objc runtime 使用，当
+&emsp;`_dyld_objc_notify_register` 函数仅供 objc runtime 使用。注册在 mapped、unmapped 和 initialized objc images 时要调用的处理程序。Dyld 将使用包含 objc-image-info section 的 images 数组回调 mapped 函数。那些 dylib 的 images 将自动增加引用计数，因此 objc 将不再需要对它们调用 dlopen() 以防止它们被卸载。在调用 \_dyld_objc_notify_register() 期间，dyld 将使用已加载的 objc images 调用 mapped 函数。在以后的任何 dlopen() 调用中，dyld 还将调用 mapped 函数。当 dyld 在该 image 中调用 initializers 时，Dyld 将调用 init 函数。这是当 objc 调用 image 中的任何 +load 方法时。
+
+&emsp;下面我们在 objc4-781 中搜一下 `_dyld_objc_notify_register` 函数，在 `_objc_init` 中我们看到了它的身影。
+
+```c++
+void _objc_init(void)
+{
+    static bool initialized = false;
+    if (initialized) return;
+    initialized = true;
+    
+    // fixme defer initialization until an objc-using image is found?
+    environ_init();
+    tls_init();
+    static_init();
+    runtime_init();
+    exception_init();
+    cache_init();
+    _imp_implementationWithBlock_init();
+    
+    // ⬇️⬇️⬇️⬇️
+    _dyld_objc_notify_register(&map_images, load_images, unmap_image);
+
+#if __OBJC2__
+    didCallDyldNotifyRegister = true;
+#endif
+}
+```
+
+&emsp;那么追了这么久，上面的 init 形数对应的实参便是 `load_images` 函数。总结下：`_dyld_objc_notify_register` 相当于一个回调函数，也就是该方法的调用是在 `_objc_init` 调用的方法里调用,类推就是调用初始化方法才回去调用 `_dyld_objc_notify_register`。下面我们回到前面的 `bool hasInitializers = this->doInitialization(context);` 调用。
+
+```c++
+bool ImageLoaderMachO::doInitialization(const LinkContext& context)
+{
+    CRSetCrashLogMessage2(this->getPath());
+
+    // ⬇️⬇️⬇️⬇️⬇️⬇️
+    // mach-o has -init and static initializers
+    doImageInit(context);
+    
+    doModInitFunctions(context);
+    
+    CRSetCrashLogMessage2(NULL);
+    
+    return (fHasDashInit || fHasInitializers);
+}
+```
+
+&emsp;其中的核心是 `doImageInit(context);` 调用。
+
+```c++
+void ImageLoaderMachO::doImageInit(const LinkContext& context)
+{
+    if ( fHasDashInit ) {
+        const uint32_t cmd_count = ((macho_header*)fMachOData)->ncmds; // ⬅️ load command 的数量
+        const struct load_command* const cmds = (struct load_command*)&fMachOData[sizeof(macho_header)];
+        const struct load_command* cmd = cmds;
+        for (uint32_t i = 0; i < cmd_count; ++i) {
+            switch (cmd->cmd) {
+                case LC_ROUTINES_COMMAND:
+                    Initializer func = (Initializer)(((struct macho_routines_command*)cmd)->init_address + fSlide);
+#if __has_feature(ptrauth_calls)
+                    func = (Initializer)__builtin_ptrauth_sign_unauthenticated((void*)func, ptrauth_key_asia, 0);
+#endif
+                    // <rdar://problem/8543820&9228031> verify initializers are in image
+                    if ( ! this->containsAddress(stripPointer((void*)func)) ) {
+                        dyld::throwf("initializer function %p not in mapped image for %s\n", func, this->getPath());
+                    }
+                    if ( ! dyld::gProcessInfo->libSystemInitialized ) {
+                        // <rdar://problem/17973316> libSystem initializer must run first
+                        dyld::throwf("-init function in image (%s) that does not link with libSystem.dylib\n", this->getPath());
+                    }
+                    if ( context.verboseInit )
+                        dyld::log("dyld: calling -init function %p in %s\n", func, this->getPath());
+                    {
+                        dyld3::ScopedTimer(DBG_DYLD_TIMING_STATIC_INITIALIZER, (uint64_t)fMachOData, (uint64_t)func, 0);
+                        func(context.argc, context.argv, context.envp, context.apple, &context.programVars);
+                    }
+                    break;
+            }
+            cmd = (const struct load_command*)(((char*)cmd)+cmd->cmdsize);
+        }
+    }
+}
+```
+
+&emsp;看看到其中就是遍历 load command 找到其中 LC_ROUTINES_COMMAND 的 load command 然后通过内存地址偏移得到要执行的方法并执行。（`Initializer func = (Initializer)(((struct macho_routines_command*)cmd)->init_address + fSlide);`） 其中的 `if ( ! dyld::gProcessInfo->libSystemInitialized )` 是判断 libSystem 必须先初始化，否则就直接抛错。总结：上面我们研究了初始化的过程，最后是由内存地址不断平移拿到初始化方法进行调用。
+
+
 
 
 
