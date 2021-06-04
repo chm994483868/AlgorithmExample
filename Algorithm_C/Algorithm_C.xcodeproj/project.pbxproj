@@ -264,6 +264,7 @@
 		8EA68A6A252DA35400BE2852 /* iOS 从源码解析Runtime (十)：聚焦cache_t objc-msg-arm64.s补充(3).md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 从源码解析Runtime (十)：聚焦cache_t objc-msg-arm64.s补充(3).md"; sourceTree = "<group>"; };
 		8EA68A6B252DA76300BE2852 /* iOS 从源码解析Runtime (十一)：聚焦objc_class(class_data_bits_t内容篇).md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 从源码解析Runtime (十一)：聚焦objc_class(class_data_bits_t内容篇).md"; sourceTree = "<group>"; };
 		8EB17F872608F4D900845A19 /* iOS 2021 面试前的准备（总结各知识点方便面试前快速复习使用）（七）.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 2021 面试前的准备（总结各知识点方便面试前快速复习使用）（七）.md"; sourceTree = "<group>"; };
+		8EC66DFC2669B27A00AB2204 /* iOS APP 启动优化(四)：dyld（the dynamic link editor）动态链接器和动态链接过程(二).md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS APP 启动优化(四)：dyld（the dynamic link editor）动态链接器和动态链接过程(二).md"; sourceTree = "<group>"; };
 		8ED5F3C4255B339500B0294D /* LeftRotateString.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = LeftRotateString.cpp; sourceTree = "<group>"; };
 		8ED5F3C5255B339500B0294D /* LeftRotateString.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = LeftRotateString.hpp; sourceTree = "<group>"; };
 		8EF1A8AA253B4E7E0058AEAD /* iOS 从 libclosure-74 源码来研究 Block 实现原理(2).md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "iOS 从 libclosure-74 源码来研究 Block 实现原理(2).md"; sourceTree = "<group>"; };
@@ -1449,6 +1450,7 @@
 				8E314959261FD06D00BBB2E2 /* iOS APP 启动优化(一)：ipa(iPhone Application) 包和 Mach-O(Mach Object file format) 概述.md */,
 				8E819539262CFD010072C00D /* iOS APP 启动优化(二)：Code Size Performance Guidelines.md */,
 				8E31495A261FD06D00BBB2E2 /* iOS APP 启动优化(三)：dyld（the dynamic link editor）动态链接器和动态链接过程.md */,
+				8EC66DFC2669B27A00AB2204 /* iOS APP 启动优化(四)：dyld（the dynamic link editor）动态链接器和动态链接过程(二).md */,
 				D2EB014724DB7B3A009EAFD6 /* iOS 从 libclosure-74 源码来研究 Block 实现原理(1).md */,
 				8EF1A8AA253B4E7E0058AEAD /* iOS 从 libclosure-74 源码来研究 Block 实现原理(2).md */,
 				D2C74D042537F2100051B89F /* block_Temp.md */,

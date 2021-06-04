@@ -1061,7 +1061,7 @@ bool ImageLoaderMachO::doInitialization(const LinkContext& context)
 {
     CRSetCrashLogMessage2(this->getPath());
 
-    // ⬇️⬇️⬇️⬇️⬇️⬇️
+    // ⬇️⬇️⬇️⬇️
     // mach-o has -init and static initializers
     doImageInit(context);
     
@@ -1113,6 +1113,7 @@ void ImageLoaderMachO::doImageInit(const LinkContext& context)
 
 &emsp;看看到其中就是遍历 load command 找到其中 LC_ROUTINES_COMMAND 的 load command 然后通过内存地址偏移得到要执行的方法并执行。（`Initializer func = (Initializer)(((struct macho_routines_command*)cmd)->init_address + fSlide);`） 其中的 `if ( ! dyld::gProcessInfo->libSystemInitialized )` 是判断 libSystem 必须先初始化，否则就直接抛错。总结：上面我们研究了初始化的过程，最后是由内存地址不断平移拿到初始化方法进行调用。
 
+&emsp;这样我们最开始的 bt 指令的截图中出现的函数就都浏览一遍了：`_dyld_start` -> `dyldbootstrap::start` -> `dyld::_main` -> `dyld::initializeMainExecutable` -> `ImageLoader::runInitializers` -> `ImageLoader::processInitializers` -> `ImageLoader::recursiveInitialization` -> `dyld::notifySingle` -> `libobjc.A.dylib \` `load_images`。
 
 
 
@@ -1127,104 +1128,6 @@ void ImageLoaderMachO::doImageInit(const LinkContext& context)
 
 
 
-
-
-```c++
-if ( sEnv.DYLD_PRINT_OPTS )
-    printOptions(argv);
-if ( sEnv.DYLD_PRINT_ENV ) 
-    printEnvironmentVariables(envp);
-```
-
-&emsp;此处是判断是否设置了环境变量，如果设置了，那么 xcode 就会在控制台打印相关的详细信息。（在 Edit Scheme... -> Run -> Arguments -> Environment Variables 进行添加） 
-
-&emsp;当添加了 DYLD_PRINT_OPTS 时，会在控制台输出可执行文件的位置。
-```c++
-opt[0] = "/Users/hmc/Library/Developer/CoreSimulator/Devices/4E072E27-E586-4E81-A693-A02A3ED83DEC/data/Containers/Bundle/Application/ECDA091A-1610-49D2-8BC0-B41A58BC76EC/Test_ipa_Simple.app/Test_ipa_Simple"
-```
-
-&emsp;当添加了 DYLD_PRINT_ENV 时，会在控制台输出用户级别、插入的动态库、动态库的路径、模拟器的信息等等一系列的信息，由于内容过多这里就粘贴出来了。
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-## LLDB 常用命令
-
-1. p po p/x p/o p/t p/d p/c
-2. expression 修改参数
-3. call 
-4. x x/4gx x/4xg
-5. image list
-6. image lookup --address+地址
-7. thread list
-8. thread backtrace（bt）bt all
-9. thread return frame variable
-10. register read register read/x
-
-## clang 
-
-&emsp;clang:Clang 是一个 C++ 编写、基于 LLVM、发布于 LLVM BSD 许可证下的 C/C++/Objective-C/Objective-C++ 编译器。它与 GNU C 语言规范几乎完全兼容（当然，也有部分不兼容的内容， 包括编译命令选项也会有点差异），并在此基础上增加了额外的语法特性，比如 C 函数重载（通过 \_ attribute_((overloadable)) 来修饰函数)，其目标(之一)就是超越 GCC。
 
 ## 参考链接
 **参考链接:🔗**
@@ -1241,4 +1144,6 @@ opt[0] = "/Users/hmc/Library/Developer/CoreSimulator/Devices/4E072E27-E586-4E81-
 + [C++ 命名空间namespace](https://www.jianshu.com/p/30e960717ef1)
 + [一文了解 Xcode 生成「静态库」和「动态库」 的流程](https://mp.weixin.qq.com/s/WH8emrMpLeVW-LfGwN09cw)
 + [Hook static initializers](https://blog.csdn.net/majiakun1/article/details/99413403)
++ [iOS逆向 dyld流程](https://juejin.cn/post/6844904202242637837)
++ [OC 底层探索 13、类的加载1 - dyld和objc的关联](https://www.cnblogs.com/zhangzhang-y/p/13806192.html)
 
