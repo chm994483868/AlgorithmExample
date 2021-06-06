@@ -1261,21 +1261,122 @@ context.notifySingle(dyld_image_state_initialized, this, NULL);
 
 &emsp;我们在 `doInitialization` 方法调用之后再进行 `notifySingle`，而 `notifySingle` 就会跳到 `sNotifyObjCInit`，`sNotifyObjCInit()` 才会执行。
 
+&emsp;文章开头处我们看到 load 方法是最先执行的，在之前的文章中我们有详细分析过 +load 的执行，如果还有印象的话一定记得它的入口 `load_imags` 函数。这正和我们上面的分析联系起来了，在 objc-781 源码中，它最先走的是 `objc_init`，它最后会调用 `_dyld_objc_notify_register` 传入 `load_images`，而 `load_images` 内部的 `prepare_load_methods` 和 `call_load_methods` 完成了整个项目中父类、子类、分类中的所有 +load 函数的调用。
+
+![截屏2021-06-06 下午4.19.52.png](https://p6-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/ba2304f261cf446bb6434d0c82dceb66~tplv-k3u1fbpfcp-watermark.image)
+
+&emsp;文章开头处我们看到 C++ 静态方法是在 +load 方法后面调用的，我们现在看一下它的调用时机。前面分析 `ImageLoaderMachO` 时只看了 `doImageInit` 而没有分析 `doModInitFunctions` 函数。
+
+```c++
+// ⬇️⬇️⬇️⬇️
+// mach-o has -init and static initializers
+doImageInit(context);
+doModInitFunctions(context);
+```
+
+&emsp;在 dyld/src/ImageLoaderMachO.cpp 中我们可看到 `void ImageLoaderMachO::doModInitFunctions(const LinkContext& context)` 的定义，由于其过长，这里我们只摘录看下其内容。
+
+```c++
+void ImageLoaderMachO::doModInitFunctions(const LinkContext& context)
+{
+    if ( fHasInitializers ) {
+        const uint32_t cmd_count = ((macho_header*)fMachOData)->ncmds;
+        const struct load_command* const cmds = (struct load_command*)&fMachOData[sizeof(macho_header)];
+        const struct load_command* cmd = cmds;
+        for (uint32_t i = 0; i < cmd_count; ++i) {
+            if ( cmd->cmd == LC_SEGMENT_COMMAND ) {
+                const struct macho_segment_command* seg = (struct macho_segment_command*)cmd;
+                const struct macho_section* const sectionsStart = (struct macho_section*)((char*)seg + sizeof(struct macho_segment_command));
+                const struct macho_section* const sectionsEnd = &sectionsStart[seg->nsects];
+                for (const struct macho_section* sect=sectionsStart; sect < sectionsEnd; ++sect) {
+                    const uint8_t type = sect->flags & SECTION_TYPE;
+                    ...
+...
+```
+
+&emsp;首先遍历找到类型是 `LC_SEGMENT_COMMAND` 的 Load command，然后遍历该段中类型是 `S_MOD_INIT_FUNC_POINTERS` 和 `S_INIT_FUNC_OFFSETS` 的区，然后便利其中的 `Initializer` 并执行。
+
+```c++
+typedef void (*Initializer)(int argc, const char* argv[], const char* envp[], const char* apple[], const ProgramVars* vars);
+```
+
+&emsp;我们在之前写的 `main_front` 函数中打一个断点，运行代码，使用 bt 查看其函数调用堆栈。
+
+![截屏2021-06-06 下午5.07.34.png](https://p9-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/9c10e651383549459241198765b5fac2~tplv-k3u1fbpfcp-watermark.image)
+
+&emsp;可看到 `main_front` 正是在 `ImageLoaderMachO::doModInitFunctions(ImageLoader::LinkContext const&)` 下执行的，也正说明了 C++ 的静态方法就是在执行 `doModInitFunctions` 下执行的。
+
+&emsp;我们在 `main_front` 中打一个断点，然后打开 Debug -> Debug Workflow -> Always Show Disassembly 选项，运行项目。
+
+```c++
+Test_ipa_simple`main_front:
+    0x10fc7bf60 <+0>:  pushq  %rbp
+    0x10fc7bf61 <+1>:  movq   %rsp, %rbp
+    0x10fc7bf64 <+4>:  leaq   0x2105(%rip), %rax        ; @
+    0x10fc7bf6b <+11>: movq   %rax, %rdi
+    0x10fc7bf6e <+14>: leaq   0x1e39(%rip), %rsi        ; "main_front"
+    0x10fc7bf75 <+21>: movb   $0x0, %al
+    0x10fc7bf77 <+23>: callq  0x10fc7c334               ; symbol stub for: NSLog
+->  0x10fc7bf7c <+28>: popq   %rbp
+    0x10fc7bf7d <+29>: retq   
+```
+
+&emsp;我们下一步等 `main_front` 执行完，再 Continue Program Execution 直接到 main 函数中：
+
+```c++
+Test_ipa_simple`main:
+    0x102838100 <+0>:  pushq  %rbp
+    0x102838101 <+1>:  movq   %rsp, %rbp
+    0x102838104 <+4>:  subq   $0x10, %rsp
+    0x102838108 <+8>:  leaq   0x1f79(%rip), %rax        ; @
+    0x10283810f <+15>: movl   $0x0, -0x4(%rbp)
+    0x102838116 <+22>: movl   %edi, -0x8(%rbp)
+    0x102838119 <+25>: movq   %rsi, -0x10(%rbp)
+->  0x10283811d <+29>: movq   %rax, %rdi
+    0x102838120 <+32>: movb   $0x0, %al
+    0x102838122 <+34>: callq  0x1028383d4               ; symbol stub for: NSLog
+    0x102838127 <+39>: xorl   %eax, %eax
+    0x102838129 <+41>: addq   $0x10, %rsp
+    0x10283812d <+45>: popq   %rbp
+    0x10283812e <+46>: retq   
+```
+
+&emsp;`main` 函数是被编译到内存中的，而且是固定写死的，编译器找到 `main` 函数会加载到内存中，如果我们修改 `main` 函数的名字则会报如下错误: `ld: entry point (_main) undefined. for architecture x86_64`，告诉我们找不到 `main` 函数，这部分其实在 `dyld` 源码中也有所体现，下面我们搜下 `_dyld_start` 看下不同平台下对 `main` 函数的调用。 
+
+```c++
+#if __i386__ && !TARGET_OS_SIMULATOR
+...
+         # LC_MAIN case, set up stack for call to main()
+Lnew:    movl    4(%ebp),%ebx
+...
+#endif /* __i386__  && !TARGET_OS_SIMULATOR*/
 
 
+#if __x86_64__ && !TARGET_OS_SIMULATOR
+...
+         # LC_MAIN case, set up stack for call to main()
+Lnew:    addq    $16,%rsp    # remove local variables
+...
+#endif /* __x86_64__ && !TARGET_OS_SIMULATOR*/
 
 
+#if __arm__
+...
+         // LC_MAIN case, set up stack for call to main()
+Lnew:    mov    lr, r5            // simulate return address into _start in libdyld
+...
+#endif /* __arm__ */
 
 
+#if __arm64__ && !TARGET_OS_SIMULATOR
+...
+         // LC_MAIN case, set up stack for call to main()
+Lnew:    mov    lr, x1            // simulate return address into _start in libdyld.dylib
+...
+#endif // __arm64__ && !TARGET_OS_SIMULATOR
+```
 
-
-
-
-
-
-
-
-
+&emsp;end...
 
 ## 参考链接
 **参考链接:🔗**
