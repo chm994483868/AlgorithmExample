@@ -1032,6 +1032,7 @@ void _dyld_objc_notify_register(_dyld_objc_notify_mapped    mapped,
 ```c++
 void _objc_init(void)
 {
+    // initialized 作为一个局部静态变量，只能初始化一次，保证 _objc_init 全局只执行一次 
     static bool initialized = false;
     if (initialized) return;
     initialized = true;
@@ -1111,9 +1112,156 @@ void ImageLoaderMachO::doImageInit(const LinkContext& context)
 }
 ```
 
-&emsp;看看到其中就是遍历 load command 找到其中 LC_ROUTINES_COMMAND 的 load command 然后通过内存地址偏移得到要执行的方法并执行。（`Initializer func = (Initializer)(((struct macho_routines_command*)cmd)->init_address + fSlide);`） 其中的 `if ( ! dyld::gProcessInfo->libSystemInitialized )` 是判断 libSystem 必须先初始化，否则就直接抛错。总结：上面我们研究了初始化的过程，最后是由内存地址不断平移拿到初始化方法进行调用。
+&emsp;看到其中就是遍历 load command，找到其中 LC_ROUTINES_COMMAND 类型的 load command 然后通过内存地址偏移找到要执行的方法的地址并执行。（`Initializer func = (Initializer)(((struct macho_routines_command*)cmd)->init_address + fSlide);`） 其中的 `if ( ! dyld::gProcessInfo->libSystemInitialized )` 是判断 libSystem 必须先初始化，否则就直接抛错。总结：上面我们研究了初始化的过程，最后是由内存地址不断平移拿到初始化方法进行调用。
 
 &emsp;这样我们最开始的 bt 指令的截图中出现的函数就都浏览一遍了：`_dyld_start` -> `dyldbootstrap::start` -> `dyld::_main` -> `dyld::initializeMainExecutable` -> `ImageLoader::runInitializers` -> `ImageLoader::processInitializers` -> `ImageLoader::recursiveInitialization` -> `dyld::notifySingle` -> `libobjc.A.dylib \` `load_images`。
+
+&emsp;下面我们开始验证 initializeMainExecutable 的流程！
+
+&emsp;我们在 objc4-781 源码的 `_objc_init` 处打一个断点并运行，可看到如下的堆栈信息。
+
+![截屏2021-06-06 上午11.30.09.png](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/b43633835e814c2aa4b09cb23304494d~tplv-k3u1fbpfcp-watermark.image)
+
+&emsp;我们看到了 `libSystem_initializer` 函数的调用，我们去下载源码：[Libsystem](https://opensource.apple.com/tarballs/Libsystem/)，打开源码，全局搜索 `libSystem_initializer`，可在 Libsystem/init.c 中看到 `libSystem_initializer` 函数的定义如下（只摘录一部分）：
+
+```c++
+// libsyscall_initializer() initializes all of libSystem.dylib
+// <rdar://problem/4892197>
+__attribute__((constructor))
+static void
+libSystem_initializer(int argc,
+              const char* argv[],
+              const char* envp[],
+              const char* apple[],
+              const struct ProgramVars* vars)
+{
+    static const struct _libkernel_functions libkernel_funcs = {
+        .version = 4,
+        // V1 functions
+#if !TARGET_OS_DRIVERKIT
+        .dlsym = dlsym,
+#endif
+        .malloc = malloc,
+        .free = free,
+        .realloc = realloc,
+        ._pthread_exit_if_canceled = _pthread_exit_if_canceled,
+        ...
+```
+
+&emsp;下面我们摘录其中比较重要的内容：
+
+```c++
+// 对内核的初始化
+__libkernel_init(&libkernel_funcs, envp, apple, vars);
+
+// 对平台的初始化
+__libplatform_init(NULL, envp, apple, vars);
+
+// 对线程的初始化（初始化后我们的 GCD 才能使用）
+__pthread_init(&libpthread_funcs, envp, apple, vars);
+
+// 对 libc 的初始化
+_libc_initializer(&libc_funcs, envp, apple, vars);
+
+// 对 malloc 初始化
+// TODO: Move __malloc_init before __libc_init after breaking malloc's upward link to Libc
+// Note that __malloc_init() will also initialize ASAN when it is present
+__malloc_init(apple);
+
+// 对 dyld 进行初始化（dyld_start 是 dyld 并没有初始化，dyld 也是一个库）
+_dyld_initializer();
+
+// 对 libdispatch 进行初始化。上面的堆栈信息中我们也看到了 libdispatch 的初始化
+libdispatch_init();
+
+_libxpc_initializer();
+```
+
+&emsp;我们可看到 `libdispatch_init` 是在 `libdispatch.dylib` 中，我们去下载源码：[libdispatch](https://opensource.apple.com/tarballs/libdispatch/)，打开源码，全局搜索 `libdispatch_init`，可在 libdispatch/Dispatch Source/queue.c 中看到 `libdispatch_init` 函数的定义如下（只摘录一部分）：
+
+```c++
+...
+frame #1: 0x00000001002e989f libdispatch.dylib`_os_object_init + 13
+frame #2: 0x00000001002faa13 libdispatch.dylib`libdispatch_init + 285
+...
+```
+
+```c++
+DISPATCH_EXPORT DISPATCH_NOTHROW
+void
+libdispatch_init(void)
+{
+    dispatch_assert(sizeof(struct dispatch_apply_s) <=
+            DISPATCH_CONTINUATION_SIZE);
+
+    if (_dispatch_getenv_bool("LIBDISPATCH_STRICT", false)) {
+        _dispatch_mode |= DISPATCH_MODE_STRICT;
+    }
+    ...
+...
+```
+
+&emsp;我们一直沿着 `libdispatch_init` 的定义往下看，临近定义结束处，会有 `_dispatch_thread` 的一些 creat 操作（GCD 相关）。
+
+```c++
+...
+_dispatch_hw_config_init();
+_dispatch_time_init();
+_dispatch_vtable_init();
+
+// ⬇️⬇️⬇️⬇️⬇️⬇️
+_os_object_init();
+
+_voucher_init();
+_dispatch_introspection_init();
+}
+```
+
+&emsp;看到其中 `_os_object_init` 的调用，我们全局搜一下可在 libdispatch/Dispatch Source/object.m 中看到其定义。 
+
+```c++
+void
+_os_object_init(void)
+{
+    // ⬇️⬇️⬇️
+    _objc_init();
+    
+    Block_callbacks_RR callbacks = {
+        sizeof(Block_callbacks_RR),
+        (void (*)(const void *))&objc_retain,
+        (void (*)(const void *))&objc_release,
+        (void (*)(const void *))&_os_objc_destructInstance
+    };
+    
+    _Block_use_RR2(&callbacks);
+#if DISPATCH_COCOA_COMPAT
+    const char *v = getenv("OBJC_DEBUG_MISSING_POOLS");
+    if (v) _os_object_debug_missing_pools = _dispatch_parse_bool(v);
+    v = getenv("DISPATCH_DEBUG_MISSING_POOLS");
+    if (v) _os_object_debug_missing_pools = _dispatch_parse_bool(v);
+    v = getenv("LIBDISPATCH_DEBUG_MISSING_POOLS");
+    if (v) _os_object_debug_missing_pools = _dispatch_parse_bool(v);
+#endif
+}
+```
+
+&emsp;我们看到 `_os_object_init` 函数定义第一行就是 `_objc_init` 调用，也就是从 `_os_object_init` 跳入到 `_objc_init` 进入 runtime 的初始化，上面我们讲了 `_objc_init` 会调用 `_dyld_objc_notify_register`，然后就对 `sNotifyObjCInit` 赋值。
+
+```c++
+...
+// initialize this image
+bool hasInitializers = this->doInitialization(context);
+
+// let anyone know we finished initializing this image
+fState = dyld_image_state_initialized;
+oldState = fState;
+context.notifySingle(dyld_image_state_initialized, this, NULL);
+...
+```
+
+&emsp;我们在 `doInitialization` 方法调用之后再进行 `notifySingle`，而 `notifySingle` 就会跳到 `sNotifyObjCInit`，`sNotifyObjCInit()` 才会执行。
+
+
 
 
 
