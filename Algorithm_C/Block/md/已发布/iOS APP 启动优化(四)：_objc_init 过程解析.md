@@ -63,36 +63,52 @@ void environ_init(void)
         return; // ⬅️ 直接 return
     } 
     
-    // 
+    // 三个局部变量，默认是 false，然后在下面第一个 for 循环中判断是否把它们置为 true。
     bool PrintHelp = false;
     bool PrintOptions = false;
     bool maybeMallocDebugging = false;
 
     // Scan environ[] directly instead of calling getenv() a lot.
     // This optimizes the case where none are set.
+    
+    // 直接遍历扫描 environ[] 
     for (char **p = *_NSGetEnviron(); *p != nil; p++) {
+        // 如果扫描到 "Malloc"、"DYLD"、"NSZombiesEnabled" 则把 maybeMallocDebugging 置为 true
         if (0 == strncmp(*p, "Malloc", 6)  ||  0 == strncmp(*p, "DYLD", 4)  ||  
             0 == strncmp(*p, "NSZombiesEnabled", 16))
         {
             maybeMallocDebugging = true;
         }
-
+        
+        // 如果是 "OBJC_" 打头的则直接跳过
         if (0 != strncmp(*p, "OBJC_", 5)) continue;
         
+        // 如果扫描到 "OBJC_HELP=" 则把 PrintHelp 置为 true
         if (0 == strncmp(*p, "OBJC_HELP=", 10)) {
             PrintHelp = true;
             continue;
         }
+        
+        // 如果扫描到 "OBJC_PRINT_OPTIONS=" 则把 PrintOptions 置为 true
         if (0 == strncmp(*p, "OBJC_PRINT_OPTIONS=", 19)) {
             PrintOptions = true;
             continue;
         }
         
+        // strchr 函数功能为在一个串中查找给定字符的第一个匹配之处。
+        // 函数原型为：char *strchr(const char *str, int c)，
+        // 即在参数 str 所指向的字符串中搜索第一次出现字符 c（一个无符号字符）的位置。
+        // strchr 函数包含在 C 标准库 <string.h> 中。
+        
+        // 查找 p 中第一个 = 的位置 
         const char *value = strchr(*p, '=');
         if (!*value) continue;
-        value++;
+        value++; // 然后这里 value 做了一次自增运算（因为 value 是一个 char 指针，所以 value 前进一个字节）
         
+        // 这里是遍历 Settings 这个元素类型是 option_t 的全局不可变数组。
+        // 在 objc-env.h 文件中列出了所有的 option_t 项。
         for (size_t i = 0; i < sizeof(Settings)/sizeof(Settings[0]); i++) {
+            // ⚠️ 实话实说，下面这一段判断是否要赋值为 YES，没有看懂
             const option_t *opt = &Settings[i];
             if ((size_t)(value - *p) == 1+opt->envlen  &&  
                 0 == strncmp(*p, opt->env, opt->envlen))
@@ -144,6 +160,35 @@ void environ_init(void)
 }
 ```
 
+### struct option_t
+
+&emsp;`objc-env.h` 中就完全是一大组 `OPTION` 宏的使用，定义了一组 `option_t` 结构体实例，每一个 `option_t` 实例就表示一个环境变量。
+
+&emsp;这里我们首先要明白 `#include "objc-env.h"` 的作用，在编译时编译器会把  `#include "objc-env.h"` 直接替换为其文件中的一大组  `option_t` 实例，即这里的 `const option_t Settings[]` 数组便包含了 `objc-env.h` 中的所有的 `option_t` 结构体实例。
+
+```c++
+struct option_t {
+    bool* var;
+    const char *env;
+    const char *help;
+    size_t envlen;
+};
+
+const option_t Settings[] = {
+#define OPTION(var, env, help) option_t{&var, #env, help, strlen(#env)}, 
+#include "objc-env.h"
+#undef OPTION
+};
+```
+
+```c++
+// OPTION(var, env, help)
+
+OPTION( PrintImages,              OBJC_PRINT_IMAGES,               "log image and library names as they are loaded")
+OPTION( PrintImageTimes,          OBJC_PRINT_IMAGE_TIMES,          "measure duration of image loading steps")
+...
+
+```
 
 
 
