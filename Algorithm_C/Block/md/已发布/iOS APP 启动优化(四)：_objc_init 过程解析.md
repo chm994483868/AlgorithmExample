@@ -119,9 +119,12 @@ void environ_init(void)
         }            
     }
 
-    // Special case: enable some autorelease pool debugging 
-    // when some malloc debugging is enabled 
-    // and OBJC_DEBUG_POOL_ALLOCATION is not set to something other than NO.
+    // Special case: enable some autorelease pool debugging
+    // 特例：启用一些自动释放池调试
+    // when some malloc debugging is enabled and OBJC_DEBUG_POOL_ALLOCATION is not set to something other than NO.
+    // 当启用了某些 malloc 调试并且 OBJC_DEBUG_POOL_ALLOCATION 未设置为 NO 以外的值时。
+    
+    // 判断是否把 DebugPoolAllocation 置为 true
     if (maybeMallocDebugging) {
         const char *insert = getenv("DYLD_INSERT_LIBRARIES");
         const char *zombie = getenv("NSZombiesEnabled");
@@ -187,7 +190,6 @@ const option_t Settings[] = {
 OPTION( PrintImages,              OBJC_PRINT_IMAGES,               "log image and library names as they are loaded")
 OPTION( PrintImageTimes,          OBJC_PRINT_IMAGE_TIMES,          "measure duration of image loading steps")
 ...
-
 ```
 
 
