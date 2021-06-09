@@ -278,7 +278,16 @@ objc[37659]: LOAD: +[LGPerson load]
 
 &emsp;
 
-
+```c++
+void tls_init(void)
+{
+#if SUPPORT_DIRECT_THREAD_KEYS
+    pthread_key_init_np(TLS_DIRECT_KEY, &_objc_pthread_destroyspecific);
+#else
+    _objc_pthread_key = tls_create(&_objc_pthread_destroyspecific);
+#endif
+}
+```
 
 
 
