@@ -276,7 +276,7 @@ objc[37659]: LOAD: +[LGPerson load]
 
 ## tls_init
 
-&emsp;
+&emsp;`_objc_pthread_destroyspecific` 是线程的销毁函数。以 `TLS_DIRECT_KEY` 为 Key，在线程的本地存储空间中保存线程对应对销毁函数。（没有看到哪里体现的进行了线程池的初始化，TLS 应该是 Thread Local Storage 的缩写，即线程本地存储，这里大概是线程本地存储的初始化。）
 
 ```c++
 void tls_init(void)
@@ -286,6 +286,26 @@ void tls_init(void)
 #else
     _objc_pthread_key = tls_create(&_objc_pthread_destroyspecific);
 #endif
+}
+```
+
+## static_init
+
+&emsp;运行 C++ 静态构造函数。libc 在 dyld 调用我们的静态构造函数之前调用 _objc_init()，所以我们必须自己做。
+
+```c++
+/***********************************************************************
+* static_init
+* Run C++ static constructor functions.
+* libc calls _objc_init() before dyld would call our static constructors, so we have to do it ourselves.
+**********************************************************************/
+static void static_init()
+{
+    size_t count;
+    auto inits = getLibobjcInitializers(&_mh_dylib_header, &count);
+    for (size_t i = 0; i < count; i++) {
+        inits[i]();
+    }
 }
 ```
 
@@ -300,6 +320,7 @@ void tls_init(void)
 
 ## 参考链接
 **参考链接:🔗**
++ [线程本地存储TLS(Thread Local Storage)的原理和实现——分类和原理](https://www.cnblogs.com/zhoug2020/p/6497709.html)
 + [dyld-832.7.3](https://opensource.apple.com/tarballs/dyld/)
 + [OC底层原理之-App启动过程（dyld加载流程）](https://juejin.cn/post/6876773824491159565)
 + [iOS中的dyld缓存是什么？](https://blog.csdn.net/gaoyuqiang30/article/details/52536168)
