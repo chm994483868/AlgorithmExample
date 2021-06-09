@@ -43,7 +43,7 @@ void _objc_init(void)
 
 ## environ_init
 
-&emsp;`environ_init` 方法就是进行环境变量的设置，
+&emsp;`environ_init` 方法就是进行环境变量的初始化。在项目运行之前我们可以在 Edit Scheme... -> Run -> Arguments -> Environment Variables 中添加环境变量以及对应的值，它们默认都是 NO，我们可以根据我们的需要来进行添加并把 value 设置为 YES。在 objc-env.h 文件中列出了所有的环境变量，其中它们分别以 OBJC_PRINT_、OBJC_DEBUG_、OBJC_DISABLE_ 为开头分了 3 块，分别针对 PRINT（打印）、DEBUG（调试）、DISABLE（禁用）的情况。环境变量的设置，可以帮助我们更快速的处理一些问题。例如添加 OBJC_PRINT_LOAD_METHODS 环境变量，控制台就会打印项目中所有的系统类、我们自己的类以及分类中的 `+load` 方法。
 
 ```c++
 /***********************************************************************
@@ -108,7 +108,9 @@ void environ_init(void)
         // 这里是遍历 Settings 这个元素类型是 option_t 的全局不可变数组。
         // 在 objc-env.h 文件中列出了所有的 option_t 项。
         for (size_t i = 0; i < sizeof(Settings)/sizeof(Settings[0]); i++) {
-            // ⚠️ 实话实说，下面这一段判断是否要赋值为 YES，没有看懂
+            // ⚠️ 实话实说，下面这一段判断是否要赋值为 YES，没有完全看懂，
+            // 大概是从 _NSGetEnviron 拿到环境变量，
+            // 然后遍历来判断是否需要把 Settings 中存放的对应的 option_t 实例的 var 成员变量置为 YES。
             const option_t *opt = &Settings[i];
             if ((size_t)(value - *p) == 1+opt->envlen  &&  
                 0 == strncmp(*p, opt->env, opt->envlen))
@@ -124,7 +126,7 @@ void environ_init(void)
     // when some malloc debugging is enabled and OBJC_DEBUG_POOL_ALLOCATION is not set to something other than NO.
     // 当启用了某些 malloc 调试并且 OBJC_DEBUG_POOL_ALLOCATION 未设置为 NO 以外的值时。
     
-    // 判断是否把 DebugPoolAllocation 置为 true
+    // 两个 if 判断是否把 DebugPoolAllocation 置为 true
     if (maybeMallocDebugging) {
         const char *insert = getenv("DYLD_INSERT_LIBRARIES");
         const char *zombie = getenv("NSZombiesEnabled");
@@ -141,33 +143,47 @@ void environ_init(void)
     }
 
     // Print OBJC_HELP and OBJC_PRINT_OPTIONS output.
+    // 打印 OBJC_HELP 和 OBJC_PRINT_OPTIONS 输出。
     if (PrintHelp  ||  PrintOptions) {
+        // 下面两个 if 是输出一些提示信息
         if (PrintHelp) {
+            // Objective-C 运行时调试。设置 variable=YES 以启用。
             _objc_inform("Objective-C runtime debugging. Set variable=YES to enable.");
+            // OBJC_HELP：描述可用的环境变量
             _objc_inform("OBJC_HELP: describe available environment variables");
             if (PrintOptions) {
+                // OBJC_HELP 已设置
                 _objc_inform("OBJC_HELP is set");
             }
+            // OBJC_PRINT_OPTIONS：列出设置了哪些选项
             _objc_inform("OBJC_PRINT_OPTIONS: list which options are set");
         }
         if (PrintOptions) {
+            // OBJC_PRINT_OPTIONS 已设置
             _objc_inform("OBJC_PRINT_OPTIONS is set");
         }
-
+        
+        // 下面的 for 循环便是遍历打印 Settings 中的所有的环境变量的 env 以及对应的描述，
+        // 然后是打印我们设置为 YES 的环境变量，表示我们对该环境变量进行了设置。
         for (size_t i = 0; i < sizeof(Settings)/sizeof(Settings[0]); i++) {
-            const option_t *opt = &Settings[i];            
+            const option_t *opt = &Settings[i];
+            // 打印现有的环境变量，以及其对应的描述
             if (PrintHelp) _objc_inform("%s: %s", opt->env, opt->help);
+            
+            // 打印 var 的值设置为 YES 的环境变量，即告诉我们当前对哪些环境变量进行了设置
             if (PrintOptions && *opt->var) _objc_inform("%s is set", opt->env);
         }
     }
 }
 ```
 
-### struct option_t
+### struct option_t 和 Settings 数组
 
-&emsp;`objc-env.h` 中就完全是一大组 `OPTION` 宏的使用，定义了一组 `option_t` 结构体实例，每一个 `option_t` 实例就表示一个环境变量。
+&emsp;`objc-env.h` 中就完全是一大组 `OPTION` 宏的使用，定义了一组 `option_t` 结构体实例，每一个 `option_t` 实例就用来表示一个环境变量。
 
-&emsp;这里我们首先要明白 `#include "objc-env.h"` 的作用，在编译时编译器会把  `#include "objc-env.h"` 直接替换为其文件中的一大组  `option_t` 实例，即这里的 `const option_t Settings[]` 数组便包含了 `objc-env.h` 中的所有的 `option_t` 结构体实例。
+&emsp;这里我们首先要明白 `#include "objc-env.h"` 的作用，在编译时编译器会把  `#include "objc-env.h"` 直接替换为 `objc-env.h` 文件中的一大组  `option_t` 实例，即这里的 `const option_t Settings[]` 数组便包含了 `objc-env.h` 中的所有的 `option_t` 结构体实例。
+
+&emsp;这里我们摘出其中几个比较重要或者我们比较熟悉的环境变量，如：`OBJC_DISABLE_TAGGED_POINTERS` 表示是否禁用 NSNumber、NSString 等的 tagged pointer 指针优化、`OBJC_DISABLE_TAG_OBFUSCATION` 表示是否禁用 tagged pointer 的混淆、`OBJC_DISABLE_NONPOINTER_ISA` 表示是否禁用 non-pointer 的 isa 字段。
 
 ```c++
 struct option_t {
@@ -190,12 +206,77 @@ const option_t Settings[] = {
 OPTION( PrintImages,              OBJC_PRINT_IMAGES,               "log image and library names as they are loaded")
 OPTION( PrintImageTimes,          OBJC_PRINT_IMAGE_TIMES,          "measure duration of image loading steps")
 ...
+OPTION( DisableTaggedPointers,    OBJC_DISABLE_TAGGED_POINTERS,    "disable tagged pointer optimization of NSNumber et al.") 
+OPTION( DisableTaggedPointerObfuscation, OBJC_DISABLE_TAG_OBFUSCATION,    "disable obfuscation of tagged pointers")
+OPTION( DisableNonpointerIsa,     OBJC_DISABLE_NONPOINTER_ISA,     "disable non-pointer isa fields")
+...
 ```
 
+### 设置 OBJC_DISABLE_NONPOINTER_ISA
 
+&emsp;下面我们演示一下 OBJC_DISABLE_NONPOINTER_ISA 的使用，我们在 Environment Variables 中添加 OBJC_DISABLE_NONPOINTER_ISA 并设置为 YES。（我们应该还记得如何判断实例对象的 isa 是 non-pointer 还是 pointer，即 uintptr_t nonpointer : 1，如果 isa 的第一位是 1 则表示它是 non-pointer 否则就是 pointer。）
 
+&emsp;我们创建一个实例对象，然后分别在 OBJC_DISABLE_NONPOINTER_ISA 设置为 YES/NS 的情况下打印它的 isa 中的内容。
 
+```c++
+// ⬇️⬇️ OBJC_DISABLE_NONPOINTER_ISA 未设置或者设置为 NO
+(lldb) x/4gx person
+0x108baa1a0: 0x011d8001000080e9 0x0000000000000000
+0x108baa1b0: 0x6b636950534e5b2d 0x426863756f547265
+(lldb) p/t 0x011d8001000080e9
+// ⬇️ isa 第一位是 1
+(long) $1 = 0b0000000100011101100000000000000100000000000000001000000011101001
 
+// ⬇️⬇️ OBJC_DISABLE_NONPOINTER_ISA 设置为 YES
+(lldb) x/4gx person
+0x108d04080: 0x00000001000080e8 0x0000000000000000
+0x108d04090: 0x00000001a0080001 0x0000000100008028
+(lldb) p/t 0x00000001000080e8
+// ⬇️ isa 第一位是 0
+(long) $1 = 0b0000000000000000000000000000000100000000000000001000000011101000
+```
+
+### 设置 OBJC_PRINT_LOAD_METHODS
+
+&emsp;下面我们演示一下 OBJC_PRINT_LOAD_METHODS 的使用，我们在 Environment Variables 中添加 OBJC_PRINT_LOAD_METHODS 并设置为 YES。运行项目，可看到如下打印项目中所有的 load 方法。
+
+```c++
+objc[37659]: LOAD: category 'NSObject(NSObject)' scheduled for +load
+objc[37659]: LOAD: +[NSObject(NSObject) load]
+
+objc[37659]: LOAD: category 'NSObject(NSObject)' scheduled for +load
+objc[37659]: LOAD: +[NSObject(NSObject) load]
+
+objc[37659]: LOAD: class 'NSColor' scheduled for +load
+objc[37659]: LOAD: class 'NSApplication' scheduled for +load
+objc[37659]: LOAD: class 'NSBinder' scheduled for +load
+objc[37659]: LOAD: class 'NSColorSpaceColor' scheduled for +load
+objc[37659]: LOAD: class 'NSNextStepFrame' scheduled for +load
+objc[37659]: LOAD: +[NSColor load]
+
+objc[37659]: LOAD: +[NSApplication load]
+
+objc[37659]: LOAD: +[NSBinder load]
+
+objc[37659]: LOAD: +[NSColorSpaceColor load]
+
+objc[37659]: LOAD: +[NSNextStepFrame load]
+
+objc[37659]: LOAD: category 'NSError(FPAdditions)' scheduled for +load
+objc[37659]: LOAD: +[NSError(FPAdditions) load]
+
+objc[37659]: LOAD: class '_DKEventQuery' scheduled for +load
+objc[37659]: LOAD: +[_DKEventQuery load]
+
+objc[37659]: LOAD: class 'LGPerson' scheduled for +load
+objc[37659]: LOAD: +[LGPerson load]
+```
+
+&emsp;环境变量的学习我们就到这里了，objc-env.h 中还有其他的一些环境变量的设置，这里就不一一演示了。
+
+## tls_init
+
+&emsp;
 
 
 
