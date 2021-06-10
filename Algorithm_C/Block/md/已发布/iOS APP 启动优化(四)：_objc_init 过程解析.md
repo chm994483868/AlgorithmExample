@@ -355,7 +355,18 @@ void runtime_init(void)
 
 ## exception_init
 
-&emsp;初始化 libobjc 的异常处理系统。通过 `map_images` 调用。`old_terminate` 是一个静态全局的函数指针。
+&emsp;初始化 libobjc 的异常处理系统。通过 `map_images` 调用。
+
+&emsp;`exception_init` 函数内部就是对 `old_terminate` 这个静态全局的函数指针赋值，`set_terminate` 函数是一个入参和返回值都是 `terminate_handler`（参数和返回值都是 `void` 的函数指针）的函数。以 `_objc_terminate` 函数地址为参数，把返回值赋值给 `old_terminate`。
+
+```c++
+static void (*old_terminate)(void) = nil;
+```
+
+```c++
+typedef void (*terminate_handler)();
+_LIBCPP_FUNC_VIS terminate_handler set_terminate(terminate_handler) _NOEXCEPT;
+```
 
 ```c++
 /***********************************************************************
@@ -369,7 +380,7 @@ void exception_init(void)
 }
 ```
 
-&emsp;
+&emsp;`exception_init` 就是注册监听异常回调，系统方法在执行的过程中，出现异常触发中断，就会报出异常，如果我们在上层对这个方法处理，我们就能捕获这次异常。注意：是系统方法执行异常。我们可以在这里去监听系统异常，我们看下怎么处理。 我们看下 `_objc_terminate` 方法。
 
 ```c++
 /***********************************************************************
@@ -385,6 +396,8 @@ void exception_init(void)
 static void (*old_terminate)(void) = nil;
 static void _objc_terminate(void)
 {
+    // OPTION( PrintExceptions, OBJC_PRINT_EXCEPTIONS, "log exception handling")
+    // OBJC_PRINT_EXCEPTIONS 是在 objc-env.h 中定义的环境变量，根据其值判断是否打印 log
     if (PrintExceptions) {
         _objc_inform("EXCEPTIONS: terminating");
     }
@@ -395,25 +408,87 @@ static void _objc_terminate(void)
     }
     else {
         // There is a current exception. Check if it's an objc exception.
+        // 当前有一个 exception。检查它是否是一个 objc exception。
         @try {
             __cxa_rethrow();
         } @catch (id e) {
             // It's an objc object. Call Foundation's handler, if any.
+            // 它是一个 objc object。调用 Foundation 的处理程序（如果有）。
             (*uncaught_handler)((id)e);
+            
             (*old_terminate)();
         } @catch (...) {
             // It's not an objc object. Continue to C++ terminate.
+            // 它不是一个 objc object。进行 C++ terminate。
+            
             (*old_terminate)();
         }
     }
 }
 ```
 
+&emsp;`@catch (id e)` 下面我们看到，如果捕获到 objc 对象，那就执行 `uncaught_handler` 函数。`uncaught_handler` 是一个静态全局函数。
 
+```c++
+// 入参是 id 返回值是 void 的指针
+typedef void (*objc_uncaught_exception_handler)(id _Null_unspecified /* _Nonnull */ exception);
 
+/***********************************************************************
+* _objc_default_uncaught_exception_handler
+* Default uncaught exception handler. Expected to be overridden by Foundation.
+* 默认 uncaught exception 处理程序。预计将被 Foundation 重载。
+**********************************************************************/
+static void _objc_default_uncaught_exception_handler(id exception)
+{
+}
+static objc_uncaught_exception_handler uncaught_handler = _objc_default_uncaught_exception_handler;
+```
 
+&emsp;我们看到 `uncaught_handler` 默认赋值为 `_objc_default_uncaught_exception_handler` 函数，而其实现其实是空的，即如果我们没有给 `uncaught_handler` 赋值的话，则就由系统处理。
 
+&emsp;我们看下哪里会给 `uncaught_handler` 赋值，我们全局搜 `uncaught_handler`。
 
+```c++
+/***********************************************************************
+* objc_setUncaughtExceptionHandler
+* Set a handler for uncaught Objective-C exceptions.
+* 为 uncaught Objective-C exceptions 设置处理程序。
+* Returns the previous handler. 
+* 返回值是以前的处理程序。
+**********************************************************************/
+objc_uncaught_exception_handler 
+objc_setUncaughtExceptionHandler(objc_uncaught_exception_handler fn)
+{
+    // result 记录旧值，用于返回值
+    objc_uncaught_exception_handler result = uncaught_handler;
+    
+    // 给 uncaught_handler 设置新值
+    uncaught_handler = fn;
+    
+    // 返回旧值
+    return result;
+}
+```
+
+&emsp;`objc_setUncaughtExceptionHandler` 方法为捕获 Objective-C 异常设置一个处理程序，并返回之前的处理程序。我们看方法实现也是将传入的方法赋值给 `uncaught_handler`。
+
+&emsp;上面说了可以通过这个方法检测异常，下面我们写个简单的 demo 实验一下。 准备代码：
+
+```c++
+#import "HMUncaughtExceptionHandle.h"
+
+@implementation HMUncaughtExceptionHandle
+
+void TestExceptionHandlers(NSException *exception) {
+    NSLog(@"🦷🦷🦷 %@ 🦷🦷🦷 %@", exception.name, exception.reason);
+}
+
++ (void)installUncaughtSignalExceptionHandler {
+    NSSetUncaughtExceptionHandler(&TestExceptionHandlers);
+}
+
+@end
+```
 
 
 
