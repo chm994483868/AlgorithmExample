@@ -309,6 +309,78 @@ static void static_init()
 }
 ```
 
+&emsp;我们分析一下 `static_init` 函数的内容，其中的 `auto inits = getLibobjcInitializers(&_mh_dylib_header, &count);` 是从 `__objc_init_func` 区中取 `UnsignedInitializer` 的内容，取出以后就直接 for 循环遍历执行所有的 `UnsignedInitializer` 函数。
+
+&emsp;`getLibobjcInitializers` 这个函数是用 `GETSECT` 宏定义的。（从名字上我们大概也能猜到它的功能：从区中取数据。）
+
+```c++
+GETSECT(getLibobjcInitializers, UnsignedInitializer, "__objc_init_func");
+
+#define GETSECT(name, type, sectname)                                   \
+    type *name(const headerType *mhdr, size_t *outCount) {              \
+        return getDataSection<type>(mhdr, sectname, nil, outCount);     \
+    }                                                                   \
+    type *name(const header_info *hi, size_t *outCount) {               \
+        return getDataSection<type>(hi->mhdr(), sectname, nil, outCount); \
+    }
+```
+
+&emsp;把 `GETSECT(getLibobjcInitializers, UnsignedInitializer, "__objc_init_func")` 展开的话就是如下的两个函数定义。
+
+```c++
+UnsignedInitializer *getLibobjcInitializers(const headerType *mhdr, size_t *outCount) {
+    return getDataSection<UnsignedInitializer>(mhdr, "__objc_init_func", nil, outCount);
+}
+
+UnsignedInitializer *getLibobjcInitializers(const header_info *hi, size_t *outCount) {
+    return getDataSection<UnsignedInitializer>(hi->mhdr(), "__objc_init_func", nil, outCount);
+}
+```
+
+## runtime_init
+
+&emsp;`unattachedCategories` 是在 namespace objc 中定义的一个静态变量：`static UnattachedCategories unattachedCategories;`，`UnattachedCategories` 类的声明：`class UnattachedCategories : public ExplicitInitDenseMap<Class, category_list>` 它主要用来为类统计分类、追加分类到类、清除分类数据、清除类数据。
+
+&emsp;`static ExplicitInitDenseSet<Class> allocatedClasses;`，`allocatedClasses` 是已使用 `objc_allocateClassPair` allocated 过的所有类（和元类）的表。 它也是在 namespace objc 中声明的一个静态变量。
+
+&emsp;`objc::unattachedCategories.init(32)` 是初始化分类的存储容器，`objc::allocatedClasses.init()` 是初始化类的存储容器。这个方法作用就是进行初始化容器工作，后面会用到这些初始化的容器。
+
+```c++
+void runtime_init(void)
+{
+    objc::unattachedCategories.init(32);
+    objc::allocatedClasses.init();
+}
+```
+
+## exception_init
+
+&emsp;初始化 libobjc 的异常处理系统。通过 `map_images` 调用。
+
+```c++
+/***********************************************************************
+* exception_init
+* Initialize libobjc's exception handling system. 
+* Called by map_images().
+**********************************************************************/
+void exception_init(void)
+{
+    old_terminate = std::set_terminate(&_objc_terminate);
+}
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
