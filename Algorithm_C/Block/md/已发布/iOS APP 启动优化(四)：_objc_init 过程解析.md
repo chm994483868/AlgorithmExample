@@ -355,7 +355,7 @@ void runtime_init(void)
 
 ## exception_init
 
-&emsp;初始化 libobjc 的异常处理系统。通过 `map_images` 调用。
+&emsp;初始化 libobjc 的异常处理系统。通过 `map_images` 调用。`old_terminate` 是一个静态全局的函数指针。
 
 ```c++
 /***********************************************************************
@@ -368,6 +368,50 @@ void exception_init(void)
     old_terminate = std::set_terminate(&_objc_terminate);
 }
 ```
+
+&emsp;
+
+```c++
+/***********************************************************************
+* _objc_terminate
+* Custom std::terminate handler.
+*
+* The uncaught exception callback is implemented as a std::terminate handler. 
+* 1. Check if there's an active exception
+* 2. If so, check if it's an Objective-C exception
+* 3. If so, call our registered callback with the object.
+* 4. Finally, call the previous terminate handler.
+**********************************************************************/
+static void (*old_terminate)(void) = nil;
+static void _objc_terminate(void)
+{
+    if (PrintExceptions) {
+        _objc_inform("EXCEPTIONS: terminating");
+    }
+
+    if (! __cxa_current_exception_type()) {
+        // No current exception.
+        (*old_terminate)();
+    }
+    else {
+        // There is a current exception. Check if it's an objc exception.
+        @try {
+            __cxa_rethrow();
+        } @catch (id e) {
+            // It's an objc object. Call Foundation's handler, if any.
+            (*uncaught_handler)((id)e);
+            (*old_terminate)();
+        } @catch (...) {
+            // It's not an objc object. Continue to C++ terminate.
+            (*old_terminate)();
+        }
+    }
+}
+```
+
+
+
+
 
 
 
