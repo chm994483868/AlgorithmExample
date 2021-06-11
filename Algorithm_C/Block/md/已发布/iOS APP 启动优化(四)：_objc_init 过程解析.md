@@ -530,7 +530,29 @@ terminating with uncaught exception of type NSException
 
 ## cache_init
 
-&emsp;
+&emsp;`objc_restartableRanges` 是一个全局的 `task_restartable_range_t` 数组。 
+
+```c++
+extern "C" task_restartable_range_t objc_restartableRanges[];
+
+void cache_init()
+{
+#if HAVE_TASK_RESTARTABLE_RANGES
+    mach_msg_type_number_t count = 0;
+    kern_return_t kr;
+
+    while (objc_restartableRanges[count].location) {
+        count++;
+    }
+
+    kr = task_restartable_ranges_register(mach_task_self(),
+                                          objc_restartableRanges, count);
+    if (kr == KERN_SUCCESS) return;
+    _objc_fatal("task_restartable_ranges_register failed (result 0x%x: %s)",
+                kr, mach_error_string(kr));
+#endif // HAVE_TASK_RESTARTABLE_RANGES
+}
+```
 
 
 
