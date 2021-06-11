@@ -470,9 +470,9 @@ objc_setUncaughtExceptionHandler(objc_uncaught_exception_handler fn)
 }
 ```
 
-&emsp;`objc_setUncaughtExceptionHandler` 方法为捕获 Objective-C 异常设置一个处理程序，并返回之前的处理程序。我们看方法实现也是将传入的方法赋值给 `uncaught_handler`。
+&emsp;`objc_setUncaughtExceptionHandler` 方法为捕获 Objective-C 异常设置一个处理程序，并返回之前的处理程序。我们看其方法实现也是将传入的方法赋值给 `uncaught_handler`。
 
-&emsp;上面说了可以通过这个方法检测异常，下面我们写个简单的 demo 实验一下。 准备代码：
+&emsp;在 `_objc_terminate` 函数中我们看到，当捕获到一个 Objective-C 异常时，会使用该异常对象（NSException）调用我们注册的回调（`uncaught_handler`），下面我们把系统提供的默认的实现为空的 `_objc_default_uncaught_exception_handler` 函数，使用 `objc_setUncaughtExceptionHandler` 替换为我们自己的函数。 
 
 ```c++
 #import "HMUncaughtExceptionHandle.h"
@@ -488,11 +488,49 @@ void TestExceptionHandlers(NSException *exception) {
 }
 
 @end
+
+#import <Foundation/Foundation.h>
+#import "HMUncaughtExceptionHandle.h"
+
+int main(int argc, const char * argv[]) {
+    [HMUncaughtExceptionHandle installUncaughtSignalExceptionHandler];
+    
+    NSLog(@"🍀🍀🍀 %s", __func__);
+    
+    NSArray *tempArray = @[@(1), @(2), @(3)];
+    NSLog(@"%@", tempArray[100]);
+    
+    return 0;
+}
 ```
 
+&emsp;我们把我们自定义的 `TestExceptionHandlers` 通过 `NSSetUncaughtExceptionHandler` 函数赋值给 `uncaught_handler`，当我们在 `main` 函数中主动触发一个数组越界的异常时，系统就会调用我们的 `TestExceptionHandlers` 函数。在 `installUncaughtSignalExceptionHandler` 函数中我们看到了 `NSSetUncaughtExceptionHandler` 函数，它是在 NSException.h 中声明的（`FOUNDATION_EXPORT void NSSetUncaughtExceptionHandler(NSUncaughtExceptionHandler * _Nullable);`），它的定义正对应了 `objc_setUncaughtExceptionHandler` 函数。
 
+```c++
+// ⬇️⬇️⬇️ 异常发生时调用了我们的 TestExceptionHandlers 函数
+2021-06-11 08:50:03.385083+0800 KCObjc[22433:2951328] 🦷🦷🦷 NSRangeException 🦷🦷🦷 *** -[__NSArrayI objectAtIndexedSubscript:]: index 100 beyond bounds [0 .. 2]
 
+2021-06-11 08:50:03.385154+0800 KCObjc[22433:2951328] *** Terminating app due to uncaught exception 'NSRangeException', reason: '*** -[__NSArrayI objectAtIndexedSubscript:]: index 100 beyond bounds [0 .. 2]'
+*** First throw call stack:
+(
+    0   CoreFoundation                      0x00007fff20484083 __exceptionPreprocess + 242
+    1   libobjc.A.dylib                     0x00007fff201bc17c objc_exception_throw + 48
+    2   CoreFoundation                      0x00007fff20538c82 _CFThrowFormattedException + 194
+    3   CoreFoundation                      0x00007fff203f7991 +[NSNull null] + 0
+    4   KCObjc                              0x0000000100003d34 main + 292
+    5   libdyld.dylib                       0x00007fff2032d621 start + 1
+    6   ???                                 0x0000000000000001 0x0 + 1
+)
+libc++abi.dylib: terminating with uncaught exception of type NSException
+*** Terminating app due to uncaught exception 'NSRangeException', reason: '*** -[__NSArrayI objectAtIndexedSubscript:]: index 100 beyond bounds [0 .. 2]'
+terminating with uncaught exception of type NSException
+```
 
+&emsp;那么 `exception_init` 我们就看到这里，下面我们开始看下一个函数。
+
+## cache_init
+
+&emsp;
 
 
 
