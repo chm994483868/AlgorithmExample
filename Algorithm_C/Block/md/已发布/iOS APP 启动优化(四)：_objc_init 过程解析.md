@@ -530,6 +530,25 @@ terminating with uncaught exception of type NSException
 
 ## cache_init
 
+&emsp;`cache_init` 看名字我们能猜到它和缓存初始化有关，而这个 `cache` 指的就是方法缓存。`cache_init` 函数的定义正位于我们之前学习方法缓存时看了无数遍的 `objc-cache.mm` 文件。
+
+&emsp;`HAVE_TASK_RESTARTABLE_RANGES` 是一个宏定义，在不同的平台下它的值是 0 或 1。
+
+```c++
+// Define HAVE_TASK_RESTARTABLE_RANGES to enable usage of task_restartable_ranges_synchronize()
+// 启用 task_restartable_ranges_synchronize
+
+#if TARGET_OS_SIMULATOR || defined(__i386__) || defined(__arm__) || !TARGET_OS_MAC
+#   define HAVE_TASK_RESTARTABLE_RANGES 0
+#else
+
+// ⬇️⬇️⬇️
+#   define HAVE_TASK_RESTARTABLE_RANGES 1
+// ⬆️⬆️⬆️
+
+#endif
+```
+
 &emsp;`objc_restartableRanges` 是一个全局的 `task_restartable_range_t` 数组。 
 
 ```c++
@@ -538,24 +557,76 @@ extern "C" task_restartable_range_t objc_restartableRanges[];
 void cache_init()
 {
 #if HAVE_TASK_RESTARTABLE_RANGES
+    // mach_msg_type_number_t 当前是 unsigned int 的别名，定义别名利于不同的平台做兼容
     mach_msg_type_number_t count = 0;
+    // 同样 kern_return_t 当前是 int 的别名
     kern_return_t kr;
 
+    // 统计 objc_restartableRanges 数组中存在 location 的 task_restartable_range_t 的数量
     while (objc_restartableRanges[count].location) {
         count++;
     }
-
+    
+    // Register a set of restartable ranges for the current task.
     kr = task_restartable_ranges_register(mach_task_self(),
                                           objc_restartableRanges, count);
     if (kr == KERN_SUCCESS) return;
-    _objc_fatal("task_restartable_ranges_register failed (result 0x%x: %s)",
-                kr, mach_error_string(kr));
+    
+    // 注册失败则停止运行
+    _objc_fatal("task_restartable_ranges_register failed (result 0x%x: %s)", kr, mach_error_string(kr));
+    
 #endif // HAVE_TASK_RESTARTABLE_RANGES
 }
 ```
 
+&emsp;我们全局搜索 `objc_restartableRanges` 可看到，在 `_collecting_in_critical` 函数中有看到有对其的遍历读取。`_collecting_in_critical` 函数在前面的方法缓存中我们有学习过，用于判断当前是否可以对旧的方法缓存（扩容后的旧的方法缓存表）进行收集释放，如果某个线程当前正在执行缓存读取函数，则返回 TRUE。当缓存读取功能正在进行时，不允许收集 cache garbage，因为它可能仍在使用 garbage memory。即当前有其它线程正在读取使用我们的旧的方法缓存表时，此时不能对旧的方法缓存表进行内存释放。
 
+&emsp;`_objc_restartableRanges` 被方法调度缓存代码（method dispatch caching code）用来确定是否有任何线程在缓存中主动进行调度。
 
+## \_imp_implementationWithBlock_init
+
+&emsp;初始化 trampoline machinery。通常这什么都不做，因为一切都是惰性初始化的，但对于某些进程，我们急切地加载 trampolines dylib。
+
+&emsp;在某些进程中急切地加载 libobjc-trampolines.dylib。一些程序（最显着的是旧版本的嵌入式 Chromium 使用的 QtWebEngineProcess）启用了一个高度限制性的沙盒配置文件，它会阻止访问该 dylib。如果有任何东西调用了 `imp_implementationWithBlock`（就像 AppKit 开始做的那样），那么我们将在尝试加载它时崩溃。在启用 sandbox 配置文件并阻止它之前，在此处加载它会对其进行设置。
+
+&emsp;`Trampolines` 是一个 `TrampolinePointerWrapper` 类型的静态全局变量。
+
+```c++
+static TrampolinePointerWrapper Trampolines;
+```
+
+```c++
+/// Initialize the trampoline machinery. Normally this does nothing, as
+/// everything is initialized lazily, but for certain processes we eagerly load
+/// the trampolines dylib.
+void
+_imp_implementationWithBlock_init(void)
+{
+#if TARGET_OS_OSX
+    // Eagerly load libobjc-trampolines.dylib in certain processes. Some
+    // programs (most notably QtWebEngineProcess used by older versions of
+    // embedded Chromium) enable a highly restrictive sandbox profile which
+    // blocks access to that dylib. If anything calls
+    // imp_implementationWithBlock (as AppKit has started doing) then we'll
+    // crash trying to load it. Loading it here sets it up before the sandbox
+    // profile is enabled and blocks it.
+    //
+    // This fixes EA Origin (rdar://problem/50813789)
+    // and Steam (rdar://problem/55286131)
+    if (__progname &&
+        (strcmp(__progname, "QtWebEngineProcess") == 0 ||
+         strcmp(__progname, "Steam Helper") == 0)) {
+        Trampolines.Initialize();
+    }
+#endif
+}
+```
+
+&emsp;`_imp_implementationWithBlock_init` 方法实现可以看到这个是在 OS 下执行，这个方法就是对 imp 的 Block 标记进行初始化。详细内容可以参考这篇文章: [imp_implementationWithBlock()的实现机制](https://www.jianshu.com/p/c52bc284e9c7)。
+
+## \_dyld_objc_notify_register
+ 
+&emsp;
 
 
 
@@ -572,6 +643,8 @@ void cache_init()
 ## 参考链接
 **参考链接:🔗**
 + [线程本地存储TLS(Thread Local Storage)的原理和实现——分类和原理](https://www.cnblogs.com/zhoug2020/p/6497709.html)
++ [imp_implementationWithBlock()的实现机制](https://www.jianshu.com/p/c52bc284e9c7)
++ [iOS 底层原理之—dyld 与 objc 的关联](https://www.yuque.com/ioser/spb08a/alu6tz)
 + [dyld-832.7.3](https://opensource.apple.com/tarballs/dyld/)
 + [OC底层原理之-App启动过程（dyld加载流程）](https://juejin.cn/post/6876773824491159565)
 + [iOS中的dyld缓存是什么？](https://blog.csdn.net/gaoyuqiang30/article/details/52536168)
