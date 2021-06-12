@@ -622,23 +622,183 @@ _imp_implementationWithBlock_init(void)
 }
 ```
 
-&emsp;`_imp_implementationWithBlock_init` 方法实现可以看到这个是在 OS 下执行，这个方法就是对 imp 的 Block 标记进行初始化。详细内容可以参考这篇文章: [imp_implementationWithBlock()的实现机制](https://www.jianshu.com/p/c52bc284e9c7)。
+&emsp;`_imp_implementationWithBlock_init` 方法实现可以看到这个是在 OS 下执行，这个方法就是对 imp 的 Block 标记进行初始化。
+
+&emsp;下面我们对 `imp_implementationWithBlock` 函数进行延伸学习。在 runtime.h 中能看到它的声明如下：
+
+```c++
+/** 
+ * Creates a pointer to a function that will call the block when the method is called.
+ * 创建一个指向将在调用函数时执行入参 block 的函数的指针。
+ * 
+ * @param block The block that implements this method. Its signature should be: method_return_type ^(id self, method_args...). 
+ *  The selector is not available as a parameter to this block.
+ *  The block is copied with \c Block_copy().
+ *
+ * 参数 block 实现返回值 IMP 的 block。它的签名应该是：method_return_type ^(id self, method_args...)。（忽略了 _cmd）
+ * selector 不可用作此 block 的参数。该 block 会被使用 Block_copy() 进行复制。
+ * 
+ * @return The IMP that calls this block. Must be disposed of with \c imp_removeBlock.
+ * 返回值是调用参数 block 的 IMP。必须当需要 block 和 IMP 解除关联时用 imp_removeBlock 处理。
+ */
+OBJC_EXPORT IMP _Nonnull
+imp_implementationWithBlock(id _Nonnull block)
+    OBJC_AVAILABLE(10.7, 4.3, 9.0, 1.0, 2.0);
+```
+
+&emsp;下面我们看下它的定义，在 objc-block-trampolines.mm 中可看到其定义如下：
+
+```c++
+IMP imp_implementationWithBlock(id block) 
+{
+    // Block object must be copied outside runtimeLock because it performs arbitrary work.
+    block = Block_copy(block);
+
+    // Trampolines must be initialized outside runtimeLock because it calls dlopen().
+    Trampolines.Initialize();
+    
+    // 加锁
+    mutex_locker_t lock(runtimeLock);
+
+    return _imp_implementationWithBlockNoCopy(block);
+}
+```
+
+&emsp;看完 `imp_implementationWithBlock` 函数我们可能一脸懵逼，下面我们就详细看下使用示例就明白了。
+
+```c++
+
+// 1⃣️ Answerer.h
+#import <Foundation/Foundation.h>
+
+NS_ASSUME_NONNULL_BEGIN
+
+@interface Answerer : NSObject
+
+@end
+
+NS_ASSUME_NONNULL_END
+
+// 2⃣️ Answerer.m
+#import "Answerer.h"
+
+@implementation Answerer
+
+@end
+
+// 3⃣️ Answerer+DynamicallyProvidedMethod.h
+#import "Answerer.h"
+
+NS_ASSUME_NONNULL_BEGIN
+
+@interface Answerer (DynamicallyProvidedMethod)
+
+- (int)answerForThis:(int)a andThat:(int)b;
+- (void)boogityBoo:(float)c;
+
+@end
+
+NS_ASSUME_NONNULL_END
+
+// 4⃣️ Answerer+DynamicallyProvidedMethod.m
+#import "Answerer+DynamicallyProvidedMethod.h"
+
+@implementation Answerer (DynamicallyProvidedMethod)
+
+@end
+
+// 5⃣️ main
+#import <Foundation/Foundation.h>
+#import "Answerer.h"
+#import "Answerer+DynamicallyProvidedMethod.h"
+#import <objc/runtime.h>
+
+int main(int argc, const char * argv[]) {
+    
+    // 创建一个 block，block 的第一个 id 类型的参数对应我们 OC 函数默认的 self 参数
+    int (^impyBlock)(id, int, int) = ^(id _self, int a, int b) {
+        return a + b;
+    };
+    
+    // 从 block 创建一个 IMP
+    int (*impyFunct)(id, SEL, int, int) = (void*)imp_implementationWithBlock(impyBlock);
+    
+    // 调用 block
+    NSLog(@"🍀🍀🍀 impyBlock: %d + %d = %d", 20, 22, impyBlock(nil, 20, 22));
+    // 调用 imp
+    NSLog(@"🍀🍀🍀 impyFunct: %d + %d = %d", 20, 22, impyFunct(nil, NULL, 20, 22));
+    
+    // 获取我们接下来要修改的类的实例
+    Answerer *answerer = [[Answerer alloc] init];
+    
+    // 将 impyFunct 动态添加到 Answerer 中, 然后调用它
+    class_addMethod([Answerer class], @selector(answerForThis:andThat:), (IMP)impyFunct, "i@:ii");
+    NSLog(@"🍀🍀🍀 Method: %d + %d = %d", 20, 20, [answerer answerForThis:20 andThat:20]);
+    
+    SEL _sel = @selector(boogityBoo:);
+    float k = 5.0;
+    IMP boo = imp_implementationWithBlock(^(id _self, float c) {
+        NSLog(@"🍀🍀🍀 Executing [%@ - %@%f] %f", [_self class], NSStringFromSelector(_sel), c, c * k);
+    });
+    class_addMethod([Answerer class], _sel, boo, "v@:f");
+    
+    [answerer boogityBoo:3.1415];
+    
+    return 0;
+}
+
+// 6⃣️ 控制台打印如下：
+
+2021-06-12 16:30:05.558548+0800 KCObjc[1543:50241] 🍀🍀🍀 impyBlock: 20 + 22 = 42
+2021-06-12 16:30:05.558636+0800 KCObjc[1543:50241] 🍀🍀🍀 impyFunct: 20 + 22 = 42
+2021-06-12 16:30:05.558695+0800 KCObjc[1543:50241] 🍀🍀🍀 Method: 20 + 20 = 40
+2021-06-12 16:30:05.558787+0800 KCObjc[1543:50241] 🍀🍀🍀 Executing [Answerer - boogityBoo:3.141500] 15.707500
+```
+
+&emsp;更详细内容可以参考这篇文章: [imp_implementationWithBlock()的实现机制](https://www.jianshu.com/p/c52bc284e9c7)。
 
 ## \_dyld_objc_notify_register
- 
-&emsp;
 
+```c++
+_dyld_objc_notify_register(&map_images, load_images, unmap_image);
+```
 
+&emsp;可看到 `_dyld_objc_notify_register` 的参数有三个，分别是 `&map_images`、`load_images`、`unmap_image`，在前面一篇 dyld 的文章中我们有提到 `_dyld_objc_notify_register` 它是用来注册一些回调函数。
 
+&emsp;我们从 `dyld_priv.h` 中看一下 `_dyld_objc_notify_register` 函数的声明。
 
+&emsp;`_dyld_objc_notify_register` 函数仅供 objc runtime 使用，注册当 mapped、unmapped 和 initialized objc images 时要调用的处理程序。Dyld 将使用包含 `objc-image-info` section 的 images 数组回调 `mapped` 函数。那些 dylibs 的 images 将自动增加引用计数，因此 objc 将不再需要对它们调用 `dlopen()` 以防止它们被卸载。在调用 `_dyld_objc_notify_register()` 期间，dyld 将使用已加载的 objc images 调用 `mapped` 函数。在以后的任何 `dlopen()` 调用中，dyld 还将调用 `mapped` 函数。当 dyld 在该 image 中调用 initializers 时，Dyld 将调用 `init` 函数。这是当 objc 调用该 image 中的任何 `+load` 方法时。
 
+```c++
+//
+// Note: only for use by objc runtime
+// Register handlers to be called when objc images are mapped, unmapped, and initialized.
+// Dyld will call back the "mapped" function with an array of images that contain an objc-image-info section.
+// Those images that are dylibs will have the ref-counts automatically bumped, so objc will no longer need to call dlopen() on them to keep them from being unloaded.
+// During the call to _dyld_objc_notify_register(), dyld will call the "mapped" function with already loaded objc images.
+// During any later dlopen() call, dyld will also call the "mapped" function.
+// Dyld will call the "init" function when dyld would be called initializers in that image.
+// This is when objc calls any +load methods in that image.
+//
+void _dyld_objc_notify_register(_dyld_objc_notify_mapped    mapped,
+                                _dyld_objc_notify_init      init,
+                                _dyld_objc_notify_unmapped  unmapped);
+```
 
+&emsp;下面我们从 dyld 源码中，看一下 `_dyld_objc_notify_register` 函数的定义。
 
+```c++
+void _dyld_objc_notify_register(_dyld_objc_notify_mapped    mapped,
+                                _dyld_objc_notify_init      init,
+                                _dyld_objc_notify_unmapped  unmapped)
+{
+    dyld::registerObjCNotifiers(mapped, init, unmapped);
+}
+```
 
+&emsp;看到 `_dyld_objc_notify_register` 函数内部是直接调用 `dyld::registerObjCNotifiers` 函数，而 `dyld::registerObjCNotifiers` 内部则是调用 `mappd` 函数初始化所有的 images，然后调用所有初始化后的 images 的 `init` 函数。也就是当 objc 的准备工作都已经完成（objc_init  函数结尾处），此时调用 `_dyld_objc_notify_register` 告诉 dyld 可以进行类的加载，于是 dyld 进行类的加载。 
 
-
-
-
+&emsp;下面我们开始分析极其重要的三个函数 `map_images`、`load_images`、`unmap_image` 函数，由于本篇篇幅过长了，我们就留到下篇文章进行分析吧！继续加油哦！🎉🎉🎉
 
 ## 参考链接
 **参考链接:🔗**
@@ -658,38 +818,3 @@ _imp_implementationWithBlock_init(void)
 + [C++ 命名空间namespace](https://www.jianshu.com/p/30e960717ef1)
 + [一文了解 Xcode 生成「静态库」和「动态库」 的流程](https://mp.weixin.qq.com/s/WH8emrMpLeVW-LfGwN09cw)
 + [Hook static initializers](https://blog.csdn.net/majiakun1/article/details/99413403)
-
-
-
-```c++
-if ( sEnv.DYLD_PRINT_OPTS )
-    printOptions(argv);
-if ( sEnv.DYLD_PRINT_ENV ) 
-    printEnvironmentVariables(envp);
-```
-
-&emsp;此处是判断是否设置了环境变量，如果设置了，那么 xcode 就会在控制台打印相关的详细信息。（在 Edit Scheme... -> Run -> Arguments -> Environment Variables 进行添加） 
-
-&emsp;当添加了 DYLD_PRINT_OPTS 时，会在控制台输出可执行文件的位置。
-```c++
-opt[0] = "/Users/hmc/Library/Developer/CoreSimulator/Devices/4E072E27-E586-4E81-A693-A02A3ED83DEC/data/Containers/Bundle/Application/ECDA091A-1610-49D2-8BC0-B41A58BC76EC/Test_ipa_Simple.app/Test_ipa_Simple"
-```
-
-&emsp;当添加了 DYLD_PRINT_ENV 时，会在控制台输出用户级别、插入的动态库、动态库的路径、模拟器的信息等等一系列的信息，由于内容过多这里就粘贴出来了。
-
-## LLDB 常用命令
-
-1. p po p/x p/o p/t p/d p/c
-2. expression 修改参数
-3. call 
-4. x x/4gx x/4xg
-5. image list
-6. image lookup --address+地址
-7. thread list
-8. thread backtrace（bt）bt all
-9. thread return frame variable
-10. register read register read/x
-
-## clang 
-
-&emsp;clang:Clang 是一个 C++ 编写、基于 LLVM、发布于 LLVM BSD 许可证下的 C/C++/Objective-C/Objective-C++ 编译器。它与 GNU C 语言规范几乎完全兼容（当然，也有部分不兼容的内容， 包括编译命令选项也会有点差异），并在此基础上增加了额外的语法特性，比如 C 函数重载（通过 \_ attribute_((overloadable)) 来修饰函数)，其目标(之一)就是超越 GCC。
