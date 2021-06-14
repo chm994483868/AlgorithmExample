@@ -340,13 +340,13 @@ map_images_nolock(unsigned mhCount, const char * const mhPaths[],
 
 &emsp;从上到下我们的每一行注释都超清晰了，其中最重要的就是 `_read_images` 函数的调用，`map_images_nolock` 上半部分就是对 `const struct mach_header * const mhdrs[]` 参数的处理，把数组中的 `mach_header` 转换为 `header_info` 并存在 `header_info *hList[mhCount]` 数组中，并统计 `totalClasses` 和 `unoptimizedTotalClasses` 的数量，然后调用 `_read_images(hList, hCount, totalClasses, unoptimizedTotalClasses)` 函数，下面我们对 `_read_images` 进行学习。
 
-&emsp;`` 超长，但是真的超级重要、超级重要、超级重要：
+&emsp;`_read_images` 超长，但是真的超级重要、超级重要、超级重要：
 
 ```c++
 /***********************************************************************
 * _read_images
-* Perform initial processing of the headers in the linked 
-* list beginning with headerList. 
+* Perform initial processing of the headers in the linked list beginning with headerList.
+* 对以 headerList 开头的链表中的 headers 进行 initial processing。
 *
 * Called by: map_images_nolock
 *
@@ -358,80 +358,47 @@ void _read_images(header_info **hList, uint32_t hCount, int totalClasses, int un
     uint32_t hIndex;
     size_t count;
     size_t i;
+    
+    // 
     Class *resolvedFutureClasses = nil;
     size_t resolvedFutureClassCount = 0;
     
+    // 静态局部变量，如果是第一次调用 _read_images 则 doneOnce 值为 NO
     static bool doneOnce;
+    
     bool launchTime = NO;
     
+    // 测量 image 加载步骤的持续时间
+    // 对应 objc-env.h 中的 OPTION( PrintImageTimes, OBJC_PRINT_IMAGE_TIMES, "measure duration of image loading steps")
     TimeLogger ts(PrintImageTimes);
 
+    // 加锁
     runtimeLock.assertLocked();
 
+    // EACH_HEADER 是给下面的 for 循环使用的宏，遍历 hList 数组中的 header_info
 #define EACH_HEADER \
     hIndex = 0;         \
     hIndex < hCount && (hi = hList[hIndex]); \
     hIndex++
 
+    // 第一次调用 _read_images 时，doneOnce 值为 NO，会进入 if 执行里面的代码 
     if (!doneOnce) {
         doneOnce = YES;
         launchTime = YES;
 
-#if SUPPORT_NONPOINTER_ISA
-        // Disable non-pointer isa under some conditions.
-
-# if SUPPORT_INDEXED_ISA
-        // Disable nonpointer isa if any image contains old Swift code
-        for (EACH_HEADER) {
-            if (hi->info()->containsSwift()  &&
-                hi->info()->swiftUnstableVersion() < objc_image_info::SwiftVersion3)
-            {
-                DisableNonpointerIsa = true;
-                if (PrintRawIsa) {
-                    _objc_inform("RAW ISA: disabling non-pointer isa because "
-                                 "the app or a framework contains Swift code "
-                                 "older than Swift 3.0");
-                }
-                break;
-            }
-        }
-# endif
-
-# if TARGET_OS_OSX
-        // Disable non-pointer isa if the app is too old
-        // (linked before OS X 10.11)
-        if (dyld_get_program_sdk_version() < DYLD_MACOSX_VERSION_10_11) {
-            DisableNonpointerIsa = true;
-            if (PrintRawIsa) {
-                _objc_inform("RAW ISA: disabling non-pointer isa because "
-                             "the app is too old (SDK version " SDK_FORMAT ")",
-                             FORMAT_SDK(dyld_get_program_sdk_version()));
-            }
-        }
-
-        // Disable non-pointer isa if the app has a __DATA,__objc_rawisa section
-        // New apps that load old extensions may need this.
-        for (EACH_HEADER) {
-            if (hi->mhdr()->filetype != MH_EXECUTE) continue;
-            unsigned long size;
-            if (getsectiondata(hi->mhdr(), "__DATA", "__objc_rawisa", &size)) {
-                DisableNonpointerIsa = true;
-                if (PrintRawIsa) {
-                    _objc_inform("RAW ISA: disabling non-pointer isa because "
-                                 "the app has a __DATA,__objc_rawisa section");
-                }
-            }
-            break;  // assume only one MH_EXECUTE image
-        }
-# endif
-
-#endif
+    // 这一段是在低版本（swifit3 之前、OS X 10.11 之前）下禁用 non-pointer isa 时的一些打印信息，为了减少我们的理解负担，这里直接进行了删除，
+    // 想要学习的可以去找源码看一下
+    ...
         
-        // 禁用 NSNumber 等的 Tagged Pointers 优化。
+        // OPTION( DisableTaggedPointers, OBJC_DISABLE_TAGGED_POINTERS, "disable tagged pointer optimization of NSNumber et al.")
+        // 禁用 NSNumber 等的 Tagged Pointers 优化时
         if (DisableTaggedPointers) {
+            // 把 Tagged Pointers 用到的 mask 全部置为 0
             disableTaggedPointers();
         }
         
+        // OPTION( DisableTaggedPointerObfuscation, OBJC_DISABLE_TAG_OBFUSCATION, "disable obfuscation of tagged pointers")
+        // 可开启 OBJC_DISABLE_TAG_OBFUSCATION，禁用 Tagged Pointer 的混淆
         initializeTaggedPointerObfuscator();
 
         if (PrintConnecting) {
