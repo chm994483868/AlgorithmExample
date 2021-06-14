@@ -359,7 +359,6 @@ void _read_images(header_info **hList, uint32_t hCount, int totalClasses, int un
     size_t count;
     size_t i;
     
-    // 
     Class *resolvedFutureClasses = nil;
     size_t resolvedFutureClassCount = 0;
     
@@ -386,21 +385,29 @@ void _read_images(header_info **hList, uint32_t hCount, int totalClasses, int un
         doneOnce = YES;
         launchTime = YES;
 
-    // 这一段是在低版本（swifit3 之前、OS X 10.11 之前）下禁用 non-pointer isa 时的一些打印信息，为了减少我们的理解负担，这里直接进行了删除，
-    // 想要学习的可以去找源码看一下
+    // 这一段是在低版本（swifit3 之前、OS X 10.11 之前）下禁用 non-pointer isa 时的一些打印信息，
+    // 为了减少我们的理解负担，这里直接进行了删除，想要学习的同学可以去看一下源码
     ...
         
         // OPTION( DisableTaggedPointers, OBJC_DISABLE_TAGGED_POINTERS, "disable tagged pointer optimization of NSNumber et al.")
         // 禁用 NSNumber 等的 Tagged Pointers 优化时
         if (DisableTaggedPointers) {
-            // 把 Tagged Pointers 用到的 mask 全部置为 0
+            // 内部直接把 Tagged Pointers 用到的 mask 全部置为 0
             disableTaggedPointers();
         }
         
         // OPTION( DisableTaggedPointerObfuscation, OBJC_DISABLE_TAG_OBFUSCATION, "disable obfuscation of tagged pointers")
-        // 可开启 OBJC_DISABLE_TAG_OBFUSCATION，禁用 Tagged Pointer 的混淆
+        // 可开启 OBJC_DISABLE_TAG_OBFUSCATION，禁用 Tagged Pointer 的混淆。
+        
+        // 随机初始化 objc_debug_taggedpointer_obfuscator。
+        // tagged pointer obfuscator 旨在使攻击者在存在缓冲区溢出或其他对某些内存的写控制的情况下更难将特定对象构造为标记指针。
+        // 在设置或检索有效载荷值（payload values）时， obfuscator 与 tagged pointers 进行异或。
+        // 它们在第一次使用时充满了随机性。
         initializeTaggedPointerObfuscator();
 
+        // OPTION( PrintConnecting, OBJC_PRINT_CLASS_SETUP, "log progress of class and category setup")
+        // objc[26520]: CLASS: found 25031 classes during launch 在 objc-781 下在启动时有 25031 个类（包含所有的系统类和自定义类）
+        
         if (PrintConnecting) {
             _objc_inform("CLASS: found %d classes during launch", totalClasses);
         }
@@ -408,25 +415,47 @@ void _read_images(header_info **hList, uint32_t hCount, int totalClasses, int un
         // namedClasses
         // Preoptimized classes don't go in this table.
         // 4/3 is NXMapTable's load factor
-        int namedClassesSize = 
-            (isPreoptimized() ? unoptimizedTotalClasses : totalClasses) * 4 / 3;
-        // 一张包含所有的类和元类的表 gdb_objc_realized_classes
-        gdb_objc_realized_classes =
-            NXCreateMapTable(NXStrValueMapPrototype, namedClassesSize);
-
+        
+        // isPreoptimized 如果我们有一个有效的优化共享缓存（valid optimized shared cache），则返回 YES。
+        int namedClassesSize = (isPreoptimized() ? unoptimizedTotalClasses : totalClasses) * 4 / 3;
+        
+        // gdb_objc_realized_classes 是一张全局的哈希表，虽然名字中有 realized，但是它的名字其实是一个误称，
+        // 实际上它存放的是不在 dyld shared cache 中的 classes 的列表，无论该类是否 realized。
+        gdb_objc_realized_classes = NXCreateMapTable(NXStrValueMapPrototype, namedClassesSize);
+        
+        // 在 objc-781 下执行到这里时，会有如下打印:
+        // objc[26722]: 0.02 ms: IMAGE TIMES: first time tasks
         ts.log("IMAGE TIMES: first time tasks");
     }
 
     // Fix up @selector references
+    // 注册修正 selector references
+    //（其实就是把 image 的 __objc_selrefs 区中的 selector 放进全局的 selector 集合中）
     static size_t UnfixedSelectors;
     {
+        // 加锁 selLock
         mutex_locker_t lock(selLock);
+        
+        // 遍历 header_info **hList 中的 header_info
         for (EACH_HEADER) {
+        
+            // 如果不需要预优化则跳过
             if (hi->hasPreoptimizedSelectors()) continue;
-
+            
+            // 根据 mhdr()->filetype 判断 image 是否是 MH_BUNDLE 类型
             bool isBundle = hi->isBundle();
+            
+            // GETSECT(_getObjc2SelectorRefs, SEL, "__objc_selrefs");
+            // 获取 __objc_selrefs 区中的 SEL
             SEL *sels = _getObjc2SelectorRefs(hi, &count);
+            
+            // 记录数量
             UnfixedSelectors += count;
+            
+            // static objc::ExplicitInitDenseSet<const char *> namedSelectors;
+            // 是一个静态全局 set，用来存放 Selector（名字，Selector 本身就是字符串）
+            
+            // 遍历把 sels 中的所有 selector 放进全局的 selector 集合中   
             for (i = 0; i < count; i++) {
                 const char *name = sel_cname(sels[i]);
                 SEL sel = sel_registerNameNoLock(name, isBundle);
@@ -434,10 +463,21 @@ void _read_images(header_info **hList, uint32_t hCount, int totalClasses, int un
                     sels[i] = sel;
                 }
             }
+            
         }
     }
-
+    
+    // 这里打印修正 selector references 用的时间
+    // 在 objc-781 下打印：objc[27056]: 0.44 ms: IMAGE TIMES: fix up selector references
+    // 耗时 0.44 毫秒
     ts.log("IMAGE TIMES: fix up selector references");
+
+
+
+// ⬇️⬇️⬇️⬇️
+
+
+
 
     // Discover classes. Fix up unresolved future classes. Mark bundle classes.
     // 发现 classes Fix. up unresolved future classes. 标记 bundle class.
