@@ -328,6 +328,9 @@ map_images_nolock(unsigned mhCount, const char * const mhPaths[],
     // 把开始时初始化的静态局部变量 firstTime 置为 NO
     firstTime = NO;
     
+    // ⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️
+    // _read_images 看完再看下面的 loadImageFuncs 函数  
+    
     // Call image load funcs after everything is set up.
     // 一切设置完毕后调用 image 加载函数。
     for (auto func : loadImageFuncs) {
@@ -380,9 +383,14 @@ void _read_images(header_info **hList, uint32_t hCount, int totalClasses, int un
     hIndex < hCount && (hi = hList[hIndex]); \
     hIndex++
 
+    // 1⃣️
     // 第一次调用 _read_images 时，doneOnce 值为 NO，会进入 if 执行里面的代码 
     if (!doneOnce) {
+        // 把静态局部变量 doneOnce 置为 YES，之后调用 _read_images 都不会再进来
+        // 第一次调用 _read_images 的时候，class、protocol、selector、category 都没有，
+        // 需要创建容器来保存这些东西，此 if 内部，最后是创建一张存 class 的表。
         doneOnce = YES;
+        
         launchTime = YES;
 
     // 这一段是在低版本（swifit3 之前、OS X 10.11 之前）下禁用 non-pointer isa 时的一些打印信息，
@@ -417,17 +425,21 @@ void _read_images(header_info **hList, uint32_t hCount, int totalClasses, int un
         // 4/3 is NXMapTable's load factor
         
         // isPreoptimized 如果我们有一个有效的优化共享缓存（valid optimized shared cache），则返回 YES。
+        // 然后是不管三目运算符返回的是 unoptimizedTotalClasses 还是 totalClasses，它都会和后面的 4 / 3 相乘，
+        // 注意是 4 / 3
         int namedClassesSize = (isPreoptimized() ? unoptimizedTotalClasses : totalClasses) * 4 / 3;
         
         // gdb_objc_realized_classes 是一张全局的哈希表，虽然名字中有 realized，但是它的名字其实是一个误称，
-        // 实际上它存放的是不在 dyld shared cache 中的 classes 的列表，无论该类是否 realized。
+        // 实际上它存放的是不在 dyld shared cache 中的 class 的表，无论该 class 是否 realized。
         gdb_objc_realized_classes = NXCreateMapTable(NXStrValueMapPrototype, namedClassesSize);
         
         // 在 objc-781 下执行到这里时，会有如下打印:
-        // objc[26722]: 0.02 ms: IMAGE TIMES: first time tasks
+        // objc[19881]: 0.04 ms: IMAGE TIMES: first time tasks
+        // 这个过程花了 0.04 毫秒
         ts.log("IMAGE TIMES: first time tasks");
     }
 
+    // 2⃣️
     // Fix up @selector references
     // 注册修正 selector references
     //（其实就是把 image 的 __objc_selrefs 区中的 selector 放进全局的 selector 集合中）
@@ -735,7 +747,10 @@ void _read_images(header_info **hList, uint32_t hCount, int totalClasses, int un
 }
 ```
 
+&emsp;第 1⃣️ 部分完成后在 objc-781 下的打印是：`objc[19881]: 0.04 ms: IMAGE TIMES: first time tasks` （机器是 m1 的 macMini），第 1⃣️ 部分的内容只有在第一次调用 `_read_images` 的时候才会执行，它主要做了两件事情：
 
+1. 根据环境变量（`OBJC_DISABLE_TAGGED_POINTERS`）判断是否禁用 Tagged Pointer，禁用 Tagged Pointer 时所涉及到的 mask 都被设置为 0，然后根据环境变量（`OBJC_DISABLE_TAG_OBFUSCATION`）以及是否是低版本系统来判断是否禁用 Tagged Pointer 的混淆器（obfuscation），禁用混淆器时 `objc_debug_taggedpointer_obfuscator` 的值 被设置为 0，否则为其设置一个随机值。
+2. 通过 `NXCreateMapTable` 根据类的数量创建一张表（ `NXMapTable` 结构体实例，可通过类名（const char *）来获取 Class 对象）并赋值给 `gdb_objc_realized_classes`，用来存放 ``   
 
 
 
