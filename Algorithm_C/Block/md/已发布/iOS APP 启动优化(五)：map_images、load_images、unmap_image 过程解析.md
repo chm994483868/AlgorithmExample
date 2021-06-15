@@ -442,7 +442,8 @@ void _read_images(header_info **hList, uint32_t hCount, int totalClasses, int un
     // 2⃣️
     // Fix up @selector references
     // 注册修正 selector references
-    //（其实就是把 image 的 __objc_selrefs 区中的 selector 放进全局的 selector 集合中）
+    //（其实就是把 image 的 __objc_selrefs 区中的 selector 放进全局的 selector 集合中，
+    // 把其中）
     static size_t UnfixedSelectors;
     {
         // 加锁 selLock
@@ -451,7 +452,7 @@ void _read_images(header_info **hList, uint32_t hCount, int totalClasses, int un
         // 遍历 header_info **hList 中的 header_info
         for (EACH_HEADER) {
         
-            // 如果不需要预优化则跳过
+            // 如果指定的 hi 不需要预优化则跳过
             if (hi->hasPreoptimizedSelectors()) continue;
             
             // 根据 mhdr()->filetype 判断 image 是否是 MH_BUNDLE 类型
@@ -750,7 +751,8 @@ void _read_images(header_info **hList, uint32_t hCount, int totalClasses, int un
 &emsp;第 1⃣️ 部分完成后在 objc-781 下的打印是：`objc[19881]: 0.04 ms: IMAGE TIMES: first time tasks` （机器是 m1 的 macMini），第 1⃣️ 部分的内容只有在第一次调用 `_read_images` 的时候才会执行，它主要做了两件事情：
 
 1. 根据环境变量（`OBJC_DISABLE_TAGGED_POINTERS`）判断是否禁用 Tagged Pointer，禁用 Tagged Pointer 时所涉及到的 mask 都被设置为 0，然后根据环境变量（`OBJC_DISABLE_TAG_OBFUSCATION`）以及是否是低版本系统来判断是否禁用 Tagged Pointer 的混淆器（obfuscation），禁用混淆器时 `objc_debug_taggedpointer_obfuscator` 的值 被设置为 0，否则为其设置一个随机值。
-2. 通过 `NXCreateMapTable` 根据类的数量创建一张表（ `NXMapTable` 结构体实例，可通过类名（const char *）来获取 Class 对象）并赋值给 `gdb_objc_realized_classes`，用来存放 ``   
+2. 通过 `NXCreateMapTable` 根据类的数量（* 4/3）创建一张表（是 `NXMapTable` 结构体实例，`NXMapTable` 结构体是被作为哈希表来使用的，可通过类名（const char *）来获取 Class 对象）并赋值给 `gdb_objc_realized_classes` 这个全局变量，用来通过类名来存放类对象。
+
 
 
 
