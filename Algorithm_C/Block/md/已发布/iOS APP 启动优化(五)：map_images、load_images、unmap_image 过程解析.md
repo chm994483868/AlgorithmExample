@@ -430,7 +430,7 @@ void _read_images(header_info **hList, uint32_t hCount, int totalClasses, int un
         int namedClassesSize = (isPreoptimized() ? unoptimizedTotalClasses : totalClasses) * 4 / 3;
         
         // gdb_objc_realized_classes 是一张全局的哈希表，虽然名字中有 realized，但是它的名字其实是一个误称，
-        // 实际上它存放的是不在 dyld shared cache 中的 class 的表，无论该 class 是否 realized。
+        // 实际上它存放的是不在 dyld shared cache 中的 class，无论该 class 是否 realized。
         gdb_objc_realized_classes = NXCreateMapTable(NXStrValueMapPrototype, namedClassesSize);
         
         // 在 objc-781 下执行到这里时，会有如下打印:
@@ -441,7 +441,7 @@ void _read_images(header_info **hList, uint32_t hCount, int totalClasses, int un
 
     // 2⃣️
     // Fix up @selector references
-    // 注册修正 selector references
+    // 注册并修正 selector references
     //（其实就是把 image 的 __objc_selrefs 区中的 selector 放进全局的 selector 集合中，
     // 把其中）
     static size_t UnfixedSelectors;
@@ -470,8 +470,14 @@ void _read_images(header_info **hList, uint32_t hCount, int totalClasses, int un
             
             // 遍历把 sels 中的所有 selector 放进全局的 selector 集合中   
             for (i = 0; i < count; i++) {
+            
+                // sel_cname 函数内部实现是返回：(const char *)(void *)sel; 即把 SEL 强转为 char 类型
                 const char *name = sel_cname(sels[i]);
+                
+                // 注册 SEL，并返回其地址
                 SEL sel = sel_registerNameNoLock(name, isBundle);
+                
+                // 如果 SEL 地址发生变化，则把它设置为相同
                 if (sels[i] != sel) {
                     sels[i] = sel;
                 }
@@ -480,30 +486,32 @@ void _read_images(header_info **hList, uint32_t hCount, int totalClasses, int un
         }
     }
     
-    // 这里打印修正 selector references 用的时间
+    // 这里打印注册并修正 selector references 用的时间
     // 在 objc-781 下打印：objc[27056]: 0.44 ms: IMAGE TIMES: fix up selector references
     // 耗时 0.44 毫秒
     ts.log("IMAGE TIMES: fix up selector references");
 
-
-
-// ⬇️⬇️⬇️⬇️
-
-
-
-
+    // 3⃣️
     // Discover classes. Fix up unresolved future classes. Mark bundle classes.
-    // 发现 classes Fix. up unresolved future classes. 标记 bundle class.
+    // 发现 classes。修复 unresolved future classes。标记 bundle classes。
     
-    // 返回是否有任何操作系统dylib在共享缓存中覆盖其副本
+    // Returns if any OS dylib has overridden its copy in the shared cache
+    //
+    // Exists in iPhoneOS 3.1 and later 
+    // Exists in Mac OS X 10.10 and later
     bool hasDyldRoots = dyld_shared_cache_some_image_overridden();
 
     for (EACH_HEADER) {
         if (! mustReadClasses(hi, hasDyldRoots)) {
             // Image is sufficiently optimized that we need not call readClass()
+            // Image 已充分优化，我们无需调用 readClass()
             continue;
         }
 
+        // GETSECT(_getObjc2ClassList, classref_t const, "__objc_classlist");
+        // 获取 __objc_classlist 区中的 classref_t
+        
+        // 从编译后的类列表中取出所有类，获取到的是一个 classref_t 类型的指针 
         classref_t const *classlist = _getObjc2ClassList(hi, &count);
 
         bool headerIsBundle = hi->isBundle();
@@ -511,34 +519,58 @@ void _read_images(header_info **hList, uint32_t hCount, int totalClasses, int un
 
         for (i = 0; i < count; i++) {
             Class cls = (Class)classlist[i];
+            
+            // 重点 ⚠️⚠️⚠️⚠️ 在这里：readClass。
+            // 我们留在下面单独分析。
             Class newCls = readClass(cls, headerIsBundle, headerIsPreoptimized);
 
             if (newCls != cls  &&  newCls) {
-                // Class was moved but not deleted. Currently this occurs 
-                // only when the new class resolved a future class.
+                // Class was moved but not deleted. Currently this occurs only when the new class resolved a future class.
                 // Non-lazily realize the class below.
-                resolvedFutureClasses = (Class *)
-                    realloc(resolvedFutureClasses, 
-                            (resolvedFutureClassCount+1) * sizeof(Class));
+                
+                // realloc 原型是 extern void *realloc(void *mem_address, unsigned int newsize);
+                // 先判断当前的指针是否有足够的连续空间，如果有，扩大 mem_address 指向的地址，并且将 mem_address 返回，
+                // 如果空间不够，先按照 newsize 指定的大小分配空间，将原有数据从头到尾拷贝到新分配的内存区域，
+                // 而后释放原来 mem_address 所指内存区域（注意：原来指针是自动释放，不需要使用free），
+                // 同时返回新分配的内存区域的首地址，即重新分配存储器块的地址。
+                resolvedFutureClasses = (Class *)realloc(resolvedFutureClasses, (resolvedFutureClassCount+1) * sizeof(Class));
                 resolvedFutureClasses[resolvedFutureClassCount++] = newCls;
             }
         }
     }
 
+    // 这里打印发现 classes 用的时间
+    // 在 objc-781 下打印：objc[11344]: 5.05 ms: IMAGE TIMES: discover classes
+    // 耗时 5.05 毫秒（和前面的 0.44 毫秒比，多出很多）
     ts.log("IMAGE TIMES: discover classes");
-
+    
+    // 4⃣️
     // Fix up remapped classes
     // Class list and nonlazy class list remain unremapped.
+    // Class list 和 nonlazy class list 仍未映射。
     // Class refs and super refs are remapped for message dispatching.
+    // Class refs 和 super refs 被重新映射为消息调度。
     
+    // 主要是修复重映射
+    // !noClassesRemapped() 在这里为 false，所以一般走不进来，
+    // 将未映射 class 和 super class 重映射，被 remap 的类都是非懒加载的类
     if (!noClassesRemapped()) {
         for (EACH_HEADER) {
+            // GETSECT(_getObjc2ClassRefs, Class, "__objc_classrefs");
+            // 获取 __objc_classrefs 区中的类引用
             Class *classrefs = _getObjc2ClassRefs(hi, &count);
+            
+            // 
             for (i = 0; i < count; i++) {
+                // Fix up a class ref, in case the class referenced has been reallocated or is an ignored weak-linked class.
+                // 修复 class ref，以防所引用的类已 reallocated 或 is an ignored weak-linked class。
                 remapClassRef(&classrefs[i]);
             }
+            
             // fixme why doesn't test future1 catch the absence of this?
+            // GETSECT(_getObjc2SuperRefs, Class, "__objc_superrefs");
             classrefs = _getObjc2SuperRefs(hi, &count);
+            
             for (i = 0; i < count; i++) {
                 remapClassRef(&classrefs[i]);
             }
@@ -751,7 +783,11 @@ void _read_images(header_info **hList, uint32_t hCount, int totalClasses, int un
 &emsp;第 1⃣️ 部分完成后在 objc-781 下的打印是：`objc[19881]: 0.04 ms: IMAGE TIMES: first time tasks` （机器是 m1 的 macMini），第 1⃣️ 部分的内容只有在第一次调用 `_read_images` 的时候才会执行，它主要做了两件事情：
 
 1. 根据环境变量（`OBJC_DISABLE_TAGGED_POINTERS`）判断是否禁用 Tagged Pointer，禁用 Tagged Pointer 时所涉及到的 mask 都被设置为 0，然后根据环境变量（`OBJC_DISABLE_TAG_OBFUSCATION`）以及是否是低版本系统来判断是否禁用 Tagged Pointer 的混淆器（obfuscation），禁用混淆器时 `objc_debug_taggedpointer_obfuscator` 的值 被设置为 0，否则为其设置一个随机值。
-2. 通过 `NXCreateMapTable` 根据类的数量（* 4/3）创建一张表（是 `NXMapTable` 结构体实例，`NXMapTable` 结构体是被作为哈希表来使用的，可通过类名（const char *）来获取 Class 对象）并赋值给 `gdb_objc_realized_classes` 这个全局变量，用来通过类名来存放类对象。
+2. 通过 `NXCreateMapTable` 根据类的数量（* 4/3，根据当前类的数量做动态扩容）创建一张哈希表（是 `NXMapTable` 结构体实例，`NXMapTable` 结构体是被作为哈希表来使用的，可通过类名（const char *）来获取 Class 对象）并赋值给 `gdb_objc_realized_classes` 这个全局的哈希表，用来通过类名来存放类对象（以及读取类对象），即这个 `gdb_objc_realized_classes` 便是一个全局的类表，只要 class 没有在共享缓存中，那么不管其实现或者未实现都会存在这个类表里面。
+
+&emsp;第 2⃣️ 部分完成后在 objc-781 下的打印是：`objc[27056]: 0.44 ms: IMAGE TIMES: fix up selector references`（机器是 m1 的 macMini），它主要做了一件事情，注册并修正 selector。也就是当 `SEL *sels = _getObjc2SelectorRefs(hi, &count);` 中的 SEL 和通过 `SEL sel = sel_registerNameNoLock(name, isBundle);` 注册返回的 SEL 不同时，就把 sels 中的 SEL 修正为 `sel_registerNameNoLock` 中返回的地址。
+
+&emsp;第 3⃣️ 部分完成后在 objc-781 下的打印是：`objc[11344]: 5.05 ms: IMAGE TIMES: discover classes`（机器是 m1 的 macMini），它主要做了一件事情，发现并读取 classes。
 
 
 
@@ -762,6 +798,36 @@ void _read_images(header_info **hList, uint32_t hCount, int totalClasses, int un
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+```c++
+objc[11344]: 0.02 ms: IMAGE TIMES: first time tasks
+objc[11344]: 0.48 ms: IMAGE TIMES: fix up selector references
+objc[11344]: 5.05 ms: IMAGE TIMES: discover classes
+objc[11344]: 0.00 ms: IMAGE TIMES: remap classes
+objc[11344]: 0.16 ms: IMAGE TIMES: fix up objc_msgSend_fixup
+objc[11344]: 6.52 ms: IMAGE TIMES: discover protocols
+objc[11344]: 0.01 ms: IMAGE TIMES: fix up @protocol references
+objc[11344]: 0.00 ms: IMAGE TIMES: discover categories
+objc[11344]: 0.30 ms: IMAGE TIMES: realize non-lazy classes
+objc[11344]: 0.00 ms: IMAGE TIMES: realize future classes
+2021-06-15 22:22:18.339697+0800 KCObjc[11344:96876] 🦁🦁🦁 main_front
+2021-06-15 22:22:18.340096+0800 KCObjc[11344:96876] 🤯🤯🤯
+Program ended with exit code: 0
+```
 
 
 
