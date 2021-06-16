@@ -512,6 +512,8 @@ void _read_images(header_info **hList, uint32_t hCount, int totalClasses, int un
         // 获取 __objc_classlist 区中的 classref_t
         
         // 从编译后的类列表中取出所有类，获取到的是一个 classref_t 类型的指针 
+        // classref_t is unremapped class_t* ➡️ classref_t 是未重映射的 class_t 指针
+        // typedef struct classref * classref_t; // classref_t 是 classref 结构体指针
         classref_t const *classlist = _getObjc2ClassList(hi, &count);
 
         bool headerIsBundle = hi->isBundle();
@@ -540,8 +542,8 @@ void _read_images(header_info **hList, uint32_t hCount, int totalClasses, int un
     }
 
     // 这里打印发现 classes 用的时间
-    // 在 objc-781 下打印：objc[11344]: 5.05 ms: IMAGE TIMES: discover classes
-    // 耗时 5.05 毫秒（和前面的 0.44 毫秒比，多出很多）
+    // 在 objc-781 下打印：objc[56474]: 3.17 ms: IMAGE TIMES: discover classes
+    // 耗时 3.17 毫秒（和前面的 0.44 毫秒比，多出不少）
     ts.log("IMAGE TIMES: discover classes");
     
     // 4⃣️
@@ -551,8 +553,7 @@ void _read_images(header_info **hList, uint32_t hCount, int totalClasses, int un
     // Class refs and super refs are remapped for message dispatching.
     // Class refs 和 super refs 被重新映射为消息调度。
     
-    // 主要是修复重映射
-    // !noClassesRemapped() 在这里为 false，所以一般走不进来，
+    // 主要是修复重映射 classes，!noClassesRemapped() 在这里为 false，所以一般走不进来，
     // 将未映射 class 和 super class 重映射，被 remap 的类都是非懒加载的类
     if (!noClassesRemapped()) {
         for (EACH_HEADER) {
@@ -560,7 +561,8 @@ void _read_images(header_info **hList, uint32_t hCount, int totalClasses, int un
             // 获取 __objc_classrefs 区中的类引用
             Class *classrefs = _getObjc2ClassRefs(hi, &count);
             
-            // 
+            // 遍历 classrefs 中的类引用，如果类引用已被重新分配或者是被忽略的弱链接类，
+            // 就将该类引用重新赋值为从重映射类表中取出新类
             for (i = 0; i < count; i++) {
                 // Fix up a class ref, in case the class referenced has been reallocated or is an ignored weak-linked class.
                 // 修复 class ref，以防所引用的类已 reallocated 或 is an ignored weak-linked class。
@@ -569,6 +571,7 @@ void _read_images(header_info **hList, uint32_t hCount, int totalClasses, int un
             
             // fixme why doesn't test future1 catch the absence of this?
             // GETSECT(_getObjc2SuperRefs, Class, "__objc_superrefs");
+            // 获取 __objc_superrefs 区中的父类引用
             classrefs = _getObjc2SuperRefs(hi, &count);
             
             for (i = 0; i < count; i++) {
@@ -577,64 +580,64 @@ void _read_images(header_info **hList, uint32_t hCount, int totalClasses, int un
         }
     }
 
+    // 这里打印修复重映射 classes 用的时间
+    // 在 objc-781 下打印：objc[56474]: 0.00 ms: IMAGE TIMES: remap classes
+    // 耗时 0 毫秒，即 Fix up remapped classes 并没有执行 
     ts.log("IMAGE TIMES: remap classes");
 
 #if SUPPORT_FIXUP
-    // Fix up old objc_msgSend_fixup call sites
-    for (EACH_HEADER) {
-        message_ref_t *refs = _getObjc2MessageRefs(hi, &count);
-        if (count == 0) continue;
-
-        if (PrintVtables) {
-            _objc_inform("VTABLES: repairing %zu unsupported vtable dispatch "
-                         "call sites in %s", count, hi->fname());
-        }
-        for (i = 0; i < count; i++) {
-            fixupMessageRef(refs+i);
-        }
-    }
-
-    ts.log("IMAGE TIMES: fix up objc_msgSend_fixup");
+...
 #endif
 
     bool cacheSupportsProtocolRoots = sharedCacheSupportsProtocolRoots();
-
+    
+    // 5⃣️ 
     // Discover protocols. Fix up protocol refs.
+    // 发现 protocols，修正 protocol refs。
     for (EACH_HEADER) {
         extern objc_class OBJC_CLASS_$_Protocol;
         Class cls = (Class)&OBJC_CLASS_$_Protocol;
         ASSERT(cls);
+        
+        // 创建一个长度是 16 的 NXMapTable
         NXMapTable *protocol_map = protocols();
         bool isPreoptimized = hi->hasPreoptimizedProtocols();
 
-        // Skip reading protocols if this is an image from the shared cache
-        // and we support roots
-        // Note, after launch we do need to walk the protocol as the protocol
-        // in the shared cache is marked with isCanonical() and that may not
-        // be true if some non-shared cache binary was chosen as the canonical
-        // definition
+        // Skip reading protocols if this is an image from the shared cache and we support roots
+        // 如果这是来自 shared cache 的 image 并且我们 support roots，则跳过 reading protocols
+        
+        // Note, after launch we do need to walk the protocol as the protocol in the shared cache is marked with isCanonical()
+        // and that may not be true if some non-shared cache binary was chosen as the canonical definition
+        // 启动后，我们确实需要遍历协议，因为 shared cache 中的协议用 isCanonical() 标记，如果选择某些非共享缓存二进制文件作为规范定义，则可能不是这样
+        
         if (launchTime && isPreoptimized && cacheSupportsProtocolRoots) {
             if (PrintProtocols) {
-                _objc_inform("PROTOCOLS: Skipping reading protocols in image: %s",
-                             hi->fname());
+                _objc_inform("PROTOCOLS: Skipping reading protocols in image: %s", hi->fname());
             }
             continue;
         }
 
         bool isBundle = hi->isBundle();
-
+        
+        // GETSECT(_getObjc2ProtocolList, protocol_t * const, "__objc_protolist");
+        // 获取 hi 的 __objc_protolist 区下的 protocol_t
         protocol_t * const *protolist = _getObjc2ProtocolList(hi, &count);
+        
         for (i = 0; i < count; i++) {
+            // Read a protocol as written by a compiler.
             readProtocol(protolist[i], cls, protocol_map, 
                          isPreoptimized, isBundle);
         }
     }
-
+    
+    // 这里打印发现并修正 protocols 用的时间
+    // 在 objc-781 下打印：objc[56474]: 5.45 ms: IMAGE TIMES: discover protocols
+    // 耗时 05.45 毫秒
     ts.log("IMAGE TIMES: discover protocols");
 
+    // 6⃣️
     // Fix up @protocol references
-    // Preoptimized images may have the right 
-    // answer already but we don't know for sure.
+    // Preoptimized images may have the right answer already but we don't know for sure.
     for (EACH_HEADER) {
         // At launch time, we know preoptimized image refs are pointing at the
         // shared cache definition of a protocol.  We can skip the check on
@@ -661,7 +664,8 @@ void _read_images(header_info **hList, uint32_t hCount, int totalClasses, int un
     }
 
     ts.log("IMAGE TIMES: discover categories");
-
+    
+    // 
     // Category discovery MUST BE Late to avoid potential races
     // when other threads call the new category code before
     // this thread finishes its fixups.
@@ -789,11 +793,9 @@ void _read_images(header_info **hList, uint32_t hCount, int totalClasses, int un
 
 &emsp;第 3⃣️ 部分完成后在 objc-781 下的打印是：`objc[11344]: 5.05 ms: IMAGE TIMES: discover classes`（机器是 m1 的 macMini），它主要做了一件事情，发现并读取 classes。
 
+&emsp;第 4⃣️ 部分 Fix up remapped classes 打印时间是 0 毫秒，一般情况下它不会执行！
 
-
-
-
-
+&emsp;第 5⃣️ 部分，discover protocols！
 
 
 
@@ -814,6 +816,22 @@ void _read_images(header_info **hList, uint32_t hCount, int totalClasses, int un
 
 
 ```c++
+// M1 macMini 下
+objc[56474]: 0.05 ms: IMAGE TIMES: first time tasks
+objc[56474]: 2.45 ms: IMAGE TIMES: fix up selector references
+objc[56474]: 3.17 ms: IMAGE TIMES: discover classes
+objc[56474]: 0.00 ms: IMAGE TIMES: remap classes
+objc[56474]: 0.15 ms: IMAGE TIMES: fix up objc_msgSend_fixup
+objc[56474]: 5.45 ms: IMAGE TIMES: discover protocols
+objc[56474]: 0.00 ms: IMAGE TIMES: fix up @protocol references
+objc[56474]: 0.00 ms: IMAGE TIMES: discover categories
+objc[56474]: 0.23 ms: IMAGE TIMES: realize non-lazy classes
+objc[56474]: 0.00 ms: IMAGE TIMES: realize future classes
+```
+
+
+```c++
+// intel i9 下
 objc[11344]: 0.02 ms: IMAGE TIMES: first time tasks
 objc[11344]: 0.48 ms: IMAGE TIMES: fix up selector references
 objc[11344]: 5.05 ms: IMAGE TIMES: discover classes
