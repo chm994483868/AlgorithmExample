@@ -638,25 +638,43 @@ void _read_images(header_info **hList, uint32_t hCount, int totalClasses, int un
     // 6⃣️
     // Fix up @protocol references
     // Preoptimized images may have the right answer already but we don't know for sure.
+    // Preoptimized images 可能已经有了正确的答案，但我们不确定。
     for (EACH_HEADER) {
-        // At launch time, we know preoptimized image refs are pointing at the
-        // shared cache definition of a protocol.  We can skip the check on
-        // launch, but have to visit @protocol refs for shared cache images
-        // loaded later.
+        // At launch time, we know preoptimized image refs are pointing at the shared cache definition of a protocol.
+        // 在启动时，我们知道 preoptimized image refs 指向协议的 shared cache 定义。
+        // We can skip the check on launch, but have to visit @protocol refs for shared cache images loaded later.
+        // 我们可以跳过启动时的检查，但必须访问 @protocol refs 以获取稍后加载的 shared cache images。
+        
         if (launchTime && cacheSupportsProtocolRoots && hi->isPreoptimized())
             continue;
+            
+        // GETSECT(_getObjc2ProtocolRefs, protocol_t *, "__objc_protorefs");
+        // 获取 hi 的 __objc_protorefs 区的 protocol_t
         protocol_t **protolist = _getObjc2ProtocolRefs(hi, &count);
+        
         for (i = 0; i < count; i++) {
+            // Fix up a protocol ref, in case the protocol referenced has been reallocated.
+            // 修复 protocol ref，以防 protocol referenced 已重新分配。
             remapProtocolRef(&protolist[i]);
         }
     }
-
+    
+    // 这里打印 @protocol references 用的时间
+    // 在 objc-781 下打印：objc[56474]: 0.00 ms: IMAGE TIMES: fix up @protocol references
+    // 因为是第一次启动，则并不进行
     ts.log("IMAGE TIMES: fix up @protocol references");
+    
+    // 7⃣️
+    // 下面把 category 的数据追加到原类中去！超重要.... 
+    // Discover categories. 发现类别。
+    // Only do this after the initial category attachment has been done.
+    // 仅在完成 initial category attachment 后才执行此操作。
+    // For categories present at startup, discovery is deferred until the first load_images call after the call to _dyld_objc_notify_register completes. rdar://problem/53119145
+    // 对于启动时出现的 categories，discovery 被推迟到 _dyld_objc_notify_register 调用完成后的第一个 load_images 调用。
+    
+    // didInitialAttachCategories 是一个静态全局变量，默认是 false，
+    // static bool didInitialAttachCategories = false;
 
-    // Discover categories. Only do this after the initial category
-    // attachment has been done. For categories present at startup,
-    // discovery is deferred until the first load_images call after
-    // the call to _dyld_objc_notify_register completes. rdar://problem/53119145
     if (didInitialAttachCategories) {
         for (EACH_HEADER) {
             load_categories_nolock(hi);
@@ -797,7 +815,7 @@ void _read_images(header_info **hList, uint32_t hCount, int totalClasses, int un
 
 &emsp;第 5⃣️ 部分，discover protocols！
 
-
+&emsp;第 6⃣️ 部分，Fix up @protocol references。
 
 
 
