@@ -665,12 +665,16 @@ void _read_images(header_info **hList, uint32_t hCount, int totalClasses, int un
     ts.log("IMAGE TIMES: fix up @protocol references");
     
     // 7⃣️
-    // 下面把 category 的数据追加到原类中去！超重要.... 
+    // 下面把 category 的数据追加到原类中去！超重要....（这个在 category 里面有详细的梳理，这里就不展开了） 
     // Discover categories. 发现类别。
     // Only do this after the initial category attachment has been done.
     // 仅在完成 initial category attachment 后才执行此操作。
-    // For categories present at startup, discovery is deferred until the first load_images call after the call to _dyld_objc_notify_register completes. rdar://problem/53119145
+    // For categories present at startup, 
+    // discovery is deferred until the first load_images call after the call to _dyld_objc_notify_register completes.
+    // rdar://problem/53119145
+    
     // 对于启动时出现的 categories，discovery 被推迟到 _dyld_objc_notify_register 调用完成后的第一个 load_images 调用。
+    // 这里 if 里面的 category 数据加载是不会执行的。
     
     // didInitialAttachCategories 是一个静态全局变量，默认是 false，
     // static bool didInitialAttachCategories = false;
@@ -681,26 +685,37 @@ void _read_images(header_info **hList, uint32_t hCount, int totalClasses, int un
         }
     }
 
+    // 这里打印 Discover categories. 用的时间
+    // 在 objc-781 下打印：objc[56474]: 0.00 ms: IMAGE TIMES: discover categories
+    // 对于启动时出现的 categories，discovery 被推迟到 _dyld_objc_notify_register 调用完成后的第一个 load_images 调用。
+    // 所以这里 if 里面的 category 数据加载是不会执行的。
     ts.log("IMAGE TIMES: discover categories");
     
-    // 
-    // Category discovery MUST BE Late to avoid potential races
-    // when other threads call the new category code before
-    // this thread finishes its fixups.
+    // 8⃣️
+    // Category discovery MUST BE Late to avoid potential races when
+    // other threads call the new category code before this thread finishes its fixups.
+    // 当其他线程在该线程完成其修复（thread finishes its fixups）之前调用新的 category code 时，
+    // category discovery 必须延迟以避免潜在的竞争。
 
     // +load handled by prepare_load_methods()
+    // +load 由 prepare_load_methods() 处理
 
     // Realize non-lazy classes (for +load methods and static instances)
+    // 实现非懒加载类（）
     for (EACH_HEADER) {
-        classref_t const *classlist = 
-            _getObjc2NonlazyClassList(hi, &count);
+        // GETSECT(_getObjc2NonlazyClassList, classref_t const, "__objc_nlclslist");
+        // 获取 hi 的 __objc_nlclslist 区中的非懒加载类（即实现了 +load 函数的类）
+        classref_t const *classlist = _getObjc2NonlazyClassList(hi, &count);
         for (i = 0; i < count; i++) {
+            // 重映射类， 获取正确的类指针
             Class cls = remapClass(classlist[i]);
             
-            printf("non-lazy classes: %s\n", cls->mangledName());
-            
             if (!cls) continue;
-
+            
+            // static void addClassTableEntry(Class cls, bool addMeta = true) { ... }
+            // 将一个类添加到所有类的表中（auto &set = objc::allocatedClasses.get();）。如果 addMeta 为 true（默认为 true），也自动添加类的元类。
+            // 这个类可以通过 shared cache 或 data segments 成为已知类，但不允许已经在 dynamic table 中。
+            
             addClassTableEntry(cls);
 
             if (cls->isSwiftStable()) {
@@ -805,6 +820,7 @@ void _read_images(header_info **hList, uint32_t hCount, int totalClasses, int un
 &emsp;第 1⃣️ 部分完成后在 objc-781 下的打印是：`objc[19881]: 0.04 ms: IMAGE TIMES: first time tasks` （机器是 m1 的 macMini），第 1⃣️ 部分的内容只有在第一次调用 `_read_images` 的时候才会执行，它主要做了两件事情：
 
 1. 根据环境变量（`OBJC_DISABLE_TAGGED_POINTERS`）判断是否禁用 Tagged Pointer，禁用 Tagged Pointer 时所涉及到的 mask 都被设置为 0，然后根据环境变量（`OBJC_DISABLE_TAG_OBFUSCATION`）以及是否是低版本系统来判断是否禁用 Tagged Pointer 的混淆器（obfuscation），禁用混淆器时 `objc_debug_taggedpointer_obfuscator` 的值 被设置为 0，否则为其设置一个随机值。
+
 2. 通过 `NXCreateMapTable` 根据类的数量（* 4/3，根据当前类的数量做动态扩容）创建一张哈希表（是 `NXMapTable` 结构体实例，`NXMapTable` 结构体是被作为哈希表来使用的，可通过类名（const char *）来获取 Class 对象）并赋值给 `gdb_objc_realized_classes` 这个全局的哈希表，用来通过类名来存放类对象（以及读取类对象），即这个 `gdb_objc_realized_classes` 便是一个全局的类表，只要 class 没有在共享缓存中，那么不管其实现或者未实现都会存在这个类表里面。
 
 &emsp;第 2⃣️ 部分完成后在 objc-781 下的打印是：`objc[27056]: 0.44 ms: IMAGE TIMES: fix up selector references`（机器是 m1 的 macMini），它主要做了一件事情，注册并修正 selector。也就是当 `SEL *sels = _getObjc2SelectorRefs(hi, &count);` 中的 SEL 和通过 `SEL sel = sel_registerNameNoLock(name, isBundle);` 注册返回的 SEL 不同时，就把 sels 中的 SEL 修正为 `sel_registerNameNoLock` 中返回的地址。
@@ -817,12 +833,7 @@ void _read_images(header_info **hList, uint32_t hCount, int totalClasses, int un
 
 &emsp;第 6⃣️ 部分，Fix up @protocol references。
 
-
-
-
-
-
-
+&emsp;第 7⃣️ 部分，Discover categories，是把 category 的数据追加到原类中去！超重要....（这个在 category 的文章里面有详细的梳理，这里就不展开了），但是这里并不会执行，didInitialAttachCategories 是一个静态全局变量，默认是 false，对于启动时出现的 categories，discovery 被推迟到 `_dyld_objc_notify_register` 调用完成后的第一个 `load_images` 调用。所以这里 if 里面的 Discover categories 是不会执行的。
 
 
 
