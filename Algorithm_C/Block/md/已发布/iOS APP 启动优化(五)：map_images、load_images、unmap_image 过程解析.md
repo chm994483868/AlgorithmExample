@@ -533,8 +533,9 @@ void _read_images(header_info **hList, uint32_t hCount, int totalClasses, int un
                 // realloc 原型是 extern void *realloc(void *mem_address, unsigned int newsize);
                 // 先判断当前的指针是否有足够的连续空间，如果有，扩大 mem_address 指向的地址，并且将 mem_address 返回，
                 // 如果空间不够，先按照 newsize 指定的大小分配空间，将原有数据从头到尾拷贝到新分配的内存区域，
-                // 而后释放原来 mem_address 所指内存区域（注意：原来指针是自动释放，不需要使用free），
+                // 而后释放原来 mem_address 所指内存区域（注意：原来指针是自动释放，不需要使用 free），
                 // 同时返回新分配的内存区域的首地址，即重新分配存储器块的地址。
+                
                 resolvedFutureClasses = (Class *)realloc(resolvedFutureClasses, (resolvedFutureClassCount+1) * sizeof(Class));
                 resolvedFutureClasses[resolvedFutureClassCount++] = newCls;
             }
@@ -758,6 +759,7 @@ void _read_images(header_info **hList, uint32_t hCount, int totalClasses, int un
     
     // 9⃣️ 
     // Realize newly-resolved future classes, in case CF manipulates them
+    // 实现 newly-resolved future classes，以防 CF 操作它们
     if (resolvedFutureClasses) {
         for (i = 0; i < resolvedFutureClassCount; i++) {
             Class cls = resolvedFutureClasses[i];
@@ -765,75 +767,35 @@ void _read_images(header_info **hList, uint32_t hCount, int totalClasses, int un
                 _objc_fatal("Swift class is not allowed to be future");
             }
             realizeClassWithoutSwift(cls, nil);
+            
+            // 将此类及其所有子类标记为需要原始 isa 指针
             cls->setInstancesRequireRawIsaRecursively(false/*inherited*/);
         }
         free(resolvedFutureClasses);
     }
-
+    
+    // objc[56474]: 0.00 ms: IMAGE TIMES: realize future classes
+    // 打印时间为 0.00 毫秒
     ts.log("IMAGE TIMES: realize future classes");
+    
+    // OPTION( DebugNonFragileIvars, OBJC_DEBUG_NONFRAGILE_IVARS, "capriciously rearrange non-fragile ivars")
+    //（反复无常地重新排列非脆弱的 ivars）
+    // 如果开启了 OBJC_DEBUG_NONFRAGILE_IVARS 这个环境变量，则会执行 realizeAllClasses() 函数，
 
+    // Non-lazily realizes 所有已知 image 中所有未实现的类。(即对已知的 image 中的所有类：懒加载和非懒加载类全部进行实现)
     if (DebugNonFragileIvars) {
         realizeAllClasses();
     }
 
-
     // Print preoptimization statistics
+    // 打印预优化统计信息
+    
+    // OPTION( PrintPreopt, OBJC_PRINT_PREOPTIMIZATION, "log preoptimization courtesy of dyld shared cache")
+    // 日志预优化由 dyld shared cache 提供
+    
     if (PrintPreopt) {
-        static unsigned int PreoptTotalMethodLists;
-        static unsigned int PreoptOptimizedMethodLists;
-        static unsigned int PreoptTotalClasses;
-        static unsigned int PreoptOptimizedClasses;
-
-        for (EACH_HEADER) {
-            if (hi->hasPreoptimizedSelectors()) {
-                _objc_inform("PREOPTIMIZATION: honoring preoptimized selectors "
-                             "in %s", hi->fname());
-            }
-            else if (hi->info()->optimizedByDyld()) {
-                _objc_inform("PREOPTIMIZATION: IGNORING preoptimized selectors "
-                             "in %s", hi->fname());
-            }
-
-            classref_t const *classlist = _getObjc2ClassList(hi, &count);
-            for (i = 0; i < count; i++) {
-                Class cls = remapClass(classlist[i]);
-                if (!cls) continue;
-
-                PreoptTotalClasses++;
-                if (hi->hasPreoptimizedClasses()) {
-                    PreoptOptimizedClasses++;
-                }
-                
-                const method_list_t *mlist;
-                if ((mlist = ((class_ro_t *)cls->data())->baseMethods())) {
-                    PreoptTotalMethodLists++;
-                    if (mlist->isFixedUp()) {
-                        PreoptOptimizedMethodLists++;
-                    }
-                }
-                if ((mlist=((class_ro_t *)cls->ISA()->data())->baseMethods())) {
-                    PreoptTotalMethodLists++;
-                    if (mlist->isFixedUp()) {
-                        PreoptOptimizedMethodLists++;
-                    }
-                }
-            }
-        }
-
-        _objc_inform("PREOPTIMIZATION: %zu selector references not "
-                     "pre-optimized", UnfixedSelectors);
-        _objc_inform("PREOPTIMIZATION: %u/%u (%.3g%%) method lists pre-sorted",
-                     PreoptOptimizedMethodLists, PreoptTotalMethodLists, 
-                     PreoptTotalMethodLists
-                     ? 100.0*PreoptOptimizedMethodLists/PreoptTotalMethodLists 
-                     : 0.0);
-        _objc_inform("PREOPTIMIZATION: %u/%u (%.3g%%) classes pre-registered",
-                     PreoptOptimizedClasses, PreoptTotalClasses, 
-                     PreoptTotalClasses 
-                     ? 100.0*PreoptOptimizedClasses/PreoptTotalClasses
-                     : 0.0);
-        _objc_inform("PREOPTIMIZATION: %zu protocol references not "
-                     "pre-optimized", UnfixedProtocolReferences);
+        // 一些 log 输出...
+        ...
     }
 
 #undef EACH_HEADER
@@ -860,8 +822,13 @@ void _read_images(header_info **hList, uint32_t hCount, int totalClasses, int un
 
 &emsp;第 8⃣️ 部分，实现非懒加载类，首先获取 image 的 `__objc_nlclslist` 区中的非懒加载类（实现了 +load 函数的类），然后对这些类进行重映射，获取正确的类指针，        然后将其添加到用来存储所有类的全局的 set 中（`auto &set = objc::allocatedClasses.get();`），如果 `addMeta` 参数为 true（默认为 true），也自动添加类的元类到这个 set 中。然后调用 `realizeClassWithoutSwift(cls, nil);` 函数实现该类（实现 Swift 之外的 classes），（对类执行首次初始化，包括分配其读写数据。不执行任何 Swift 端初始化。返回类的真实类结构。）大概是设置 `ro` `rw` 和一些标识位的过程，也包括递归实现父类（`supercls = realizeClassWithoutSwift(remapClass(cls->superclass), nil);`）和元类（`metacls = realizeClassWithoutSwift(remapClass(cls->ISA()`), nil);），然后更新 cls 的父类和元类（cls->superclass = supercls; cls->initClassIsa(metacls);），将 cls 连接到其父类的子类列表（`addSubclass(supercls, cls);`）（操作 class_rw_t 的 `Class firstSubclass;` 和 `Class nextSiblingClass;` 两个成员变量），修正 cls 的方法列表、协议列表和属性列表，以及最后的附加任何未完成的 categories 到类中（主要包含 method list、protocol list、property list）（objc::unattachedCategories.attachToClass）。
 
-&emsp;第 9⃣️ 部分，
+1. 懒加载：类没有实现 +load 函数，在使用的第一次才会加载，当我们给这个类的发送消息时，如果是第一次，在消息查找的过程中就会判断这个类是否加载，没有加载就会加载这个类。懒加载类在首次调用方法的时候，才会去调用 `realizeClassWithoutSwift` 函数去进行加载。 
 
+2. 非懒加载：类的内部实现了 +load 函数，类的加载就会提前。
+
+&emsp;第 9⃣️ 部分，实现 newly-resolved future classes，以防 CF 操作它们。
+
+#### readClass
 
 
 
