@@ -691,7 +691,6 @@ void _read_images(header_info **hList, uint32_t hCount, int totalClasses, int un
     // 所以这里 if 里面的 category 数据加载是不会执行的。
     ts.log("IMAGE TIMES: discover categories");
     
-    // 8⃣️
     // Category discovery MUST BE Late to avoid potential races when
     // other threads call the new category code before this thread finishes its fixups.
     // 当其他线程在该线程完成其修复（thread finishes its fixups）之前调用新的 category code 时，
@@ -700,6 +699,7 @@ void _read_images(header_info **hList, uint32_t hCount, int totalClasses, int un
     // +load handled by prepare_load_methods()
     // +load 由 prepare_load_methods() 处理
 
+    // 8⃣️
     // Realize non-lazy classes (for +load methods and static instances)
     // 实现非懒加载类（）
     for (EACH_HEADER) {
@@ -713,25 +713,45 @@ void _read_images(header_info **hList, uint32_t hCount, int totalClasses, int un
             if (!cls) continue;
             
             // static void addClassTableEntry(Class cls, bool addMeta = true) { ... }
-            // 将一个类添加到所有类的表中（auto &set = objc::allocatedClasses.get();）。如果 addMeta 为 true（默认为 true），也自动添加类的元类。
+            // 将一个类添加到用来存储所有类的全局的 set 中（auto &set = objc::allocatedClasses.get();）。
+            // 如果 addMeta 为 true（默认为 true），也自动添加类的元类到这个 set 中。
             // 这个类可以通过 shared cache 或 data segments 成为已知类，但不允许已经在 dynamic table 中。
             
+            // allocatedClasses 是 objc 命名空间中的一个静态变量。
+            // A table of all classes (and metaclasses) which have been allocated with objc_allocateClassPair.
+            // 已使用 objc_allocateClassPair 分配空间的存储所有 classes（和 metaclasses）的 Set。
+            // namespace objc {
+            //     static ExplicitInitDenseSet<Class> allocatedClasses;
+            // }
+            
+            // 先把 cls 放入 allocatedClasses 中，然后递归把 metaclass 放入 allocatedClasses 中
             addClassTableEntry(cls);
-
+            
+            // 判断 cls 是否是来自稳定的 Swift ABI 的 Swift 类
             if (cls->isSwiftStable()) {
                 if (cls->swiftMetadataInitializer()) {
                     _objc_fatal("Swift class %s with a metadata initializer "
                                 "is not allowed to be non-lazy",
                                 cls->nameForLogging());
                 }
-                // fixme also disallow relocatable classes
-                // We can't disallow all Swift classes because of
-                // classes like Swift.__EmptyArrayStorage
+                // fixme also disallow relocatable classes We can't disallow all Swift classes because of classes like Swift.__EmptyArrayStorage
+                // 也禁止 relocatable classes 我们不能因为像 Swift.__EmptyArrayStorage 这样的类而禁止所有 Swift 类
             }
+            
+            // 实现 Swift 之外的 classes
+            // 对类 cls 执行首次初始化，包括分配其读写数据。不执行任何 Swift 端初始化。返回类的真实类结构。
+            
+            // 大概是设置 ro rw 和一些标识位的过程，也包括递归实现父类（supercls = realizeClassWithoutSwift(remapClass(cls->superclass), nil);）
+            // 和元类（metacls = realizeClassWithoutSwift(remapClass(cls->ISA()), nil);），
+            // 然后更新 cls 的父类和元类（cls->superclass = supercls; cls->initClassIsa(metacls);），
+            // 将 cls 连接到其父类的子类列表（addSubclass(supercls, cls);）（操作 class_rw_t 的 Class firstSubclass; 和 Class nextSiblingClass; 两个成员变量），
+            // 修正 cls 的方法列表、协议列表和属性列表，附加任何未完成的 categories（objc::unattachedCategories.attachToClass）。
             realizeClassWithoutSwift(cls, nil);
         }
     }
-
+    
+    // 这里打印 Realize non-lazy classes 用的时间
+    // 在 objc-781 下打印：objc[56474]: 0.23 ms: IMAGE TIMES: realize non-lazy classes
     ts.log("IMAGE TIMES: realize non-lazy classes");
 
     // Realize newly-resolved future classes, in case CF manipulates them
@@ -835,6 +855,7 @@ void _read_images(header_info **hList, uint32_t hCount, int totalClasses, int un
 
 &emsp;第 7⃣️ 部分，Discover categories，是把 category 的数据追加到原类中去！超重要....（这个在 category 的文章里面有详细的梳理，这里就不展开了），但是这里并不会执行，didInitialAttachCategories 是一个静态全局变量，默认是 false，对于启动时出现的 categories，discovery 被推迟到 `_dyld_objc_notify_register` 调用完成后的第一个 `load_images` 调用。所以这里 if 里面的 Discover categories 是不会执行的。
 
+&emsp;第 8⃣️ 部分，
 
 
 
