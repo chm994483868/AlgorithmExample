@@ -766,6 +766,8 @@ void _read_images(header_info **hList, uint32_t hCount, int totalClasses, int un
             if (cls->isSwiftStable()) {
                 _objc_fatal("Swift class is not allowed to be future");
             }
+            
+            // 实现类
             realizeClassWithoutSwift(cls, nil);
             
             // 将此类及其所有子类标记为需要原始 isa 指针
@@ -793,6 +795,7 @@ void _read_images(header_info **hList, uint32_t hCount, int totalClasses, int un
     // OPTION( PrintPreopt, OBJC_PRINT_PREOPTIMIZATION, "log preoptimization courtesy of dyld shared cache")
     // 日志预优化由 dyld shared cache 提供
     
+    // 🔟
     if (PrintPreopt) {
         // 一些 log 输出...
         ...
@@ -826,9 +829,124 @@ void _read_images(header_info **hList, uint32_t hCount, int totalClasses, int un
 
 2. 非懒加载：类的内部实现了 +load 函数，类的加载就会提前。
 
-&emsp;第 9⃣️ 部分，实现 newly-resolved future classes，以防 CF 操作它们。
+&emsp;第 9⃣️ 部分，实现 newly-resolved future classes，以防 CF 操作它们。（第一次启动时并不会执行，我们也可以看到 `resolvedFutureClasses` 中并没有记录到需要执行 `realizeClassWithoutSwift` 的类。）
+
+&emsp;第 🔟 部分，则是一些 log 信息，我们打开 `OBJC_PRINT_PREOPTIMIZATION` 环境变量，可以进行查看。
+
+```c++
+....
+objc[35841]: PREOPTIMIZATION: 659 selector references not pre-optimized
+objc[35841]: PREOPTIMIZATION: 34944/35013 (99.8%) method lists pre-sorted
+objc[35841]: PREOPTIMIZATION: 24524/24579 (99.8%) classes pre-registered
+objc[35841]: PREOPTIMIZATION: 0 protocol references not pre-optimized
+```
 
 #### readClass
+
+&emsp;上面我们已经把 `_read_images` 函数对整体实现都看完了，其中 `Discover classes. Fix up unresolved future classes. Mark bundle classes.` 部分的内容中涉及到一个 `Class readClass(Class cls, bool headerIsBundle, bool headerIsPreoptimized)` 函数，下面我们来详细看一下它。
+
+```c++
+/***********************************************************************
+* readClass
+* Read a class and metaclass as written by a compiler.
+* 读取由编译器编写的类和元类。
+
+* Returns the new class pointer. This could be:
+* 返回新的类指针。这可能是：
+
+* - cls
+* - nil  (cls has a missing weak-linked superclass)
+* - something else (space for this class was reserved by a future class)
+
+* Note that all work performed by this function is preflighted by mustReadClasses().
+* 请注意，此函数执行的所有工作都由 mustReadClasses() 预检。
+
+* Do not change this function without updating that one.
+
+* Locking: runtimeLock acquired by map_images or objc_readClassPair
+**********************************************************************/
+Class readClass(Class cls, bool headerIsBundle, bool headerIsPreoptimized)
+{
+    // 类的名字
+    const char *mangledName = cls->mangledName();
+    
+    // 1⃣️ 只有 superclass 不存在时，才会进入判断内
+    if (missingWeakSuperclass(cls)) {
+        // No superclass (probably weak-linked). 
+        // Disavow any knowledge of this subclass.
+        if (PrintConnecting) {
+            _objc_inform("CLASS: IGNORING class '%s' with "
+                         "missing weak-linked superclass", 
+                         cls->nameForLogging());
+        }
+        addRemappedClass(cls, nil);
+        cls->superclass = nil;
+        return nil;
+    }
+    
+    // 如果 cls 是 swift 类，进行一些修正
+    cls->fixupBackwardDeployingStableSwift();
+    
+    // 2⃣️ 判断 class 是否是 unrealized future class（判断它是否存在与 future_named_class_map 中） 
+    Class replacing = nil;
+    if (Class newCls = popFutureNamedClass(mangledName)) {
+        // This name was previously allocated as a future class.
+        // Copy objc_class to future class's struct.
+        // Preserve future's rw data block.
+        
+        if (newCls->isAnySwift()) {
+            _objc_fatal("Can't complete future class request for '%s' "
+                        "because the real class is too big.", 
+                        cls->nameForLogging());
+        }
+        
+        class_rw_t *rw = newCls->data();
+        const class_ro_t *old_ro = rw->ro();
+        memcpy(newCls, cls, sizeof(objc_class));
+        rw->set_ro((class_ro_t *)newCls->data());
+        newCls->setData(rw);
+        freeIfMutable((char *)old_ro->name);
+        free((void *)old_ro);
+        
+        addRemappedClass(cls, newCls);
+        
+        replacing = cls;
+        cls = newCls;
+    }
+    
+    // headerIsPreoptimized 是外部参数，只有该类禁用了预优化才会返回 true，所以到这里会走下面的 else
+    if (headerIsPreoptimized  &&  !replacing) {
+        // class list built in shared cache
+        // fixme strict assert doesn't work because of duplicates
+        // ASSERT(cls == getClass(name));
+        ASSERT(getClassExceptSomeSwift(mangledName));
+    } else {
+        // 会执行这里的内容
+        addNamedClass(cls, mangledName, replacing);
+        addClassTableEntry(cls);
+    }
+
+    // for future reference: shared cache never contains MH_BUNDLEs
+    // 如果 headerIsBundle 为真，则设置下面的标识位 RO_FROM_BUNDLE
+    if (headerIsBundle) {
+        cls->data()->flags |= RO_FROM_BUNDLE;
+        cls->ISA()->data()->flags |= RO_FROM_BUNDLE;
+    }
+    
+    return cls;
+}
+```
+
+&emsp;从上到下可看到有一些情况的处理：例如 superclass 不存在时、判断 class 是否是 unrealized **future class**、判读该类是否禁用了预优化，而最终的绝大部分情况则会是调用：`addNamedClass(cls, mangledName, replacing);` 和 `addClassTableEntry(cls);` 下面我们看一下他们的实现。
+
+&emsp;
+
+
+
+
+
+
+
 
 
 
