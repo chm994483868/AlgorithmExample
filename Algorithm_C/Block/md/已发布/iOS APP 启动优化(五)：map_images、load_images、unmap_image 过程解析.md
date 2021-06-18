@@ -937,12 +937,54 @@ Class readClass(Class cls, bool headerIsBundle, bool headerIsPreoptimized)
 }
 ```
 
-&emsp;从上到下可看到有一些情况的处理：例如 superclass 不存在时、判断 class 是否是 unrealized **future class**、判读该类是否禁用了预优化，而最终的绝大部分情况则会是调用：`addNamedClass(cls, mangledName, replacing);` 和 `addClassTableEntry(cls);` 下面我们看一下他们的实现。
+&emsp;从上到下可看到有一些情况的处理：例如 superclass 不存在时、判断 class 是否是 unrealized **future class**、判断该类是否禁用了预优化，而最终的绝大部分情况则会是调用：`addNamedClass(cls, mangledName, replacing);` 和 `addClassTableEntry(cls);` 下面我们看一下他们的实现。
+
+```c++
+/***********************************************************************
+* addNamedClass
+* Adds name => cls to the named non-meta class map.
+* 将 name => cls 添加到命名为 non-meta class map。
+
+* Warns about duplicate class names and keeps the old mapping.
+* 警告：重复的类名并保留旧的 mapping。
+* Locking: runtimeLock must be held by the caller
+**********************************************************************/
+static void addNamedClass(Class cls, const char *name, Class replacing = nil)
+{
+    runtimeLock.assertLocked();
+    Class old;
+    
+    // 根据 name 查找对应的类（swift 类除外），
+    // 其中会在 NXMapTable *gdb_objc_realized_classes 中查找 和 dyld shared cache 的表中查找，
+    if ((old = getClassExceptSomeSwift(name))  &&  old != replacing) {
+        inform_duplicate(name, old, cls);
+
+        // getMaybeUnrealizedNonMetaClass uses name lookups.
+        // Classes not found by name lookup must be in the secondary meta->nonmeta table.
+        // 名称查找未找到的类必须位于辅助元->非元表中。
+        addNonMetaClass(cls);
+    } else {
+        // 把 cls 和 name 插入到 gdb_objc_realized_classes 中去
+        NXMapInsert(gdb_objc_realized_classes, name, cls);
+    }
+    ASSERT(!(cls->data()->flags & RO_META));
+
+    // wrong: constructed classes are already realized when they get here
+    // ASSERT(!cls->isRealized());
+}
+```
+
+&emsp;看注释可知道 `addNamedClass` 函数是把 `name => cls` 添加到命名为非元类的 map 中去。`addNamedClass` 函数内部则是首先 `if ((old = getClassExceptSomeSwift(name))  &&  old != replacing)` 是根据 `name` 去 `NXMapTable *gdb_objc_realized_classes` 和 `dyld shared cache` 的表中去查找对应对类，如果未找到的话则把 `cls` 插入到 `gdb_objc_realized_classes` 中去。
+
+&emsp;下面我们看一下 `NXMapInsert(gdb_objc_realized_classes, name, cls);` 的实现。
+
+#### NXMapInsert
 
 &emsp;
 
+```c++
 
-
+```
 
 
 
