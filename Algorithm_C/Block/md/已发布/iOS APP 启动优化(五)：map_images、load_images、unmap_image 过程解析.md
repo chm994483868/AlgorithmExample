@@ -980,14 +980,156 @@ static void addNamedClass(Class cls, const char *name, Class replacing = nil)
 
 #### NXMapInsert
 
-&emsp;
+&emsp;`NXMapInsert` 函数是把 cls 和 name 插入到 `NXMapTable *gdb_objc_realized_classes` 中去。
 
 ```c++
 
+/* This module allows hashing of arbitrary associations [key -> value].  
+ * 该模块允许对任意关联 [key -> value] 进行哈希化。
+ * Keys and values must be pointers or integers, and client is responsible for allocating/deallocating this data.
+ * 键和值必须是指针或整数，client 负责 allocating/deallocating 这些数据。
+ * A deallocation call-back is provided.
+ * 提供 deallocation call-back。
+ * NX_MAPNOTAKEY (-1) is used internally as a marker, and therefore keys must always be different from -1.
+ * NX_MAPNOTAKEY (-1) 在内部用作标记，因此 keys 必须始终不同于 -1。
+ * As well-behaved scalable data structures, hash tables double in size when they start becoming full, 
+ * 作为行为良好的可扩展数据结构，哈希表在开始变满时大小会增加一倍，从而保证平均恒定时间访问和线性大小。
+ * thus guaranteeing both average constant time access and linear size. 
+ */
+
+// 这里是 NXMapTable 的结构
+typedef struct _NXMapTable {
+
+/* private data structure; may change */
+
+const struct _NXMapTablePrototype    * _Nonnull prototype;
+unsigned    count;
+unsigned    nbBucketsMinusOne;
+void    * _Nullable buckets;
+
+} NXMapTable OBJC_MAP_AVAILABILITY;
+
+void *NXMapInsert(NXMapTable *table, const void *key, const void *value) {
+    // 取得 table 的 buckets 成员变量
+    MapPair    *pairs = (MapPair *)table->buckets;
+    
+    // 调用 table->prototype->hash 函数计算 key 在 table 中的哈希值
+    unsigned    index = bucketOf(table, key);
+    
+    // 取得 index 位置的 MapPair
+    MapPair    *pair = pairs + index;
+    
+    // key 不能等于 -1，-1 是保留值
+    if (key == NX_MAPNOTAKEY) {
+    _objc_inform("*** NXMapInsert: invalid key: -1\n");
+    return NULL;
+    }
+
+    // buckets 长度
+    unsigned numBuckets = table->nbBucketsMinusOne + 1;
+
+    // 上面如果根据 key 的哈希值取得的 pair，该 pair 的 key 是 -1，则表示该位置还没有存入东西，
+    // 则把 key 和 value 存在这里，如果当前 table 存储的数据已经超过了其容量的 3 / 4，则进行扩容并重新哈希化里面的数据
+    if (pair->key == NX_MAPNOTAKEY) {
+        pair->key = key; pair->value = value;
+        table->count++;
+        if (table->count * 4 > numBuckets * 3) _NXMapRehash(table);
+        return NULL;
+    }
+    
+    // 如果 pair 的 key 和入参 key 相同，则表示 key 已经存在于 table 中（则更新 value）
+    if (isEqual(table, pair->key, key)) {
+        // 取得 pair 的 value，即旧值
+        const void    *old = pair->value;
+        
+        // 如果旧值和入参新值 value 不同，则把 value 赋值给 pair 的 value
+        if (old != value) pair->value = value;/* avoid writing unless needed! */
+        
+        // 把旧值 old 返回
+        return (void *)old;
+    } else if (table->count == numBuckets) { // ⬅️ 如果刚好没有空间了，则扩容并重新哈希化旧数据后，再尝试插入 [key value]
+        /* no room: rehash and retry */
+        
+        // 扩容并重新哈希旧数据
+        _NXMapRehash(table);
+        
+        // 再尝试插入 [key value] 
+        return NXMapInsert(table, key, value);
+    } else {
+        // 如果进了这里，则表示是产生了哈希碰撞
+        // 用 index2 记录下入参 key 在 table 中的哈希值
+        unsigned    index2 = index;
+        
+        // 开放寻址法，nextInde 函数则是：(index + 1) & table->nbBucketsMinusOne，
+        // 直到 index2 等于 index，当 index2 等于 index 时表示寻址一遍了，都没有找到位置。
+        while ((index2 = nextIndex(table, index2)) != index) {
+            // 取得 index2 的 pair
+            pair = pairs + index2;
+            
+            // 如果 pair 的 key 值是 -1，即表示为 [key value] 找到了一个空位置
+            if (pair->key == NX_MAPNOTAKEY) {
+                // 找到了空位，则把 [key value] 放入
+                pair->key = key; pair->value = value;
+                
+                // count 自增
+                table->count++;
+                
+                // 然后判断是否需要扩容，并把旧数据进行重新哈希化
+                if (table->count * 4 > numBuckets * 3) _NXMapRehash(table);
+                
+                return NULL;
+            }
+            
+            // 找到一个相同的 key，更新 value，并把旧值返回
+            if (isEqual(table, pair->key, key)) {
+                const void    *old = pair->value;
+                if (old != value) pair->value = value;/* avoid writing unless needed! */
+                return (void *)old;
+            }
+        }
+        
+        // 不可能发生这里，如果执行到了这里表示哈希表出错了，即 NXMapInsert 出现了 bug
+        /* no room: can't happen! */
+        _objc_inform("**** NXMapInsert: bug\n");
+        
+        return NULL;
+    }
+}
 ```
 
+&emsp;上面就是一个普通的哈希表插入的操作，最终将类的名字跟地址进行关联存储到 `NXMapTable` 中了。
 
+#### addClassTableEntry
 
+&emsp;`addClassTableEntry` 函数，将 `cls` 添加到全局的类表中。如果 `addMeta` 为 `true`，则自动添加 cls 的元类。
+
+```c++
+/***********************************************************************
+* addClassTableEntry
+
+* Add a class to the table of all classes. If addMeta is true, 
+* automatically adds the metaclass of the class as well.
+* 将 cls 添加到全局的类表中。如果 addMeta 为 true，则自动添加类的元类。
+
+* Locking: runtimeLock must be held by the caller.
+**********************************************************************/
+static void
+addClassTableEntry(Class cls, bool addMeta = true)
+{
+    runtimeLock.assertLocked();
+
+    // This class is allowed to be a known class via the shared cache or via data segments, but it is not allowed to be in the dynamic table already.
+    // 这个类可以通过共享缓存或数据段成为已知类，但不允许已经在动态表中。
+    auto &set = objc::allocatedClasses.get();
+
+    ASSERT(set.find(cls) == set.end());
+
+    if (!isKnownClass(cls))
+        set.insert(cls);
+    if (addMeta)
+        addClassTableEntry(cls->ISA(), false);
+}
+```
 
 
 
