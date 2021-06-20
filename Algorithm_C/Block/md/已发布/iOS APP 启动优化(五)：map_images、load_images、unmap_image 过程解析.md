@@ -1101,7 +1101,7 @@ void *NXMapInsert(NXMapTable *table, const void *key, const void *value) {
 
 #### addClassTableEntry
 
-&emsp;`addClassTableEntry` 函数，将 `cls` 添加到全局的类表中。如果 `addMeta` 为 `true`，则自动添加 cls 的元类。
+&emsp;`addClassTableEntry` 函数，将 `cls` 添加到全局的类表中。如果 `addMeta` 为 `true`，则也会把 cls 的元类添加到全局的类表中。
 
 ```c++
 /***********************************************************************
@@ -1109,7 +1109,7 @@ void *NXMapInsert(NXMapTable *table, const void *key, const void *value) {
 
 * Add a class to the table of all classes. If addMeta is true, 
 * automatically adds the metaclass of the class as well.
-* 将 cls 添加到全局的类表中。如果 addMeta 为 true，则自动添加类的元类。
+* 将 cls 添加到全局的类表中。如果 addMeta 参数为 true，则也会把 cls 的元类添加到全局的类表中。
 
 * Locking: runtimeLock must be held by the caller.
 **********************************************************************/
@@ -1118,27 +1118,57 @@ addClassTableEntry(Class cls, bool addMeta = true)
 {
     runtimeLock.assertLocked();
 
-    // This class is allowed to be a known class via the shared cache or via data segments, but it is not allowed to be in the dynamic table already.
-    // 这个类可以通过共享缓存或数据段成为已知类，但不允许已经在动态表中。
+    // This class is allowed to be a known class via the shared cache or via data segments, 
+    // but it is not allowed to be in the dynamic table already.
+    // 允许此类通过 shared cache 或 data segments 成为已知类，但不允许已经在动态表（dynamic table）中的类。
+    
+    // 首先我们再看一眼 allocatedClasses，它是 objc 命名空间中的一个静态的 ExplicitInitDenseSet<Class> 类型，
+    // 里面装的是 Class 的一个 set。（其中包括类和元类）
+    // A table of all classes (and metaclasses) which have been allocated with objc_allocateClassPair.
+    
+    // namespace objc {
+    //  static ExplicitInitDenseSet<Class> allocatedClasses;
+    // }
+    
+    // 然后在上面 runtime_init 函数中，调用了 objc::allocatedClasses.init();
+    // 对其进行了初始化。
+    
     auto &set = objc::allocatedClasses.get();
-
+    
+    // 在 set 中找到 cls 的话触发断言
     ASSERT(set.find(cls) == set.end());
 
-    if (!isKnownClass(cls))
+// Return true if the class is known to the runtime (located within the shared cache, within the data segment of a loaded image, or has been allocated with obj_allocateClassPair).
+
+    // isKnownClass 函数，如果 runtime 知道该类，则返回 true，当以下情况时返回 true:
+    // 1. cls 位于 shared cache
+    // 2. cls 在加载 image 的 data segment 内
+    // 3. cls 已用 obj_allocateClassPair 分配 
+    
+    // 此操作的结果会缓存在类的 cls->data()->witness 中，
+    // 即我们的 class_rw_t 结构体的 witness 成员变量。
+    // struct class_rw_t {
+    //   ...
+    //   uint16_t witness;
+    //   ...
+    // }
+    
+    if (!isKnownClass(cls)) {
+        // 把 cls 添加到 set 中
         set.insert(cls);
-    if (addMeta)
+    }
+    
+    // addMeta 为 true 时，则把 cls->ISA() 即 cls 的元类也添加到 set 中
+    if (addMeta) {
+        // 看到这里递归调用 addClassTableEntry 且把 addMeta 参数置为 false 
         addClassTableEntry(cls->ISA(), false);
+    }
 }
 ```
 
+&emsp;`addClassTableEntry` 函数已经注释的超级清晰了，这里就不展开描述了。 
 
-
-
-
-
-
-
-
+&emsp;彩蛋 🎉🎉 ，开启 `OBJC_PRINT_IMAGE_TIMES` 后在 `m1` 下和 `i9` 下的时间打印。
 ```c++
 // M1 macMini 下
 objc[56474]: 0.05 ms: IMAGE TIMES: first time tasks
@@ -1153,7 +1183,6 @@ objc[56474]: 0.23 ms: IMAGE TIMES: realize non-lazy classes
 objc[56474]: 0.00 ms: IMAGE TIMES: realize future classes
 ```
 
-
 ```c++
 // intel i9 下
 objc[11344]: 0.02 ms: IMAGE TIMES: first time tasks
@@ -1166,33 +1195,8 @@ objc[11344]: 0.01 ms: IMAGE TIMES: fix up @protocol references
 objc[11344]: 0.00 ms: IMAGE TIMES: discover categories
 objc[11344]: 0.30 ms: IMAGE TIMES: realize non-lazy classes
 objc[11344]: 0.00 ms: IMAGE TIMES: realize future classes
-2021-06-15 22:22:18.339697+0800 KCObjc[11344:96876] 🦁🦁🦁 main_front
-2021-06-15 22:22:18.340096+0800 KCObjc[11344:96876] 🤯🤯🤯
 Program ended with exit code: 0
 ```
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 ## 参考链接
 **参考链接:🔗**
@@ -1215,104 +1219,3 @@ Program ended with exit code: 0
 + [C++ 命名空间namespace](https://www.jianshu.com/p/30e960717ef1)
 + [一文了解 Xcode 生成「静态库」和「动态库」 的流程](https://mp.weixin.qq.com/s/WH8emrMpLeVW-LfGwN09cw)
 + [Hook static initializers](https://blog.csdn.net/majiakun1/article/details/99413403)
-
-
-
-```c++
-if ( sEnv.DYLD_PRINT_OPTS )
-    printOptions(argv);
-if ( sEnv.DYLD_PRINT_ENV ) 
-    printEnvironmentVariables(envp);
-```
-
-&emsp;此处是判断是否设置了环境变量，如果设置了，那么 xcode 就会在控制台打印相关的详细信息。（在 Edit Scheme... -> Run -> Arguments -> Environment Variables 进行添加） 
-
-&emsp;当添加了 DYLD_PRINT_OPTS 时，会在控制台输出可执行文件的位置。
-```c++
-opt[0] = "/Users/hmc/Library/Developer/CoreSimulator/Devices/4E072E27-E586-4E81-A693-A02A3ED83DEC/data/Containers/Bundle/Application/ECDA091A-1610-49D2-8BC0-B41A58BC76EC/Test_ipa_Simple.app/Test_ipa_Simple"
-```
-
-&emsp;当添加了 DYLD_PRINT_ENV 时，会在控制台输出用户级别、插入的动态库、动态库的路径、模拟器的信息等等一系列的信息，由于内容过多这里就粘贴出来了。
-
-## LLDB 常用命令
-
-1. p po p/x p/o p/t p/d p/c
-2. expression 修改参数
-3. call 
-4. x x/4gx x/4xg
-5. image list
-6. image lookup --address+地址
-7. thread list
-8. thread backtrace（bt）bt all
-9. thread return frame variable
-10. register read register read/x
-
-## clang 
-
-&emsp;clang:Clang 是一个 C++ 编写、基于 LLVM、发布于 LLVM BSD 许可证下的 C/C++/Objective-C/Objective-C++ 编译器。它与 GNU C 语言规范几乎完全兼容（当然，也有部分不兼容的内容， 包括编译命令选项也会有点差异），并在此基础上增加了额外的语法特性，比如 C 函数重载（通过 \_ attribute_((overloadable)) 来修饰函数)，其目标(之一)就是超越 GCC。
-
-## iOS 内存五大分区
-
-1. 栈区
-
-&emsp;又称堆栈 ，由编译器自动分配释放，是用户存放程序临时创建的局部变量，也就是说我们函数括弧“{}” 中定义的变量(但不包括 static 声明的变量, static 意味着在数据段中存放变量)。除此以外, 在函数被调用时,其参数也会被压入发起调用的进程栈中, 并且待到调用结束后, 函数的返回值 也会被存放回栈中。由于 栈的后进先出特点,所以 栈 特别方便用来保存/恢复调用现场。从这个意义上讲,我们可以把 堆栈 看成一个寄存、交换临时数据的内存区。
-
-&emsp;栈 是向低地址扩展的数据结构，是一块连续的内存区域
-
-2. 堆区
-
-&emsp;由程序员分配释放，分配方式类似于链表，是向高地址扩展的数据结构，是不连续的内存区域。用于存放进程运行中被动态分配的内存段，堆区的大小并不固定，可动态扩张或缩减。当进程调用 alloc 等函数分配内存时，新分配的内存就被动态添加到堆上（堆被扩张）；当利用 realse 释放内存时，被释放的内存从堆中被剔除（堆被缩减）。如果应用程序没有释放掉，操作系统会自动回收。变量通过 new、alloc、malloc、realloc 分配的内存块就存放在堆区。
-
-3. 全局/静态区
-
-+ 全局/静态区 是存放全局变量和静态变量的。
-+ 已初始化的全局变量和静态变量存放在一块区域。
-+ 未初始化的全局变量和静态变量在相邻的另一块区域。
-+ 由 static 修饰的变量会成为静态变量，该变量的内存由全局/静态区在编译阶段完成分配，且仅分配一次。
-+ static 可以修饰局部变量也可以修饰全局变量。
-+ 全局/静态区 的内存在编译阶段完成分配，程序运行时会一直存在内存中，只有当程序结束后才会由操作系统释放。
-
-4. 常量区
-
-+ 常量区 是一块比较特殊的存储区，常量区里面存放的是常量，常量字符串就存放在常量区。
-+ 常量区 的内存在编译阶段完成分配，程序运行时会一直存在内存中，只有当程序结束后才会由操作系统释放。
-
-5. 代码区
-
-&emsp;代码区 是用来存放可执行文件的操作指令（存放函数的二进制代码），其实就是存放程序的所有代码。代码区 需要防止在运行时被非法修改，所以只准许读取操作，而不允许写入（修改）操作——它是不可写的。
-
-
-// duishanji4822ee@163.com
-// Heiye2121
-
-// 赢赢转使用的苹果开发者账号
-// shanghaiguwan@163.com
-// 1Q@w3e4r5t
-
-// 18780334870
-
-// 快买他使用的苹果开发者账号
-// cugme9@163.com Ww115511
-// qwe999 oo123-oo456-oo789 => 密保顺序对应 朋友工作父母
-// 1998/8/8
-
-// cugme9@163.com 当前密码：Cwq17150198837 绑定的手机号码：17150198837
-
-// 富富转使用的苹果开发者账号
-// feiquhui407300@126.com // 绑定手机号码：17150198837
-// feiquhui407300@126.com    Ass112211
-// bu3309    香港    宝马    火箭 => 密保顺序对应 朋友工作父母
-// 1990/1/1
-
-// feiquhui407300@126.com 当前密码：Cwq17150198837 绑定的手机号码：17150198837
-
-// qwe999
-// Cwq17150198837
-
-// 好好做新买账号的原始信息
-// 账号ruhan32106@21cn.com   密码Knn12355
-// 密保  ooo  ppp   qqq => 密保顺序对应 朋友工作父母
-// 日期1997/11/24    Nsr9455613
-
-// ruhan32106@21cn.com 当前密码：Cwq17150198837 绑定的手机号码：18611404599
-

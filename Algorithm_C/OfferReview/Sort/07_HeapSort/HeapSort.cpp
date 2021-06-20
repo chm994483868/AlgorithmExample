@@ -54,7 +54,6 @@ void HeapSort::maxHeapFixdown(int nums[], int i, int n) {
             break;
         }
         
-        swap(&nums[i], &nums[j]);
         i = j;
         j = i * 2 + 1;
     }

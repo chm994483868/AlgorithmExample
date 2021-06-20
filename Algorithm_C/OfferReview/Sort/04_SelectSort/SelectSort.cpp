@@ -16,11 +16,10 @@ void SelectSort::selectSort(int nums[], int count) {
     for (int i = 0; i < count; ++i) {
         int minIndex = i;
         for (int j = i + 1; j < count; ++j) {
-            if (nums[minIndex] > nums[j]) {
+            if (nums[j] < nums[minIndex]) {
                 minIndex = j;
             }
         }
-        
         swap(&nums[i], &nums[minIndex]);
     }
     

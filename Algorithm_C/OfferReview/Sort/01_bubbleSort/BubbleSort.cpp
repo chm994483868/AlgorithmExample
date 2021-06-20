@@ -21,18 +21,17 @@ void BubbleSort::bubbleSort(int nums[], int count) {
     for (int i = 0; i < count - 1; ++i) {
         bool noExchange = true;
         int n = 0;
-        for (int j = 0; j < k ; ++j) {
+        for (int j = 0; j < k; ++j) {
             if (nums[j] > nums[j + 1]) {
                 swap(&nums[j], &nums[j + 1]);
                 noExchange = false;
                 n = j;
             }
         }
-        
         if (noExchange) {
             break;
         }
-        k = n; // 更新 k 值
+        k = n;
     }
     
     //if (nums == nullptr || count <= 0) {

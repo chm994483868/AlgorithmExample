@@ -38,7 +38,7 @@ void MergeSort::mergeSort(int nums[], int first, int last, int temp[]) {
 }
 
 void MergeSort::mergeArray(int nums[], int first, int mid, int last, int temp[]) {
-    if (nums[mid] <= nums[mid + 1]) {
+    if (nums[mid] < nums[mid + 1]) {
         return;
     }
     
