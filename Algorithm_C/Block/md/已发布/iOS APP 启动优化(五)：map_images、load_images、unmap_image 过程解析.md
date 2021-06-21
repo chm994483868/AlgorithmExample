@@ -1369,22 +1369,37 @@ void prepare_load_methods(const headerType *mhdr)
     // #define RW_LOADED (1<<23)
     // static struct loadable_class *loadable_classes = nil;
 
-    // 遍历这些非懒加载类，并将其 +load 函数添加到 loadable_classes 中，用于下面 call_load_methods 函数调用 
+    // 遍历这些非懒加载类，并将其 +load 函数添加到 loadable_classes 数组中，优先添加其父类的 +load 方法，
+    // 用于下面 call_load_methods 函数调用 
     for (i = 0; i < count; i++) {
         schedule_class_load(remapClass(classlist[i]));
     }
 
+    // GETSECT(_getObjc2NonlazyCategoryList, category_t * const, "__objc_nlcatlist");
+    // 获取所有 __objc_nlcatlist 区的数据（所有非懒加载分类）
+    
     category_t * const *categorylist = _getObjc2NonlazyCategoryList(mhdr, &count);
+    
+    // 遍历这些分类
     for (i = 0; i < count; i++) {
         category_t *cat = categorylist[i];
         Class cls = remapClass(cat->cls);
+        
+        // 如果没有找到分类所属的类就跳出当前循环，处理数组中的下一个分类
         if (!cls) continue;  // category for ignored weak-linked class
+        
         if (cls->isSwiftStable()) {
             _objc_fatal("Swift class extensions and categories on Swift "
                         "classes are not allowed to have +load methods");
         }
+        
+        // 如果分类所属的类没有实现就先去实现
         realizeClassWithoutSwift(cls, nil);
+        
+        // 断言
         ASSERT(cls->ISA()->isRealized());
+        
+        // 遍历这些分类，并将其 +load 方法添加到 loadable_categories 数组中保存
         add_category_to_loadable_list(cat);
     }
 }
