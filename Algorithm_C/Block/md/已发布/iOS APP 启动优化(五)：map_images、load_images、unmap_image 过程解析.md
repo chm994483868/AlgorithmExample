@@ -1166,7 +1166,7 @@ addClassTableEntry(Class cls, bool addMeta = true)
 }
 ```
 
-&emsp;`addClassTableEntry` 函数已经注释的超级清晰了，这里就不展开描述了。 
+&emsp;`addClassTableEntry` 函数已经注释的超级清晰了，这里就不展开描述了。到这里 `map_images` 的内容就都看完了，下面我们接着看 `load_images` 的内容。 
 
 &emsp;彩蛋 🎉🎉 ，开启 `OBJC_PRINT_IMAGE_TIMES` 后在 `m1` 下和 `i9` 下的时间打印。
 ```c++
@@ -1197,6 +1197,175 @@ objc[11344]: 0.30 ms: IMAGE TIMES: realize non-lazy classes
 objc[11344]: 0.00 ms: IMAGE TIMES: realize future classes
 Program ended with exit code: 0
 ```
+
+## load_images
+
+&emsp;在之前的文章中其实已经分析过 `+load` 函数的流程，不过时间比较久了，这里我们就再梳理一遍它的流程。
+
+&emsp;概括的说 `load_images` 函数就是用来调用类以及分类中的 `+load` 函数的（仅限于实现了 `+load` 函数的类或者分类）。
+
+```c++
+/***********************************************************************
+* load_images
+* Process +load in the given images which are being mapped in by dyld.
+* 在 dyld 映射的给定 images 中处理 +load。
+*
+* Locking: write-locks runtimeLock and loadMethodLock
+**********************************************************************/
+// 下面是两个外联函数，一个用来判断 image 中是否有 load 函数，
+// 另一个用来收集 image 中的 load 函数，然后后面会统一调用
+extern bool hasLoadMethods(const headerType *mhdr);
+extern void prepare_load_methods(const headerType *mhdr);
+
+void
+load_images(const char *path __unused, const struct mach_header *mh)
+{
+    // didInitialAttachCategories 标记加载分类的，默认值为 false，
+    // didCallDyldNotifyRegister 标记 _dyld_objc_notify_register 是否调用完成，
+    // 此时为 false，所以暂时此 if 内部不会执行。
+    if (!didInitialAttachCategories && didCallDyldNotifyRegister) {
+        didInitialAttachCategories = true;
+        loadAllCategories();
+    }
+
+    // Return without taking locks if there are no +load methods here.
+    // 如果 mh 中不包含 +load 则 return（且 without taking locks）
+    
+    // hasLoadMethods 函数是根据 `headerType *mhdr` 的 `__objc_nlclslist` 区和 `__objc_nlcatlist` 区中是否有数据，
+    // 来判断是否有 +load 函数要执行。(即是否包含非懒加载类和非懒加载分类) 
+    if (!hasLoadMethods((const headerType *)mh)) return;
+
+    // 
+    recursive_mutex_locker_t lock(loadMethodLock);
+
+    // Discover load methods
+    {
+        mutex_locker_t lock2(runtimeLock);
+        prepare_load_methods((const headerType *)mh);
+    }
+
+    // Call +load methods (without runtimeLock - re-entrant)
+    call_load_methods();
+}
+```
+
+### didCallDyldNotifyRegister
+
+&emsp;我们全局搜 `didCallDyldNotifyRegister` 可看到如下代码段:
+
+&emsp;`didCallDyldNotifyRegister` 是一个定义在 objc/Source/objc-runtime-new.mm 文件中的全局变量（1⃣️），默认值为 `false`，用来标记 `_dyld_objc_notify_register` 是否已经完成。然后在 objc/Project Headers/objc-private.h 中通过 extern 把 `didCallDyldNotifyRegister` 声明为一个外联变量（2⃣️），来给外部使用。然后最后是在 objc/Source/objc-os.mm 中的 `_objc_init` 函数内，在执行完 `_dyld_objc_notify_register(&map_images, load_images, unmap_image);` 函数后，把 `didCallDyldNotifyRegister` 置为了 true，也正对应了 1⃣️ 中的注释。      
+
+```c++
+// 1⃣️
+/***********************************************************************
+* didCallDyldNotifyRegister
+* Whether the call to _dyld_objc_notify_register has completed.
+* 此全局变量用来标记 _dyld_objc_notify_register 是否已经完成。
+**********************************************************************/
+bool didCallDyldNotifyRegister = false;
+```
+
+```c++
+// 2⃣️
+#if __OBJC2__
+extern bool didCallDyldNotifyRegister;
+#endif
+```
+
+```c++
+// 3⃣️
+/***********************************************************************
+* _objc_init
+* Bootstrap initialization. Registers our image notifier with dyld.
+* Called by libSystem BEFORE library initialization time
+**********************************************************************/
+
+void _objc_init(void)
+{
+    ...
+
+    _dyld_objc_notify_register(&map_images, load_images, unmap_image);
+    
+    // ⬇️⬇️⬇️
+    
+#if __OBJC2__
+    didCallDyldNotifyRegister = true;
+#endif
+}
+```
+
+### didInitialAttachCategories
+
+&emsp;`didInitialAttachCategories` 是一个定义在 objc/Source/objc-runtime-new.mm 文件中的静态全局变量，默认值为 `false`，且全局仅在 `load_images` 函数的起始处 `if` 内部被赋值为 `true`，然后就一直为 `true` 了，就不会再进入该 `if` 了。即 `didInitialAttachCategories` 直白一点理解的话它即是用来标记 `loadAllCategories();` 函数有没有被调用过的。 （即用来标记分类是否加载过用的）
+
+```c++
+/***********************************************************************
+* didInitialAttachCategories
+* Whether the initial attachment of categories present at startup has been done.
+* 是否已完成启动时出现的 categories 的初始附加。
+**********************************************************************/
+static bool didInitialAttachCategories = false;
+```
+
+### hasLoadMethods
+
+&emsp;根据 `headerType *mhdr` 的 `__objc_nlclslist` 区和 `__objc_nlcatlist` 区中是否有数据，来判断是否有 `+load` 函数要执行。 
+
+```c++
+// Quick scan for +load methods that doesn't take a lock.
+bool hasLoadMethods(const headerType *mhdr)
+{
+    size_t count;
+    
+    // GETSECT(_getObjc2NonlazyClassList, classref_t const, "__objc_nlclslist");
+    // 读取 __objc_nlclslist 区中的非懒加载类的列表
+    if (_getObjc2NonlazyClassList(mhdr, &count)  &&  count > 0) return true;
+    
+    // GETSECT(_getObjc2NonlazyCategoryList, category_t * const, "__objc_nlcatlist");
+    // 读取 __objc_nlcatlist 区中非懒加载分类的列表
+    if (_getObjc2NonlazyCategoryList(mhdr, &count)  &&  count > 0) return true;
+    
+    return false;
+}
+```
+
+### Lock management
+
+&emsp;锁管理，在 objc/Source/objc-runtime-new.mm 文件的开头处，
+
+```c++
+/***********************************************************************
+* Lock management
+**********************************************************************/
+mutex_t runtimeLock;
+mutex_t selLock;
+#if CONFIG_USE_CACHE_LOCK
+mutex_t cacheUpdateLock;
+#endif
+recursive_mutex_t loadMethodLock;
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 ## 参考链接
 **参考链接:🔗**
