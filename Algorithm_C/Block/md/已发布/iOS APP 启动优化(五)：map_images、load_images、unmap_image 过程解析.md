@@ -1229,22 +1229,26 @@ load_images(const char *path __unused, const struct mach_header *mh)
     }
 
     // Return without taking locks if there are no +load methods here.
-    // 如果 mh 中不包含 +load 则 return（且 without taking locks）
+    // 如果 mh 中不包含 +load 就直接不加锁 return（且 without taking locks）
     
     // hasLoadMethods 函数是根据 `headerType *mhdr` 的 `__objc_nlclslist` 区和 `__objc_nlcatlist` 区中是否有数据，
     // 来判断是否有 +load 函数要执行。(即是否包含非懒加载类和非懒加载分类) 
     if (!hasLoadMethods((const headerType *)mh)) return;
 
-    // 
+    // loadMethodLock 是一把递归互斥锁（加锁）
     recursive_mutex_locker_t lock(loadMethodLock);
 
-    // Discover load methods
-    {
+    // Discover load methods 发现 +load 方法
+    {   
+        // runtimeLock 加锁
         mutex_locker_t lock2(runtimeLock);
+        
+        // 获取所有要调用的 +load 方法
         prepare_load_methods((const headerType *)mh);
     }
 
     // Call +load methods (without runtimeLock - re-entrant)
+    // 调用获取到的所有 +load 方法
     call_load_methods();
 }
 ```
@@ -1331,7 +1335,7 @@ bool hasLoadMethods(const headerType *mhdr)
 
 ### Lock management
 
-&emsp;锁管理，在 objc/Source/objc-runtime-new.mm 文件的开头处，
+&emsp;锁管理，在 objc/Source/objc-runtime-new.mm 文件的开头处，我们能看到如下几把锁，而其中的递归互斥锁 `loadMethodLock` 就是在 `load_images` 中使用的。
 
 ```c++
 /***********************************************************************
@@ -1345,6 +1349,45 @@ mutex_t cacheUpdateLock;
 recursive_mutex_t loadMethodLock;
 ```
 
+### prepare_load_methods
+
+&emsp;`prepare_load_methods` 用来获取所有要调用的 +load 方法。
+
+```c++
+void prepare_load_methods(const headerType *mhdr)
+{
+    size_t count, i;
+
+    runtimeLock.assertLocked();
+    
+    // GETSECT(_getObjc2NonlazyClassList, classref_t const, "__objc_nlclslist");
+    // 获取所有 __objc_nlclslist 区的数据（所有非懒加载类） 
+    
+    classref_t const *classlist = _getObjc2NonlazyClassList(mhdr, &count);
+    
+    // class +load has been called
+    #define RW_LOADED (1<<23)
+
+    // 
+    for (i = 0; i < count; i++) {
+        schedule_class_load(remapClass(classlist[i]));
+    }
+
+    category_t * const *categorylist = _getObjc2NonlazyCategoryList(mhdr, &count);
+    for (i = 0; i < count; i++) {
+        category_t *cat = categorylist[i];
+        Class cls = remapClass(cat->cls);
+        if (!cls) continue;  // category for ignored weak-linked class
+        if (cls->isSwiftStable()) {
+            _objc_fatal("Swift class extensions and categories on Swift "
+                        "classes are not allowed to have +load methods");
+        }
+        realizeClassWithoutSwift(cls, nil);
+        ASSERT(cls->ISA()->isRealized());
+        add_category_to_loadable_list(cat);
+    }
+}
+```
 
 
 
