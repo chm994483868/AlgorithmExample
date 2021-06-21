@@ -1366,9 +1366,10 @@ void prepare_load_methods(const headerType *mhdr)
     classref_t const *classlist = _getObjc2NonlazyClassList(mhdr, &count);
     
     // class +load has been called
-    #define RW_LOADED (1<<23)
+    // #define RW_LOADED (1<<23)
+    // static struct loadable_class *loadable_classes = nil;
 
-    // 
+    // 遍历这些非懒加载类，并将其 +load 函数添加到 loadable_classes 中，用于下面 call_load_methods 函数调用 
     for (i = 0; i < count; i++) {
         schedule_class_load(remapClass(classlist[i]));
     }
