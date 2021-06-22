@@ -1351,7 +1351,7 @@ recursive_mutex_t loadMethodLock;
 
 ### prepare_load_methods
 
-&emsp;`prepare_load_methods` 用来获取所有要调用的 +load 方法。
+&emsp;`prepare_load_methods` 用来获取所有要调用的 +load 方法（父类、子类、分类）。
 
 ```c++
 void prepare_load_methods(const headerType *mhdr)
@@ -1367,6 +1367,11 @@ void prepare_load_methods(const headerType *mhdr)
     
     // class +load has been called
     // #define RW_LOADED (1<<23)
+    
+    // List of classes that need +load called (pending superclass +load)
+    // This list always has superclasses first because of the way it is constructed
+    // 由于其构造方式，此列表始终首先具有 superclasses
+    // 需要调用 +load 的 classes 列表
     // static struct loadable_class *loadable_classes = nil;
 
     // 遍历这些非懒加载类，并将其 +load 函数添加到 loadable_classes 数组中，优先添加其父类的 +load 方法，
@@ -1399,12 +1404,49 @@ void prepare_load_methods(const headerType *mhdr)
         // 断言
         ASSERT(cls->ISA()->isRealized());
         
+        // List of categories that need +load called (pending parent class +load)
+        // 需要调用 +load 的 categories 列表
+        // static struct loadable_category *loadable_categories = nil;
+        
         // 遍历这些分类，并将其 +load 方法添加到 loadable_categories 数组中保存
         add_category_to_loadable_list(cat);
     }
 }
 ```
 
+#### schedule_class_load
+
+&emsp;`schedule_class_load` 将其 `+load` 函数添加到 `loadable_classes` 数组中，优先添加其父类的 `+load` 方法。（用于后续的 `call_load_methods` 函数调用。） 
+
+```c++
+/***********************************************************************
+* prepare_load_methods
+* Schedule +load for classes in this image, any un-+load-ed 
+* superclasses in other images, and any categories in this image.
+**********************************************************************/
+// Recursively schedule +load for cls and any un-+load-ed superclasses.
+// cls must already be connected.
+static void schedule_class_load(Class cls)
+{
+    // 如果 cls 不存在则 return（下面有一个针对 superclass 的递归调用）
+    if (!cls) return;
+    
+    // DEBUG 模式下的断言，cls 必须是实现过的（这个在 _read_images 中已经实现了）
+    ASSERT(cls->isRealized());  // _read_images should realize
+    
+    // class +load has been called
+    // #define RW_LOADED (1<<23)
+    
+    // RW_LOADED 是 class +load 已被调用
+    if (cls->data()->flags & RW_LOADED) return;
+
+    // Ensure superclass-first ordering
+    schedule_class_load(cls->superclass);
+
+    add_class_to_loadable_list(cls);
+    cls->setInfo(RW_LOADED); 
+}
+```
 
 
 
