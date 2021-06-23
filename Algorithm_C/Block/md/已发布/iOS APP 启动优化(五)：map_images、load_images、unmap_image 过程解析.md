@@ -1370,7 +1370,7 @@ void prepare_load_methods(const headerType *mhdr)
     
     // List of classes that need +load called (pending superclass +load)
     // This list always has superclasses first because of the way it is constructed
-    // 由于其构造方式，此列表始终首先具有 superclasses
+    // 由于其构造方式，此列表始终首先处理 superclasses 的 +load 函数
     // 需要调用 +load 的 classes 列表
     // static struct loadable_class *loadable_classes = nil;
 
@@ -1437,22 +1437,153 @@ static void schedule_class_load(Class cls)
     // class +load has been called
     // #define RW_LOADED (1<<23)
     
-    // RW_LOADED 是 class +load 已被调用
+    // RW_LOADED 是 class +load 已被调用的掩码
     if (cls->data()->flags & RW_LOADED) return;
 
     // Ensure superclass-first ordering
+    // 优先处理 superclass 的 +load 函数
     schedule_class_load(cls->superclass);
 
+    // static struct loadable_class *loadable_classes = nil;
+    // struct loadable_class {
+    //    Class cls;  // may be nil
+    //    IMP method;
+    // };
+    
+    // 将 cls 的 +load 函数添加到全局的 loadable_class 数组 loadable_classes 中，
+    // loadable_class 结构体是用来保存类的 +load 函数的一个数据结构，其中 cls 是该类，method 则是 +load 函数的 IMP，
+    // 这里也能看出 +load 函数是不走 OC 的消息转发机制的，它是直接通过 +load 函数的地址调用的！
     add_class_to_loadable_list(cls);
+    
+    // 将 RW_LOADED 设置到类的 Flags 中
     cls->setInfo(RW_LOADED); 
 }
 ```
 
+&emsp;下面的 `add_category_to_loadable_list` 函数就不展开了，和 `schedule_class_load` 大同小异。这里我们只要谨记 `+load` 函数的加载顺序就好了：父类 -> 子类 -> 分类。 
+
+### call_load_methods
 
 
+&emsp;
 
+```c++
+/***********************************************************************
+* call_load_methods
+* Call all pending class and category +load methods.
+* 调用所有准备好的 类 和 分类的 +load 函数。
 
+* Class +load methods are called superclass-first. 
+* 类的 +load 方法是父类优先的。
 
+* Category +load methods are not called until after the parent class's +load.
+* 只有所有类（以及父类）中的 +load 函数都调用完成后，才会调用 category 中的 +load 函数。
+* 
+* This method must be RE-ENTRANT, because a +load could trigger more image mapping.
+* 此方法必须是 RE-ENTRANT，因为很多 +load 方法很可能触发更多的 image 进行 mapping.
+
+* In addition, the superclass-first ordering must be preserved in the face of re-entrant calls. 
+* 此外，对于 re-entrant 调用，必须保留超类优先的顺序。
+* 
+* Therefore, only the OUTERMOST call of this function will do anything,
+* and that call will handle all loadable classes, even those generated while it was running.
+* 因此，只有该函数的 OUTERMOST 调用会执行任何操作，并且该调用将处理所有可加载类，甚至是那些在运行时生成的类。
+* 
+* The sequence below preserves +load ordering in the face of image loading during a +load, and make sure that no +load method is forgotten because it was added during a +load call.
+* 下面的序列在 +load 调用期间面对图像加载时保留 +load 顺序，并确保没有忘记 +load 方法，因为它是在 +load 调用期间添加的。
+* 
+* Sequence:
+* 1. Repeatedly call class +loads until there aren't any more
+* 1. 重复调用 class 的 +loads 直到不再有 class 的 +load 方法再调用
+* 
+* 2. Call category +loads ONCE.
+* 2. 调用 category 的 +loads 一次。
+* 
+* 3. Run more +loads if:
+*    (a) there are more classes to load, OR
+*    (b) there are some potential category +loads that have still never been attempted.
+* 
+* Category +loads are only run once to ensure "parent class first" ordering,
+* even if a category +load triggers a new loadable class and a new loadable category attached to that class. 
+*
+* Locking: loadMethodLock must be held by the caller All other locks must not be held.
+* Locking: loadMethodLock 必须由调用者持有 所有其他锁不得持有。
+**********************************************************************/
+void call_load_methods(void)
+{
+    static bool loading = NO;
+    bool more_categories;
+    
+    // 加锁
+    loadMethodLock.assertLocked();
+
+    // Re-entrant calls do nothing; the outermost call will finish the job.
+    // 重入调用什么都不做；最外层的调用将完成工作。
+    
+    // 如果正在 loading 则 return，
+    // 保证当前 +load 方法同时只有一次被调用
+    if (loading) return;
+    loading = YES;
+
+    // 创建自动释放池
+    void *pool = objc_autoreleasePoolPush();
+
+    // 循环调用
+    do {
+        // 1. Repeatedly call class +loads until there aren't any more
+        
+        // 调用类中的 +load 函数
+        while (loadable_classes_used > 0) {
+            // 调用 loadable_classes 中的的类的 +load 函数，并且把 loadable_classes_used 置为 0
+            call_class_loads();
+        }
+
+        // 2. Call category +loads ONCE
+        
+        // 调用 分类中的 +load 函数， 只调用一次 call_category_loads，因为上面的 call_class_loads 函数内部，
+        // 已经把 loadable_classes_used 置为 0，所以除非有新的分类需要 +load，即 call_category_loads 返回 true，
+        // 否则循环就结束了。 
+        more_categories = call_category_loads();
+
+        // 3. Run more +loads if there are classes OR more untried categories
+    } while (loadable_classes_used > 0  ||  more_categories);
+    // 如果 loadable_classes_used 大于 0，或者有更多分类需要调用 +load，则循环继续。（一般 loadable_classes_used 到这里基本就是 0 了）
+    
+    // 自动释放池进行 pop
+    objc_autoreleasePoolPop(pool);
+
+    // 标记处理完成了，可以进行下一个了
+    loading = NO;
+}
+```
+
+&emsp;在 while 循环中，先循环遍历类、父类的 +load 函数，然后遍历 分类的 +load 方法。
+
+## unmap_image
+
+&emsp;处理即将被 dyld 取消映射的给定 image。
+
+```c++
+/***********************************************************************
+* unmap_image
+* Process the given image which is about to be unmapped by dyld.
+*
+* Locking: write-locks runtimeLock and loadMethodLock
+**********************************************************************/
+void 
+unmap_image(const char *path __unused, const struct mach_header *mh)
+{
+    // 递归锁（）
+    recursive_mutex_locker_t lock(loadMethodLock);
+    
+    // runtime Lock
+    mutex_locker_t lock2(runtimeLock);
+    
+    // _unload_image(hi); 和 removeHeader(hi);
+    // 卸载 hi 的数据和移除 hi
+    unmap_image_nolock(mh);
+}
+```
 
 
 
